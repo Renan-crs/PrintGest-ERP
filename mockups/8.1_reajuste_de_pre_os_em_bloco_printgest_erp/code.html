@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#737686", "on-primary-fixed": "#00174b", "tertiary-fixed-dim": "#d0bcff", "on-primary-container": "#eeefff", "surface-tint": "#0053db", "surface-container": "#e5eeff", "primary-fixed-dim": "#b4c5ff", "surface-bright": "#f8f9ff", "outline-variant": "#c3c6d7", "on-error-container": "#93000a", "secondary": "#006591", "primary": "#004ac6", "primary-fixed": "#dbe1ff", "on-tertiary": "#ffffff", "on-secondary-fixed": "#001e2f", "tertiary-container": "#7d4ce7", "on-error": "#ffffff", "on-secondary": "#ffffff", "surface-container-lowest": "#ffffff", "secondary-fixed-dim": "#89ceff", "tertiary": "#632ecd", "on-tertiary-fixed": "#23005c", "on-tertiary-fixed-variant": "#5516be", "surface": "#f8f9ff", "on-secondary-container": "#004666", "on-secondary-fixed-variant": "#004c6e", "surface-variant": "#d3e4fe", "surface-container-high": "#dce9ff", "error-container": "#ffdad6", "on-tertiary-container": "#f6edff", "primary-container": "#2563eb", "on-surface": "#0b1c30", "surface-container-low": "#eff4ff", "inverse-on-surface": "#eaf1ff", "surface-container-highest": "#d3e4fe", "on-surface-variant": "#434655", "on-background": "#0b1c30", "on-primary-fixed-variant": "#003ea8", "on-primary": "#ffffff", "inverse-surface": "#213145", "background": "#f8f9ff", "surface-dim": "#cbdbf5", "tertiary-fixed": "#e9ddff", "secondary-container": "#39b8fd", "inverse-primary": "#b4c5ff", "error": "#ba1a1a", "secondary-fixed": "#c9e6ff" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "1.5rem", "space-lg": "1rem", "margin": "1rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "gutter": "0.75rem", "space-md": "0.75rem" }, "fontFamily": { "headline-md": [ "Inter" ], "data-mono-lg": [ "Inter" ], "headline-lg": [ "Inter" ], "label-sm": [ "Inter" ], "data-mono-sm": [ "Inter" ], "body-md": [ "Inter" ], "label-md": [ "Inter" ], "label-lg": [ "Inter" ], "headline-sm": [ "Inter" ], "display-sm": [ "Inter" ], "data-mono-md": [ "Inter" ], "body-sm": [ "Inter" ], "body-lg": [ "Inter" ] }, "fontSize": { "headline-md": [ "16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600" } ], "data-mono-lg": [ "18px", { "lineHeight": "24px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "headline-lg": [ "20px", { "lineHeight": "28px", "letterSpacing": "-0.015em", "fontWeight": "600" } ], "label-sm": [ "10px", { "lineHeight": "12px", "letterSpacing": "0.04em", "fontWeight": "600" } ], "data-mono-sm": [ "11px", { "lineHeight": "14px", "fontWeight": "500" } ], "body-md": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "label-md": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "600" } ], "label-lg": [ "13px", { "lineHeight": "16px", "fontWeight": "500" } ], "headline-sm": [ "14px", { "lineHeight": "20px", "fontWeight": "600" } ], "display-sm": [ "24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "data-mono-md": [ "13px", { "lineHeight": "18px", "fontWeight": "500" } ], "body-sm": [ "12px", { "lineHeight": "16px", "fontWeight": "400" } ], "body-lg": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased select-none"><header class="fixed top-0 left-0 right-0 h-14 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex items-center justify-between px-space-md gap-space-md"><div class="flex items-center gap-space-md min-w-[280px]"><img alt="Brand logo. - Primary color: #2563eb
+- Font: inter
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xuaz9r5BIC8vwg0qc0QAun3UPGEHCkAsSzeUUaDAxAso9n-N-l84u2VGqqt13D7my948lk4VJ79e848PEP-VOLFTDjXPCbrfrUSdoW7yr-TxCB9mKsiw6LekijXEdh4u5i5eRCz_vms8yxky2w4cJqZ16-YoIApf6Qni3B3jl6Ktl3RQVVFW1lRoM1NpT2_x6r7CD8HBEBvG2Tnjl7n1nbvFY_Xl5tYXsmAoPNFnFNQsgZXUhkS82g81YT"/><div class="flex flex-col"><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-primary tracking-tight">PrintGest ERP</span><span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container-high text-on-surface-variant">v2.0</span></div><span class="font-label-sm text-label-sm text-on-surface-variant leading-none">Sistema para Gráfica Rápida</span></div></div><div class="flex items-center gap-space-md flex-1 max-w-xl"><div class="relative w-full"><span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">search</span><input class="w-full h-8 pl-8 pr-16 bg-surface-container-low font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant rounded border border-outline-variant focus:outline-none focus:border-primary" placeholder="Busca rápida em cadastros, O.S., itens e pedidos..." type="text"/><kbd class="absolute right-2 top-1/2 -translate-y-1/2 bg-surface-container-lowest font-data-mono-sm text-data-mono-sm px-1.5 py-0.5 rounded border border-outline-variant text-on-surface-variant">Ctrl+K</kbd></div></div><div class="flex items-center gap-space-md"><div class="hidden xl:flex items-center gap-space-xs"><div class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-low"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Servidor:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">192.168.1.10:8000</span><span class="font-label-sm text-label-sm text-secondary font-semibold">(Online)</span></div><div class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-low"><span class="material-symbols-outlined text-[14px] text-secondary">verified_user</span><span class="font-label-sm text-label-sm text-on-surface-variant">Licença Ativa:</span><span class="font-data-mono-sm text-data-mono-sm text-secondary font-semibold">72h OK</span></div></div><div class="h-6 w-px bg-surface-container-high"></div><div class="flex items-center gap-space-xs"><button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Ajuda (F1)"><span class="material-symbols-outlined text-[20px]">help</span></button><button class="w-8 h-8 rounded flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors relative" title="Notificações da Fila"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error"></span></button></div><div class="h-6 w-px bg-surface-container-high"></div><div class="flex items-center gap-space-sm pl-space-xs"><div class="flex flex-col text-right hidden sm:flex"><span class="font-label-lg text-label-lg text-on-surface leading-tight">Roberto Silva</span><span class="font-label-sm text-label-sm text-on-surface-variant leading-tight">Admin / Direção Geral</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><aside class="fixed left-0 top-14 bottom-7 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 overflow-y-auto flex flex-col py-space-sm"><nav class="flex flex-col gap-space-xs px-space-sm" data-active-classes="bg-primary-container text-on-primary-container font-semibold rounded-lg"><div class="pt-space-xs pb-1 px-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Menu Principal</span></div><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="dashboard" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">dashboard</span><span class="font-label-lg text-label-lg">Dashboard / Início</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F1</kbd></a><div class="pt-space-sm pb-1 px-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Cadastros</span></div><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="clientes" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">group</span><span class="font-label-lg text-label-lg">Clientes</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F2</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="produtos-servicos" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">inventory_2</span><span class="font-label-lg text-label-lg">Produtos e Serviços</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F3</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="fornecedores" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">local_shipping</span><span class="font-label-lg text-label-lg">Fornecedores</span></div></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="funcionarios" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">badge</span><span class="font-label-lg text-label-lg">Funcionários</span></div></a><div class="pt-space-sm pb-1 px-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Movimento</span></div><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="ordens-servico" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">assignment</span><span class="font-label-lg text-label-lg">Ordens de Serviço</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F4</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="orcamentos-graficos" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">calculate</span><span class="font-label-lg text-label-lg">Orçamentos Gráficos</span></div></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="venda-balcao-pdv" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">point_of_sale</span><span class="font-label-lg text-label-lg">Venda Balcão / PDV</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F5</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="pedidos-compra" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">shopping_bag</span><span class="font-label-lg text-label-lg">Pedidos de Compra</span></div></a><div class="pt-space-sm pb-1 px-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Módulos Operacionais</span></div><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="estoque-bobinas" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">pallet</span><span class="font-label-lg text-label-lg">Estoque &amp; Bobinas</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F6</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="financeiro-caixa" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">account_balance_wallet</span><span class="font-label-lg text-label-lg">Financeiro &amp; Caixa</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F7</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="fiscal" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">receipt_long</span><span class="font-label-lg text-label-lg">Fiscal (NFC-e / NF-e)</span></div><kbd class="font-data-mono-sm text-data-mono-sm px-1 rounded bg-surface-container text-on-surface-variant">F8</kbd></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="relatorios-bi" href="#"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px]">monitoring</span><span class="font-label-lg text-label-lg">Relatórios &amp; BI</span></div></a><div class="pt-space-sm pb-1 px-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Configurações</span></div><a aria-current="page" class="flex items-center justify-between px-space-sm py-1.5 transition-colors bg-primary-container text-on-primary-container font-semibold rounded-lg" data-path="configuracoes-parametros" href="#"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-primary mr-1"></span><span class="material-symbols-outlined text-[18px]">tune</span><span class="font-label-lg text-label-lg">Configurações &amp; Parâmetros</span></div></a></nav></aside><div class="pl-64"><main class="relative pt-14 pb-7 bg-surface min-h-[calc(100vh-1.75rem)] w-full px-space-lg"><div class="flex flex-col w-full gap-space-lg pb-space-xl">
+<!-- BREADCRUMB & HEADER ACTIONS -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm uppercase tracking-wider">
+<span>Configurações &amp; Sistema</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span>Precificação &amp; Custos</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-primary font-semibold">Tabela de Preços</span>
+</div>
+<h1 class="font-display-sm text-display-sm text-on-surface tracking-tight">Reajuste de Preços em Bloco &amp; Simulação de Margem</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-4xl">
+        Aplicação de reajustes percentuais ou fixos em lote por categoria gráfica. A alteração efetiva requer autenticação de Administrador e gera registro permanente na trilha de auditoria.
+      </p>
+</div>
+<!-- Header Quick Actions -->
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="h-9 px-space-md rounded bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors flex items-center gap-space-xs shadow-sm" title="Exportar tabela atual (Ctrl+E)" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">table_view</span>
+<span class="font-label-lg text-label-lg">Exportar Atual</span>
+<kbd class="font-data-mono-sm text-data-mono-sm px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface-variant ml-1">Ctrl+E</kbd>
+</button>
+<button class="h-9 px-space-md rounded bg-primary text-on-primary hover:bg-surface-tint transition-all flex items-center gap-space-xs shadow-sm" id="btn-recalculate-top" type="button">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+<span class="font-label-lg text-label-lg">Simular Novo Preço</span>
+<kbd class="font-data-mono-sm text-data-mono-sm px-1.5 py-0.5 rounded bg-on-primary-fixed-variant text-on-primary ml-1">F9</kbd>
+</button>
+</div>
+</div>
+<!-- CONTROL PANEL / SIMULATION PARAMETERS -->
+<section class="rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">tune</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Parâmetros de Ajuste em Massa</span>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface-variant flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+        Motor de Cálculo: v2.4 (Margem Líquida Real)
+      </span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-space-md items-end">
+<!-- Method Selector -->
+<div class="xl:col-span-3 flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant">Tipo de Aplicação</label>
+<div class="flex rounded bg-surface-container-low p-1 gap-1">
+<button class="flex-1 py-1.5 px-2 rounded bg-surface-container-lowest shadow-sm font-label-md text-label-md text-primary text-center font-semibold" type="button">Percentual (%)</button>
+<button class="flex-1 py-1.5 px-2 rounded font-label-md text-label-md text-on-surface-variant hover:text-on-surface text-center" type="button">Fixo (R$)</button>
+<button class="flex-1 py-1.5 px-2 rounded font-label-md text-label-md text-on-surface-variant hover:text-on-surface text-center" type="button">Margem Alvo</button>
+</div>
+</div>
+<!-- Adjustment Value Input -->
+<div class="xl:col-span-2 flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface-variant">Valor do Reajuste</label>
+<span class="font-label-sm text-label-sm text-primary font-medium">Inflação Papéis</span>
+</div>
+<div class="relative flex items-center">
+<span class="absolute left-2.5 font-data-mono-md text-data-mono-md text-secondary font-bold">+</span>
+<input class="w-full h-9 pl-7 pr-8 bg-surface-container-low rounded font-data-mono-lg text-data-mono-lg text-on-surface focus:outline-none focus:bg-surface-container-lowest transition-colors" id="input-rate" type="text" value="8,50"/>
+<span class="absolute right-2.5 font-data-mono-md text-data-mono-md text-on-surface-variant font-medium">%</span>
+</div>
+</div>
+<!-- Scope Filter -->
+<div class="xl:col-span-3 flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant">Categoria Gráfica / Escopo</label>
+<div class="relative">
+<select class="w-full h-9 pl-2.5 pr-8 bg-surface-container-low rounded font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer">
+<option selected="">Papéis &amp; Cartões (Impressão Digital) — 38 itens</option>
+<option>Comunicação Visual (Lonas e Adesivos) — 24 itens</option>
+<option>Acabamento &amp; Encadernação — 19 itens</option>
+<option>Serviços de Balcão e Cópias — 41 itens</option>
+<option>Todos os Produtos e Serviços (142 itens)</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- Rounding Logic -->
+<div class="xl:col-span-2 flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant">Regra de Arredondamento</label>
+<div class="relative">
+<select class="w-full h-9 pl-2.5 pr-8 bg-surface-container-low rounded font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer">
+<option selected="">Final 0,50 ou 0,00 mais próximo</option>
+<option>Final ,90 psicológico</option>
+<option>Sem arredondamento (2 decimais)</option>
+<option>Arredondar sempre para cima (+1,00)</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- Base Mode -->
+<div class="xl:col-span-2 flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant">Base de Cálculo</label>
+<div class="relative">
+<select class="w-full h-9 pl-2.5 pr-8 bg-surface-container-low rounded font-body-sm text-body-sm text-on-surface focus:outline-none appearance-none cursor-pointer">
+<option selected="">Preço de Venda Atual</option>
+<option>Custo Insumo + Margem Alvo</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">expand_more</span>
+</div>
+</div>
+</div>
+</section>
+<!-- IMPACT KPI METRICS -->
+<section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- Card 1 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md uppercase tracking-wider">Itens Impactados</span>
+<span class="material-symbols-outlined text-[20px] text-primary">fact_check</span>
+</div>
+<div class="mt-2 flex items-baseline gap-2">
+<span class="font-data-mono-lg text-[28px] text-on-surface font-bold leading-none">38</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">de 142 itens (26,7%)</span>
+</div>
+<div class="mt-2 flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Escopo: Papéis &amp; Cartões Digital</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md uppercase tracking-wider">Ticket Médio Estimado</span>
+<span class="material-symbols-outlined text-[20px] text-secondary">payments</span>
+</div>
+<div class="mt-2 flex items-baseline gap-2">
+<span class="font-data-mono-lg text-[28px] text-on-surface font-bold leading-none">R$ 38,40</span>
+<span class="font-label-md text-label-md text-secondary font-semibold">+ R$ 3,00 méd.</span>
+</div>
+<div class="mt-2 flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Tabela Vigente: R$ 35,40</span>
+<span class="font-data-mono-sm text-data-mono-sm text-primary font-semibold">+8,47%</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md uppercase tracking-wider">Faturamento Projetado (30d)</span>
+<span class="material-symbols-outlined text-[20px] text-primary">trending_up</span>
+</div>
+<div class="mt-2 flex items-baseline gap-2">
+<span class="font-data-mono-lg text-[28px] text-on-surface font-bold leading-none">R$ 161.580</span>
+<span class="font-label-md text-label-md text-secondary font-semibold">+ R$ 12.660</span>
+</div>
+<div class="mt-2 flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Base Últimos 30 Dias (Realizado)</span>
+<span class="font-data-mono-sm text-data-mono-sm text-secondary font-semibold">+8,5%</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md uppercase tracking-wider">Margem Média da Categoria</span>
+<span class="material-symbols-outlined text-[20px] text-tertiary">query_stats</span>
+</div>
+<div class="mt-2 flex items-baseline gap-2">
+<span class="font-data-mono-lg text-[28px] text-tertiary font-bold leading-none">61,2%</span>
+<span class="font-label-md text-label-md text-primary font-semibold">+3,4 p.p.</span>
+</div>
+<div class="mt-2 flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Margem Anterior: 57,8%</span>
+<span class="text-secondary font-semibold">Meta Atingida</span>
+</div>
+</div>
+</section>
+<!-- MAIN SIMULATION WORKSPACE (SPLIT LAYOUT: GRID & AUTH MODAL) -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT / CENTER: COMPARATIVE DATA GRID (8 COLS) -->
+<div class="xl:col-span-8 flex flex-col gap-space-sm bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<!-- Grid Header Controls -->
+<div class="p-space-md bg-surface-container-low flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-2">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" id="check-all" type="checkbox"/>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Selecionar Todos</span>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container-highest text-on-surface-variant">
+<strong class="text-primary font-semibold">38</strong> de 38 selecionados
+          </span>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative w-full sm:w-64">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">search</span>
+<input class="w-full h-8 pl-7 pr-12 bg-surface-container-lowest font-body-sm text-body-sm rounded text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Filtrar item simulado (Ctrl+F)..." type="text"/>
+<kbd class="absolute right-1.5 top-1/2 -translate-y-1/2 font-data-mono-sm text-[9px] px-1 py-0.5 rounded bg-surface-container text-on-surface-variant">Ctrl+F</kbd>
+</div>
+<button class="w-8 h-8 rounded bg-surface-container-lowest flex items-center justify-center text-on-surface-variant hover:text-on-surface" title="Filtro Avançado de Itens" type="button">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+</button>
+</div>
+</div>
+<!-- High Density Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-2.5 px-3 w-8 text-center">Sel.</th>
+<th class="py-2.5 px-3">Código / Produto ou Serviço</th>
+<th class="py-2.5 px-3">Categoria</th>
+<th class="py-2.5 px-3 text-right">Custo Insumo</th>
+<th class="py-2.5 px-3 text-right">Preço Atual</th>
+<th class="py-2.5 px-3 text-right">Margem Atual</th>
+<th class="py-2.5 px-3 text-right text-primary font-bold">Novo Preço Simulado</th>
+<th class="py-2.5 px-3 text-right">Nova Margem</th>
+<th class="py-2.5 px-3 text-right">Diferença</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high font-body-sm text-body-sm text-on-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-2.5 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-2.5 px-3">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Impressão Colorida A4 Laser Couché 150g</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">PROD-0104</span>
+</div>
+</td>
+<td class="py-2.5 px-3">
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Papéis &amp; Cartões</span>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">R$ 0,85</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-on-surface font-medium">R$ 2,50</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">66,0%</td>
+<td class="py-2.5 px-3 text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="font-data-mono-md text-data-mono-md font-bold text-primary">R$ 2,75</span>
+<span class="font-label-sm text-[10px] px-1 py-0.2 rounded bg-surface-container-high text-primary font-semibold">+10,0%</span>
+</div>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">69,1%</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-secondary font-bold">+R$ 0,25</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="py-2.5 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-2.5 px-3">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Cartão de Visita Couché 300g 4x4 (1000 un)</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">PROD-0108</span>
+</div>
+</td>
+<td class="py-2.5 px-3">
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Papéis &amp; Cartões</span>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">R$ 38,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-on-surface font-medium">R$ 85,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">55,3%</td>
+<td class="py-2.5 px-3 text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="font-data-mono-md text-data-mono-md font-bold text-primary">R$ 92,00</span>
+<span class="font-label-sm text-[10px] px-1 py-0.2 rounded bg-surface-container-high text-primary font-semibold">+8,2%</span>
+</div>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">58,7%</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-secondary font-bold">+R$ 7,00</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-2.5 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-2.5 px-3">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Panfleto Couché 90g 4x0 10x15cm (2500 un)</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">PROD-0112</span>
+</div>
+</td>
+<td class="py-2.5 px-3">
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Papéis &amp; Cartões</span>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">R$ 52,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-on-surface font-medium">R$ 135,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">61,5%</td>
+<td class="py-2.5 px-3 text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="font-data-mono-md text-data-mono-md font-bold text-primary">R$ 146,50</span>
+<span class="font-label-sm text-[10px] px-1 py-0.2 rounded bg-surface-container-high text-primary font-semibold">+8,5%</span>
+</div>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">64,5%</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-secondary font-bold">+R$ 11,50</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="py-2.5 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-2.5 px-3">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Apostila A4 Wire-O 50 fls Color Capa PVC</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">PROD-0125</span>
+</div>
+</td>
+<td class="py-2.5 px-3">
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Encadernação</span>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">R$ 8,20</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-on-surface font-medium">R$ 22,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">62,7%</td>
+<td class="py-2.5 px-3 text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="font-data-mono-md text-data-mono-md font-bold text-primary">R$ 24,00</span>
+<span class="font-label-sm text-[10px] px-1 py-0.2 rounded bg-surface-container-high text-primary font-semibold">+9,1%</span>
+</div>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">65,8%</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-secondary font-bold">+R$ 2,00</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="py-2.5 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-2.5 px-3">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Plastificação Rígida Polaseal A4</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">PROD-0130</span>
+</div>
+</td>
+<td class="py-2.5 px-3">
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Balcão</span>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">R$ 1,20</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-on-surface font-medium">R$ 8,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">85,0%</td>
+<td class="py-2.5 px-3 text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="font-data-mono-md text-data-mono-md font-bold text-primary">R$ 8,50</span>
+<span class="font-label-sm text-[10px] px-1 py-0.2 rounded bg-surface-container-high text-primary font-semibold">+6,2%</span>
+</div>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">85,9%</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-secondary font-bold">+R$ 0,50</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="py-2.5 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-2.5 px-3">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Adesivo Vinil Brilho m² com Meio Corte</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">PROD-0142</span>
+</div>
+</td>
+<td class="py-2.5 px-3">
+<span class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">Comunicação Visual</span>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">R$ 18,50</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-on-surface font-medium">R$ 65,00</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-on-surface-variant">71,5%</td>
+<td class="py-2.5 px-3 text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="font-data-mono-md text-data-mono-md font-bold text-primary">R$ 70,50</span>
+<span class="font-label-sm text-[10px] px-1 py-0.2 rounded bg-surface-container-high text-primary font-semibold">+8,5%</span>
+</div>
+</td>
+<td class="py-2.5 px-3 text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">73,7%</td>
+<td class="py-2.5 px-3 text-right font-data-mono-sm text-data-mono-sm text-secondary font-bold">+R$ 5,50</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Sub-Bar Pagination & Quick Toggle Info -->
+<div class="p-space-sm bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<div class="flex items-center gap-space-xs">
+<span>Exibindo 6 de 38 itens na pré-visualização prioritária</span>
+<span class="text-outline-variant">|</span>
+<span class="text-secondary font-semibold">Critério: Maiores volumes de balcão</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface" type="button">Página 1 de 4</button>
+<button class="w-6 h-6 rounded bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high" type="button">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+</button>
+<button class="w-6 h-6 rounded bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high" type="button">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- RIGHT: CONFIRMATION & AUTHENTICATION DOCKED PANEL (4 COLS) -->
+<div class="xl:col-span-4 flex flex-col gap-space-md">
+<div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-md flex flex-col gap-space-md relative overflow-hidden">
+<!-- Visual Accent Top Stripe -->
+<div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary via-secondary to-primary-container"></div>
+<!-- Panel Title -->
+<div class="flex items-center gap-space-xs pt-1">
+<span class="material-symbols-outlined text-primary text-[22px]">lock</span>
+<span class="font-headline-md text-headline-md text-on-surface">Efetivar Reajuste na Base</span>
+</div>
+<!-- Operational Guard Warning -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px] shrink-0 mt-0.5">info</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+            Esta ação atualizará imediatamente os preços de tabela para balcão, pedidos e novos orçamentos. <strong class="text-on-surface">O.S. já abertas manterão o valor contratado.</strong>
+</p>
+</div>
+<!-- Summary Capsule -->
+<div class="p-space-sm rounded bg-surface-container flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Lote Selecionado</span>
+<span class="font-label-lg text-label-lg font-bold text-on-surface">38 Itens da Categoria</span>
+</div>
+<div class="flex flex-col text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Aumento Médio</span>
+<span class="font-data-mono-md text-data-mono-md font-bold text-secondary">+8,50%</span>
+</div>
+</div>
+<!-- Form: Mandatory Justification -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface flex items-center justify-between">
+<span>Motivo / Justificativa Obrigatória</span>
+<span class="font-label-sm text-label-sm text-outline">Auditoria Ativa</span>
+</label>
+<textarea class="w-full p-2.5 bg-surface-container-low rounded font-body-sm text-body-sm text-on-surface focus:outline-none focus:bg-surface-container-lowest resize-none" rows="3">Repasse de aumento de insumos gráficos e celulose Suzano tabela Q4/2026</textarea>
+</div>
+<!-- Form: Admin Authentication -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface">Senha de Administrador Master</label>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Roberto Silva (Admin)</span>
+</div>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-[18px]">key</span>
+<input class="w-full h-9 pl-8 pr-10 bg-surface-container-low rounded font-data-mono-md text-data-mono-md text-on-surface focus:outline-none focus:bg-surface-container-lowest" placeholder="Digite sua senha de liberação..." type="password" value="••••••••••••"/>
+<span class="material-symbols-outlined absolute right-2.5 text-secondary text-[18px]" title="Credencial válida em sessão">verified</span>
+</div>
+</div>
+<!-- Compliance Checkbox -->
+<label class="flex items-start gap-2 cursor-pointer mt-1">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-0 mt-0.5 cursor-pointer" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant">
+            Registrar na Trilha de Auditoria LGPD e atualizar histórico permanente de custos (Fator SUZANO-2026).
+          </span>
+</label>
+<!-- Final Action CTA Buttons -->
+<div class="flex flex-col gap-2 pt-2">
+<button class="w-full h-10 rounded bg-primary text-on-primary hover:bg-surface-tint font-label-lg text-label-lg font-semibold flex items-center justify-center gap-space-xs shadow-sm transition-all" id="btn-apply-bulk" type="button">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+<span>Confirmar e Aplicar Novo Preço</span>
+<kbd class="font-data-mono-sm text-data-mono-sm px-1.5 py-0.5 rounded bg-on-primary-fixed-variant text-on-primary ml-1">F10</kbd>
+</button>
+<button class="w-full h-8 rounded bg-surface-container-low hover:bg-surface-container text-on-surface-variant font-label-md text-label-md flex items-center justify-center gap-space-xs transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+<span>Descartar Simulação</span>
+<kbd class="font-data-mono-sm text-[10px] px-1 rounded bg-surface-container-highest ml-1">Esc</kbd>
+</button>
+</div>
+</div>
+<!-- Quick Tips Card -->
+<div class="rounded-xl bg-surface-container-low p-space-md flex items-center gap-space-md">
+<span class="material-symbols-outlined text-secondary text-[28px] shrink-0">history_toggle_off</span>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Reversão Garantida</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">
+            O PrintGest ERP armazena instantâneos (snapshots) de preços por 180 dias. É possível reverter o lote com 1 clique.
+          </span>
+</div>
+</div>
+</div>
+</div>
+<!-- AUDIT LOG & HISTORICAL BULK REVISIONS -->
+<section class="rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">history_edu</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Trilha de Auditoria Recente de Reajustes</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Logs invioláveis com carimbo de tempo da base local</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Historical Item 1 -->
+<div class="rounded-lg bg-surface-container-low p-space-md flex flex-col justify-between gap-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container font-semibold text-secondary">+5,00%</span>
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Comunicação Visual (Lonas &amp; Tintas Solvente)</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">15/06/2026 14:10</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+<strong class="text-on-surface">Motivo:</strong> Aumento do dólar para insumos solventes e frete marítimo de bobinas Starflex.
+        </p>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm pt-1">
+<span>Executor: <strong>Roberto Silva (Admin Direção)</strong></span>
+<span class="font-data-mono-sm text-data-mono-sm">IP 192.168.1.10 (Estação 01)</span>
+</div>
+</div>
+<!-- Historical Item 2 -->
+<div class="rounded-lg bg-surface-container-low p-space-md flex flex-col justify-between gap-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container font-semibold text-secondary">+7,00%</span>
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Tabela Geral (Dissídio e Inflação Anual)</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">10/01/2026 09:30</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+<strong class="text-on-surface">Motivo:</strong> Reajuste coletivo sindicato gráfico e atualização de custos de energia elétrica.
+        </p>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm pt-1">
+<span>Executor: <strong>Roberto Silva (Admin Direção)</strong></span>
+<span class="font-data-mono-sm text-data-mono-sm">IP 192.168.1.10 (Estação 01)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- POPUP TOAST / FEEDBACK OVERLAY (HIDDEN BY DEFAULT) -->
+<div class="fixed bottom-12 right-6 rounded-lg bg-inverse-surface text-inverse-on-surface px-space-md py-3 shadow-xl hidden flex items-center gap-space-sm z-50 transition-all" id="sim-feedback-toast">
+<span class="material-symbols-outlined text-secondary-fixed text-[20px]">check_circle</span>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-bold text-inverse-on-surface">Simulação Recalculada!</span>
+<span class="font-body-sm text-body-sm text-inverse-on-surface">Preços e margens atualizados no grid com arredondamento R$ 0,50.</span>
+</div>
+</div>
+</div>
+<script>
+  (function initPriceBulkAdjust() {
+    const btnSimulate = document.getElementById('btn-recalculate-top');
+    const toast = document.getElementById('sim-feedback-toast');
+    const btnApply = document.getElementById('btn-apply-bulk');
+    const checkAll = document.getElementById('check-all');
+
+    if (btnSimulate && toast) {
+      btnSimulate.addEventListener('click', () => {
+        toast.classList.remove('hidden');
+        toast.classList.add('flex');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+          toast.classList.remove('flex');
+        }, 3200);
+      });
+    }
+
+    if (btnApply) {
+      btnApply.addEventListener('click', () => {
+        const confirmed = confirm('Confirma a aplicação definitiva do reajuste de +8,50% para os 38 itens selecionados?');
+        if (confirmed) {
+          alert('Preços atualizados com sucesso no banco de dados local! Snapshot gerado na auditoria.');
+        }
+      });
+    }
+
+    if (checkAll) {
+      checkAll.addEventListener('change', (e) => {
+        const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+          cb.checked = e.target.checked;
+        });
+      });
+    }
+
+    // Keyboard Shortcuts Support
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'F9') {
+        e.preventDefault();
+        btnSimulate?.click();
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        btnApply?.click();
+      }
+    });
+  })();
+</script></main></div><footer class="fixed bottom-0 left-0 right-0 h-7 bg-surface-container-low shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex items-center justify-between px-space-md text-on-surface-variant font-data-mono-sm text-data-mono-sm"><div class="flex items-center gap-space-md"><div class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span><span>Daemon Local 127.0.0.1:8000 Conectado</span></div><span class="text-outline-variant">|</span><span>Estação: 01 (Matriz / Servidor)</span><span class="text-outline-variant">|</span><span>Banco: PostgreSQL 15 Local</span></div><div class="flex items-center gap-space-md"><div class="hidden md:flex items-center gap-space-sm font-label-sm text-label-sm"><span class="px-1 rounded bg-surface-container">F1 Ajuda</span><span class="px-1 rounded bg-surface-container">F3 Produtos</span><span class="px-1 rounded bg-surface-container">F9 Simular</span><span class="px-1 rounded bg-surface-container">F10 Confirmar</span><span class="px-1 rounded bg-surface-container">Esc Sair</span></div><span class="text-outline-variant hidden md:inline">|</span><span class="font-data-mono-sm text-data-mono-sm text-primary font-semibold">v2.0.0</span></div></footer></body></html>

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-surface-variant": "#434655",
+          "on-secondary-fixed-variant": "#004c6e",
+          "on-tertiary-fixed": "#23005c",
+          "on-error-container": "#93000a",
+          "on-tertiary": "#ffffff",
+          "surface-container-highest": "#d3e4fe",
+          "tertiary-fixed": "#e9ddff",
+          "secondary-fixed-dim": "#89ceff",
+          "on-tertiary-container": "#f6edff",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-high": "#dce9ff",
+          "surface-bright": "#f8f9ff",
+          "secondary": "#006591",
+          "inverse-surface": "#213145",
+          "on-secondary-container": "#004666",
+          "on-surface": "#0b1c30",
+          "background": "#f8f9ff",
+          "inverse-primary": "#b4c5ff",
+          "error": "#ba1a1a",
+          "outline-variant": "#c3c6d7",
+          "on-error": "#ffffff",
+          "surface-dim": "#cbdbf5",
+          "on-secondary": "#ffffff",
+          "on-primary-fixed-variant": "#003ea8",
+          "surface-tint": "#0053db",
+          "tertiary-container": "#7d4ce7",
+          "secondary-container": "#39b8fd",
+          "primary": "#004ac6",
+          "surface-variant": "#d3e4fe",
+          "error-container": "#ffdad6",
+          "on-background": "#0b1c30",
+          "on-secondary-fixed": "#001e2f",
+          "primary-fixed": "#dbe1ff",
+          "on-tertiary-fixed-variant": "#5516be",
+          "secondary-fixed": "#c9e6ff",
+          "on-primary": "#ffffff",
+          "on-primary-fixed": "#00174b",
+          "on-primary-container": "#eeefff",
+          "primary-container": "#2563eb",
+          "outline": "#737686",
+          "surface": "#f8f9ff",
+          "tertiary-fixed-dim": "#d0bcff",
+          "surface-container-low": "#eff4ff",
+          "tertiary": "#632ecd",
+          "primary-fixed-dim": "#b4c5ff",
+          "surface-container": "#e5eeff",
+          "inverse-on-surface": "#eaf1ff"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "margin": "1rem",
+          "space-lg": "1rem",
+          "space-sm": "0.5rem",
+          "space-md": "0.75rem",
+          "space-xl": "1.5rem",
+          "gutter": "0.75rem",
+          "space-xs": "0.25rem"
+        },
+        "fontFamily": {
+          "data-mono-sm": ["Inter"],
+          "display-sm": ["Inter"],
+          "data-mono-lg": ["Inter"],
+          "label-md": ["Inter"],
+          "headline-lg": ["Inter"],
+          "headline-md": ["Inter"],
+          "body-lg": ["Inter"],
+          "data-mono-md": ["Inter"],
+          "label-sm": ["Inter"],
+          "body-md": ["Inter"],
+          "label-lg": ["Inter"],
+          "body-sm": ["Inter"],
+          "headline-sm": ["Inter"]
+        },
+        "fontSize": {
+          "data-mono-sm": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+          "display-sm": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+          "data-mono-lg": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+          "label-md": ["11px", {"lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+          "headline-lg": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.015em", "fontWeight": "600"}],
+          "headline-md": ["16px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+          "body-lg": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+          "data-mono-md": ["13px", {"lineHeight": "18px", "fontWeight": "500"}],
+          "label-sm": ["10px", {"lineHeight": "12px", "letterSpacing": "0.04em", "fontWeight": "600"}],
+          "body-md": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+          "label-lg": ["13px", {"lineHeight": "16px", "fontWeight": "500"}],
+          "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+          "headline-sm": ["14px", {"lineHeight": "20px", "fontWeight": "600"}]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between select-none"><div class="flex flex-col flex-1 overflow-y-auto"><div class="h-8 bg-surface-container-low flex items-center px-space-md gap-space-sm"><span class="material-symbols-outlined text-primary text-[16px]">print</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-semibold">PRINTGEST ERP v2.0</span></div><nav class="p-space-sm space-y-space-md" data-active-classes="bg-primary-container text-on-primary-container font-semibold"><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Menu Principal</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="dashboard" href="#"><span class="font-label-lg text-label-lg">Dashboard / Início</span></a></div><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cadastros</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="clientes" href="#"><span class="font-label-lg text-label-lg">Clientes</span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F2</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="produtos-e-servicos" href="#"><span class="font-label-lg text-label-lg">Produtos e Serviços</span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F3</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="fornecedores" href="#"><span class="font-label-lg text-label-lg">Fornecedores</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="funcionarios" href="#"><span class="font-label-lg text-label-lg">Funcionários</span></a></div><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Movimento</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="ordens-de-servico" href="#"><span class="font-label-lg text-label-lg">Ordens de Serviço</span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F4</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="orcamentos-graficos" href="#"><span class="font-label-lg text-label-lg">Orçamentos Gráficos</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="venda-balcao-pdv" href="#"><span class="font-label-lg text-label-lg">Venda Balcão / PDV</span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F5</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="pedidos-de-compra" href="#"><span class="font-label-lg text-label-lg">Pedidos de Compra</span></a></div><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Módulos Operacionais</div><a aria-current="page" class="flex items-center justify-between px-space-md py-space-sm rounded-lg transition-all bg-primary-container text-on-primary-container font-semibold" data-path="estoque-e-bobinas" href="#"><span class="font-label-lg text-label-lg">Estoque &amp; Bobinas</span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F6</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="financeiro-e-caixa" href="#"><span class="font-label-lg text-label-lg">Financeiro &amp; Caixa</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="fiscal-nfc-e-nf-e" href="#"><span class="font-label-lg text-label-lg">Fiscal (NFC-e / NF-e)</span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="relatorios-e-config" href="#"><span class="font-label-lg text-label-lg">Relatórios &amp; Config</span></a></div></nav></div><div class="p-space-sm bg-surface-container-low m-space-sm rounded-lg space-y-space-xs"><div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant"><span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">print_connect</span>Fila de Impressão</span><span class="w-2 h-2 rounded-full bg-secondary-container"></span></div><div class="space-y-1 pt-1 font-body-sm text-body-sm"><div class="flex items-center justify-between text-on-surface"><span class="truncate font-medium">Konica C3070</span><span class="font-label-sm text-label-sm text-secondary-container bg-surface-container-lowest px-1 rounded">Pronta</span></div><div class="flex items-center justify-between text-on-surface-variant"><span class="truncate">Plotter Roland</span><span class="font-label-sm text-label-sm text-tertiary-container bg-surface-container-lowest px-1 rounded">2 Trabalhos</span></div></div></div></aside><div class="pl-64 flex flex-col min-h-screen"><header class="fixed top-0 left-64 right-0 z-40 bg-surface/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] select-none"><div class="h-7 bg-surface-container-high flex items-center justify-between px-space-md"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-primary text-[14px]">desktop_windows</span><span class="font-label-sm text-label-sm text-on-surface-variant tracking-wide font-medium">PRINTGEST ERP V2.0 — GRÁFICA RÁPIDA (MATRIZ)</span></div><div class="flex items-center gap-space-xs"><button class="w-6 h-5 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded" title="Minimizar" type="button"><span class="material-symbols-outlined text-[13px]">minimize</span></button><button class="w-6 h-5 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded" title="Maximizar" type="button"><span class="material-symbols-outlined text-[13px]">crop_square</span></button><button class="w-6 h-5 flex items-center justify-center text-on-surface-variant hover:bg-error hover:text-on-error rounded" title="Fechar" type="button"><span class="material-symbols-outlined text-[13px]">close</span></button></div></div><div class="h-14 px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md"><img alt="PrintGest ERP" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xuaz9r5BIC8vwg0qc0QAun3UPGEHCkAsSzeUUaDAxAso9n-N-l84u2VGqqt13D7my948lk4VJ79e848PEP-VOLFTDjXPCbrfrUSdoW7yr-TxCB9mKsiw6LekijXEdh4u5i5eRCz_vms8yxky2w4cJqZ16-YoIApf6Qni3B3jl6Ktl3RQVVFW1lRoM1NpT2_x6r7CD8HBEBvG2Tnjl7n1nbvFY_Xl5tYXsmAoPNFnFNQsgZXUhkS82g81YT"/><div class="flex items-center gap-space-sm pl-space-xs"><span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface"><span class="w-2 h-2 rounded-full bg-secondary-container"></span>Servidor Local: 192.168.1.10:8000 (Online)</span><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-low font-data-mono-sm text-data-mono-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px] text-primary">verified</span>Licença Ativa (72h OK)</span></div></div><div class="flex-1 max-w-md mx-space-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-space-md text-on-surface-variant text-[18px]">search</span><input class="w-full h-8 pl-9 pr-14 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-primary shadow-[0_1px_4px_rgba(0,0,0,0.03)]" placeholder="Busca rápida por Bobina, Insumo, O.S. ou Lote... (Ctrl+K)" type="text"/><kbd class="absolute right-space-sm px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">Ctrl+K</kbd></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-sm cursor-pointer"><div class="text-right leading-tight"><div class="font-label-lg text-label-lg font-semibold text-on-surface">Roberto Silva</div><div class="font-label-sm text-label-sm text-on-surface-variant">Gerente de Produção</div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><main class="flex-1 pt-[84px] pb-7 w-full px-space-lg bg-surface"><div class="flex flex-col w-full space-y-space-md">
+<!-- Top Operational Banner & Direct Action Controls -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
+<div class="space-y-space-xs min-w-0">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error text-on-error font-label-sm text-label-sm uppercase tracking-wide">
+<span class="material-symbols-outlined text-[13px]">warning</span> Diagnóstico Crítico
+        </span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Módulo Estoque &amp; Suprimentos • PRD 2.0 §1.3/§1.4</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">
+        Relatório de Reposição &amp; Curva de Consumo de Insumos
+      </h1>
+<p class="font-body-md text-body-md text-on-surface-variant truncate">
+        Diagnóstico de ruptura de estoque, previsão de autonomia e solicitação direta a fornecedores homologados.
+      </p>
+</div>
+<!-- Shortcut CTA Cluster -->
+<div class="flex flex-wrap items-center gap-space-sm shrink-0">
+<button class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-lg text-label-lg transition-all shadow-sm active:scale-[0.99]" id="btn-export-excel" type="button">
+<span class="material-symbols-outlined text-[17px] text-primary">table_view</span>
+<span>Exportar Excel / PDF</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-data-mono-sm text-data-mono-sm">Ctrl+E</kbd>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-label-lg text-label-lg transition-all shadow-sm active:scale-[0.99]" id="btn-print-order" type="button">
+<span class="material-symbols-outlined text-[17px] text-on-surface-variant">print</span>
+<span>Imprimir Ordem</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-data-mono-sm text-data-mono-sm">Ctrl+P</kbd>
+</button>
+<button class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-container hover:bg-primary text-on-primary font-headline-sm text-headline-sm shadow-md transition-all active:scale-[0.98]" id="btn-f9-generate" type="button">
+<span class="material-symbols-outlined text-[18px]">shopping_cart_checkout</span>
+<span>Gerar Pedidos de Compra</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest/20 text-on-primary font-data-mono-sm text-data-mono-sm">F9</span>
+<span class="text-secondary-fixed font-semibold" id="selected-badge-count">(6 selecionados)</span>
+</button>
+</div>
+</div>
+<!-- KPI Matrix / Rupture Indicators -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Card 1 -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-24 h-24 bg-error/5 rounded-full -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+<div class="flex items-start justify-between">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Itens em Ruptura Crítica</span>
+<span class="p-1.5 rounded-lg bg-error-container text-on-error-container">
+<span class="material-symbols-outlined text-[18px]">emergency</span>
+</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-display-sm text-display-sm text-error font-bold tracking-tight">12 Insumos</span>
+<span class="font-label-sm text-label-sm text-error font-semibold uppercase px-1.5 py-0.5 rounded bg-error-container">Risco Máquina</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Parada de prensa Konica e Plotter iminente</p>
+</div>
+<!-- Card 2 -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+<div class="flex items-start justify-between">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Valor Estimado Reposição</span>
+<span class="p-1.5 rounded-lg bg-surface-container-high text-primary">
+<span class="material-symbols-outlined text-[18px]">payments</span>
+</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-display-sm text-display-sm text-on-surface font-bold tracking-tight">R$ 24.680,00</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Lotes econômicos consolidados</p>
+</div>
+<!-- Card 3 -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-24 h-24 bg-secondary/5 rounded-full -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+<div class="flex items-start justify-between">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Fornecedores a Acionar</span>
+<span class="p-1.5 rounded-lg bg-surface-container-high text-secondary">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-display-sm text-display-sm text-on-surface font-bold tracking-tight">4 Fabricantes</span>
+<span class="font-data-mono-sm text-data-mono-sm text-secondary font-medium px-1.5 py-0.5 rounded bg-secondary-fixed">Homologados</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 truncate">Suzano, Serilon, Sun Chemical, Plásticos Alv.</p>
+</div>
+<!-- Card 4 -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute right-0 top-0 w-24 h-24 bg-tertiary/5 rounded-full -mr-8 -mt-8 pointer-events-none transition-transform group-hover:scale-110"></div>
+<div class="flex items-start justify-between">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-semibold">Prazo Médio (Lead-time)</span>
+<span class="p-1.5 rounded-lg bg-surface-container-high text-tertiary">
+<span class="material-symbols-outlined text-[18px]">hourglass_top</span>
+</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-space-sm">
+<span class="font-display-sm text-display-sm text-on-surface font-bold tracking-tight">3.2 dias</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">úteis ponderados</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Expedição e transporte rodoviário integrado</p>
+</div>
+</div>
+<!-- Operational Grid Header Filter Strip -->
+<div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-space-sm px-space-md py-2.5 rounded-lg bg-surface-container-low shadow-sm">
+<div class="flex flex-wrap items-center gap-space-sm">
+<span class="font-label-md text-label-md uppercase text-on-surface-variant font-semibold">Filtros Rápidos:</span>
+<button class="px-2.5 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm font-semibold" type="button">
+        Abaixo do Mínimo (12)
+      </button>
+<button class="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-sm text-label-sm" type="button">
+        Ruptura &lt; 48h (5)
+      </button>
+<button class="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-sm text-label-sm" type="button">
+        Papéis &amp; Mídias (4)
+      </button>
+<button class="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-sm text-label-sm" type="button">
+        Químicos &amp; Tintas (3)
+      </button>
+</div>
+<div class="flex items-center gap-space-md text-on-surface-variant font-body-sm text-body-sm">
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-error"></span> Ruptura Crítica (≤ 2d)
+      </span>
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span> Atenção (≤ 5d)
+      </span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface">Base de Cálculo: Últimos 30 dias</span>
+</div>
+</div>
+<!-- Core Production Replenishment Table (Dense Layout) -->
+<div class="rounded-xl bg-surface-container-lowest shadow-sm overflow-hidden flex flex-col">
+<div class="overflow-x-auto">
+<table class="w-full text-left select-none border-collapse">
+<thead>
+<tr class="h-9 bg-surface-container-low text-on-surface-variant font-label-md text-label-md uppercase tracking-wider">
+<th class="w-10 px-3 text-center">
+<input checked="" class="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" id="check-all" type="checkbox"/>
+</th>
+<th class="px-3 py-2 font-semibold">Insumo / Especificação Gráfica</th>
+<th class="px-3 py-2 font-semibold">Fornecedor Homologado</th>
+<th class="px-3 py-2 font-semibold text-right">Saldo Atual</th>
+<th class="px-3 py-2 font-semibold text-right">Est. Mínimo</th>
+<th class="px-3 py-2 font-semibold text-right">Giro Diário</th>
+<th class="px-3 py-2 font-semibold text-center">Autonomia</th>
+<th class="px-3 py-2 font-semibold text-right">Sugestão (Lote)</th>
+<th class="px-3 py-2 font-semibold text-right">Custo Est.</th>
+<th class="px-4 py-2 font-semibold text-center">Ações Operacionais</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md divide-y-0 text-on-surface" id="replenish-table-body">
+<!-- Row 1 -->
+<tr class="h-11 hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="px-3 text-center">
+<input checked="" class="row-checkbox w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" data-cost="2720.00" type="checkbox"/>
+</td>
+<td class="px-3 py-1.5 min-w-[240px]">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary shrink-0" title="Toner Cyan"></span>
+                Toner Konica Minolta TN-619 Cyan Original
+              </div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Cód: TON-KM619-C • Prensa C3070</div>
+</td>
+<td class="px-3 py-1.5">
+<div class="font-body-md text-body-md font-medium text-on-surface">Sun Chemical / Konica</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 04.341.229/0001-44</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-error font-semibold">
+              1 un
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface-variant">
+              3 un
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface">
+              0.2 un/dia
+            </td>
+<td class="px-3 py-1.5 text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[12px]">alarm</span> 2 dias
+              </span>
+</td>
+<td class="px-3 py-1.5 text-right">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">4 un</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Lote Econômico</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md font-semibold text-on-surface">
+              R$ 2.720,00
+            </td>
+<td class="px-4 py-1.5 text-center">
+<div class="inline-flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm" type="button">
+                  Cotar
+                </button>
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Pedir (F9)
+                </button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="h-11 hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="px-3 text-center">
+<input checked="" class="row-checkbox w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" data-cost="1080.00" type="checkbox"/>
+</td>
+<td class="px-3 py-1.5 min-w-[240px]">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-outline-variant shrink-0" title="Adesivo"></span>
+                Adesivo Vinil Fosco 0.10mm 1.26m × 50m
+              </div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Cód: AD-VF126-50 • Plotter Roland SG-540</div>
+</td>
+<td class="px-3 py-1.5">
+<div class="font-body-md text-body-md font-medium text-on-surface">Serilon Lonas &amp; Mídias</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 08.921.099/0002-18</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-error font-semibold">
+              2.5 rolos
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface-variant">
+              5 rolos
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface">
+              0.4 r/dia
+            </td>
+<td class="px-3 py-1.5 text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm font-semibold">
+                5 dias
+              </span>
+</td>
+<td class="px-3 py-1.5 text-right">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">6 rolos</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Embalagem Fechada</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md font-semibold text-on-surface">
+              R$ 1.080,00
+            </td>
+<td class="px-4 py-1.5 text-center">
+<div class="inline-flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm" type="button">
+                  Cotar
+                </button>
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Pedir (F9)
+                </button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="h-11 hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="px-3 text-center">
+<input checked="" class="row-checkbox w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" data-cost="1450.00" type="checkbox"/>
+</td>
+<td class="px-3 py-1.5 min-w-[240px]">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-surface-dim shrink-0" title="Papel Couche"></span>
+                Papel Couché Fosco 115g Formato SRA3 (320×450mm)
+              </div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Cód: PAP-CF115-SRA3 • Offset / Laser</div>
+</td>
+<td class="px-3 py-1.5">
+<div class="font-body-md text-body-md font-medium text-on-surface">Suzano Papel &amp; Celulose</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 16.404.287/0001-55</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-error font-semibold">
+              600 fls
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface-variant">
+              3.000 fls
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface">
+              450 fls/dia
+            </td>
+<td class="px-3 py-1.5 text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error text-on-error font-label-sm text-label-sm font-bold animate-pulse">
+<span class="material-symbols-outlined text-[12px]">warning</span> 1.3 dias
+              </span>
+</td>
+<td class="px-3 py-1.5 text-right">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">5.000 fls</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">10 pacotes de 500</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md font-semibold text-on-surface">
+              R$ 1.450,00
+            </td>
+<td class="px-4 py-1.5 text-center">
+<div class="inline-flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm" type="button">
+                  Cotar
+                </button>
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Pedir (F9)
+                </button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="h-11 hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="px-3 text-center">
+<input checked="" class="row-checkbox w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" data-cost="1900.00" type="checkbox"/>
+</td>
+<td class="px-3 py-1.5 min-w-[240px]">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary shrink-0" title="Chapa CTP"></span>
+                Chapa Térmica CTP 0.30 650×550mm
+              </div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Cód: CHP-CTP6555 • Heidelberg GTO 52</div>
+</td>
+<td class="px-3 py-1.5">
+<div class="font-body-md text-body-md font-medium text-on-surface">Grafsystem Chapas Gráficas</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 54.120.334/0001-92</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-error font-semibold">
+              8 un
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface-variant">
+              30 un
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface">
+              5 un/dia
+            </td>
+<td class="px-3 py-1.5 text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[12px]">alarm</span> 1.5 dias
+              </span>
+</td>
+<td class="px-3 py-1.5 text-right">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">50 un</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Caixa Protegida</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md font-semibold text-on-surface">
+              R$ 1.900,00
+            </td>
+<td class="px-4 py-1.5 text-center">
+<div class="inline-flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm" type="button">
+                  Cotar
+                </button>
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Pedir (F9)
+                </button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="h-11 hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="px-3 text-center">
+<input checked="" class="row-checkbox w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" data-cost="225.00" type="checkbox"/>
+</td>
+<td class="px-3 py-1.5 min-w-[240px]">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-outline shrink-0" title="Ilhos"></span>
+                Ilhós Metálico Nº 54 Niquelado (Acabamento)
+              </div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Cód: ILH-54NIQ • Prensa Pneumática de Ilhós</div>
+</td>
+<td class="px-3 py-1.5">
+<div class="font-body-md text-body-md font-medium text-on-surface">Plásticos Alvorada &amp; Aviamentos</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 61.884.103/0001-11</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-error font-semibold">
+              400 un
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface-variant">
+              2.000 un
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface">
+              250 un/dia
+            </td>
+<td class="px-3 py-1.5 text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
+<span class="material-symbols-outlined text-[12px]">alarm</span> 1.6 dias
+              </span>
+</td>
+<td class="px-3 py-1.5 text-right">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">5.000 un</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Caixa Industrial</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md font-semibold text-on-surface">
+              R$ 225,00
+            </td>
+<td class="px-4 py-1.5 text-center">
+<div class="inline-flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm" type="button">
+                  Cotar
+                </button>
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Pedir (F9)
+                </button>
+</div>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="h-11 hover:bg-surface-container-low transition-colors group bg-surface-container-lowest">
+<td class="px-3 text-center">
+<input checked="" class="row-checkbox w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer align-middle" data-cost="380.00" type="checkbox"/>
+</td>
+<td class="px-3 py-1.5 min-w-[240px]">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary-container shrink-0" title="Solvente Eco"></span>
+                Solvente Eco-Solvente DX5 Limpeza / Flush
+              </div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Cód: SOLV-DX5-FLUSH • Manutenção Cabeça DX5</div>
+</td>
+<td class="px-3 py-1.5">
+<div class="font-body-md text-body-md font-medium text-on-surface">Sun Chemical Brasil</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 04.341.229/0001-44</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-error font-semibold">
+              1 litro
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface-variant">
+              4 litros
+            </td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md text-on-surface">
+              0.3 L/dia
+            </td>
+<td class="px-3 py-1.5 text-center">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-sm text-label-sm font-semibold">
+                3 dias
+              </span>
+</td>
+<td class="px-3 py-1.5 text-right">
+<span class="font-headline-sm text-headline-sm font-semibold text-primary">5 litros</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Galão Lacrado</div>
+</td>
+<td class="px-3 py-1.5 text-right font-data-mono-md text-data-mono-md font-semibold text-on-surface">
+              R$ 380,00
+            </td>
+<td class="px-4 py-1.5 text-center">
+<div class="inline-flex items-center gap-1.5">
+<button class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-label-sm" type="button">
+                  Cotar
+                </button>
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-sm" type="button">
+                  Pedir (F9)
+                </button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Summary Sub-Bar -->
+<div class="p-space-md bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-space-md font-body-sm text-body-sm">
+<div class="flex items-center gap-space-md">
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+          Exibindo 6 de 12 itens com recomendação ativa
+        </span>
+<span class="font-data-mono-sm text-data-mono-sm px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface">
+          Total Selecionado: <strong class="text-primary font-bold" id="total-selected-value">R$ 7.755,00</strong>
+</span>
+</div>
+<div class="flex items-center gap-space-sm font-data-mono-sm text-data-mono-sm">
+<span class="text-on-surface-variant">Página 1 de 2</span>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container" disabled="" type="button">Anterior</button>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container" type="button">Próxima</button>
+</div>
+</div>
+</div>
+<!-- Bottom Analytical Section: 30-Day Insumos Consumption Curve (Bento Style) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md">
+<!-- Left: Top Insumos Visual Hierarchy (8 cols) -->
+<div class="lg:col-span-8 p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<div>
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">
+            Curva de Insumos Mais Consumidos (Últimos 30 Dias)
+          </h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+            Volume físico de tração por linha de produção (Laser, Grandes Formatos e Offset)
+          </p>
+</div>
+<span class="p-2 rounded-lg bg-surface-container-low text-primary">
+<span class="material-symbols-outlined text-[20px]">leaderboard</span>
+</span>
+</div>
+<!-- Bars Matrix with Inline SVG Sparklines & Percentages -->
+<div class="space-y-space-md mt-space-sm">
+<!-- Item 1 -->
+<div class="space-y-1">
+<div class="flex items-center justify-between font-label-lg text-label-lg">
+<span class="font-semibold text-on-surface flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-data-mono-sm text-data-mono-sm font-bold">1</span>
+              Papel Couché 150g SRA3 (Laser / Digital)
+            </span>
+<span class="font-data-mono-md text-data-mono-md font-bold text-on-surface">
+              24.500 fls <span class="text-on-surface-variant font-normal">(100% cap)</span>
+</span>
+</div>
+<div class="w-full h-3 rounded bg-surface-container-high overflow-hidden flex">
+<div class="h-full bg-primary rounded transition-all duration-700" style="width: 92%;"></div>
+</div>
+<div class="flex items-center justify-between font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<span>Média: 816 fls/dia • Pico em Sextas-feiras</span>
+<span class="text-primary font-semibold">Reposição sugerida: 30.000 fls</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="space-y-1">
+<div class="flex items-center justify-between font-label-lg text-label-lg">
+<span class="font-semibold text-on-surface flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-data-mono-sm text-data-mono-sm font-bold">2</span>
+              Lona Frontlight 440g 1.50m (Comunicação Visual)
+            </span>
+<span class="font-data-mono-md text-data-mono-md font-bold text-on-surface">
+              480 m linear <span class="text-on-surface-variant font-normal">(74%)</span>
+</span>
+</div>
+<div class="w-full h-3 rounded bg-surface-container-high overflow-hidden flex">
+<div class="h-full bg-secondary rounded transition-all duration-700" style="width: 74%;"></div>
+</div>
+<div class="flex items-center justify-between font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<span>Média: 16 m/dia • Roland Solvente</span>
+<span class="text-secondary font-semibold">Reposição sugerida: 10 bobinas</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="space-y-1">
+<div class="flex items-center justify-between font-label-lg text-label-lg">
+<span class="font-semibold text-on-surface flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-data-mono-sm text-data-mono-sm font-bold">3</span>
+              Adesivo Vinil Brilho 1.26m × 50m
+            </span>
+<span class="font-data-mono-md text-data-mono-md font-bold text-on-surface">
+              340 m consumidos <span class="text-on-surface-variant font-normal">(56%)</span>
+</span>
+</div>
+<div class="w-full h-3 rounded bg-surface-container-high overflow-hidden flex">
+<div class="h-full bg-secondary-container rounded transition-all duration-700" style="width: 56%;"></div>
+</div>
+<div class="flex items-center justify-between font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<span>Média: 11.3 m/dia • Rótulos e Adesivações</span>
+<span class="text-on-surface font-semibold">Reposição sugerida: 8 rolos</span>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="space-y-1">
+<div class="flex items-center justify-between font-label-lg text-label-lg">
+<span class="font-semibold text-on-surface flex items-center gap-2">
+<span class="w-5 h-5 rounded-full bg-tertiary text-on-tertiary flex items-center justify-center font-data-mono-sm text-data-mono-sm font-bold">4</span>
+              Tinta Eco-Solvente Black Premium
+            </span>
+<span class="font-data-mono-md text-data-mono-md font-bold text-on-surface">
+              12 litros <span class="text-on-surface-variant font-normal">(42%)</span>
+</span>
+</div>
+<div class="w-full h-3 rounded bg-surface-container-high overflow-hidden flex">
+<div class="h-full bg-tertiary rounded transition-all duration-700" style="width: 42%;"></div>
+</div>
+<div class="flex items-center justify-between font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<span>Média: 0.40 L/dia • Cobertura 100% chapados</span>
+<span class="text-tertiary font-semibold">Reposição sugerida: 15 litros</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Operational Intelligence / Direct Supplier Dispatch Widget (4 cols) -->
+<div class="lg:col-span-4 p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between space-y-space-md">
+<div>
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">
+            Canal Direto de Suprimentos
+          </h2>
+<span class="material-symbols-outlined text-secondary text-[20px]">hub</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">
+          Geração de Ordem de Compra automatizada por EDI / WhatsApp e integração XML.
+        </p>
+<!-- Suppliers Fast Dispatch List -->
+<div class="space-y-space-sm mt-space-md">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="min-w-0">
+<div class="font-label-lg text-label-lg font-semibold text-on-surface truncate">Suzano Papel S/A</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">EDI Ativo • 24h Frete Grátis</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-data-mono-sm text-data-mono-sm font-bold">1 Pedido</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="min-w-0">
+<div class="font-label-lg text-label-lg font-semibold text-on-surface truncate">Serilon Distribuidora</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">WhatsApp API Integrada</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-data-mono-sm text-data-mono-sm font-bold">1 Pedido</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="min-w-0">
+<div class="font-label-lg text-label-lg font-semibold text-on-surface truncate">Sun Chemical Latam</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Portal B2B Conectado</div>
+</div>
+<span class="px-2 py-0.5 rounded bg-surface-container-lowest text-primary font-data-mono-sm text-data-mono-sm font-bold">2 Pedidos</span>
+</div>
+</div>
+</div>
+<!-- Quick Action Alert Box -->
+<div class="p-space-sm rounded-lg bg-surface-container-high space-y-space-xs">
+<div class="flex items-center gap-1.5 font-label-md text-label-md text-on-surface font-semibold">
+<span class="material-symbols-outlined text-[16px] text-primary">mark_email_read</span>
+          Disparo Consolidado por Fornecedor
+        </div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          Ao acionar <kbd class="px-1 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm">F9</kbd>, o sistema separa 3 minutas de compra divididas automaticamente por CNPJ homologado.
+        </p>
+</div>
+</div>
+</div>
+<!-- Operational Keyboard Guidance & Quick Bar Footer -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-wrap items-center justify-between gap-space-md select-none font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<div class="flex flex-wrap items-center gap-space-md">
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-semibold shadow-sm">[F1]</kbd> Ajuda Operacional
+      </span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-semibold shadow-sm">[F2]</kbd> Pesquisar Insumo / Cód
+      </span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-primary font-bold shadow-sm">[F9]</kbd> Emitir Ordem de Reposição
+      </span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-semibold shadow-sm">[Ctrl+E]</kbd> Exportar XLS
+      </span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-semibold shadow-sm">[Ctrl+P]</kbd> Imprimir Relatório
+      </span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-semibold shadow-sm">[Esc]</kbd> Retornar ao Menu
+      </span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+<span>Cálculo de Segurança Atualizado: Hoje às 14:32</span>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const checkAll = document.getElementById('check-all');
+    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    const selectedBadgeCount = document.getElementById('selected-badge-count');
+    const totalSelectedValue = document.getElementById('total-selected-value');
+
+    function updateCalculations() {
+      let count = 0;
+      let total = 0;
+      rowCheckboxes.forEach(cb => {
+        if (cb.checked) {
+          count++;
+          total += parseFloat(cb.getAttribute('data-cost') || 0);
+        }
+      });
+
+      if (selectedBadgeCount) {
+        selectedBadgeCount.textContent = `(${count} selecionados)`;
+      }
+
+      if (totalSelectedValue) {
+        totalSelectedValue.textContent = new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        }).format(total);
+      }
+
+      if (checkAll) {
+        checkAll.checked = (count === rowCheckboxes.length);
+        checkAll.indeterminate = (count > 0 && count < rowCheckboxes.length);
+      }
+    }
+
+    if (checkAll) {
+      checkAll.addEventListener('change', function() {
+        rowCheckboxes.forEach(cb => {
+          cb.checked = checkAll.checked;
+        });
+        updateCalculations();
+      });
+    }
+
+    rowCheckboxes.forEach(cb => {
+      cb.addEventListener('change', updateCalculations);
+    });
+
+    // Global Keydown shortcuts simulating Windows Desktop ERP
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'F9') {
+        e.preventDefault();
+        const btn = document.getElementById('btn-f9-generate');
+        if (btn) btn.click();
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        const btnExcel = document.getElementById('btn-export-excel');
+        if (btnExcel) btnExcel.click();
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        const btnPrint = document.getElementById('btn-print-order');
+        if (btnPrint) btnPrint.click();
+      }
+    });
+
+    const f9Btn = document.getElementById('btn-f9-generate');
+    if (f9Btn) {
+      f9Btn.addEventListener('click', function() {
+        const activeCount = Array.from(rowCheckboxes).filter(c => c.checked).length;
+        if (activeCount === 0) {
+          alert('Selecione ao menos um insumo para gerar os pedidos de compra.');
+          return;
+        }
+        alert(`[PrintGest ERP] Pedidos de compra gerados com sucesso para ${activeCount} insumos! 3 Ordens de Fornecimento foram roteadas.`);
+      });
+    }
+
+    const excelBtn = document.getElementById('btn-export-excel');
+    if (excelBtn) {
+      excelBtn.addEventListener('click', function() {
+        alert('Exportando dados analíticos para planilha Excel (.xlsx)...');
+      });
+    }
+
+    const printBtn = document.getElementById('btn-print-order');
+    if (printBtn) {
+      printBtn.addEventListener('click', function() {
+        window.print();
+      });
+    }
+  })();
+</script></main><footer class="fixed bottom-0 left-64 right-0 h-7 bg-surface-container-high z-40 flex items-center justify-between px-space-md select-none"><div class="flex items-center gap-space-md font-data-mono-sm text-data-mono-sm text-on-surface-variant"><span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>Daemon: 127.0.0.1:8000 Conectado</span><span>|</span><span>Estação: 02 (Balcão Atendimento)</span><span>|</span><span>Banco: PostgreSQL 15 Local</span></div><div class="flex items-center gap-space-md font-data-mono-sm text-data-mono-sm text-on-surface-variant"><div class="flex items-center gap-2"><span class="text-on-surface font-semibold">[F1]</span> Ajuda <span class="text-on-surface font-semibold ml-2">[F2]</span> Clientes <span class="text-on-surface font-semibold ml-2">[F3]</span> Produtos <span class="text-on-surface font-semibold ml-2">[F4]</span> O.S. <span class="text-on-surface font-semibold ml-2">[F5]</span> PDV <span class="text-on-surface font-semibold ml-2">[F6]</span> Estoque <span class="text-on-surface font-semibold ml-2">[Esc]</span> Voltar</div><span>|</span><span>v2.0.0</span></div></footer></div></body></html>

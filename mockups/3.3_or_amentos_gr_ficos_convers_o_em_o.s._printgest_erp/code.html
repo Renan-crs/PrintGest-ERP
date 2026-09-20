@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "secondary-fixed-dim": "#89ceff",
+          "outline": "#737686",
+          "on-background": "#0b1c30",
+          "surface-variant": "#d3e4fe",
+          "tertiary-fixed": "#e9ddff",
+          "outline-variant": "#c3c6d7",
+          "surface-container-highest": "#d3e4fe",
+          "primary-fixed": "#dbe1ff",
+          "secondary-fixed": "#c9e6ff",
+          "surface-container": "#e5eeff",
+          "on-secondary-fixed-variant": "#004c6e",
+          "error-container": "#ffdad6",
+          "inverse-surface": "#213145",
+          "on-primary-container": "#eeefff",
+          "surface-dim": "#cbdbf5",
+          "error": "#ba1a1a",
+          "inverse-on-surface": "#eaf1ff",
+          "inverse-primary": "#b4c5ff",
+          "on-tertiary-fixed": "#23005c",
+          "on-secondary-fixed": "#001e2f",
+          "surface-container-lowest": "#ffffff",
+          "on-secondary": "#ffffff",
+          "surface-container-high": "#dce9ff",
+          "on-error-container": "#93000a",
+          "on-tertiary-container": "#f6edff",
+          "on-secondary-container": "#004666",
+          "tertiary-container": "#7d4ce7",
+          "tertiary": "#632ecd",
+          "on-surface": "#0b1c30",
+          "primary": "#004ac6",
+          "on-tertiary": "#ffffff",
+          "on-surface-variant": "#434655",
+          "primary-fixed-dim": "#b4c5ff",
+          "on-primary-fixed-variant": "#003ea8",
+          "on-primary-fixed": "#00174b",
+          "tertiary-fixed-dim": "#d0bcff",
+          "surface-tint": "#0053db",
+          "secondary-container": "#39b8fd",
+          "on-tertiary-fixed-variant": "#5516be",
+          "surface-bright": "#f8f9ff",
+          "on-primary": "#ffffff",
+          "on-error": "#ffffff",
+          "primary-container": "#2563eb",
+          "surface": "#f8f9ff",
+          "background": "#f8f9ff",
+          "secondary": "#006591",
+          "surface-container-low": "#eff4ff"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "space-sm": "0.5rem",
+          "margin": "1rem",
+          "space-xl": "1.5rem",
+          "gutter": "0.75rem",
+          "space-lg": "1rem",
+          "space-xs": "0.25rem",
+          "space-md": "0.75rem"
+        },
+        "fontFamily": {
+          "label-sm": [
+            "Inter"
+          ],
+          "body-lg": [
+            "Inter"
+          ],
+          "body-md": [
+            "Inter"
+          ],
+          "headline-lg": [
+            "Inter"
+          ],
+          "label-md": [
+            "Inter"
+          ],
+          "data-mono-lg": [
+            "Inter"
+          ],
+          "display-sm": [
+            "Inter"
+          ],
+          "headline-sm": [
+            "Inter"
+          ],
+          "data-mono-sm": [
+            "Inter"
+          ],
+          "label-lg": [
+            "Inter"
+          ],
+          "data-mono-md": [
+            "Inter"
+          ],
+          "body-sm": [
+            "Inter"
+          ],
+          "headline-md": [
+            "Inter"
+          ]
+        },
+        "fontSize": {
+          "label-sm": [
+            "10px",
+            {
+              "lineHeight": "12px",
+              "letterSpacing": "0.04em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-lg": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "fontWeight": "400"
+            }
+          ],
+          "body-md": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.03em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-mono-lg": [
+            "18px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-sm": [
+            "24px",
+            {
+              "lineHeight": "32px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "headline-sm": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "fontWeight": "600"
+            }
+          ],
+          "data-mono-sm": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "fontWeight": "500"
+            }
+          ],
+          "label-lg": [
+            "13px",
+            {
+              "lineHeight": "16px",
+              "fontWeight": "500"
+            }
+          ],
+          "data-mono-md": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "fontWeight": "500"
+            }
+          ],
+          "body-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-md": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between select-none"><div class="flex flex-col flex-1 overflow-y-auto"><div class="h-8 bg-surface-container-low flex items-center px-space-md gap-space-sm"><span class="material-symbols-outlined text-primary text-[16px]">print</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">PRINTGEST ERP v2.0</span></div><nav class="p-space-sm space-y-space-md" data-active-classes="bg-primary-container text-on-primary-container font-semibold"><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Menu Principal</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="dashboard" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">dashboard</span><span class="font-label-lg text-label-lg">Dashboard / Início</span></span></a></div><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cadastros</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="clientes" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">groups</span><span class="font-label-lg text-label-lg">Clientes</span></span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F2</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="produtos-e-servicos" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">inventory_2</span><span class="font-label-lg text-label-lg">Produtos e Serviços</span></span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F3</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="fornecedores" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">local_shipping</span><span class="font-label-lg text-label-lg">Fornecedores</span></span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="funcionarios" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">badge</span><span class="font-label-lg text-label-lg">Funcionários</span></span></a></div><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Movimento</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="ordens-de-servico" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">receipt_long</span><span class="font-label-lg text-label-lg">Ordens de Serviço</span></span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F4</kbd></a><a aria-current="page" class="flex items-center justify-between px-space-md py-space-sm rounded-lg transition-all bg-primary-container text-on-primary-container font-semibold" data-path="orcamentos-graficos" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">request_quote</span><span class="font-label-lg text-label-lg">Orçamentos Gráficos</span></span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="venda-balcao-pdv" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">point_of_sale</span><span class="font-label-lg text-label-lg">Venda Balcão / PDV</span></span><kbd class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">F5</kbd></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="pedidos-de-compra" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">shopping_cart</span><span class="font-label-lg text-label-lg">Pedidos de Compra</span></span></a></div><div class="space-y-space-xs"><div class="px-space-sm py-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Módulos Operacionais</div><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="estoque-e-bobinas" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">inventory</span><span class="font-label-lg text-label-lg">Estoque &amp; Bobinas</span></span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="financeiro-e-caixa" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">account_balance_wallet</span><span class="font-label-lg text-label-lg">Financeiro &amp; Caixa</span></span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="fiscal-nfc-e-nf-e" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">description</span><span class="font-label-lg text-label-lg">Fiscal (NFC-e / NF-e)</span></span></a><a class="flex items-center justify-between px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="relatorios-e-config" href="#"><span class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[18px]">tune</span><span class="font-label-lg text-label-lg">Relatórios &amp; Config</span></span></a></div></nav></div><div class="p-space-sm bg-surface-container-low m-space-sm rounded-lg space-y-space-xs"><div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant"><span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">print_connect</span>Fila de Impressão</span><span class="w-2 h-2 rounded-full bg-secondary-container"></span></div><div class="space-y-1 pt-1 font-body-sm text-body-sm"><div class="flex items-center justify-between text-on-surface"><span class="truncate font-medium">Konica C3070</span><span class="font-label-sm text-label-sm text-secondary-container bg-surface-container-lowest px-1 rounded">Pronta</span></div><div class="flex items-center justify-between text-on-surface-variant"><span class="truncate">Plotter Roland</span><span class="font-label-sm text-label-sm text-tertiary-container bg-surface-container-lowest px-1 rounded">2 Trabalhos</span></div></div></div></aside><div class="pl-64 flex flex-col min-h-screen"><header class="fixed top-0 left-64 right-0 z-40 bg-surface/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] select-none"><div class="h-7 bg-surface-container-high flex items-center justify-between px-space-md"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-primary text-[14px]">desktop_windows</span><span class="font-label-sm text-label-sm text-on-surface-variant tracking-wide font-medium">PRINTGEST ERP V2.0 — GRÁFICA RÁPIDA (MATRIZ)</span></div><div class="flex items-center gap-space-xs"><button class="w-6 h-5 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded" title="Minimizar" type="button"><span class="material-symbols-outlined text-[13px]">minimize</span></button><button class="w-6 h-5 flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface rounded" title="Maximizar" type="button"><span class="material-symbols-outlined text-[13px]">crop_square</span></button><button class="w-6 h-5 flex items-center justify-center text-on-surface-variant hover:bg-error hover:text-on-error rounded" title="Fechar" type="button"><span class="material-symbols-outlined text-[13px]">close</span></button></div></div><div class="h-14 px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md"><img alt="Brand logo. - Primary color: #2563eb
+- Font: inter
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xuaz9r5BIC8vwg0qc0QAun3UPGEHCkAsSzeUUaDAxAso9n-N-l84u2VGqqt13D7my948lk4VJ79e848PEP-VOLFTDjXPCbrfrUSdoW7yr-TxCB9mKsiw6LekijXEdh4u5i5eRCz_vms8yxky2w4cJqZ16-YoIApf6Qni3B3jl6Ktl3RQVVFW1lRoM1NpT2_x6r7CD8HBEBvG2Tnjl7n1nbvFY_Xl5tYXsmAoPNFnFNQsgZXUhkS82g81YT"/><div class="flex items-center gap-space-sm pl-space-xs"><span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface"><span class="w-2 h-2 rounded-full bg-secondary-container"></span>Servidor Local: 192.168.1.10:8000 (Online)</span><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-low font-data-mono-sm text-data-mono-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px] text-primary">verified</span>Licença Ativa (72h OK)</span></div></div><div class="flex-1 max-w-md mx-space-md"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-space-md text-on-surface-variant text-[18px]">search</span><input class="w-full h-8 pl-9 pr-14 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-primary shadow-[0_1px_4px_rgba(0,0,0,0.03)]" placeholder="Busca rápida por Comanda, O.S., Cliente ou Produto... (Ctrl+K)" type="text"/><kbd class="absolute right-space-sm px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">Ctrl+K</kbd></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-sm cursor-pointer"><div class="text-right leading-tight"><div class="font-label-lg text-label-lg font-semibold text-on-surface">Roberto Silva</div><div class="font-label-sm text-label-sm text-on-surface-variant">Gerente de Produção</div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><main class="flex-1 pt-[84px] pb-7 w-full px-space-lg bg-surface"><div class="flex flex-col w-full pb-10">
+<!-- TOP ACTION BAR / HEADER -->
+<header class="flex flex-col xl:flex-row xl:items-center justify-between gap-space-md py-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-display-sm text-display-sm tracking-tight text-on-surface">Orçamentos Gráficos &amp; Simulações</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container font-label-md text-label-md text-primary">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+          Válido por 10 dias
+        </span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+          Modo Cotação Ativa
+        </span>
+</div>
+<div class="flex items-center gap-space-sm font-data-mono-md text-data-mono-md text-on-surface-variant">
+<span class="text-primary font-semibold">ORC-2026-0849</span>
+<span>•</span>
+<span>Edição e Simulação de Margem Operacional</span>
+<span>•</span>
+<span class="text-outline">Última alteração: Hoje às 10:22 por Roberto Silva</span>
+</div>
+</div>
+<!-- SUPREME ACTION & COMPLEMENTARY BUTTONS -->
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="inline-flex items-center gap-2 px-space-lg py-2.5 rounded-xl bg-secondary-container text-on-secondary-container shadow-md hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer font-headline-sm text-headline-sm" onclick="converterEmOS()" type="button">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+<span>Converter em Ordem de Serviço</span>
+<kbd class="px-1.5 py-0.5 rounded bg-on-secondary-container/10 font-data-mono-sm text-data-mono-sm">F9</kbd>
+</button>
+<div class="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl">
+<button class="inline-flex items-center gap-1.5 px-space-md py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-high transition-all font-label-lg text-label-lg shadow-sm" title="WhatsApp" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">send_to_mobile</span>
+<span>WhatsApp / E-mail</span>
+<kbd class="hidden md:inline px-1 py-0.2 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-outline">^W</kbd>
+</button>
+<button class="inline-flex items-center gap-1.5 px-space-md py-2 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-high transition-all font-label-lg text-label-lg shadow-sm" title="Imprimir Proposta" type="button">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">print</span>
+<span>Proposta</span>
+<kbd class="hidden md:inline px-1 py-0.2 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-outline">^P</kbd>
+</button>
+<button class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" title="Duplicar Simulação" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="inline-flex items-center gap-1 px-space-md py-2 rounded-lg bg-primary-container text-on-primary-container font-label-lg text-label-lg hover:brightness-105 transition-all shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Novo</span>
+<kbd class="px-1 py-0.2 rounded bg-white/20 font-data-mono-sm text-data-mono-sm">F6</kbd>
+</button>
+</div>
+</div>
+</header>
+<!-- WORKSPACE GRID (2 COLUMNS: PRODUCTION / SIMULATION & COMMERCIAL CLOSING) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start mt-space-sm">
+<!-- LEFT COLUMN: 8 COLS (CLIENT, RUN TIERS, FINISHINGS, MARGIN BREAKDOWN) -->
+<div class="lg:col-span-8 flex flex-col gap-space-lg min-w-0">
+<!-- CLIENT MASTER CARD -->
+<section class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/30 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10"></div>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-md">
+<div class="w-11 h-11 rounded-xl bg-surface-container flex items-center justify-center text-primary font-bold shadow-sm">
+<span class="material-symbols-outlined text-[24px]">corporate_fare</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-md text-headline-md text-on-surface">Studio Design &amp; Propaganda ME</span>
+<span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm uppercase tracking-wide">
+                  Agência / Revenda Gráfica (-15%)
+                </span>
+</div>
+<div class="flex items-center gap-space-md mt-1 font-body-sm text-body-sm text-on-surface-variant flex-wrap">
+<span class="font-data-mono-sm text-data-mono-sm">CNPJ: 29.402.115/0001-90</span>
+<span>•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">person</span> Contato: Fernanda
+                </span>
+<span>•</span>
+<span class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-primary">
+<span class="material-symbols-outlined text-[14px]">call</span> (11) 97100-3344
+                </span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs self-end md:self-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-low font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">credit_score</span> Limite: R$ 4.500,00
+            </span>
+</div>
+</div>
+</section>
+<!-- TIER COMPARISON CARD (TIRAGENS: 500, 1000, 2500) -->
+<section class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between flex-wrap gap-2">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">layers</span>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Comparativo de Tiragens &amp; Escala de Volume</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Item base: Panfleto Couché 115g Brilho • Formato 10x15cm • 4x4 Cores (Frente e Verso)</p>
+</div>
+</div>
+<span class="font-label-md text-label-md text-secondary-container font-medium px-2 py-0.5 rounded bg-surface-container">
+            Selecione a tiragem aprovada
+          </span>
+</div>
+<!-- 3-TIER BENTO CARDS -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md pt-space-xs">
+<!-- OPÇÃO A: 500 un -->
+<div class="tier-card group relative p-space-md rounded-xl bg-surface-container-low cursor-pointer transition-all hover:bg-surface-container" id="tier-card-a" onclick="selectTier('a', 135.00, 48.00)">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Opção A • Básica</span>
+<span class="w-4 h-4 rounded-full bg-surface-container-lowest flex items-center justify-center text-outline">
+<span class="w-2 h-2 rounded-full bg-transparent" id="tier-check-a"></span>
+</span>
+</div>
+<div class="mt-space-sm">
+<div class="font-data-mono-lg text-data-mono-lg text-on-surface">500 <span class="font-body-sm text-body-sm text-on-surface-variant font-normal">unidades</span></div>
+<div class="font-display-sm text-display-sm text-primary mt-1">R$ 135,00</div>
+<div class="font-data-mono-sm text-data-mono-sm text-outline mt-0.5">R$ 0,270 / unitário</div>
+</div>
+<div class="mt-space-md pt-space-sm space-y-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex justify-between"><span>Custo Insumos:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">R$ 48,00</span></div>
+<div class="flex justify-between"><span>Margem Operacional:</span><span class="font-data-mono-sm text-data-mono-sm text-secondary">64,4%</span></div>
+<div class="flex justify-between"><span>Prazo Produção:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">24 horas</span></div>
+</div>
+</div>
+<!-- OPÇÃO B: 1.000 un (RECOMENDADA / DEFAULT ATIVA) -->
+<div class="tier-card relative p-space-md rounded-xl bg-surface-container-lowest shadow-md cursor-pointer transition-all ring-2 ring-primary" id="tier-card-b" onclick="selectTier('b', 195.00, 74.00)">
+<div class="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-label-sm uppercase tracking-wider shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">recommend</span> Recomendada pelo Operador
+            </div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-semibold">Opção B • Ideal</span>
+<span class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-on-primary">
+<span class="w-2 h-2 rounded-full bg-on-primary" id="tier-check-b"></span>
+</span>
+</div>
+<div class="mt-space-sm">
+<div class="font-data-mono-lg text-data-mono-lg text-on-surface font-bold">1.000 <span class="font-body-sm text-body-sm text-on-surface-variant font-normal">unidades</span></div>
+<div class="font-display-sm text-display-sm text-primary font-bold mt-1">R$ 195,00</div>
+<div class="font-data-mono-sm text-data-mono-sm text-secondary font-medium mt-0.5">R$ 0,195 / unitário (-28%)</div>
+</div>
+<div class="mt-space-md pt-space-sm space-y-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex justify-between"><span>Custo Insumos:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">R$ 74,00</span></div>
+<div class="flex justify-between"><span>Margem Operacional:</span><span class="font-data-mono-sm text-data-mono-sm text-secondary font-semibold">62,1%</span></div>
+<div class="flex justify-between"><span>Prazo Produção:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">24 horas</span></div>
+</div>
+</div>
+<!-- OPÇÃO C: 2.500 un -->
+<div class="tier-card group relative p-space-md rounded-xl bg-surface-container-low cursor-pointer transition-all hover:bg-surface-container" id="tier-card-c" onclick="selectTier('c', 340.00, 142.00)">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-medium">Opção C • Maior Margem</span>
+<span class="w-4 h-4 rounded-full bg-surface-container-lowest flex items-center justify-center text-outline">
+<span class="w-2 h-2 rounded-full bg-transparent" id="tier-check-c"></span>
+</span>
+</div>
+<div class="mt-space-sm">
+<div class="font-data-mono-lg text-data-mono-lg text-on-surface">2.500 <span class="font-body-sm text-body-sm text-on-surface-variant font-normal">unidades</span></div>
+<div class="font-display-sm text-display-sm text-primary mt-1">R$ 340,00</div>
+<div class="font-data-mono-sm text-data-mono-sm text-outline mt-0.5">R$ 0,136 / unitário (-50%)</div>
+</div>
+<div class="mt-space-md pt-space-sm space-y-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex justify-between"><span>Custo Insumos:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">R$ 142,00</span></div>
+<div class="flex justify-between"><span>Margem Operacional:</span><span class="font-data-mono-sm text-data-mono-sm text-secondary">58,2%</span></div>
+<div class="flex justify-between"><span>Prazo Produção:</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface">48 horas</span></div>
+</div>
+</div>
+</div>
+<!-- ACABAMENTOS ESPECIAIS / ADICIONAIS DE PRODUÇÃO -->
+<div class="mt-space-sm pt-space-md">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Serviços de Acabamento Vinculados</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">2 serviços selecionados (+ R$ 60,00)</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm">
+<!-- Finisher 1 -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-all cursor-pointer">
+<input checked="" class="mt-1 rounded text-primary focus:ring-0" id="chk-finish-1" onchange="recalculateTotals()" type="checkbox"/>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">Verniz Total Frente (UV Industrial)</span>
+<span class="font-data-mono-md text-data-mono-md text-primary font-semibold">+ R$ 35,00</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Equipamento: Termolaminadora / UV LED Station • Custo Insumo: R$ 11,20</p>
+</div>
+</label>
+<!-- Finisher 2 -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-all cursor-pointer">
+<input checked="" class="mt-1 rounded text-primary focus:ring-0" id="chk-finish-2" onchange="recalculateTotals()" type="checkbox"/>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">Refile e Dobra ao Meio (Dobra Mecânica)</span>
+<span class="font-data-mono-md text-data-mono-md text-primary font-semibold">+ R$ 25,00</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Equipamento: Dobradeira Horizon • Custo Operacional: R$ 4,80</p>
+</div>
+</label>
+</div>
+</div>
+<!-- SPECIFICATIONS MATRIX -->
+<div class="p-space-md rounded-xl bg-surface-container-low flex flex-wrap items-center justify-between gap-space-md text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline">palette</span>
+<div>
+<div class="font-label-sm text-label-sm uppercase text-on-surface-variant">Escala Cromática</div>
+<div class="font-headline-sm text-headline-sm">CMYK 4x4 Frente/Verso</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline">aspect_ratio</span>
+<div>
+<div class="font-label-sm text-label-sm uppercase text-on-surface-variant">Formato Final</div>
+<div class="font-headline-sm text-headline-sm">100 x 150 mm (Sangra 2mm)</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline">print</span>
+<div>
+<div class="font-label-sm text-label-sm uppercase text-on-surface-variant">Impressora Designada</div>
+<div class="font-headline-sm text-headline-sm">Konica Minolta C3070</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline">timer</span>
+<div>
+<div class="font-label-sm text-label-sm uppercase text-on-surface-variant">Tempo de Máquina Estimado</div>
+<div class="font-headline-sm text-headline-sm">22 minutos</div>
+</div>
+</div>
+</div>
+</section>
+<!-- TRANSPARENCIA DE CUSTOS INTERNOS E SIMULADOR DE MARGEM OPERACIONAL -->
+<section class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[20px]">analytics</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Detalhamento de Custos Internos &amp; Margem Líquida</h2>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-outline">Fórmula: [Preço Venda - CPV - Impostos Simples]</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-lg items-center">
+<!-- VISUAL METRIC: SVG DONUT GAUGE CHART (PRODUÇÃO X LUCRO BRUTO) -->
+<div class="md:col-span-4 flex flex-col items-center justify-center p-space-md rounded-xl bg-surface-container-low text-center">
+<div class="relative w-36 h-36 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<!-- Background track -->
+<circle class="text-surface-container-highest" cx="50" cy="50" fill="none" r="38" stroke="currentColor" stroke-width="12"></circle>
+<!-- Cost slice (34.2%) -->
+<circle class="text-outline" cx="50" cy="50" fill="none" r="38" stroke="currentColor" stroke-dasharray="238.76" stroke-dashoffset="157.1" stroke-width="12"></circle>
+<!-- Margin slice (65.8%) -->
+<circle class="text-secondary-container" cx="50" cy="50" fill="none" r="38" stroke="currentColor" stroke-dasharray="238.76" stroke-dashoffset="81.65" stroke-linecap="round" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-data-mono-lg text-data-mono-lg font-bold text-on-surface">55,8%</span>
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Margem Oper.</span>
+</div>
+</div>
+<div class="flex items-center gap-space-md mt-space-sm font-label-sm text-label-sm">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-outline"></span> Custo: R$ 86,00</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-secondary-container"></span> Lucro: R$ 109,00</span>
+</div>
+</div>
+<!-- COST BREAKDOWN LIST -->
+<div class="md:col-span-8 space-y-space-sm">
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[16px] text-primary">filter_frames</span>
+<span class="text-on-surface">Cliques Digitais / Matrizes Konica (4x4)</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">R$ 28,50</span>
+</div>
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[16px] text-primary">description</span>
+<span class="text-on-surface">Papel Couché 115g (Resmas formato SRA3 cortado)</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">R$ 45,50</span>
+</div>
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[16px] text-primary">settings</span>
+<span class="text-on-surface">Acabamento, Refile e Perdas de Setup (5% estimado)</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">R$ 12,00</span>
+</div>
+<div class="pt-space-xs flex items-center justify-between font-label-md text-label-md px-1 text-on-surface-variant">
+<span>CUSTO TOTAL DE PRODUÇÃO DIRETA:</span>
+<span class="font-data-mono-md text-data-mono-md text-error font-bold">R$ 86,00</span>
+</div>
+</div>
+</div>
+</section>
+<!-- ARTWORK & ASSET PREVIEW DRAWER (OS INTEGRATION COMPONENT) -->
+<section class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col md:flex-row items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<img class="w-16 h-16 rounded-lg object-cover shadow-sm" data-alt="Close up proof print of colorful corporate advertising flyer on gloss coated paper under neutral industrial laboratory lighting with registration marks" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvZPHh_7uqX3VKNTCXBE7iagQ1MD2XCP2LUbfMsI2QYtgEAT4I_RcSOgiF4YOsCOOtaJBYwmb6OIuYDBBsdHcuMCxD1Ru3o4p6VZxgqkzxPk0qcHKe3Kh27mhFpP_oaBC-mnasVEwDbARG0OWX5o9YGwgKvDDT-o6O0ZBi7_xmbJB1IF7Cbg0NOgxZSWwn6yJ72_b9JilP1Aio0DrM0CWskfehFcvncqBhTWDxUuX72WkJVs7TG0FbKQ"/>
+<div>
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface">panfleto_studio_promo_v3.pdf</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-secondary">PDF/X-1a OK</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Arquivo pré-validado no Enfocus PitStop Server: 300 DPI, CMYK nativo, fontes em curvas.</p>
+</div>
+</div>
+<div class="flex items-center gap-space-xs w-full md:w-auto justify-end">
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+<span>Ver RIP Prova</span>
+</button>
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">upload_file</span>
+<span>Substituir</span>
+</button>
+</div>
+</section>
+</div>
+<!-- RIGHT COLUMN: 4 COLS (STATUS, PAYMENT CONDITIONS, SUMMARY & HUGE CONVERT OS CTA) -->
+<div class="lg:col-span-4 flex flex-col gap-space-lg">
+<!-- STATUS & VALIDITY PILL -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Status da Proposta</span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-highest text-primary font-headline-sm text-headline-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+            Aberto • Aguardando Cliente
+          </span>
+</div>
+<div class="space-y-space-xs font-body-sm text-body-sm text-on-surface-variant pt-space-xs">
+<div class="flex justify-between">
+<span>Data de Emissão:</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-medium">24/10/2026 às 09:40</span>
+</div>
+<div class="flex justify-between">
+<span>Validade da Proposta:</span>
+<span class="font-data-mono-sm text-data-mono-sm text-error font-medium">03/11/2026 (10 dias)</span>
+</div>
+<div class="flex justify-between">
+<span>Atendente Responsável:</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium">Roberto Silva (Estação 02)</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low font-body-sm text-body-sm space-y-1">
+<div class="flex items-center gap-1 text-primary font-medium">
+<span class="material-symbols-outlined text-[16px]">history</span>
+<span>Rastreamento de Comunicação</span>
+</div>
+<p class="text-on-surface-variant">Enviado link PDF no WhatsApp da Fernanda às 10:14. Visualizado pelo cliente às 10:19.</p>
+</div>
+</div>
+<!-- PAYMENT CONDITIONS SELECTION -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-space-md">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Condições Comerciais Oferecidas</span>
+<span class="material-symbols-outlined text-outline text-[18px]">payments</span>
+</div>
+<div class="space-y-space-sm">
+<!-- Condition 1: PIX 5% OFF -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-all cursor-pointer">
+<input checked="" class="mt-1 text-primary focus:ring-0" name="pay_cond" type="radio"/>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">Pix à Vista</span>
+<span class="font-data-mono-sm text-data-mono-sm text-secondary font-bold">R$ 242,25</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">5% de desconto financeiro aplicado imediato.</p>
+</div>
+</label>
+<!-- Condition 2: 50% / 50% -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-all cursor-pointer">
+<input class="mt-1 text-primary focus:ring-0" name="pay_cond" type="radio"/>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">50% Entrada + 50% Retirada</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">2x R$ 127,50</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Cartão de Crédito ou Dinheiro no balcão.</p>
+</div>
+</label>
+<!-- Condition 3: Faturado 28 DDL -->
+<label class="flex items-start gap-space-sm p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-all cursor-pointer">
+<input class="mt-1 text-primary focus:ring-0" name="pay_cond" type="radio"/>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">Boleto 28 DDL (Faturado)</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">1x R$ 255,00</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Crédito homologado para Studio Design ME.</p>
+</div>
+</label>
+</div>
+</div>
+<!-- SUMMARY TOTALIZER & THE SUPREME CONVERT CTA -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-lg flex flex-col gap-space-md">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Resumo Final do Orçamento</span>
+<div class="space-y-space-xs font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between">
+<span>Subtotal Opção B (1.000 un):</span>
+<span class="font-data-mono-md text-data-mono-md text-on-surface font-semibold" id="txt-subtotal">R$ 195,00</span>
+</div>
+<div class="flex justify-between">
+<span>Acabamentos e Serviços:</span>
+<span class="font-data-mono-md text-data-mono-md text-on-surface font-semibold" id="txt-finishes">+ R$ 60,00</span>
+</div>
+<div class="flex justify-between text-secondary">
+<span>Desconto Comercial Especial:</span>
+<span class="font-data-mono-md text-data-mono-md font-semibold">- R$ 0,00</span>
+</div>
+</div>
+<div class="p-space-md rounded-xl bg-surface-container flex flex-col gap-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Valor Total da Proposta</span>
+<div class="flex items-baseline justify-between">
+<span class="font-display-sm text-display-sm text-primary font-bold" id="txt-total">R$ 255,00</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Em até 2x s/ juros</span>
+</div>
+</div>
+<!-- THE SUPREME F9 CALL TO ACTION -->
+<button class="w-full group relative overflow-hidden flex flex-col items-center justify-center p-space-md rounded-xl bg-secondary-container text-on-secondary-container shadow-md hover:shadow-xl hover:brightness-105 active:scale-[0.98] transition-all cursor-pointer" onclick="converterEmOS()" type="button">
+<div class="flex items-center gap-2 font-headline-md text-headline-md">
+<span class="material-symbols-outlined text-[24px]">bolt</span>
+<span>CONVERTER EM ORDEM DE SERVIÇO</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm opacity-90 mt-0.5">
+            [F9] Gera O.S. com arte e dados vinculados instantaneamente
+          </span>
+</button>
+<div class="flex items-center justify-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm text-center">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+<span>Bloqueia alteração e reserva lote de papel couché no estoque</span>
+</div>
+</div>
+</div>
+</div>
+<!-- FLOATING BOTTOM SHORTCUTS BAR (DENSE ERP BAR) -->
+<div class="mt-space-xl p-space-md rounded-xl bg-surface-container-low flex flex-wrap items-center justify-between gap-space-md select-none text-on-surface-variant">
+<div class="flex items-center gap-space-md font-data-mono-sm text-data-mono-sm flex-wrap">
+<span class="text-on-surface font-semibold flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-primary shadow-sm font-bold">F9</kbd> Converter em O.S.
+      </span>
+<span class="text-on-surface font-semibold flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface shadow-sm font-bold">F6</kbd> Novo Orçamento
+      </span>
+<span class="text-on-surface font-semibold flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface shadow-sm font-bold">Ctrl+P</kbd> Imprimir Proposta
+      </span>
+<span class="text-on-surface font-semibold flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface shadow-sm font-bold">Ctrl+W</kbd> Enviar WhatsApp
+      </span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface shadow-sm font-bold">Esc</kbd> Voltar à Lista
+      </span>
+</div>
+<div class="flex items-center gap-space-sm font-data-mono-sm text-data-mono-sm">
+<span class="inline-flex items-center gap-1 text-secondary font-medium">
+<span class="material-symbols-outlined text-[14px]">cloud_sync</span> Sincronizado com Daemon Local
+      </span>
+</div>
+</div>
+<!-- CONVERSION SUCCESS MODAL NOTIFICATION (HIDDEN BY DEFAULT) -->
+<div class="fixed inset-0 bg-on-background/40 backdrop-blur-sm z-50 flex items-center justify-center hidden" id="conversion-modal">
+<div class="bg-surface-container-lowest rounded-xl p-space-xl max-w-md w-full shadow-2xl space-y-space-md animate-in fade-in zoom-in-95 duration-150">
+<div class="w-12 h-12 rounded-xl bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[28px]">check_circle</span>
+</div>
+<div>
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Ordem de Serviço Gerada!</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">
+          O Orçamento <strong class="text-on-surface">ORC-2026-0849</strong> foi convertido com sucesso na <strong class="text-primary">O.S. Nº 2026-1044</strong>. O lote de papel couché foi empenhado e o RIP recebeu a pré-visualização.
+        </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low font-data-mono-sm text-data-mono-sm space-y-1 text-on-surface">
+<div>• 1.000 un Panfleto 10x15cm Couché 115g 4x4</div>
+<div>• Total O.S.: R$ 255,00 (Faturado 28 DDL)</div>
+<div>• Fila: Konica Minolta C3070 (Prioridade Normal)</div>
+</div>
+<div class="flex items-center gap-space-sm justify-end pt-space-xs">
+<button class="px-space-md py-2 rounded-lg bg-surface-container text-on-surface font-label-lg text-label-lg hover:bg-surface-container-high transition-all" onclick="closeModal()" type="button">
+          Permanecer no Orçamento
+        </button>
+<button class="px-space-md py-2 rounded-lg bg-primary text-on-primary font-label-lg text-label-lg hover:bg-primary-container transition-all shadow-sm" onclick="window.location.reload()" type="button">
+          Ir para a O.S. (F4)
+        </button>
+</div>
+</div>
+</div>
+</div>
+<!-- INTERACTIVE SCRIPT FOR RUN SELECTION AND DIRECT CONVERSION -->
+<script>
+  let currentBasePrice = 195.00;
+
+  function selectTier(tierKey, basePrice, cost) {
+    currentBasePrice = basePrice;
+    
+    // Reset all tiers
+    ['a', 'b', 'c'].forEach(k => {
+      const card = document.getElementById('tier-card-' + k);
+      const dot = document.getElementById('tier-check-' + k);
+      if (card && dot) {
+        card.classList.remove('ring-2', 'ring-primary', 'bg-surface-container-lowest', 'shadow-md');
+        card.classList.add('bg-surface-container-low');
+        dot.classList.remove('bg-on-primary');
+        dot.classList.add('bg-transparent');
+        dot.parentElement.classList.remove('bg-primary');
+        dot.parentElement.classList.add('bg-surface-container-lowest');
+      }
+    });
+
+    // Set selected tier
+    const activeCard = document.getElementById('tier-card-' + tierKey);
+    const activeDot = document.getElementById('tier-check-' + tierKey);
+    if (activeCard && activeDot) {
+      activeCard.classList.remove('bg-surface-container-low');
+      activeCard.classList.add('ring-2', 'ring-primary', 'bg-surface-container-lowest', 'shadow-md');
+      activeDot.classList.remove('bg-transparent');
+      activeDot.classList.add('bg-on-primary');
+      activeDot.parentElement.classList.remove('bg-surface-container-lowest');
+      activeDot.parentElement.classList.add('bg-primary');
+    }
+
+    recalculateTotals();
+  }
+
+  function recalculateTotals() {
+    const chk1 = document.getElementById('chk-finish-1');
+    const chk2 = document.getElementById('chk-finish-2');
+    
+    let finishes = 0;
+    if (chk1 && chk1.checked) finishes += 35.00;
+    if (chk2 && chk2.checked) finishes += 25.00;
+
+    const total = currentBasePrice + finishes;
+
+    const subEl = document.getElementById('txt-subtotal');
+    const finEl = document.getElementById('txt-finishes');
+    const totEl = document.getElementById('txt-total');
+
+    if (subEl) subEl.textContent = 'R$ ' + currentBasePrice.toFixed(2).replace('.', ',');
+    if (finEl) finEl.textContent = '+ R$ ' + finishes.toFixed(2).replace('.', ',');
+    if (totEl) totEl.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  }
+
+  function converterEmOS() {
+    const modal = document.getElementById('conversion-modal');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('conversion-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // Keyboard shortcut listener for Print Shop rapid POS flow
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'F9') {
+      e.preventDefault();
+      converterEmOS();
+    }
+    if (e.key === 'Escape') {
+      closeModal();
+    }
+  });
+</script></main><footer class="fixed bottom-0 left-64 right-0 h-7 bg-surface-container-high z-40 flex items-center justify-between px-space-md select-none"><div class="flex items-center gap-space-md font-data-mono-sm text-data-mono-sm text-on-surface-variant"><span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>Daemon: 127.0.0.1:8000 Conectado</span><span>|</span><span>Estação: 02 (Balcão Atendimento)</span><span>|</span><span>Banco: PostgreSQL 15 Local</span></div><div class="flex items-center gap-space-md font-data-mono-sm text-data-mono-sm text-on-surface-variant"><div class="flex items-center gap-2"><span class="text-on-surface font-semibold">[F1]</span> Ajuda <span class="text-on-surface font-semibold ml-2">[F2]</span> Clientes <span class="text-on-surface font-semibold ml-2">[F3]</span> Produtos <span class="text-on-surface font-semibold ml-2">[F4]</span> O.S. <span class="text-on-surface font-semibold ml-2">[F5]</span> PDV <span class="text-on-surface font-semibold ml-2">[Esc]</span> Voltar</div><span>|</span><span>v2.0.0</span></div></footer></div></body></html>

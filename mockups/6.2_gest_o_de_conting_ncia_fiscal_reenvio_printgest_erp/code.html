@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"on-primary-fixed-variant":"#003ea8","on-tertiary":"#ffffff","inverse-primary":"#b4c5ff","surface-container-lowest":"#ffffff","secondary-container":"#39b8fd","on-error-container":"#93000a","on-tertiary-container":"#f6edff","secondary":"#006591","primary-fixed-dim":"#b4c5ff","on-surface-variant":"#434655","on-tertiary-fixed":"#23005c","primary":"#004ac6","surface-tint":"#0053db","on-error":"#ffffff","surface-bright":"#f8f9ff","on-primary":"#ffffff","on-secondary-container":"#004666","tertiary-fixed-dim":"#d0bcff","outline-variant":"#c3c6d7","on-primary-container":"#eeefff","on-primary-fixed":"#00174b","primary-fixed":"#dbe1ff","tertiary-container":"#7d4ce7","background":"#f8f9ff","error-container":"#ffdad6","tertiary-fixed":"#e9ddff","secondary-fixed":"#c9e6ff","on-secondary-fixed-variant":"#004c6e","surface-container-highest":"#d3e4fe","on-background":"#0b1c30","inverse-on-surface":"#eaf1ff","on-secondary":"#ffffff","surface-container-high":"#dce9ff","surface-variant":"#d3e4fe","surface":"#f8f9ff","error":"#ba1a1a","surface-container-low":"#eff4ff","on-surface":"#0b1c30","secondary-fixed-dim":"#89ceff","on-secondary-fixed":"#001e2f","tertiary":"#632ecd","surface-container":"#e5eeff","on-tertiary-fixed-variant":"#5516be","primary-container":"#2563eb","outline":"#737686","inverse-surface":"#213145","surface-dim":"#cbdbf5"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-xl":"1.5rem","space-sm":"0.5rem","space-md":"0.75rem","space-lg":"1rem","gutter":"0.75rem","space-xs":"0.25rem","margin":"1rem"},"fontFamily":{"headline-sm":["Inter"],"display-sm":["Inter"],"body-md":["Inter"],"body-lg":["Inter"],"data-mono-md":["Inter"],"label-lg":["Inter"],"label-md":["Inter"],"headline-md":["Inter"],"body-sm":["Inter"],"label-sm":["Inter"],"data-mono-sm":["Inter"],"data-mono-lg":["Inter"],"headline-lg":["Inter"]},"fontSize":{"headline-sm":["14px",{"lineHeight":"20px","fontWeight":"600"}],"display-sm":["24px",{"lineHeight":"32px","letterSpacing":"-0.02em","fontWeight":"700"}],"body-md":["13px",{"lineHeight":"18px","fontWeight":"400"}],"body-lg":["14px",{"lineHeight":"20px","fontWeight":"400"}],"data-mono-md":["13px",{"lineHeight":"18px","fontWeight":"500"}],"label-lg":["13px",{"lineHeight":"16px","fontWeight":"500"}],"label-md":["11px",{"lineHeight":"14px","letterSpacing":"0.03em","fontWeight":"600"}],"headline-md":["16px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-sm":["12px",{"lineHeight":"16px","fontWeight":"400"}],"label-sm":["10px",{"lineHeight":"12px","letterSpacing":"0.04em","fontWeight":"600"}],"data-mono-sm":["11px",{"lineHeight":"14px","fontWeight":"500"}],"data-mono-lg":["18px",{"lineHeight":"24px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-lg":["20px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}]}}}}</script></head><body class="bg-surface font-body-md text-body-md text-on-surface select-none"><header class="fixed top-0 left-0 right-0 z-50 flex flex-col"><div class="h-8 w-full bg-inverse-surface text-inverse-on-surface flex items-center justify-between px-space-md select-none"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-inverse-primary text-[14px]">print</span><span class="font-label-sm text-label-sm tracking-wider uppercase opacity-90">PRINTGEST ERP V2.0 — GRÁFICA RÁPIDA (MATRIZ)</span></div><div class="flex items-center"><button aria-label="Minimizar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-surface-variant/20 transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">minimize</span></button><button aria-label="Maximizar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-surface-variant/20 transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">crop_square</span></button><button aria-label="Fechar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-error hover:text-on-error transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">close</span></button></div></div><div class="h-12 w-full bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] px-space-md flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #2563eb - Font: inter - Mode: light - Roundness: rounded-sm" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xuaz9r5BIC8vwg0qc0QAun3UPGEHCkAsSzeUUaDAxAso9n-N-l84u2VGqqt13D7my948lk4VJ79e848PEP-VOLFTDjXPCbrfrUSdoW7yr-TxCB9mKsiw6LekijXEdh4u5i5eRCz_vms8yxky2w4cJqZ16-YoIApf6Qni3B3jl6Ktl3RQVVFW1lRoM1NpT2_x6r7CD8HBEBvG2Tnjl7n1nbvFY_Xl5tYXsmAoPNFnFNQsgZXUhkS82g81YT"/><span class="font-headline-sm text-headline-sm text-primary tracking-tight">PrintGest ERP</span></div><div class="hidden xl:flex items-center gap-space-sm"><div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span><span>Servidor Local: 192.168.1.10:8000 (Online)</span></div><div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-high text-on-surface font-data-mono-sm text-data-mono-sm"><span class="material-symbols-outlined text-[12px] text-secondary">verified</span><span>Licença Ativa (72h OK)</span></div></div></div><div class="flex items-center gap-space-md"><div class="relative hidden md:flex items-center"><span class="material-symbols-outlined absolute left-space-sm text-on-surface-variant text-[16px]">search</span><input class="h-[30px] w-64 bg-surface-container-low pl-8 pr-space-md py-1 font-body-sm text-body-sm text-on-surface rounded-lg focus:outline-none focus:bg-surface-container-lowest placeholder:text-on-surface-variant/70" placeholder="Busca rápida geral... [Ctrl+K]" type="text"/></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="text-right hidden sm:block"><div class="font-label-md text-label-md text-on-surface leading-none">Roberto Silva</div><div class="font-label-sm text-label-sm text-on-surface-variant leading-none mt-1">Gerente Fiscal / Produção</div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><aside class="fixed left-0 top-20 bottom-8 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col overflow-y-auto"><div class="p-space-sm flex-1 flex flex-col gap-space-sm"><div class="px-space-sm pt-space-xs pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Menu Principal</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="dashboard" href="#"><span>Dashboard / Início</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F1</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cadastros</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-clientes" href="#"><span>Clientes</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F2</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="produtos-servicos" href="#"><span>Produtos e Serviços</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F3</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-fornecedores" href="#"><span>Fornecedores</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-funcionarios" href="#"><span>Funcionários</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Movimento</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="ordens-servico" href="#"><span>Ordens de Serviço</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F4</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="orcamentos-graficos" href="#"><span>Orçamentos Gráficos</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="venda-balcao-pdv" href="#"><span>Venda Balcão / PDV</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F5</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="pedidos-compra" href="#"><span>Pedidos de Compra</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Módulos Operacionais</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="estoque-bobinas" href="#"><span>Estoque &amp; Bobinas</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F6</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="financeiro-caixa" href="#"><span>Financeiro &amp; Caixa</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F7</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="fiscal-nfe" href="#"><span>Fiscal (NFC-e / NF-e)</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F8</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="relatorios-configuracoes" href="#"><span>Relatórios &amp; Config</span></a></nav></div></aside><div class="pl-64"><main class="w-full min-h-screen pt-20 pb-8 bg-surface px-space-lg"><div class="flex flex-col w-full gap-space-md">
+<!-- 1. BANNER SUPERIOR DE CONTINGÊNCIA ATIVA (ALERTA CRÍTICO INSTITUCIONAL) -->
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-surface-container-lowest p-space-md shadow-md">
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-md relative z-10">
+<div class="flex items-start gap-space-md max-w-4xl">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest/20 flex items-center justify-center shrink-0 animate-pulse">
+<span class="material-symbols-outlined text-surface-container-lowest text-[26px]">wifi_off</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-sm text-headline-sm uppercase tracking-wider font-bold">Modo Contingência Fiscal Ativado (NFC-e Offline)</span>
+<span class="px-space-xs py-0.5 rounded-lg bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm font-bold">CÓD 999: TIMEOUT SEFAZ</span>
+</div>
+<p class="font-body-sm text-body-sm opacity-95 text-surface-container-lowest leading-relaxed">
+            O servidor da SEFAZ Estadual ou o Gateway Focus NFe não respondeu nos últimos 4 minutos (Timeout de comunicação). O sistema entrou em modo de contingência local automática conforme a legislação fiscal. O balcão e a entrega de O.S. <strong class="underline decoration-surface-container-lowest decoration-2">CONTINUAM OPERANDO NORMALMENTE</strong> emitindo comprovantes provisórios de NFC-e.
+          </p>
+<div class="flex items-center gap-space-md mt-1 font-data-mono-sm text-data-mono-sm opacity-90">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-container-lowest inline-block"></span>
+              Último ping falhou: 14:18:22
+            </span>
+<span>•</span>
+<span>Tentativas de reconexão automática a cada 30 segundos (Próxima em 12s)</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm self-stretch lg:self-auto shrink-0 justify-end">
+<button class="h-9 px-space-md rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md flex items-center gap-space-xs hover:bg-surface-container-high transition-colors shadow-sm" id="btn-test-sefaz">
+<span class="material-symbols-outlined text-[16px] text-primary">network_check</span>
+<span>Testar Conexão SEFAZ Agora</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-high font-data-mono-sm text-data-mono-sm text-on-surface-variant">F5</kbd>
+</button>
+</div>
+</div>
+</div>
+<!-- 2. CABEÇALHO DA PÁGINA COM AÇÕES PRINCIPAIS -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md py-space-xs">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<span>Módulo Fiscal</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-primary font-bold">Contingência &amp; Transmissão Offline</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mt-0.5">Fila de Transmissão em Contingência (NFC-e / NF-e)</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+        Documentos fiscais gerados em modo offline aguardando autorização da SEFAZ e sincronização com o banco de dados fiscal.
+      </p>
+</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="h-9 px-space-md rounded-lg bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-space-sm hover:opacity-90 transition-opacity shadow-sm" id="btn-transmit-all">
+<span class="material-symbols-outlined text-[16px]">cloud_upload</span>
+<span>Transmitir Fila Completa</span>
+<span class="px-1.5 py-0.5 rounded-full bg-surface-container-lowest text-primary font-data-mono-sm text-data-mono-sm font-bold">6 Documentos</span>
+<kbd class="px-1 py-0.5 rounded bg-surface-container-lowest/20 font-data-mono-sm text-data-mono-sm text-on-primary">F9</kbd>
+</button>
+<button class="h-9 px-space-md rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md flex items-center gap-space-xs hover:bg-surface-container-high transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">settings</span>
+<span>Configurações</span>
+</button>
+<button class="h-9 px-space-md rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md flex items-center gap-space-xs hover:bg-surface-container-high transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">print</span>
+<span>Imprimir Relatório</span>
+<kbd class="px-1 py-0.5 rounded bg-surface-container-high font-data-mono-sm text-data-mono-sm text-on-surface-variant">Ctrl+P</kbd>
+</button>
+</div>
+</div>
+<!-- 3. PAINEL DE DIAGNÓSTICO TÉCNICO & PRAZOS LEGAIS (4 BENTO CARDS) -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- Card 1: Notas em fila local -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Notas em Fila Local</span>
+<span class="material-symbols-outlined text-primary text-[20px]">database</span>
+</div>
+<div class="my-space-sm flex items-baseline justify-between">
+<div class="font-display-sm text-display-sm text-on-surface">6 Documentos</div>
+<div class="font-data-mono-md text-data-mono-md text-primary font-bold">R$ 1.415,00</div>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-primary inline-block shrink-0"></span>
+<span class="truncate">Retidos em buffer SQLite/Postgres seguro</span>
+</div>
+</div>
+<!-- Card 2: Prazo Legal de Transmissão -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Prazo Legal Limite (24h)</span>
+<span class="material-symbols-outlined text-secondary text-[20px]">hourglass_top</span>
+</div>
+<div class="my-space-sm flex items-baseline justify-between">
+<div class="font-display-sm text-display-sm text-secondary">22h 38min</div>
+<span class="px-2 py-0.5 rounded-lg bg-surface-container-high font-data-mono-sm text-data-mono-sm text-secondary font-bold">Dentro do Prazo</span>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[14px] text-secondary shrink-0">gavel</span>
+<span class="truncate">Legislação exige envio em até 24h</span>
+</div>
+</div>
+<!-- Card 3: Diagnóstico de Gateway & WebService -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Motivo da Contingência</span>
+<span class="material-symbols-outlined text-amber-500 text-[20px]">error</span>
+</div>
+<div class="my-space-sm">
+<div class="font-headline-sm text-headline-sm text-on-surface line-clamp-1">Timeout no WebService SEFAZ-SP</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant mt-0.5">Tempo resposta &gt; 15s (FocusNFe Gateway)</div>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-amber-500 inline-block shrink-0"></span>
+<span class="truncate">Retentativas a cada 30s ativas</span>
+</div>
+</div>
+<!-- Card 4: Status do Balcão e O.S. -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Operação do Balcão</span>
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+</div>
+<div class="my-space-sm flex items-baseline justify-between">
+<div class="font-display-sm text-display-sm text-primary">100% Liberada</div>
+<span class="px-2 py-0.5 rounded-lg bg-surface-container text-primary font-data-mono-sm text-data-mono-sm font-bold">DANFE Provisório</span>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[14px] text-primary shrink-0">point_of_sale</span>
+<span class="truncate">Vendas e entregas sem interrupções</span>
+</div>
+</div>
+</div>
+<!-- 4. ÁREA DE AÇÃO E FILA DE DOCUMENTOS RETIDOS (DATA GRID TÉCNICO COMPACTO) -->
+<div class="rounded-xl bg-surface-container-lowest shadow-sm flex flex-col overflow-hidden">
+<div class="p-space-md bg-surface-container-low flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">pending_actions</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Documentos Gerados em Contingência</h2>
+<span class="px-space-sm py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-data-mono-sm text-data-mono-sm">6 registros retidos</span>
+</div>
+<div class="flex items-center gap-space-sm w-full sm:w-auto">
+<div class="relative flex-1 sm:w-64">
+<span class="material-symbols-outlined absolute left-space-sm top-2 text-on-surface-variant text-[16px]">search</span>
+<input class="h-[32px] w-full bg-surface-container-lowest pl-8 pr-space-sm font-body-sm text-body-sm text-on-surface rounded-lg focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-on-surface-variant/60" placeholder="Filtrar por O.S., Cliente ou Nº..." type="text"/>
+</div>
+<button class="h-[32px] px-space-sm rounded-lg bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container-high transition-colors flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[14px]">filter_list</span>
+<span>Modelo 65/55</span>
+</button>
+</div>
+</div>
+<!-- Tabela de Alta Densidade com Seleção Múltipla -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-md text-label-md uppercase tracking-wider h-8">
+<th class="px-space-md py-1 w-10 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" title="Selecionar Todos" type="checkbox"/>
+</th>
+<th class="px-space-sm py-1">Hora Emissão</th>
+<th class="px-space-sm py-1">Tipo / Modelo</th>
+<th class="px-space-sm py-1">Número / Série</th>
+<th class="px-space-sm py-1">Origem / Documento</th>
+<th class="px-space-sm py-1">Cliente / Destinatário</th>
+<th class="px-space-sm py-1 text-right">Valor (R$)</th>
+<th class="px-space-sm py-1">Status do Buffer Local</th>
+<th class="px-space-md py-1 text-center">Ações Rápidas</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container font-body-sm text-body-sm text-on-surface">
+<!-- Linha 1 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="px-space-md py-2 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm text-on-surface-variant">14:22:10</td>
+<td class="px-space-sm py-2">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">NFC-e Mod 65</span>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm font-bold text-primary">#008495 <span class="font-normal text-on-surface-variant">Série 900</span></td>
+<td class="px-space-sm py-2 font-medium">Venda Balcão #2896 <span class="text-on-surface-variant block text-[11px] font-normal">Cartão de Visita Express 250g</span></td>
+<td class="px-space-sm py-2">
+<div class="font-medium">João Carlos Vasconcelos</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CPF: 219.043.888-12</div>
+</td>
+<td class="px-space-sm py-2 text-right font-data-mono-sm text-data-mono-sm font-bold">R$ 85,00</td>
+<td class="px-space-sm py-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-primary font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                Buffer Offline OK
+              </span>
+</td>
+<td class="px-space-md py-2">
+<div class="flex items-center justify-center gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-primary transition-colors" title="Transmitir Agora">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Ver DANFE Provisório">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Auditar XML">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Linha 2 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-low/30">
+<td class="px-space-md py-2 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm text-on-surface-variant">14:18:45</td>
+<td class="px-space-sm py-2">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">NFC-e Mod 65</span>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm font-bold text-primary">#008494 <span class="font-normal text-on-surface-variant">Série 900</span></td>
+<td class="px-space-sm py-2 font-medium">Venda Balcão #2895 <span class="text-on-surface-variant block text-[11px] font-normal">20 Impressões A3 Laser Couche</span></td>
+<td class="px-space-sm py-2">
+<div class="font-medium">Mariana Alencar Design ME</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 34.551.981/0001-20</div>
+</td>
+<td class="px-space-sm py-2 text-right font-data-mono-sm text-data-mono-sm font-bold">R$ 120,00</td>
+<td class="px-space-sm py-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-primary font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                Buffer Offline OK
+              </span>
+</td>
+<td class="px-space-md py-2">
+<div class="flex items-center justify-center gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-primary transition-colors" title="Transmitir Agora">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Ver DANFE Provisório">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Auditar XML">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Linha 3 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="px-space-md py-2 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm text-on-surface-variant">14:10:04</td>
+<td class="px-space-sm py-2">
+<span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold">NF-e Mod 55</span>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm font-bold text-tertiary">#001241 <span class="font-normal text-on-surface-variant">Série 900</span></td>
+<td class="px-space-sm py-2 font-medium">O.S. #8946 <span class="text-on-surface-variant block text-[11px] font-normal">Faixa Lona 3x1m Ilhós + Reforço</span></td>
+<td class="px-space-sm py-2">
+<div class="font-medium">Restaurante Sabor &amp; Arte EIRELI</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 18.239.400/0001-92</div>
+</td>
+<td class="px-space-sm py-2 text-right font-data-mono-sm text-data-mono-sm font-bold">R$ 380,00</td>
+<td class="px-space-sm py-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                Aguardando SEFAZ
+              </span>
+</td>
+<td class="px-space-md py-2">
+<div class="flex items-center justify-center gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-primary transition-colors" title="Transmitir Agora">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Ver DANFE Provisório">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Auditar XML">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Linha 4 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-low/30">
+<td class="px-space-md py-2 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm text-on-surface-variant">13:55:12</td>
+<td class="px-space-sm py-2">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">NFC-e Mod 65</span>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm font-bold text-primary">#008493 <span class="font-normal text-on-surface-variant">Série 900</span></td>
+<td class="px-space-sm py-2 font-medium">Venda Balcão #2892 <span class="text-on-surface-variant block text-[11px] font-normal">Encadernações Wire-O Apostilas</span></td>
+<td class="px-space-sm py-2">
+<div class="font-medium">Colégio Horizonte Ltda</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CNPJ: 05.120.449/0001-31</div>
+</td>
+<td class="px-space-sm py-2 text-right font-data-mono-sm text-data-mono-sm font-bold">R$ 290,00</td>
+<td class="px-space-sm py-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-primary font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                Buffer Offline OK
+              </span>
+</td>
+<td class="px-space-md py-2">
+<div class="flex items-center justify-center gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-primary transition-colors" title="Transmitir Agora">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Ver DANFE Provisório">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Auditar XML">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Linha 5 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+<td class="px-space-md py-2 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm text-on-surface-variant">13:40:50</td>
+<td class="px-space-sm py-2">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">NFC-e Mod 65</span>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm font-bold text-primary">#008492 <span class="font-normal text-on-surface-variant">Série 900</span></td>
+<td class="px-space-sm py-2 font-medium">Venda Balcão #2891 <span class="text-on-surface-variant block text-[11px] font-normal">Xerox PB + Impressão Cor</span></td>
+<td class="px-space-sm py-2">
+<div class="font-medium text-on-surface-variant">Consumidor Não Identificado</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Sem CPF na nota</div>
+</td>
+<td class="px-space-sm py-2 text-right font-data-mono-sm text-data-mono-sm font-bold">R$ 40,00</td>
+<td class="px-space-sm py-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-primary font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                Buffer Offline OK
+              </span>
+</td>
+<td class="px-space-md py-2">
+<div class="flex items-center justify-center gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-primary transition-colors" title="Transmitir Agora">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Ver DANFE Provisório">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Auditar XML">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Linha 6 -->
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-container-low/30">
+<td class="px-space-md py-2 text-center">
+<input checked="" class="rounded text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm text-on-surface-variant">13:15:33</td>
+<td class="px-space-sm py-2">
+<span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-sm text-label-sm font-semibold">NF-e Mod 55</span>
+</td>
+<td class="px-space-sm py-2 font-data-mono-sm text-data-mono-sm font-bold text-tertiary">#001240 <span class="font-normal text-on-surface-variant">Série 900</span></td>
+<td class="px-space-sm py-2 font-medium">O.S. #8940 <span class="text-on-surface-variant block text-[11px] font-normal">Talões Receituários Médicos 1x0</span></td>
+<td class="px-space-sm py-2">
+<div class="font-medium">Dra. Vanessa Castilho Pediatria</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">CPF: 110.450.989-40</div>
+</td>
+<td class="px-space-sm py-2 text-right font-data-mono-sm text-data-mono-sm font-bold">R$ 500,00</td>
+<td class="px-space-sm py-2">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                Aguardando SEFAZ
+              </span>
+</td>
+<td class="px-space-md py-2">
+<div class="flex items-center justify-center gap-1">
+<button class="p-1 rounded hover:bg-surface-container text-primary transition-colors" title="Transmitir Agora">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Ver DANFE Provisório">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container text-on-surface-variant transition-colors" title="Auditar XML">
+<span class="material-symbols-outlined text-[18px]">code</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Barra de Rodapé da Fila com Totais -->
+<div class="p-space-sm bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-space-sm font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-space-md">
+<span>Selecionados: <strong class="text-primary font-bold">6 de 6</strong></span>
+<span>|</span>
+<span>Total a Transmitir: <strong class="text-on-surface font-bold">R$ 1.415,00</strong></span>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high transition-colors">Marcar Todas</button>
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-high transition-colors">Desmarcar</button>
+</div>
+</div>
+</div>
+<!-- 5. PAINEL INFERIOR DIVIDIDO (SIMULAÇÃO DANFE EM CONTINGÊNCIA & INSTRUÇÕES OPERACIONAIS) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-start">
+<!-- Lado Esquerdo (5 colunas): Visualização Gráfica de Cupom Térmico 80mm com Tarja Legal -->
+<div class="lg:col-span-5 rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">receipt</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Visualização: DANFE em Contingência</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant">Impressora Térmica 80mm</span>
+</div>
+<!-- Cupom Provisório Estilizado com Papel Térmico Realista -->
+<div class="p-space-md bg-surface-container-lowest rounded-lg shadow-sm font-data-mono-sm text-data-mono-sm text-on-surface flex flex-col gap-2 select-text">
+<div class="text-center font-bold">
+<div class="text-[13px] tracking-tight">PRINTGEST COMÉRCIO GRÁFICO LTDA</div>
+<div class="text-[10px] text-on-surface-variant font-normal">CNPJ: 12.345.678/0001-90 • IE: 112.443.901.110</div>
+<div class="text-[10px] text-on-surface-variant font-normal">AV. PAULISTA, 1000 - SÃO PAULO/SP</div>
+</div>
+<!-- Tarja Obrigatória por Lei -->
+<div class="my-1 py-1.5 px-2 bg-on-surface text-surface-container-lowest text-center font-bold text-[11px] rounded uppercase tracking-wider leading-tight">
+          EMITIDA EM CONTINGÊNCIA<br/>
+<span class="text-[9px] font-normal opacity-90">Pendente de autorização pelo Fisco</span>
+</div>
+<div class="text-[11px] leading-tight">
+<div class="flex justify-between">
+<span>DANFE NFC-e - Cupom Fiscal Eletrônico</span>
+<span class="font-bold">#008495</span>
+</div>
+<div class="flex justify-between text-on-surface-variant text-[10px]">
+<span>Série Contingência: 900</span>
+<span>14:22:10 - 24/10/2023</span>
+</div>
+</div>
+<div class="h-[1px] bg-surface-container my-1"></div>
+<!-- Itens do Cupom -->
+<div class="text-[11px] flex flex-col gap-1">
+<div class="flex justify-between">
+<span class="truncate pr-2">001 CARTÃO DE VISITA 250G 4X0 (1000 UN)</span>
+<span class="font-bold">85,00</span>
+</div>
+<div class="flex justify-between text-on-surface-variant text-[10px]">
+<span>QTD: 1,00 UN x R$ 85,00</span>
+<span>Desconto: 0,00</span>
+</div>
+</div>
+<div class="h-[1px] bg-surface-container my-1"></div>
+<div class="flex justify-between font-bold text-[13px]">
+<span>TOTAL R$</span>
+<span>85,00</span>
+</div>
+<div class="flex justify-between text-[11px]">
+<span>FORMA DE PAGTO (PIX)</span>
+<span>85,00</span>
+</div>
+<!-- QR Code Provisório com Assinatura Hash Local -->
+<div class="mt-2 flex flex-col items-center justify-center p-2 bg-surface-container-low rounded-lg text-center gap-1">
+<!-- Inline SVG representativo de QR Code técnico -->
+<svg class="w-24 h-24 text-on-surface" fill="currentColor" viewbox="0 0 100 100">
+<rect fill="none" height="24" rx="2" stroke="currentColor" stroke-width="4" width="24" x="10" y="10"></rect>
+<rect fill="currentColor" height="12" width="12" x="16" y="16"></rect>
+<rect fill="none" height="24" rx="2" stroke="currentColor" stroke-width="4" width="24" x="66" y="10"></rect>
+<rect fill="currentColor" height="12" width="12" x="72" y="16"></rect>
+<rect fill="none" height="24" rx="2" stroke="currentColor" stroke-width="4" width="24" x="10" y="66"></rect>
+<rect fill="currentColor" height="12" width="12" x="16" y="72"></rect>
+<rect height="6" width="6" x="42" y="12"></rect>
+<rect height="6" width="6" x="52" y="12"></rect>
+<rect height="6" width="8" x="42" y="24"></rect>
+<rect height="16" width="16" x="42" y="42"></rect>
+<rect height="6" width="8" x="64" y="42"></rect>
+<rect height="6" width="12" x="78" y="42"></rect>
+<rect height="12" width="6" x="42" y="66"></rect>
+<rect height="6" width="12" x="54" y="72"></rect>
+<rect height="18" width="8" x="72" y="66"></rect>
+<rect height="8" width="6" x="86" y="80"></rect>
+</svg>
+<span class="text-[9px] text-on-surface-variant uppercase tracking-wider">QR-Code Offline com DigestValue Assinado</span>
+<span class="text-[8px] font-mono text-on-surface-variant break-all">CHAVE: 3523 1012 3456 7800 0190 6590 0000 0849 5912 3489 1234</span>
+</div>
+<div class="text-[9px] text-center text-on-surface-variant mt-1 leading-tight">
+          A autenticidade deste documento será disponibilizada no portal da SEFAZ em até 24h após sua emissão.
+        </div>
+</div>
+</div>
+<!-- Lado Direito (7 colunas): Orientações de Balcão e Parâmetros Técnicos -->
+<div class="lg:col-span-7 flex flex-col gap-space-md">
+<!-- Card de Instruções Rápidas ao Operador -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">support_agent</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Instruções Operacionais ao Atendente de Balcão &amp; Caixa</h3>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm mt-1">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[11px]">1</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Não Pare o Atendimento</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Entregue o cupom impresso normalmente ao cliente. O documento é 100% legal e fiscalmente válido.
+            </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[11px]">2</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Reenvio Automático</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Assim que o link com a SEFAZ estabilizar, o sistema disparará o lote em segundo plano sem travar o caixa.
+            </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[11px]">3</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Confirmação Sonora</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Uma notificação verde no topo confirmará o carimbo oficial da SEFAZ para todas as 6 notas pendentes.
+            </p>
+</div>
+</div>
+</div>
+<!-- Card de Log de Conectividade SEFAZ & Parâmetros do Gateway -->
+<div class="rounded-xl bg-surface-container-lowest p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">terminal</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Log do Daemon de Retransmissão Local (PySide6 / Qt Localhost)</h3>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-primary flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary inline-block"></span>
+            PID: 8814 (Thread Ativa)
+          </span>
+</div>
+<div class="bg-inverse-surface text-inverse-on-surface p-space-sm rounded-lg font-data-mono-sm text-data-mono-sm flex flex-col gap-1 overflow-x-auto select-text max-h-48 overflow-y-auto">
+<div class="text-on-surface-variant">[14:18:22] POST https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx -&gt; ETIMEDOUT (15002ms)</div>
+<div class="text-amber-400">[14:18:23] WARN: Ativando fallback de contingência offline local (tpEmis = 9 / Série 900)</div>
+<div class="text-inverse-primary">[14:18:25] BUFFER: Documento NFC-e #008494 assinado com certificado A1 e gravado localmente.</div>
+<div class="text-inverse-primary">[14:22:10] BUFFER: Documento NFC-e #008495 assinado com certificado A1 e gravado localmente.</div>
+<div class="text-on-surface-variant">[14:22:30] RETRY: Testando ping no gateway Focus NFe (Tentativa 8 de ∞)...</div>
+<div class="text-error">[14:22:35] FAIL: Gateway inacessível (DNS OK, HTTP 504 Gateway Timeout). Aguardando 30s.</div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm pt-1">
+<span>Certificado Digital: <strong class="text-on-surface">A1 (Validade: 14/11/2024 - 386 dias)</strong></span>
+<span>Fuso Horário Fiscal: <strong class="text-on-surface">UTC-03:00 (São Paulo)</strong></span>
+</div>
+</div>
+</div>
+</div>
+<!-- 6. BARRA DE ATALHOS & STATUS OPERACIONAL INFERIOR -->
+<div class="rounded-xl bg-surface-container-high p-space-sm flex flex-col md:flex-row items-center justify-between gap-space-sm text-on-surface-variant font-label-md text-label-md">
+<div class="flex items-center gap-space-sm flex-wrap justify-center md:justify-start">
+<span class="font-bold text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">keyboard</span> Atalhos:
+      </span>
+<span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm font-bold shadow-sm">[F5]</kbd> Forçar Teste SEFAZ</span>
+<span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm font-bold shadow-sm">[F9]</kbd> Transmitir Toda a Fila</span>
+<span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm font-bold shadow-sm">[Enter]</kbd> Detalhes do XML</span>
+<span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm font-bold shadow-sm">[Ctrl+P]</kbd> Imprimir Comprovante</span>
+<span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm font-bold shadow-sm">[ESC]</kbd> Fechar Tela</span>
+</div>
+<div class="flex items-center gap-space-sm shrink-0 font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary inline-block"></span>
+<span>Daemon Local: 127.0.0.1:8000 Ativo</span>
+</div>
+<span>•</span>
+<span class="text-amber-600 font-bold">Modo: Contingência Offline</span>
+</div>
+</div>
+</div>
+<script>
+  // Micro-interatividade para os botões de ação na fila de contingência
+  const testBtn = document.getElementById('btn-test-sefaz');
+  if (testBtn) {
+    testBtn.addEventListener('click', () => {
+      const originalText = testBtn.innerHTML;
+      testBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Consultando WebService SEFAZ...</span>';
+      testBtn.disabled = true;
+      setTimeout(() => {
+        testBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-amber-500">warning</span><span>SEFAZ continua sem resposta (Timeout 15s)</span>';
+        setTimeout(() => {
+          testBtn.innerHTML = originalText;
+          testBtn.disabled = false;
+        }, 3000);
+      }, 1500);
+    });
+  }
+
+  const transmitBtn = document.getElementById('btn-transmit-all');
+  if (transmitBtn) {
+    transmitBtn.addEventListener('click', () => {
+      const original = transmitBtn.innerHTML;
+      transmitBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Tentando conexão de lote...</span>';
+      transmitBtn.disabled = true;
+      setTimeout(() => {
+        alert('Tentativa de conexão falhou. Os documentos continuam salvos com segurança no banco local e serão retransmitidos automaticamente assim que a SEFAZ restabelecer o serviço.');
+        transmitBtn.innerHTML = original;
+        transmitBtn.disabled = false;
+      }, 1200);
+    });
+  }
+
+  // Teclas de atalho para ambiente de desktop
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F5') {
+      e.preventDefault();
+      if (testBtn) testBtn.click();
+    } else if (e.key === 'F9') {
+      e.preventDefault();
+      if (transmitBtn) transmitBtn.click();
+    }
+  });
+</script></main></div><footer class="fixed bottom-0 left-0 right-0 h-8 z-50 bg-inverse-surface text-inverse-on-surface flex items-center justify-between px-space-md select-none font-data-mono-sm text-data-mono-sm"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-secondary-container inline-block"></span><span>Daemon: 127.0.0.1:8000 Conectado</span></div><span class="text-outline">|</span><span>Estação: 01 (Gerência / Caixa)</span><span class="text-outline">|</span><span>Banco: PostgreSQL 15 Local</span></div><div class="flex items-center gap-space-md"><div class="hidden lg:flex items-center gap-space-sm text-inverse-primary font-label-sm text-label-sm"><span>[F1 Ajuda]</span><span>[F2 Clientes]</span><span>[F3 Produtos]</span><span>[F4 OS]</span><span>[F5 PDV]</span><span>[F6 Estoque]</span><span>[F7 Caixa]</span><span>[F8 Fiscal]</span><span>[ESC Sair]</span></div><span class="text-outline hidden lg:inline">|</span><span class="font-label-sm text-label-sm opacity-80">v2.0.0</span></div></footer></body></html>

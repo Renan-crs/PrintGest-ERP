@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"on-primary-fixed-variant":"#003ea8","on-tertiary":"#ffffff","inverse-primary":"#b4c5ff","surface-container-lowest":"#ffffff","secondary-container":"#39b8fd","on-error-container":"#93000a","on-tertiary-container":"#f6edff","secondary":"#006591","primary-fixed-dim":"#b4c5ff","on-surface-variant":"#434655","on-tertiary-fixed":"#23005c","primary":"#004ac6","surface-tint":"#0053db","on-error":"#ffffff","surface-bright":"#f8f9ff","on-primary":"#ffffff","on-secondary-container":"#004666","tertiary-fixed-dim":"#d0bcff","outline-variant":"#c3c6d7","on-primary-container":"#eeefff","on-primary-fixed":"#00174b","primary-fixed":"#dbe1ff","tertiary-container":"#7d4ce7","background":"#f8f9ff","error-container":"#ffdad6","tertiary-fixed":"#e9ddff","secondary-fixed":"#c9e6ff","on-secondary-fixed-variant":"#004c6e","surface-container-highest":"#d3e4fe","on-background":"#0b1c30","inverse-on-surface":"#eaf1ff","on-secondary":"#ffffff","surface-container-high":"#dce9ff","surface-variant":"#d3e4fe","surface":"#f8f9ff","error":"#ba1a1a","surface-container-low":"#eff4ff","on-surface":"#0b1c30","secondary-fixed-dim":"#89ceff","on-secondary-fixed":"#001e2f","tertiary":"#632ecd","surface-container":"#e5eeff","on-tertiary-fixed-variant":"#5516be","primary-container":"#2563eb","outline":"#737686","inverse-surface":"#213145","surface-dim":"#cbdbf5"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-xl":"1.5rem","space-sm":"0.5rem","space-md":"0.75rem","space-lg":"1rem","gutter":"0.75rem","space-xs":"0.25rem","margin":"1rem"},"fontFamily":{"headline-sm":["Inter"],"display-sm":["Inter"],"body-md":["Inter"],"body-lg":["Inter"],"data-mono-md":["Inter"],"label-lg":["Inter"],"label-md":["Inter"],"headline-md":["Inter"],"body-sm":["Inter"],"label-sm":["Inter"],"data-mono-sm":["Inter"],"data-mono-lg":["Inter"],"headline-lg":["Inter"]},"fontSize":{"headline-sm":["14px",{"lineHeight":"20px","fontWeight":"600"}],"display-sm":["24px",{"lineHeight":"32px","letterSpacing":"-0.02em","fontWeight":"700"}],"body-md":["13px",{"lineHeight":"18px","fontWeight":"400"}],"body-lg":["14px",{"lineHeight":"20px","fontWeight":"400"}],"data-mono-md":["13px",{"lineHeight":"18px","fontWeight":"500"}],"label-lg":["13px",{"lineHeight":"16px","fontWeight":"500"}],"label-md":["11px",{"lineHeight":"14px","letterSpacing":"0.03em","fontWeight":"600"}],"headline-md":["16px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-sm":["12px",{"lineHeight":"16px","fontWeight":"400"}],"label-sm":["10px",{"lineHeight":"12px","letterSpacing":"0.04em","fontWeight":"600"}],"data-mono-sm":["11px",{"lineHeight":"14px","fontWeight":"500"}],"data-mono-lg":["18px",{"lineHeight":"24px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-lg":["20px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}]}}}}</script></head><body class="bg-surface font-body-md text-body-md text-on-surface select-none"><header class="fixed top-0 left-0 right-0 z-50 flex flex-col"><div class="h-8 w-full bg-inverse-surface text-inverse-on-surface flex items-center justify-between px-space-md select-none"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-inverse-primary text-[14px]">print</span><span class="font-label-sm text-label-sm tracking-wider uppercase opacity-90">PRINTGEST ERP V2.0 — GRÁFICA RÁPIDA (MATRIZ)</span></div><div class="flex items-center"><button aria-label="Minimizar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-surface-variant/20 transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">minimize</span></button><button aria-label="Maximizar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-surface-variant/20 transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">crop_square</span></button><button aria-label="Fechar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-error hover:text-on-error transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">close</span></button></div></div><div class="h-12 w-full bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] px-space-md flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #2563eb - Font: inter - Mode: light - Roundness: rounded-sm" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xuaz9r5BIC8vwg0qc0QAun3UPGEHCkAsSzeUUaDAxAso9n-N-l84u2VGqqt13D7my948lk4VJ79e848PEP-VOLFTDjXPCbrfrUSdoW7yr-TxCB9mKsiw6LekijXEdh4u5i5eRCz_vms8yxky2w4cJqZ16-YoIApf6Qni3B3jl6Ktl3RQVVFW1lRoM1NpT2_x6r7CD8HBEBvG2Tnjl7n1nbvFY_Xl5tYXsmAoPNFnFNQsgZXUhkS82g81YT"/><span class="font-headline-sm text-headline-sm text-primary tracking-tight">PrintGest ERP</span></div><div class="hidden xl:flex items-center gap-space-sm"><div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span><span>Servidor Local: 192.168.1.10:8000 (Online)</span></div><div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-high text-on-surface font-data-mono-sm text-data-mono-sm"><span class="material-symbols-outlined text-[12px] text-secondary">verified</span><span>Licença Ativa (72h OK)</span></div></div></div><div class="flex items-center gap-space-md"><div class="relative hidden md:flex items-center"><span class="material-symbols-outlined absolute left-space-sm text-on-surface-variant text-[16px]">search</span><input class="h-[30px] w-64 bg-surface-container-low pl-8 pr-space-md py-1 font-body-sm text-body-sm text-on-surface rounded-lg focus:outline-none focus:bg-surface-container-lowest placeholder:text-on-surface-variant/70" placeholder="Busca rápida geral... [Ctrl+K]" type="text"/></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="text-right hidden sm:block"><div class="font-label-md text-label-md text-on-surface leading-none">Roberto Silva</div><div class="font-label-sm text-label-sm text-on-surface-variant leading-none mt-1">Gerente Fiscal / Produção</div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><aside class="fixed left-0 top-20 bottom-8 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col overflow-y-auto"><div class="p-space-sm flex-1 flex flex-col gap-space-sm"><div class="px-space-sm pt-space-xs pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Menu Principal</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="dashboard" href="#"><span>Dashboard / Início</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F1</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cadastros</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-clientes" href="#"><span>Clientes</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F2</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="produtos-servicos" href="#"><span>Produtos e Serviços</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F3</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-fornecedores" href="#"><span>Fornecedores</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-funcionarios" href="#"><span>Funcionários</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Movimento</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="ordens-servico" href="#"><span>Ordens de Serviço</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F4</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="orcamentos-graficos" href="#"><span>Orçamentos Gráficos</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="venda-balcao-pdv" href="#"><span>Venda Balcão / PDV</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F5</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="pedidos-compra" href="#"><span>Pedidos de Compra</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Módulos Operacionais</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="estoque-bobinas" href="#"><span>Estoque &amp; Bobinas</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F6</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="financeiro-caixa" href="#"><span>Financeiro &amp; Caixa</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F7</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="fiscal-nfe" href="#"><span>Fiscal (NFC-e / NF-e)</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F8</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="relatorios-configuracoes" href="#"><span>Relatórios &amp; Config</span></a></nav></div></aside><div class="pl-64"><main class="w-full min-h-screen pt-20 pb-8 bg-surface px-space-lg"><div class="flex flex-col w-full">
+<!-- Top Navigation & Header Bar -->
+<div class="flex flex-col gap-space-sm mb-space-md">
+<!-- Breadcrumb + Live Gateway Monitor Pill -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<span>MÓDULO FISCAL</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-primary font-bold">PAINEL DE NOTAS E CUPONS</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-surface-container-high text-on-surface font-data-mono-sm text-data-mono-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-container inline-block animate-pulse"></span>
+<span>SEFAZ SP Online</span>
+<span class="text-on-surface-variant font-bold">240ms</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-surface-container-low text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<span class="material-symbols-outlined text-[13px] text-secondary">verified_user</span>
+<span>Certificado A1: 214 dias</span>
+</div>
+</div>
+</div>
+<!-- Title and Core Actions Cluster -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-sm">
+<div>
+<h1 class="font-display-sm text-display-sm text-on-surface tracking-tight">Central de Emissão &amp; Consulta Fiscal (NF-e / NFC-e)</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Acompanhamento de notas fiscais autorizadas, transmissão via gateway Focus NFe e gestão de arquivos XML/DANFE.</p>
+</div>
+<!-- Action Buttons with Integrated Kbd Hotkeys -->
+<div class="flex items-center gap-space-xs flex-wrap">
+<button class="h-[34px] px-3 bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-lg text-label-lg rounded-lg shadow-sm flex items-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">archive</span>
+<span>Exportar Lote XML</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant font-data-mono-sm text-data-mono-sm">Ctrl+E</span>
+</button>
+<button class="h-[34px] px-3 bg-surface-container-lowest hover:bg-surface-container-high text-on-surface font-label-lg text-label-lg rounded-lg shadow-sm flex items-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">sync</span>
+<span>Sincronizar Gateway</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant font-data-mono-sm text-data-mono-sm">F8</span>
+</button>
+<button class="h-[34px] px-3.5 bg-primary-container hover:bg-primary text-on-primary font-label-lg text-label-lg rounded-lg shadow-sm flex items-center gap-1.5 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">add_circle</span>
+<span>Emitir Nota Avulsa</span>
+<span class="px-1.5 py-0.2 rounded bg-on-primary/20 font-data-mono-sm text-data-mono-sm">F9</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Row 2: Status KPI Cards (5 Bento Units) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm mb-space-md">
+<!-- Card 1: Autorizadas -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Notas Autorizadas (Mês)</span>
+<span class="w-6 h-6 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[15px]">check_circle</span>
+</span>
+</div>
+<div class="my-1">
+<div class="flex items-baseline gap-1.5">
+<span class="font-data-mono-lg text-data-mono-lg text-on-surface">412</span>
+<span class="font-label-md text-label-md text-on-surface-variant">docs</span>
+</div>
+<div class="font-data-mono-md text-data-mono-md text-primary font-semibold">R$ 118.450,00</div>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant/80 truncate">
+        328 NFC-e (Balcão) • 84 NF-e (O.S.)
+      </div>
+</div>
+<!-- Card 2: Processando / Fila -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Processando / Fila</span>
+<span class="w-6 h-6 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[15px] animate-spin">sync</span>
+</span>
+</div>
+<div class="my-1">
+<div class="flex items-baseline gap-1.5">
+<span class="font-data-mono-lg text-data-mono-lg text-on-surface">3</span>
+<span class="font-label-md text-label-md text-on-surface-variant">docs</span>
+</div>
+<div class="font-data-mono-md text-data-mono-md text-secondary font-semibold">R$ 1.840,00</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant/90">Aguardando SEFAZ</span>
+<button class="font-label-sm text-label-sm text-primary hover:underline font-semibold" type="button">Consultar Fila</button>
+</div>
+</div>
+<!-- Card 3: Rejeitadas -->
+<div class="bg-error-container/40 p-space-sm rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-error">
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-bold">Rejeitadas / Ajuste</span>
+<span class="w-6 h-6 rounded-lg bg-error-container flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[15px]">report</span>
+</span>
+</div>
+<div class="my-1">
+<div class="flex items-baseline gap-1.5">
+<span class="font-data-mono-lg text-data-mono-lg text-error">2</span>
+<span class="font-label-md text-label-md text-error/80">docs</span>
+</div>
+<div class="inline-block px-1.5 py-0.5 rounded bg-error text-on-error font-label-sm text-label-sm font-bold">
+          Ação Requerida
+        </div>
+</div>
+<div class="font-body-sm text-body-sm text-on-error-container truncate">
+        Erros de CFOP e I.E. Incompatível
+      </div>
+</div>
+<!-- Card 4: Armazenamento Fiscal 5 Anos -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Arquivo 5 Anos (PRD §6)</span>
+<span class="w-6 h-6 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[15px]">verified</span>
+</span>
+</div>
+<div class="my-1">
+<div class="flex items-baseline gap-1.5">
+<span class="font-data-mono-lg text-data-mono-lg text-on-surface">100%</span>
+<span class="font-label-md text-label-md text-secondary font-bold">Íntegro</span>
+</div>
+<div class="font-data-mono-md text-data-mono-md text-on-surface-variant">PostgreSQL + Nuvem</div>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant/80 truncate">
+        SHA-256 e XMLs locais validados
+      </div>
+</div>
+<!-- Card 5: Focus NFe REST API Gateway -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Gateway Focus NFe</span>
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+</div>
+<div class="my-1">
+<div class="font-headline-sm text-headline-sm text-on-surface truncate">REST API v2 Online</div>
+<div class="font-body-sm text-body-sm text-secondary font-semibold">Produção (SP)</div>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant/80 truncate">
+        Mod 55, 65 &amp; NFS-e ativos
+      </div>
+</div>
+</div>
+<!-- Search and Tab Filters -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm mb-space-sm flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
+<!-- Fast Search Box -->
+<div class="relative flex-1 max-w-xl">
+<span class="material-symbols-outlined absolute left-2.5 top-2 text-on-surface-variant text-[16px]">search</span>
+<input class="h-[34px] w-full pl-8 pr-16 bg-surface-container-low focus:bg-surface-container-lowest rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none transition-colors" placeholder="Buscar por Chave de Acesso (44 dígitos), Número da Nota, O.S., Cliente ou CNPJ/CPF... [F2 / Ctrl+F]" type="text" value=""/>
+<span class="absolute right-2.5 top-2 px-1.5 py-0.5 rounded bg-surface-container font-data-mono-sm text-data-mono-sm text-on-surface-variant">Ctrl+F</span>
+</div>
+<!-- Document Category Filter Tabs -->
+<div class="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+<button class="h-8 px-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md whitespace-nowrap shadow-sm" type="button">
+        Todos (417)
+      </button>
+<button class="h-8 px-3 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+        NFC-e Balcão (328)
+      </button>
+<button class="h-8 px-3 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+        NF-e Mercadoria (54)
+      </button>
+<button class="h-8 px-3 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+        NFS-e Gráfica (35)
+      </button>
+<button class="h-8 px-2.5 rounded-lg bg-error-container text-on-error-container font-label-md text-label-md flex items-center gap-1 whitespace-nowrap" type="button">
+<span>Rejeitadas (2)</span>
+</button>
+<button class="h-8 px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-md text-label-md whitespace-nowrap transition-colors" type="button">
+        Canceladas (2)
+      </button>
+<!-- Date Period Selector Quick Tool -->
+<div class="ml-auto pl-space-sm flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[15px]">calendar_today</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">Hoje (24/10/2026)</span>
+<button class="p-1 hover:bg-surface-container-high rounded" title="Alterar Período" type="button">
+<span class="material-symbols-outlined text-[14px]">arrow_drop_down</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Core Workspace: Split Data Grid + Right Inspection Drawer -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-sm">
+<!-- Left/Center: High-Density Operations Grid (8 Cols on 1080p, Full on small) -->
+<div class="xl:col-span-8 bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Grid Operations Mini-Bar -->
+<div class="h-9 px-space-md bg-surface-container-low flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<div class="flex items-center gap-space-md">
+<label class="flex items-center gap-1.5 cursor-pointer">
+<input class="w-3.5 h-3.5 rounded text-primary focus:ring-0" type="checkbox"/>
+<span>Selecionar Página (50)</span>
+</label>
+<span>Exibindo <strong>1-5</strong> de 417 notas</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="hover:text-primary flex items-center gap-1 text-on-surface-variant" type="button">
+<span class="material-symbols-outlined text-[14px]">file_download</span>
+<span>Exportar Seleção (.ZIP)</span>
+</button>
+<span class="text-outline-variant">|</span>
+<button class="hover:text-primary flex items-center gap-1 text-on-surface-variant" type="button">
+<span class="material-symbols-outlined text-[14px]">filter_list</span>
+<span>Mais Filtros</span>
+</button>
+</div>
+</div>
+<!-- Data Table Density Mode -->
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left font-body-sm text-body-sm border-collapse">
+<thead>
+<tr class="h-8 bg-surface-container text-on-surface-variant uppercase font-label-sm text-label-sm select-none">
+<th class="w-8 px-2 text-center"></th>
+<th class="px-2.5 font-bold">Doc / Série</th>
+<th class="px-2 font-bold">Tipo</th>
+<th class="px-2.5 font-bold">Data/Hora</th>
+<th class="px-2.5 font-bold">Destinatário / Cliente</th>
+<th class="px-2.5 font-bold">Origem (Comanda/OS)</th>
+<th class="px-2.5 text-right font-bold">Valor (R$)</th>
+<th class="px-3 font-bold">Status SEFAZ</th>
+<th class="px-3 text-right font-bold">Ações Rápidas</th>
+</tr>
+</thead>
+<tbody class="divide-y-0">
+<!-- Row 1: Selected (NFC-e #008492) -->
+<tr class="h-10 bg-surface-container-high/60 hover:bg-surface-container-high transition-colors relative cursor-pointer">
+<td class="px-2 text-center">
+<input checked="" class="w-3.5 h-3.5 rounded text-primary" type="checkbox"/>
+</td>
+<td class="px-2.5 font-data-mono-md text-data-mono-md text-on-surface font-bold">
+                NFC-e #008492 <span class="font-normal text-on-surface-variant font-data-mono-sm text-data-mono-sm">Sér. 1</span>
+</td>
+<td class="px-2">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface font-data-mono-sm text-data-mono-sm font-semibold">Mod 65</span>
+</td>
+<td class="px-2.5 font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+                Hoje 14:10
+              </td>
+<td class="px-2.5">
+<div class="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[170px]">Consumidor Final</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant truncate">CPF 341.890.128-40</div>
+</td>
+<td class="px-2.5">
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-data-mono-sm text-data-mono-sm hover:underline cursor-pointer">
+                  Venda Balcão #2894
+                </span>
+</td>
+<td class="px-2.5 text-right font-data-mono-md text-data-mono-md text-on-surface font-bold">
+                R$ 100,00
+              </td>
+<td class="px-3">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                  Autorizada
+                </span>
+</td>
+<td class="px-3 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-primary" title="Imprimir Cupom Térmico (Ctrl+P)" type="button">
+<span class="material-symbols-outlined text-[15px]">print</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Baixar XML" type="button">
+<span class="material-symbols-outlined text-[15px]">download</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Enviar WhatsApp / E-mail" type="button">
+<span class="material-symbols-outlined text-[15px]">share</span>
+</button></div></td>
+</tr></tbody></table></div>
+<!-- Row 2: NF-e #001240 -->
+<input class="w-3.5 h-3.5 rounded text-primary" type="checkbox"/>
+
+
+                NF-e #001240 <span class="font-normal text-on-surface-variant font-data-mono-sm text-data-mono-sm">Sér. 2</span>
+<span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-data-mono-sm text-data-mono-sm font-semibold">Mod 55</span>
+
+
+                Hoje 13:45
+              
+
+<div class="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[170px]">Agência Criativa SP Ltda</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant truncate">CNPJ 18.234.901/0001-88</div>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-data-mono-sm text-data-mono-sm hover:underline cursor-pointer">
+                  O.S. #8942 (Banner)
+                </span>
+
+
+                R$ 550,00
+              
+
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                  Autorizada
+                </span>
+<div class="flex items-center justify-end gap-1">
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-primary" title="Imprimir DANFE A4" type="button">
+<span class="material-symbols-outlined text-[15px]">print</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Baixar XML" type="button">
+<span class="material-symbols-outlined text-[15px]">download</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Enviar WhatsApp / E-mail" type="button">
+<span class="material-symbols-outlined text-[15px]">share</span>
+</button>
+</div>
+<!-- Row 3: Rejeitada NF-e #001239 -->
+<input class="w-3.5 h-3.5 rounded text-error" type="checkbox"/>
+
+
+                NF-e #001239 <span class="font-normal text-on-surface-variant font-data-mono-sm text-data-mono-sm">Sér. 2</span>
+<span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-data-mono-sm text-data-mono-sm font-semibold">Mod 55</span>
+
+
+                Hoje 11:20
+              
+
+<div class="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[170px]">Colégio Horizonte Prime</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant truncate">CNPJ 54.912.003/0001-77</div>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-data-mono-sm text-data-mono-sm hover:underline cursor-pointer">
+                  O.S. #8939 (Apostilas)
+                </span>
+
+
+                R$ 1.840,00
+              
+
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-error text-on-error font-label-sm text-label-sm font-bold shadow-sm" title="Rejeição 539: Duplicidade de NF-e com diferença na Chave de Acesso">
+<span class="material-symbols-outlined text-[13px]">error</span>
+                  Rejeitada [539]
+                </span>
+<div class="flex items-center justify-end gap-1">
+<button class="h-6 px-2 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-bold flex items-center gap-1" title="Corrigir Chave e Reenviar" type="button">
+<span>Corrigir</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Ver Detalhes do Erro" type="button">
+<span class="material-symbols-outlined text-[15px]">info</span>
+</button>
+</div>
+<!-- Row 4: NFC-e #008491 -->
+<input class="w-3.5 h-3.5 rounded text-primary" type="checkbox"/>
+
+
+                NFC-e #008491 <span class="font-normal text-on-surface-variant font-data-mono-sm text-data-mono-sm">Sér. 1</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface font-data-mono-sm text-data-mono-sm font-semibold">Mod 65</span>
+
+
+                Hoje 10:30
+              
+
+<div class="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[170px]">Restaurante Sabor &amp; Arte</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant truncate">CNPJ 29.402.115/0001-90</div>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-data-mono-sm text-data-mono-sm hover:underline cursor-pointer">
+                  Venda Balcão #2890
+                </span>
+
+
+                R$ 240,00
+              
+
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                  Autorizada
+                </span>
+<div class="flex items-center justify-end gap-1">
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-primary" title="Imprimir Cupom" type="button">
+<span class="material-symbols-outlined text-[15px]">print</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Baixar XML" type="button">
+<span class="material-symbols-outlined text-[15px]">download</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Enviar WhatsApp / E-mail" type="button">
+<span class="material-symbols-outlined text-[15px]">share</span>
+</button>
+</div>
+<!-- Row 5: NF-e #001238 -->
+<input class="w-3.5 h-3.5 rounded text-primary" type="checkbox"/>
+
+
+                NF-e #001238 <span class="font-normal text-on-surface-variant font-data-mono-sm text-data-mono-sm">Sér. 2</span>
+<span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-data-mono-sm text-data-mono-sm font-semibold">Mod 55</span>
+
+
+                Hoje 09:15
+              
+
+<div class="font-label-md text-label-md text-on-surface font-semibold truncate max-w-[170px]">Studio Design &amp; Propaganda ME</div>
+<div class="font-data-mono-sm text-data-mono-sm text-on-surface-variant truncate">CNPJ 09.551.482/0001-34</div>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-data-mono-sm text-data-mono-sm hover:underline cursor-pointer">
+                  O.S. #8935 (Cartões)
+                </span>
+
+
+                R$ 195,00
+              
+
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                  Autorizada
+                </span>
+<div class="flex items-center justify-end gap-1">
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-primary" title="Imprimir DANFE" type="button">
+<span class="material-symbols-outlined text-[15px]">print</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Baixar XML" type="button">
+<span class="material-symbols-outlined text-[15px]">download</span>
+</button>
+<button class="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant" title="Enviar WhatsApp / E-mail" type="button">
+<span class="material-symbols-outlined text-[15px]">share</span>
+</button>
+</div>
+</div>
+<!-- Quick Pagination & Summary Status Strip -->
+<div class="mt-auto px-space-md py-space-xs bg-surface-container-low flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+<div class="flex items-center gap-space-sm">
+<span>Linhas por tela: <strong>25</strong></span>
+<span class="text-outline-variant">|</span>
+<span>Tempo Médio Transmissão Focus NFe: <strong class="text-on-surface font-data-mono-sm text-data-mono-sm">312 ms</strong></span>
+</div>
+<div class="flex items-center gap-1">
+<button class="h-6 w-6 rounded hover:bg-surface-container flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[14px]">first_page</span>
+</button>
+<button class="h-6 w-6 rounded hover:bg-surface-container flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[14px]">chevron_left</span>
+</button>
+<span class="px-2 font-data-mono-sm text-data-mono-sm text-on-surface font-bold">Página 1 de 17</span>
+<button class="h-6 w-6 rounded hover:bg-surface-container flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</button>
+<button class="h-6 w-6 rounded hover:bg-surface-container flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[14px]">last_page</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Right: Sticky Inspector Drawer / Live DANFE & Cupom Inspector (4 Cols) -->
+<div class="xl:col-span-4 flex flex-col gap-space-sm">
+<!-- Inspector Main Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-sm">
+<!-- Inspector Header -->
+<div class="flex items-start justify-between pb-space-xs">
+<div>
+<div class="flex items-center gap-1.5 mb-1">
+<span class="font-headline-md text-headline-md text-on-surface">NFC-e #008492</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">Mod 65</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Protocolo SEFAZ: <span class="font-data-mono-sm text-data-mono-sm text-on-surface font-semibold">1352600984210</span></div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+            Autorizada
+          </span>
+</div>
+<!-- 44-Digit Access Key Strip with 1-Click Copy -->
+<div class="bg-surface-container-low p-2 rounded-lg flex items-center justify-between">
+<div class="flex flex-col min-w-0 pr-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Chave de Acesso SEFAZ (44 dígitos)</span>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface truncate select-all">3526 1018 2349 0100 0188 6500 1000 0084 9219 8241 0293</span>
+</div>
+<button class="h-7 w-7 rounded hover:bg-surface-container-high flex items-center justify-center text-primary transition-colors flex-shrink-0" title="Copiar Chave Completa" type="button">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+<!-- Simulated DANFE / Cupom Fiscal Thermal Render -->
+<div class="bg-surface-bright p-space-sm rounded-lg shadow-inner text-on-surface font-data-mono-sm text-data-mono-sm flex flex-col gap-2">
+<!-- Receipt Header -->
+<div class="text-center pb-1">
+<div class="font-bold text-on-surface">PRINTGEST GRAFICA RAPIDA LTDA</div>
+<div class="text-on-surface-variant">CNPJ: 12.345.678/0001-90 • IE: 110.293.840.111</div>
+<div class="text-on-surface-variant text-[10px]">Rua dos Gráficos, 450 - Centro - São Paulo/SP</div>
+<div class="mt-1 font-bold text-secondary">DANFE NFC-e - Documento Auxiliar</div>
+</div>
+<!-- Items Breakdown -->
+<div class="py-1">
+<div class="flex justify-between font-bold text-on-surface-variant text-[10px] pb-1 uppercase">
+<span>Item / Descrição</span>
+<span>Qtd x Unit</span>
+<span>Total</span>
+</div>
+<div class="flex flex-col gap-1 text-[11px]">
+<div class="flex justify-between">
+<div class="truncate max-w-[150px]">001 Plastificação A4 Cristal (NCM 3920.10)</div>
+<div class="text-on-surface-variant">10 x R$ 5,00</div>
+<div class="font-bold">R$ 50,00</div>
+</div>
+<div class="flex justify-between">
+<div class="truncate max-w-[150px]">002 Cópias Color Laser Couché (NCM 4911.10)</div>
+<div class="text-on-surface-variant">25 x R$ 2,00</div>
+<div class="font-bold">R$ 50,00</div>
+</div>
+</div>
+</div>
+<!-- Tax and Total Math -->
+<div class="pt-1 flex flex-col gap-0.5">
+<div class="flex justify-between text-on-surface-variant text-[11px]">
+<span>Qtd Total de Itens</span>
+<span>2</span>
+</div>
+<div class="flex justify-between text-on-surface-variant text-[11px]">
+<span>Tributos Totais Aprox. (IBPT 13.45%)</span>
+<span>R$ 13,45</span>
+</div>
+<div class="flex justify-between font-headline-sm text-headline-sm text-on-surface font-bold pt-1">
+<span>VALOR TOTAL</span>
+<span class="text-primary font-bold">R$ 100,00</span>
+</div>
+<div class="flex justify-between text-on-surface-variant text-[11px]">
+<span>Forma Pgto: Cartão de Débito TEF</span>
+<span>R$ 100,00</span>
+</div>
+</div>
+<!-- QR Code SEFAZ Block -->
+<div class="pt-2 flex items-center gap-space-sm bg-surface-container-low p-2 rounded">
+<!-- Inline Mini SVG QR Code representation -->
+<svg class="w-14 h-14 bg-surface-container-lowest p-1 rounded shrink-0" fill="currentColor" viewbox="0 0 100 100">
+<rect class="text-on-surface" height="30" width="30" x="0" y="0"></rect>
+<rect fill="white" height="20" width="20" x="5" y="5"></rect>
+<rect class="text-on-surface" height="10" width="10" x="10" y="10"></rect>
+<rect class="text-on-surface" height="30" width="30" x="70" y="0"></rect>
+<rect fill="white" height="20" width="20" x="75" y="5"></rect>
+<rect class="text-on-surface" height="10" width="10" x="80" y="10"></rect>
+<rect class="text-on-surface" height="30" width="30" x="0" y="70"></rect>
+<rect fill="white" height="20" width="20" x="5" y="75"></rect>
+<rect class="text-on-surface" height="10" width="10" x="10" y="80"></rect>
+<rect class="text-on-surface" height="10" width="10" x="40" y="10"></rect>
+<rect class="text-on-surface" height="10" width="10" x="50" y="25"></rect>
+<rect class="text-on-surface" height="10" width="20" x="40" y="45"></rect>
+<rect class="text-on-surface" height="25" width="25" x="70" y="70"></rect>
+</svg>
+<div class="flex flex-col text-[10px] text-on-surface-variant leading-tight">
+<span class="font-bold text-on-surface">Consulta via Leitor QR Code</span>
+<span>Protocolo de Autorização: 1352600984210</span>
+<span class="text-[9px] text-primary truncate mt-0.5">https://www.nfce.fazenda.sp.gov.br/qrcode?...</span>
+</div>
+</div>
+</div>
+<!-- Drawer Action Buttons -->
+<div class="flex flex-col gap-1.5 pt-1">
+<button class="h-9 px-3 bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">print</span>
+<span>Reimprimir Cupom Térmico</span>
+<span class="px-1.5 py-0.2 rounded bg-on-primary/20 font-data-mono-sm text-data-mono-sm">Ctrl+P</span>
+</button>
+<div class="grid grid-cols-2 gap-1.5">
+<button class="h-8 px-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px] text-secondary">file_download</span>
+<span>Baixar XML</span>
+</button>
+<button class="h-8 px-2 bg-surface-container-low hover:bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px] text-primary">send_to_mobile</span>
+<span>WhatsApp / Email</span>
+</button>
+</div>
+<button class="h-8 px-3 bg-surface-container-low hover:bg-error-container text-error hover:text-on-error-container font-label-md text-label-md rounded-lg flex items-center justify-center gap-1.5 transition-colors mt-1" type="button">
+<span class="material-symbols-outlined text-[15px]">cancel</span>
+<span>Cancelar Documento Fiscal (Restam 22h)</span>
+</button>
+</div>
+<!-- Audit & Technical Telemetry Trail -->
+<div class="bg-surface-container p-2.5 rounded-lg text-on-surface-variant font-data-mono-sm text-data-mono-sm flex flex-col gap-1">
+<div class="font-label-sm text-label-sm font-bold text-on-surface uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary">terminal</span>
+<span>Trilha de Auditoria Focus NFe</span>
+</div>
+<div class="flex justify-between">
+<span>ID Referência Focus:</span>
+<span class="text-on-surface font-bold">fcs_ord_8492_sp</span>
+</div>
+<div class="flex justify-between">
+<span>Latência Gateway SEFAZ:</span>
+<span class="text-on-surface">312ms (Autorizado)</span>
+</div>
+<div class="flex justify-between">
+<span>Terminal Emissor:</span>
+<span class="text-on-surface">PDV-02 (Caixa Balcão)</span>
+</div>
+<div class="flex justify-between">
+<span>Operador Fiscal:</span>
+<span class="text-on-surface">Roberto Silva (ID #04)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Operational Bottom Command Bar (Keyboard Helpers & Service Daemon Status) -->
+<div class="mt-space-md bg-surface-container-lowest p-space-sm rounded-xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md text-on-surface font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+<span class="font-bold text-secondary">Focus NFe REST API:</span>
+<span>Produção Ativa</span>
+</div>
+<span class="text-outline-variant">|</span>
+<div>
+<span class="text-on-surface-variant">Armazenamento Local: </span>
+<span class="text-on-surface font-bold">PostgreSQL / 5 Anos OK</span>
+</div>
+<span class="text-outline-variant">|</span>
+<div>
+<span class="text-on-surface-variant">Impressora Padrão: </span>
+<span class="text-on-surface font-bold">Epson TM-T20X (ESC/POS)</span>
+</div>
+</div>
+<!-- Active Key Shortcuts Reminder -->
+<div class="flex items-center gap-space-xs flex-wrap font-data-mono-sm text-data-mono-sm text-on-surface-variant">
+<span class="px-1.5 py-0.5 bg-surface-container rounded text-on-surface font-bold">[F2 Buscar]</span>
+<span class="px-1.5 py-0.5 bg-surface-container rounded text-on-surface font-bold">[Ctrl+P Imprimir]</span>
+<span class="px-1.5 py-0.5 bg-surface-container rounded text-on-surface font-bold">[F8 Sync]</span>
+<span class="px-1.5 py-0.5 bg-surface-container rounded text-on-surface font-bold">[F9 Emitir]</span>
+<span class="px-1.5 py-0.5 bg-surface-container rounded text-on-surface font-bold">[Ctrl+E Exportar]</span>
+<span class="px-1.5 py-0.5 bg-surface-container rounded text-on-surface font-bold">[ESC Fechar]</span>
+</div>
+</div>
+</main></div><footer class="fixed bottom-0 left-0 right-0 h-8 z-50 bg-inverse-surface text-inverse-on-surface flex items-center justify-between px-space-md select-none font-data-mono-sm text-data-mono-sm"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-secondary-container inline-block"></span><span>Daemon: 127.0.0.1:8000 Conectado</span></div><span class="text-outline">|</span><span>Estação: 01 (Gerência / Caixa)</span><span class="text-outline">|</span><span>Banco: PostgreSQL 15 Local</span></div><div class="flex items-center gap-space-md"><div class="hidden lg:flex items-center gap-space-sm text-inverse-primary font-label-sm text-label-sm"><span>[F1 Ajuda]</span><span>[F2 Clientes]</span><span>[F3 Produtos]</span><span>[F4 OS]</span><span>[F5 PDV]</span><span>[F6 Estoque]</span><span>[F7 Caixa]</span><span>[F8 Fiscal]</span><span>[ESC Sair]</span></div><span class="text-outline hidden lg:inline">|</span><span class="font-label-sm text-label-sm opacity-80">v2.0.0</span></div></footer></body></html>

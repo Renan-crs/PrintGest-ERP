@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"on-primary-fixed-variant":"#003ea8","on-tertiary":"#ffffff","inverse-primary":"#b4c5ff","surface-container-lowest":"#ffffff","secondary-container":"#39b8fd","on-error-container":"#93000a","on-tertiary-container":"#f6edff","secondary":"#006591","primary-fixed-dim":"#b4c5ff","on-surface-variant":"#434655","on-tertiary-fixed":"#23005c","primary":"#004ac6","surface-tint":"#0053db","on-error":"#ffffff","surface-bright":"#f8f9ff","on-primary":"#ffffff","on-secondary-container":"#004666","tertiary-fixed-dim":"#d0bcff","outline-variant":"#c3c6d7","on-primary-container":"#eeefff","on-primary-fixed":"#00174b","primary-fixed":"#dbe1ff","tertiary-container":"#7d4ce7","background":"#f8f9ff","error-container":"#ffdad6","tertiary-fixed":"#e9ddff","secondary-fixed":"#c9e6ff","on-secondary-fixed-variant":"#004c6e","surface-container-highest":"#d3e4fe","on-background":"#0b1c30","inverse-on-surface":"#eaf1ff","on-secondary":"#ffffff","surface-container-high":"#dce9ff","surface-variant":"#d3e4fe","surface":"#f8f9ff","error":"#ba1a1a","surface-container-low":"#eff4ff","on-surface":"#0b1c30","secondary-fixed-dim":"#89ceff","on-secondary-fixed":"#001e2f","tertiary":"#632ecd","surface-container":"#e5eeff","on-tertiary-fixed-variant":"#5516be","primary-container":"#2563eb","outline":"#737686","inverse-surface":"#213145","surface-dim":"#cbdbf5"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-xl":"1.5rem","space-sm":"0.5rem","space-md":"0.75rem","space-lg":"1rem","gutter":"0.75rem","space-xs":"0.25rem","margin":"1rem"},"fontFamily":{"headline-sm":["Inter"],"display-sm":["Inter"],"body-md":["Inter"],"body-lg":["Inter"],"data-mono-md":["Inter"],"label-lg":["Inter"],"label-md":["Inter"],"headline-md":["Inter"],"body-sm":["Inter"],"label-sm":["Inter"],"data-mono-sm":["Inter"],"data-mono-lg":["Inter"],"headline-lg":["Inter"]},"fontSize":{"headline-sm":["14px",{"lineHeight":"20px","fontWeight":"600"}],"display-sm":["24px",{"lineHeight":"32px","letterSpacing":"-0.02em","fontWeight":"700"}],"body-md":["13px",{"lineHeight":"18px","fontWeight":"400"}],"body-lg":["14px",{"lineHeight":"20px","fontWeight":"400"}],"data-mono-md":["13px",{"lineHeight":"18px","fontWeight":"500"}],"label-lg":["13px",{"lineHeight":"16px","fontWeight":"500"}],"label-md":["11px",{"lineHeight":"14px","letterSpacing":"0.03em","fontWeight":"600"}],"headline-md":["16px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"body-sm":["12px",{"lineHeight":"16px","fontWeight":"400"}],"label-sm":["10px",{"lineHeight":"12px","letterSpacing":"0.04em","fontWeight":"600"}],"data-mono-sm":["11px",{"lineHeight":"14px","fontWeight":"500"}],"data-mono-lg":["18px",{"lineHeight":"24px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-lg":["20px",{"lineHeight":"28px","letterSpacing":"-0.015em","fontWeight":"600"}]}}}}</script></head><body class="bg-surface font-body-md text-body-md text-on-surface select-none"><header class="fixed top-0 left-0 right-0 z-50 flex flex-col"><div class="h-8 w-full bg-inverse-surface text-inverse-on-surface flex items-center justify-between px-space-md select-none"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-inverse-primary text-[14px]">print</span><span class="font-label-sm text-label-sm tracking-wider uppercase opacity-90">PRINTGEST ERP V2.0 — GRÁFICA RÁPIDA (MATRIZ)</span></div><div class="flex items-center"><button aria-label="Minimizar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-surface-variant/20 transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">minimize</span></button><button aria-label="Maximizar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-surface-variant/20 transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">crop_square</span></button><button aria-label="Fechar Janela" class="h-8 w-11 flex items-center justify-center hover:bg-error hover:text-on-error transition-colors" type="button"><span class="material-symbols-outlined text-[14px]">close</span></button></div></div><div class="h-12 w-full bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] px-space-md flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><img alt="Brand logo. - Primary color: #2563eb
+- Font: inter
+- Mode: light
+- Roundness: rounded-sm
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Xuaz9r5BIC8vwg0qc0QAun3UPGEHCkAsSzeUUaDAxAso9n-N-l84u2VGqqt13D7my948lk4VJ79e848PEP-VOLFTDjXPCbrfrUSdoW7yr-TxCB9mKsiw6LekijXEdh4u5i5eRCz_vms8yxky2w4cJqZ16-YoIApf6Qni3B3jl6Ktl3RQVVFW1lRoM1NpT2_x6r7CD8HBEBvG2Tnjl7n1nbvFY_Xl5tYXsmAoPNFnFNQsgZXUhkS82g81YT"/><span class="font-headline-sm text-headline-sm text-primary tracking-tight">PrintGest ERP</span></div><div class="hidden xl:flex items-center gap-space-sm"><div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm"><span class="w-2 h-2 rounded-full bg-primary inline-block"></span><span>Servidor Local: 192.168.1.10:8000 (Online)</span></div><div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container-high text-on-surface font-data-mono-sm text-data-mono-sm"><span class="material-symbols-outlined text-[12px] text-secondary">verified</span><span>Licença Ativa (72h OK)</span></div></div></div><div class="flex items-center gap-space-md"><div class="relative hidden md:flex items-center"><span class="material-symbols-outlined absolute left-space-sm text-on-surface-variant text-[16px]">search</span><input class="h-[30px] w-64 bg-surface-container-low pl-8 pr-space-md py-1 font-body-sm text-body-sm text-on-surface rounded-lg focus:outline-none focus:bg-surface-container-lowest placeholder:text-on-surface-variant/70" placeholder="Busca rápida geral... [Ctrl+K]" type="text"/></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="text-right hidden sm:block"><div class="font-label-md text-label-md text-on-surface leading-none">Roberto Silva</div><div class="font-label-sm text-label-sm text-on-surface-variant leading-none mt-1">Gerente Financeiro</div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></div></header><aside class="fixed left-0 top-20 bottom-8 w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex flex-col overflow-y-auto"><div class="p-space-sm flex-1 flex flex-col gap-space-sm"><div class="px-space-sm pt-space-xs pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Menu Principal</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="dashboard" href="#"><span>Dashboard / Início</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F1</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Cadastros</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-clientes" href="#"><span>Clientes</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F2</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="produtos-servicos" href="#"><span>Produtos e Serviços</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F3</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-fornecedores" href="#"><span>Fornecedores</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="cadastro-funcionarios" href="#"><span>Funcionários</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Movimento</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="ordens-servico" href="#"><span>Ordens de Serviço</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F4</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="orcamentos-graficos" href="#"><span>Orçamentos Gráficos</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="venda-balcao-pdv" href="#"><span>Venda Balcão / PDV</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F5</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="pedidos-compra" href="#"><span>Pedidos de Compra</span></a></nav><div class="px-space-sm pt-space-sm pb-1 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Módulos Operacionais</div><nav class="flex flex-col gap-0.5" data-active-classes="bg-primary-container text-on-primary font-bold rounded-lg"><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="estoque-bobinas" href="#"><span>Estoque &amp; Bobinas</span></a><a aria-current="page" class="flex items-center justify-between px-space-sm py-1.5 transition-colors bg-primary-container text-on-primary font-bold rounded-lg" data-path="financeiro-caixa" href="#"><span>Financeiro &amp; Caixa</span><span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant/80">F7</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="fiscal-nfe" href="#"><span>Fiscal (NFC-e / NF-e)</span></a><a class="flex items-center justify-between px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors font-body-md text-body-md" data-path="relatorios-configuracoes" href="#"><span>Relatórios &amp; Config</span></a></nav></div></aside><div class="pl-64"><main class="w-full min-h-screen pt-20 pb-8 bg-surface px-space-lg"><div class="flex flex-col w-full gap-space-md">
+<!-- Top Breadcrumb & Status Navigation Strip -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm bg-surface-container-lowest px-space-md py-space-sm rounded-lg shadow-sm">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+<span>Financeiro</span>
+<span class="material-symbols-outlined text-[13px]">chevron_right</span>
+<span>Operações de Balcão</span>
+<span class="material-symbols-outlined text-[13px]">chevron_right</span>
+<span class="text-primary font-semibold">Caixa Operacional Diário</span>
+</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Gestão de Caixa &amp; Fechamento de Turno</h1>
+<div class="flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md">
+<span class="w-2 h-2 rounded-full bg-secondary inline-block animate-pulse"></span>
+<span class="font-bold">Turno 01 — ABERTO</span>
+</div>
+<span class="font-data-mono-sm text-data-mono-sm text-on-surface-variant px-space-xs py-0.5 rounded bg-surface-container">Estação #01 (PDV Frontal)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Controle de gaveta física, suprimentos, sangrias e conciliação por método de pagamento em tempo real.</p>
+</div>
+<!-- Top Action Shortcuts -->
+<div class="flex items-center gap-space-xs flex-wrap self-start sm:self-center">
+<button class="h-[34px] px-space-sm bg-surface-container-low hover:bg-surface-container text-primary font-label-md text-label-md rounded-lg flex items-center gap-space-xs transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">add_circle</span>
+<span>Suprimento</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm">F6</kbd>
+</button>
+<button class="h-[34px] px-space-sm bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded-lg flex items-center gap-space-xs transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-tertiary">remove_circle</span>
+<span>Sangria / Retirada</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest text-on-surface font-data-mono-sm text-data-mono-sm">F7</kbd>
+</button>
+<button class="h-[34px] px-space-sm bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-label-md text-label-md rounded-lg flex items-center gap-space-xs transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">receipt_long</span>
+<span>Extrato</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-data-mono-sm text-data-mono-sm">^P</kbd>
+</button>
+<button class="h-[34px] px-space-md bg-error text-on-error hover:opacity-90 font-label-md text-label-md rounded-lg flex items-center gap-space-xs transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+<span>Fechar Caixa</span>
+<kbd class="px-1.5 py-0.5 rounded bg-on-error/20 text-on-error font-data-mono-sm text-data-mono-sm">F10</kbd>
+</button>
+</div>
+</div>
+<!-- KPI Metric Cards Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm">
+<!-- Card 1: Fundo de Troco Inicial -->
+<div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Fundo de Gaveta</span>
+<span class="material-symbols-outlined text-secondary text-[18px]">account_balance_wallet</span>
+</div>
+<div class="mt-2">
+<div class="font-data-mono-lg text-data-mono-lg text-on-surface tracking-tight">R$ 250,00</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate mt-0.5">Abertura 07:45 • Camila D.</div>
+</div>
+<div class="mt-space-xs pt-space-xs flex items-center justify-between text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<span>Fundo Fixo Inicial</span>
+<span class="text-secondary font-semibold">100% OK</span>
+</div>
+</div>
+<!-- Card 2: Entradas / Faturamento Líquido -->
+<div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Entradas do Turno</span>
+<span class="material-symbols-outlined text-primary text-[18px]">trending_up</span>
+</div>
+<div class="mt-2">
+<div class="font-data-mono-lg text-data-mono-lg text-primary tracking-tight">+R$ 4.890,50</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate mt-0.5">48 transações registradas</div>
+</div>
+<div class="mt-space-xs pt-space-xs flex items-center justify-between text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<span>Balcão: 32 | O.S.: 16</span>
+<span class="text-primary font-semibold">Fluxo Alto</span>
+</div>
+</div>
+<!-- Card 3: Sangrias Realizadas -->
+<div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Sangrias p/ Cofre</span>
+<span class="material-symbols-outlined text-error text-[18px]">outbox</span>
+</div>
+<div class="mt-2">
+<div class="font-data-mono-lg text-data-mono-lg text-error tracking-tight">-R$ 1.500,00</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate mt-0.5">2 retiradas auditadas</div>
+</div>
+<div class="mt-space-xs pt-space-xs flex items-center justify-between text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<span>Retirada Gerencial</span>
+<span class="text-on-surface-variant">Cofre Matriz</span>
+</div>
+</div>
+<!-- Card 4: Saldo Esperado em Cédulas/Moedas -->
+<div class="bg-surface-container-low p-space-md rounded-lg shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider">Saldo Gaveta (Esp.)</span>
+<span class="material-symbols-outlined text-primary text-[18px]">point_of_sale</span>
+</div>
+<div class="mt-2">
+<div class="font-data-mono-lg text-data-mono-lg text-on-surface font-bold tracking-tight">R$ 1.140,50</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate mt-0.5">Apenas Cédulas &amp; Moedas</div>
+</div>
+<div class="mt-space-xs pt-space-xs flex items-center justify-between font-data-mono-sm text-data-mono-sm">
+<span class="text-on-surface-variant">Conferência Cega</span>
+<span class="text-primary font-semibold">Exige Físico</span>
+</div>
+</div>
+<!-- Card 5: Total Geral Faturado -->
+<div class="bg-primary text-on-primary p-space-md rounded-lg shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between opacity-90">
+<span class="font-label-sm text-label-sm uppercase tracking-wider">Receita Consolidada</span>
+<span class="material-symbols-outlined text-inverse-primary text-[18px]">query_stats</span>
+</div>
+<div class="mt-2">
+<div class="font-data-mono-lg text-data-mono-lg tracking-tight font-bold">R$ 3.640,50</div>
+<div class="font-body-sm text-body-sm opacity-90 truncate mt-0.5">Total faturado no caixa</div>
+</div>
+<div class="mt-space-xs pt-space-xs flex items-center justify-between text-inverse-primary font-data-mono-sm text-data-mono-sm">
+<span>Pix: 50.8%</span>
+<span>Dinheiro: 31.3%</span>
+</div>
+</div>
+</div>
+<!-- Operational Two-Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-start">
+<!-- Left Column (65% width / 8 cols): Detailed Transaction Grid & Audit Trail -->
+<div class="lg:col-span-8 flex flex-col gap-space-sm bg-surface-container-lowest p-space-md rounded-lg shadow-sm">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Extrato Operacional de Movimentações</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Registros em tempo real acoplados ao spooler fiscal e recibos</span>
+</div>
+<!-- Live Counter badge -->
+<div class="flex items-center gap-space-xs px-space-sm py-1 bg-surface-container rounded font-data-mono-sm text-data-mono-sm text-on-surface">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary inline-block"></span>
+<span>48 Lançamentos</span>
+<span class="text-on-surface-variant">•</span>
+<span class="text-on-surface-variant">Último: 14:22</span>
+</div>
+</div>
+<!-- Quick Category Filters -->
+<div class="flex items-center gap-space-xs overflow-x-auto pb-1">
+<button class="px-space-sm py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm whitespace-nowrap shadow-sm" type="button">Todos (48)</button>
+<button class="px-space-sm py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm whitespace-nowrap transition-colors" type="button">Vendas Balcão (32)</button>
+<button class="px-space-sm py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm whitespace-nowrap transition-colors" type="button">Recebimento O.S. (12)</button>
+<button class="px-space-sm py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm whitespace-nowrap transition-colors" type="button">Sangrias (2)</button>
+<button class="px-space-sm py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm whitespace-nowrap transition-colors" type="button">Suprimentos (2)</button>
+</div>
+<!-- Search & Filters Toolbar -->
+<div class="flex items-center gap-space-sm bg-surface-container-low p-space-xs rounded-lg">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-2 top-2 text-on-surface-variant text-[16px]">filter_alt</span>
+<input class="w-full h-8 pl-8 pr-3 text-body-sm font-body-sm bg-surface-container-lowest text-on-surface rounded focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-on-surface-variant/60" placeholder="[Ctrl+F] Localizar documento, cliente, operador ou forma de pgto..." type="text"/>
+</div>
+<button class="h-8 px-space-sm bg-surface-container-lowest text-on-surface-variant hover:text-on-surface rounded flex items-center gap-1 font-label-sm text-label-sm shadow-sm" title="Filtrar por turno" type="button">
+<span class="material-symbols-outlined text-[15px]">schedule</span>
+<span>Hoje (Turno Atual)</span>
+</button>
+<button class="h-8 px-space-xs bg-surface-container-lowest text-on-surface-variant hover:text-on-surface rounded flex items-center justify-center shadow-sm" title="Exportar CSV" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+<!-- High-Density Desktop Data Grid -->
+<div class="overflow-x-auto rounded">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider h-8">
+<th class="px-space-sm w-16">HORA</th>
+<th class="px-space-sm w-28">TIPO</th>
+<th class="px-space-sm w-36">DOC / ORIGEM</th>
+<th class="px-space-sm">CLIENTE / HISTÓRICO</th>
+<th class="px-space-sm w-32">FORMA PGTO</th>
+<th class="px-space-sm w-24">OPERADOR</th>
+<th class="px-space-sm text-right w-28">VALOR (R$)</th>
+</tr>
+</thead>
+<tbody class="divide-y-0 text-body-sm font-body-sm">
+<!-- Row 1: Venda Balcao -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-lowest">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">14:22</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">arrow_downward</span> Entrada
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-primary">#VND-2894</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface">Consumidor Final <span class="text-on-surface-variant">(Adesivo Vinil + Plastificação)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px] text-secondary">qr_code_2</span> Pix Cora
+              </td>
+<td class="px-space-sm text-on-surface-variant">Camila D.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-primary font-semibold">+ 100,00</td>
+</tr>
+<!-- Row 2: Entrada OS -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-low/30">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">13:50</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">arrow_downward</span> Entrada
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-primary">#OS-8942</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface">Agência Criativa SP <span class="text-on-surface-variant">(Sinal 50% Banner Lona 440g)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px] text-secondary">qr_code_2</span> Pix Cora
+              </td>
+<td class="px-space-sm text-on-surface-variant">Juliana M.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-primary font-semibold">+ 275,00</td>
+</tr>
+<!-- Row 3: Sangria Gerencial -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-lowest">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">13:15</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">arrow_upward</span> Sangria
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-error">#SAN-014</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface font-medium">Sangria Gerencial p/ Cofre <span class="text-on-surface-variant">(Aut. Roberto S.)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px]">payments</span> Dinheiro
+              </td>
+<td class="px-space-sm text-on-surface-variant">Camila D.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-error font-semibold">- 1.000,00</td>
+</tr>
+<!-- Row 4: Venda Cartao Debito -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-low/30">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">12:40</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">arrow_downward</span> Entrada
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-primary">#VND-2891</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface">Lucas Peixoto <span class="text-on-surface-variant">(Cópias Color A4 + Encadernação Wire-O)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px]">credit_card</span> Cartão Débito
+              </td>
+<td class="px-space-sm text-on-surface-variant">Camila D.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-primary font-semibold">+ 48,50</td>
+</tr>
+<!-- Row 5: Faturado Boleto -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-lowest">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">11:10</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">info</span> Faturado
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-on-surface">#OS-8939</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface">Colégio Horizonte Prime <span class="text-on-surface-variant">(150 Apostilas Encadernadas)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px]">description</span> Boleto 15 DDL
+              </td>
+<td class="px-space-sm text-on-surface-variant">Juliana M.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-on-surface">1.840,00</td>
+</tr>
+<!-- Row 6: Sangria Motoboy -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-low/30">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">10:05</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">arrow_upward</span> Sangria
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-error">#SAN-013</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface">Pagamento Motoboy <span class="text-on-surface-variant">(Entrega Expressa O.S. #8928)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px]">payments</span> Dinheiro
+              </td>
+<td class="px-space-sm text-on-surface-variant">Camila D.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-error font-semibold">- 50,00</td>
+</tr>
+<!-- Row 7: Venda Dinheiro -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-lowest">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">08:30</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">arrow_downward</span> Entrada
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-primary">#VND-2880</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface">Dra. Vanessa Castilho <span class="text-on-surface-variant">(Receituários Blocado 2x 50fls)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px]">payments</span> Dinheiro
+              </td>
+<td class="px-space-sm text-on-surface-variant">Camila D.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-primary font-semibold">+ 180,00</td>
+</tr>
+<!-- Row 8: Suprimento Inicial -->
+<tr class="hover:bg-surface-container-low transition-colors h-9 bg-surface-container-low/30">
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm text-on-surface-variant">07:45</td>
+<td class="px-space-sm">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-container-highest text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[12px]">add_circle</span> Suprimento
+                </span>
+</td>
+<td class="px-space-sm font-data-mono-sm text-data-mono-sm font-semibold text-secondary">#SUP-001</td>
+<td class="px-space-sm truncate max-w-xs text-on-surface font-medium">Troco Inicial de Gaveta <span class="text-on-surface-variant">(Abertura de Caixa)</span></td>
+<td class="px-space-sm text-on-surface-variant flex items-center gap-1 pt-2">
+<span class="material-symbols-outlined text-[14px]">payments</span> Dinheiro
+              </td>
+<td class="px-space-sm text-on-surface-variant">Roberto S.</td>
+<td class="px-space-sm text-right font-data-mono-md text-data-mono-md text-secondary font-semibold">+ 250,00</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination & Hardware Log Status -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pt-space-xs text-on-surface-variant font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-space-xs">
+<span>Mostrando 8 de 48 registros</span>
+<span>•</span>
+<span class="text-secondary font-semibold">Gaveta física conectada via RJ12 (Status: Fechada)</span>
+</div>
+<div class="flex items-center gap-space-xs self-end sm:self-auto">
+<button class="px-2 py-0.5 bg-surface-container rounded hover:bg-surface-container-high transition-colors" type="button">Anterior</button>
+<span class="px-2 py-0.5 bg-primary text-on-primary rounded font-bold">1</span>
+<button class="px-2 py-0.5 bg-surface-container rounded hover:bg-surface-container-high transition-colors" type="button">2</button>
+<button class="px-2 py-0.5 bg-surface-container rounded hover:bg-surface-container-high transition-colors" type="button">3</button>
+<button class="px-2 py-0.5 bg-surface-container rounded hover:bg-surface-container-high transition-colors" type="button">Próximo</button>
+</div>
+</div>
+</div>
+<!-- Right Column (35% width / 4 cols): Blind Closure & Physical Cash Count -->
+<div class="lg:col-span-4 flex flex-col gap-space-md">
+<!-- Blind Count / Physical Cash Denomination Module -->
+<div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">calculate</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Conferência Cega de Gaveta</h3>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-surface-container-high text-on-surface font-label-sm text-label-sm uppercase">Turno 01</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          Informe a quantidade física apurada na gaveta. O sistema calcula a divergência no fechamento.
+        </p>
+<!-- Denominations Grid -->
+<div class="bg-surface-container-low p-space-xs rounded-lg flex flex-col gap-space-xs">
+<div class="grid grid-cols-3 gap-space-xs text-center font-label-sm text-label-sm text-on-surface-variant pb-1">
+<span>CÉDULA / MOEDA</span>
+<span>QUANTIDADE</span>
+<span>SUBTOTAL</span>
+</div>
+<!-- Denomination Row 1 -->
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<div class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-on-surface px-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> R$ 100,00
+            </div>
+<input class="h-7 text-center font-data-mono-sm text-data-mono-sm bg-surface-container-lowest rounded focus:outline-none focus:ring-1 focus:ring-primary text-on-surface" type="number" value="7"/>
+<div class="text-right font-data-mono-sm text-data-mono-sm text-on-surface pr-space-xs">R$ 700,00</div>
+</div>
+<!-- Denomination Row 2 -->
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<div class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-on-surface px-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> R$ 50,00
+            </div>
+<input class="h-7 text-center font-data-mono-sm text-data-mono-sm bg-surface-container-lowest rounded focus:outline-none focus:ring-1 focus:ring-primary text-on-surface" type="number" value="6"/>
+<div class="text-right font-data-mono-sm text-data-mono-sm text-on-surface pr-space-xs">R$ 300,00</div>
+</div>
+<!-- Denomination Row 3 -->
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<div class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-on-surface px-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> R$ 20,00
+            </div>
+<input class="h-7 text-center font-data-mono-sm text-data-mono-sm bg-surface-container-lowest rounded focus:outline-none focus:ring-1 focus:ring-primary text-on-surface" type="number" value="4"/>
+<div class="text-right font-data-mono-sm text-data-mono-sm text-on-surface pr-space-xs">R$ 80,00</div>
+</div>
+<!-- Denomination Row 4 -->
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<div class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-on-surface px-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> R$ 10,00
+            </div>
+<input class="h-7 text-center font-data-mono-sm text-data-mono-sm bg-surface-container-lowest rounded focus:outline-none focus:ring-1 focus:ring-primary text-on-surface" type="number" value="4"/>
+<div class="text-right font-data-mono-sm text-data-mono-sm text-on-surface pr-space-xs">R$ 40,00</div>
+</div>
+<!-- Denomination Row 5 -->
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<div class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-on-surface px-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> R$ 5,00 / 2,00
+            </div>
+<input class="h-7 text-center font-data-mono-sm text-data-mono-sm bg-surface-container-lowest rounded focus:outline-none focus:ring-1 focus:ring-primary text-on-surface" type="number" value="3"/>
+<div class="text-right font-data-mono-sm text-data-mono-sm text-on-surface pr-space-xs">R$ 15,00</div>
+</div>
+<!-- Denomination Row 6: Moedas Fracionadas -->
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<div class="flex items-center gap-1 font-data-mono-sm text-data-mono-sm text-on-surface px-space-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Moedas Diversas
+            </div>
+<input class="h-7 text-center font-data-mono-sm text-data-mono-sm bg-surface-container-lowest rounded focus:outline-none focus:ring-1 focus:ring-primary text-on-surface" step="0.05" type="number" value="5.50"/>
+<div class="text-right font-data-mono-sm text-data-mono-sm text-on-surface pr-space-xs">R$ 5,50</div>
+</div>
+</div>
+<!-- Total Contado vs Esperado -->
+<div class="p-space-sm rounded-lg bg-surface-container flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>TOTAL FÍSICO INFORMADO</span>
+<span class="text-secondary font-bold">100% AUDITADO</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-data-mono-lg text-data-mono-lg text-on-surface font-bold">R$ 1.140,50</span>
+<div class="flex items-center gap-1 text-secondary font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span>Sem Quebra</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-data-mono-sm text-data-mono-sm pt-1">
+<span>Saldo Esperado do Sistema:</span>
+<span>R$ 1.140,50</span>
+</div>
+</div>
+<!-- Automated Digital Breakdowns -->
+<div class="flex flex-col gap-1.5 pt-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Meios Digitais &amp; Eletrônicos (TEF/API)</span>
+<div class="flex items-center justify-between p-space-xs rounded bg-surface-container-low font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-secondary">qr_code_2</span>
+<span>Pix Cora / QR Dinâmico</span>
+</div>
+<div class="text-right">
+<span class="font-semibold text-on-surface">R$ 1.850,00</span>
+<span class="text-on-surface-variant ml-1">(14 tx)</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-space-xs rounded bg-surface-container-low font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-primary">credit_card</span>
+<span>Cartão de Débito (Cielo LIO)</span>
+</div>
+<div class="text-right">
+<span class="font-semibold text-on-surface">R$ 420,00</span>
+<span class="text-on-surface-variant ml-1">(6 tx)</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-space-xs rounded bg-surface-container-low font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-primary">credit_score</span>
+<span>Cartão de Crédito (Cielo LIO)</span>
+</div>
+<div class="text-right">
+<span class="font-semibold text-on-surface">R$ 230,00</span>
+<span class="text-on-surface-variant ml-1">(3 tx)</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-space-xs rounded bg-surface-container-low font-data-mono-sm text-data-mono-sm">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-on-surface-variant">description</span>
+<span>Faturado / Boleto Bancário</span>
+</div>
+<div class="text-right">
+<span class="font-semibold text-on-surface">R$ 1.840,00</span>
+<span class="text-on-surface-variant ml-1">(1 O.S.)</span>
+</div>
+</div>
+</div>
+<!-- Action Confirmation Controls -->
+<div class="flex flex-col gap-space-xs pt-space-xs">
+<button class="w-full h-9 bg-surface-container text-on-surface hover:bg-surface-container-high rounded font-label-md text-label-md flex items-center justify-center gap-2 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">print</span>
+<span>Imprimir Extrato ESC/POS (80mm)</span>
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest font-data-mono-sm text-data-mono-sm text-on-surface-variant">Ctrl+P</kbd>
+</button>
+<button class="w-full h-10 bg-error hover:opacity-90 text-on-error rounded font-label-md text-label-md flex items-center justify-center gap-2 transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<span>Confirmar Fechamento &amp; Bloquear</span>
+<kbd class="px-1.5 py-0.5 rounded bg-on-error/20 font-data-mono-sm text-data-mono-sm">F10</kbd>
+</button>
+</div>
+<!-- Audit Signature String -->
+<div class="p-space-xs rounded bg-surface-container-low text-on-surface-variant font-data-mono-sm text-data-mono-sm flex flex-col gap-0.5">
+<div class="flex items-center justify-between">
+<span>Operador Responsável:</span>
+<span class="font-semibold text-on-surface">Roberto Silva (Gerente)</span>
+</div>
+<div class="flex items-center justify-between">
+<span>IP da Máquina:</span>
+<span>192.168.1.10 (Terminal 01)</span>
+</div>
+<div class="flex items-center justify-between">
+<span>Hash Fiscal MD5:</span>
+<span class="font-mono text-[10px]">7e28b1a...f89c</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Visual Ergonomics: Quick Keyboard Shortcuts Summary -->
+<div class="flex items-center justify-between px-space-md py-space-xs bg-surface-container-lowest rounded-lg shadow-sm font-label-sm text-label-sm text-on-surface-variant flex-wrap gap-space-sm">
+<div class="flex items-center gap-space-md flex-wrap">
+<span class="font-bold uppercase tracking-wider text-on-surface">Teclas de Acesso Rápido:</span>
+<div class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm font-bold">F6</kbd>
+<span>Novo Suprimento</span>
+</div>
+<div class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm font-bold">F7</kbd>
+<span>Nova Sangria</span>
+</div>
+<div class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm font-bold">F10</kbd>
+<span>Fechamento Cego</span>
+</div>
+<div class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm font-bold">Ctrl+P</kbd>
+<span>Imprimir Comprovante</span>
+</div>
+<div class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface font-data-mono-sm text-data-mono-sm font-bold">Esc</kbd>
+<span>Retornar ao PDV</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs text-secondary font-data-mono-sm text-data-mono-sm">
+<span class="w-2 h-2 rounded-full bg-secondary inline-block"></span>
+<span>Sincronizado c/ Módulo Fiscal NFC-e</span>
+</div>
+</div>
+</div></main></div><footer class="fixed bottom-0 left-0 right-0 h-8 z-50 bg-inverse-surface text-inverse-on-surface flex items-center justify-between px-space-md select-none font-data-mono-sm text-data-mono-sm"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-secondary-container inline-block"></span><span>Daemon: 127.0.0.1:8000 Conectado</span></div><span class="text-outline">|</span><span>Estação: 01 (Gerência / Caixa)</span><span class="text-outline">|</span><span>Banco: PostgreSQL 15 Local</span></div><div class="flex items-center gap-space-md"><div class="hidden lg:flex items-center gap-space-sm text-inverse-primary font-label-sm text-label-sm"><span>[F1 Ajuda]</span><span>[F2 Clientes]</span><span>[F3 Produtos]</span><span>[F4 OS]</span><span>[F5 PDV]</span><span>[F7 Caixa]</span><span>[ESC Sair]</span></div><span class="text-outline hidden lg:inline">|</span><span class="font-label-sm text-label-sm opacity-80">v2.0.0</span></div></footer></body></html>
