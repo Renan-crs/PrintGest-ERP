@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==8.*
+# redgest_stub (scripts/) assina JWT RS256 em dev/homologação
+cryptography==43.*

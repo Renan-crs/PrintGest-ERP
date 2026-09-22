@@ -13,6 +13,7 @@ htmlcov/
 # Ambiente
 .env
 .env.local
+.dev/
 
 # Build / empacotamento
 build/
@@ -20,6 +21,26 @@ dist/
 *.spec
 *.exe
 *.msi
+
+# Graphify (grafo de conhecimento — saída local de cada dev)
+graphify-out/
+
+# Ferramentas locais (opencode)
+.opencode/
+
+# Obsidian (workspace local)
+docs/.obsidian/
+
+# Estrutura antiga / exportada de outro projeto
+stitch_print_shop_management_system/
+
+# Rascunhos e saídas de depuração
+*.log
+_*.txt
+backend/_*.txt
+backend/api_test.ps1
+backend/api_test.py
+backend/test_token.txt
 
 # Editores / SO
 .vscode/

@@ -220,7 +220,8 @@ CREATE TABLE funcionario (
     comissao_pct    NUMERIC(6,3) DEFAULT 0,
     ativo           BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_funcionario_comissao CHECK (comissao_pct BETWEEN 0 AND 100)
 );
 CREATE INDEX idx_funcionario_nome ON funcionario (nome);
 CREATE TRIGGER trg_funcionario_upd BEFORE UPDATE ON funcionario
@@ -231,12 +232,13 @@ CREATE TRIGGER trg_funcionario_upd BEFORE UPDATE ON funcionario
 -- ===========================================================================
 CREATE TABLE produto_categoria (
     id          BIGSERIAL PRIMARY KEY,
-    filial_id   BIGINT REFERENCES filial (id),
-    nome        VARCHAR(80) NOT NULL UNIQUE,
+    filial_id   BIGINT NOT NULL REFERENCES filial (id),
+    nome        VARCHAR(80) NOT NULL,
     description VARCHAR(255),
     ativo       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_produto_categoria_filial_nome UNIQUE (filial_id, nome)
 );
 CREATE TRIGGER trg_produto_categoria_upd BEFORE UPDATE ON produto_categoria
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -261,7 +263,9 @@ CREATE TABLE produto (
     bloqueado_reajuste BOOLEAN NOT NULL DEFAULT FALSE,       -- protegido do reajuste em bloco (8.1)
     ativo              BOOLEAN NOT NULL DEFAULT TRUE,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_produto_precos CHECK (preco_custo >= 0 AND preco_venda >= 0),
+    CONSTRAINT ck_produto_estoque_minimo CHECK (estoque_minimo >= 0)
 );
 CREATE INDEX idx_produto_nome        ON produto (nome);
 CREATE INDEX idx_produto_categoria   ON produto (categoria_id);
@@ -326,7 +330,9 @@ CREATE TABLE ordem_servico (
     criado_por           BIGINT REFERENCES usuario (id),
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CHECK (ordem_servico.orcamento_origem_id IS NULL OR ordem_servico.orcamento_origem_id <> ordem_servico.id)
+    CHECK (ordem_servico.orcamento_origem_id IS NULL OR ordem_servico.orcamento_origem_id <> ordem_servico.id),
+    CONSTRAINT ck_os_valores_nao_negativos CHECK (desconto >= 0 AND valor_itens >= 0 AND valor_total >= 0),
+    CONSTRAINT ck_os_valor_consistente CHECK (valor_itens - desconto = valor_total)
 );
 CREATE INDEX idx_os_status    ON ordem_servico (status, data_emissao);
 CREATE INDEX idx_os_cliente   ON ordem_servico (cliente_id);
@@ -346,7 +352,9 @@ CREATE TABLE ordem_servico_item (
     desconto           NUMERIC(14,2) NOT NULL DEFAULT 0,
     valor_total        NUMERIC(14,2) NOT NULL DEFAULT 0,
     executado          BOOLEAN NOT NULL DEFAULT FALSE,  -- progresso na produção (3.2)
-    UNIQUE (ordem_servico_id, seq)
+    UNIQUE (ordem_servico_id, seq),
+    CONSTRAINT ck_os_item_qtd_positiva CHECK (quantidade > 0),
+    CONSTRAINT ck_os_item_valores_nao_negativos CHECK (valor_unitario >= 0 AND desconto >= 0 AND valor_total >= 0)
 );
 CREATE INDEX idx_os_item_produto ON ordem_servico_item (produto_id);
 
@@ -367,13 +375,16 @@ CREATE TABLE venda_balcao (
     valor_total        NUMERIC(14,2) NOT NULL DEFAULT 0,
     forma_pagamento    forma_pagamento NOT NULL,
     parcelas           INTEGER NOT NULL DEFAULT 1,        -- parcelamento (fiado/cartão)
-    caixa_id           BIGINT,                            -- preenchido no lançamento do caixa
-    documento_fiscal_id BIGINT,                           -- lançado após emissão (6.1)
+    caixa_id           BIGINT REFERENCES caixa (id),                        -- preenchido no lançamento do caixa
+    documento_fiscal_id BIGINT REFERENCES documento_fiscal (id),          -- lançado após emissão (6.1)
     observacoes        TEXT,
     criado_por         BIGINT REFERENCES usuario (id),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CHECK (venda_balcao.status <> 'ok' OR venda_balcao.operador_caixa IS NOT NULL)
+    CHECK (venda_balcao.status <> 'ok' OR venda_balcao.operador_caixa IS NOT NULL),
+    CONSTRAINT ck_venda_valores_nao_negativos CHECK (desconto >= 0 AND valor_itens >= 0 AND valor_total >= 0),
+    CONSTRAINT ck_venda_valor_consistente CHECK (valor_itens - desconto = valor_total),
+    CONSTRAINT ck_venda_parcelas CHECK (parcelas >= 1)
 );
 CREATE INDEX idx_venda_status ON venda_balcao (status, data_venda);
 CREATE INDEX idx_venda_cliente ON venda_balcao (cliente_id);
@@ -390,7 +401,9 @@ CREATE TABLE venda_balcao_item (
     valor_unitario     NUMERIC(14,2) NOT NULL DEFAULT 0,
     desconto           NUMERIC(14,2) NOT NULL DEFAULT 0,
     valor_total        NUMERIC(14,2) NOT NULL DEFAULT 0,
-    UNIQUE (venda_balcao_id, seq)
+    UNIQUE (venda_balcao_id, seq),
+    CONSTRAINT ck_venda_item_qtd_positiva CHECK (quantidade > 0),
+    CONSTRAINT ck_venda_item_valores_nao_negativos CHECK (valor_unitario >= 0 AND desconto >= 0 AND valor_total >= 0)
 );
 CREATE INDEX idx_venda_item_produto ON venda_balcao_item (produto_id);
 
@@ -410,7 +423,8 @@ CREATE TABLE pedido_compra (
     observacoes        TEXT,
     solicitante_id     BIGINT REFERENCES usuario (id),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_pedido_valor_total CHECK (valor_total >= 0)
 );
 CREATE INDEX idx_pedido_status ON pedido_compra (status, data_pedido);
 CREATE INDEX idx_pedido_fornecedor ON pedido_compra (fornecedor_id);
@@ -427,7 +441,10 @@ CREATE TABLE pedido_compra_item (
     quantidade_recebida NUMERIC(12,3) NOT NULL DEFAULT 0,
     valor_unitario     NUMERIC(14,2) NOT NULL DEFAULT 0,
     valor_total        NUMERIC(14,2) NOT NULL DEFAULT 0,
-    UNIQUE (pedido_compra_id, seq)
+    UNIQUE (pedido_compra_id, seq),
+    CONSTRAINT ck_pedido_item_qtd_positiva CHECK (quantidade > 0),
+    CONSTRAINT ck_pedido_item_qtd_recebida CHECK (quantidade_recebida BETWEEN 0 AND quantidade),
+    CONSTRAINT ck_pedido_item_valores_nao_negativos CHECK (valor_unitario >= 0 AND valor_total >= 0)
 );
 CREATE INDEX idx_pedido_item_produto ON pedido_compra_item (produto_id);
 
@@ -446,7 +463,8 @@ CREATE TABLE agendamento (
     ordem_servico_id   BIGINT REFERENCES ordem_servico (id),
     usuario_id         BIGINT REFERENCES usuario (id),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_agendamento_horario CHECK (data_hora_fim IS NULL OR data_hora_fim > data_hora_inicio)
 );
 CREATE INDEX idx_agenda_inicio ON agendamento (data_hora_inicio);
 CREATE TRIGGER trg_agendamento_upd BEFORE UPDATE ON agendamento
@@ -457,7 +475,7 @@ CREATE TRIGGER trg_agendamento_upd BEFORE UPDATE ON agendamento
 -- ===========================================================================
 CREATE TABLE plano_contas (
     id           BIGSERIAL PRIMARY KEY,
-    filial_id    BIGINT REFERENCES filial (id),
+    filial_id    BIGINT NOT NULL REFERENCES filial (id),
     codigo       VARCHAR(20) NOT NULL,
     nome         VARCHAR(120) NOT NULL,
     tipo         tipo_plano_conta NOT NULL,
@@ -485,7 +503,9 @@ CREATE TABLE conta_receber (
     usuario_baixa_id  BIGINT REFERENCES usuario (id),
     observacoes       TEXT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_cr_valores_nao_negativos CHECK (valor >= 0 AND valor_pago >= 0),
+    CONSTRAINT ck_cr_parcelas CHECK (parcela >= 1 AND total_parcelas >= 1)
 );
 CREATE INDEX idx_cr_vencimento ON conta_receber (status, vencimento);
 CREATE INDEX idx_cr_cliente    ON conta_receber (cliente_id);
@@ -509,7 +529,9 @@ CREATE TABLE conta_pagar (
     usuario_baixa_id  BIGINT REFERENCES usuario (id),
     observacoes       TEXT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_cp_valores_nao_negativos CHECK (valor >= 0 AND valor_pago >= 0),
+    CONSTRAINT ck_cp_parcelas CHECK (parcela >= 1 AND total_parcelas >= 1)
 );
 CREATE INDEX idx_cp_vencimento ON conta_pagar (status, vencimento);
 CREATE INDEX idx_cp_fornecedor ON conta_pagar (fornecedor_id);
@@ -532,9 +554,12 @@ CREATE TABLE caixa (
     diferenca             NUMERIC(14,2),    -- divergência registrada (PRD §8)
     observacoes           TEXT,
     closed_user_id        BIGINT REFERENCES usuario (id),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_caixa_valor_abertura CHECK (valor_abertura >= 0)
 );
 CREATE INDEX idx_caixa_status ON caixa (status, data_abertura);
+CREATE UNIQUE INDEX uq_caixa_aberto_filial_usuario ON caixa (filial_id, usuario_id)
+    WHERE status = 'aberto';
 CREATE TRIGGER trg_caixa_upd BEFORE UPDATE ON caixa
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -548,7 +573,8 @@ CREATE TABLE movimento_caixa (
     descricao         VARCHAR(255),
     valor             NUMERIC(14,2) NOT NULL,
     usuario_id        BIGINT REFERENCES usuario (id),
-    criado_em         TIMESTAMPTZ NOT NULL DEFAULT now()
+    criado_em         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_movcaixa_valor CHECK (valor >= 0)
 );
 CREATE INDEX idx_movcaixa_caixa ON movimento_caixa (caixa_id, criado_em);
 
@@ -576,12 +602,13 @@ CREATE TABLE documento_fiscal (
     tentativas        INTEGER NOT NULL DEFAULT 0,
     criado_por        BIGINT REFERENCES usuario (id),
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_df_chave_acesso UNIQUE (chave_acesso),
+    CONSTRAINT uq_df_modelo_numero_serie UNIQUE (modelo, numero, serie)
 );
 CREATE INDEX idx_df_status ON documento_fiscal (status, created_at);
 CREATE INDEX idx_df_venda  ON documento_fiscal (venda_balcao_id) WHERE venda_balcao_id IS NOT NULL;
 CREATE INDEX idx_df_os     ON documento_fiscal (ordem_servico_id) WHERE ordem_servico_id IS NOT NULL;
-CREATE INDEX idx_df_chave  ON documento_fiscal (chave_acesso);
 CREATE TRIGGER trg_df_upd BEFORE UPDATE ON documento_fiscal
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
