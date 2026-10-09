@@ -1,0 +1,284 @@
+================================================================================
+ RESUMO CONSOLIDADO — MÓDULO 5 (FINANCEIRO / CAIXA & CONTAS) — PRINTGEST ERP v2.0
+================================================================================
+ Fonte: C:\Compart\Projetos\Printgest\mockups
+   - 5.1_gest_o_de_caixa_di_rio_fechamento_de_turno_printgest_erp\code.html
+   - 5.3_contas_a_pagar_insumos_printgest_erp\code.html
+   (cada pasta contém apenas 1 arquivo code.html + 1 screen.png)
+
+ NOTA IMPORTANTE: O mockup 5.2 (Contas a Receber) NÃO EXISTE na pasta mockups.
+ Estão presentes apenas 5.1 (Caixa Diário / Fechamento de Turno) e 5.3
+ (Contas a Pagar / Insumos). O fluxo recebimentos/crediatos não foi mockado.
+================================================================================
+
+CONTEXTO COMUM AOS DOIS MOCKUPS (idêntico em ambos):
+  - Cabeçalho do app: "Servidor Local: 192.168.1.10:8000 (Online)" +
+    badge "Licença Ativa (72h OK)"; usuário "Roberto Silva — Gerente
+    Financeiro"; busca rápida geral "[Ctrl+K]".
+  - Rodapé fixo com telemetria: "Daemon: 127.0.0.1:8000 Conectado | Estação:
+    01 (Gerência / Caixa) | Banco: PostgreSQL 15 Local".
+  - Rodapé de atalhos globais: [F1 Ajuda] [F2 Clientes] [F3 Produtos]
+    [F4 OS] [F5 PDV] [F7 Caixa] [ESC Sair] | v2.0.0.
+  - Design: Material 3 (Tailwind), fonte Inter, ícones Material Symbols,
+    modo light, rodapés de atalhos operacionais (dock) acima do rodapé fixo.
+  - Termos recorrentes: caixa por turno, sangria, suprimento, fechamento
+    cego, gaveta (cash drawer), conciliação por forma de pagamento, DDA,
+    boleto, centro de custo, CMV, insumos gráficos, fornecedores.
+
+--------------------------------------------------------------------------------
+SEÇÃO 1 — 5.1 GESTÃO DE CAIXA & FECHAMENTO DE TURNO
+            (Caixa Operacional Diário / Fechamento de Turno)
+--------------------------------------------------------------------------------
+
+1.1 TÍTULO / INSTRUMENTOS DA TELA
+  - Breadcrumb: "Financeiro / Operações de Balcão / Caixa Operacional
+    Diário".
+  - Título: "Gestão de Caixa & Fechamento de Turno" + badge pulsante
+    "Turno 01 — ABERTO" + badge "Estação #01 (PDV Frontal)".
+  - Subtítulo: "Controle de gaveta física, suprimentos, sangrias e
+    conciliação por método de pagamento em tempo real."
+  - Botões de ação no topo (com atalhos):
+      * "Suprimento" [F6] (ícone add_circle).
+      * "Sangria / Retirada" [F7] (ícone remove_circle, terciário).
+      * "Extrato" [^P] (Ctrl+P).
+      * "Fechar Caixa" [F10] (vermelho, primário — ação crítica).
+  - Barra de atalhos (dock inferior): F6 Novo Suprimento, F7 Nova Sangria,
+    F10 Fechamento Cego, Ctrl+P Imprimir Comprovante, Esc Retornar ao PDV.
+  - Selo final: "Sincronizado c/ Módulo Fiscal NFC-e".
+
+1.2 CARDS DE INDICADORES (KPIs — 5 cards)
+  1. Fundo de Gaveta: R$ 250,00 — "Abertura 07:45 • Camila D." — rodapé
+     "Fundo Fixo Inicial" / "100% OK".
+  2. Entradas do Turno: +R$ 4.890,50 — "48 transações registradas" —
+     "Balcão: 32 | O.S.: 16" — "Fluxo Alto".
+  3. Sangrias p/ Cofre: -R$ 1.500,00 — "2 retiradas auditadas" —
+     "Retirada Gerencial" / "Cofre Matriz".
+  4. Saldo Gaveta (Esp.): R$ 1.140,50 — "Apenas Cédulas & Moedas" —
+     "Conferência Cega" / "Exige Físico" (destaque, fundo claro).
+  5. Receita Consolidada: R$ 3.640,50 — "Total faturado no caixa" —
+     mix "Pix: 50.8% / Dinheiro: 31.3%" (card primário azul).
+
+1.3 COLUNAS DA TABELA — "Extrato Operacional de Movimentações"
+  (subtítulo: "Registros em tempo real acoplados ao spooler fiscal e
+  recibos"; badge "48 Lançamentos • Último: 14:22"). Na ordem exata:
+  1. HORA
+  2. TIPO — badge: Entrada (↓, azul) / Sangria (↑, vermelho) /
+     Faturado (info, neutro) / Suprimento (+, ciano).
+  3. DOC / ORIGEM — ex.: #VND-2894, #OS-8942, #SAN-014, #SUP-001.
+  4. CLIENTE / HISTÓRICO — cliente + descrição do item vendido (ex.:
+     "Consumidor Final (Adesivo Vinil + Plastificação)").
+  5. FORMA PGTO — Pix Cora (QR), Dinheiro, Cartão Débito, Boleto 15 DDL.
+  6. OPERADOR — Camila D., Juliana M., Roberto S.
+  7. VALOR (R$) — entradas verdes "+ R$", sangrias vermelhas "- R$",
+     faturado/boleto sem sinal (não entra no caixa).
+  - Linhas de exemplo: 14:22 #VND-2894 Pix Cora +100,00 | 13:50 #OS-8942
+    Pix Cora +275,00 (Sinal 50% Banner Lona 440g) | 13:15 #SAN-014 Dinheiro
+    -1.000,00 (Sangria Gerencial, Aut. Roberto S.) | 12:40 #VND-2891 Débito
+    +48,50 | 11:10 #OS-8939 Boleto 1.840,00 (Faturado) | 10:05 #SAN-013
+    Dinheiro -50,00 (Pagamento Motoboy) | 08:30 #VND-2880 Dinheiro +180,00 |
+    07:45 #SUP-001 Dinheiro +250,00 (Troco Inicial de Gaveta).
+  - Filtros por categoria (contadores): Todos (48), Vendas Balcão (32),
+    Recebimento O.S. (12), Sangrias (2), Suprimentos (2).
+  - Toolbar de busca e filtro: placeholder "[Ctrl+F] Localizar documento,
+    cliente, operador ou forma de pgto..."; botão "Hoje (Turno Atual)" com
+    ícone de relógio; botão de exportar CSV (download).
+  - Rodapé da grade: "Mostrando 8 de 48 registros" • "Gaveta física
+    conectada via RJ12 (Status: Fechada)"; paginação Anterior / 1 2 3 /
+    Próximo.
+
+1.4 PAINEL LATERAL — "Conferência Cega de Gaveta" (badge "Turno 01")
+  - Grid de denominações (colunas "CÉDULA / MOEDA | QUANTIDADE | SUBTOTAL"):
+      R$ 100,00: qtd 7 → R$ 700,00
+      R$ 50,00:  qtd 6 → R$ 300,00
+      R$ 20,00:  qtd 4 → R$ 80,00
+      R$ 10,00:  qtd 4 → R$ 40,00
+      R$ 5,00 / 2,00: qtd 3 → R$ 15,00
+      Moedas Diversas: 5,50 → R$ 5,50   (step 0,05)
+  - Totais: "TOTAL FÍSICO INFORMADO R$ 1.140,50" — badge "100% AUDITADO" —
+    "Sem Quebra" (check) — "Saldo Esperado do Sistema: R$ 1.140,50".
+  - Widget "Meios Digitais & Eletrônicos (TEF/API)":
+      * Pix Cora / QR Dinâmico — R$ 1.850,00 (14 tx)
+      * Cartão de Débito (Cielo LIO) — R$ 420,00 (6 tx)
+      * Cartão de Crédito (Cielo LIO) — R$ 230,00 (3 tx)
+      * Faturado / Boleto Bancário — R$ 1.840,00 (1 O.S.)
+  - Botões de fechamento:
+      * "Imprimir Extrato ESC/POS (80mm)" [Ctrl+P]
+      * "Confirmar Fechamento & Bloquear" [F10] (vermelho)
+  - Assinatura de auditoria: Operador Responsável: Roberto Silva (Gerente);
+    IP da Máquina: 192.168.1.10 (Terminal 01); Hash Fiscal MD5:
+    7e28b1a...f89c.
+
+1.5 CRUD / REGRAS VISÍVEIS
+  - Turno aberto com suprimento inicial (troco) registrado na abertura
+    (07:45, #SUP-001, operador Roberto S.).
+  - Sangria requer autorização gerencial ("Sangria Gerencial p/ Cofre,
+    Aut. Roberto S."); auditadas e sem "entrada" de volta.
+  - Conferência cega: o sistema informa o saldo esperado e o usuário digita
+    quantidades físicas; divergência calculada no fechamento (aqui "Sem
+    Quebra" = 100% AUDITADO).
+  - Valores faturados em boleto aparecem sem sinal (não compõem a gaveta
+    física). Receita consolidada une dinheiro + meios digitais; Pix 50.8% /
+    Dinheiro 31.3%.
+  - Fechamento com bloqueio, hash fiscal MD5 e sincronização NFC-e.
+
+================================================================================
+SEÇÃO 2 — 5.3 CONTAS A PAGAR & COMPROMISSOS DE INSUMOS
+            (Duplicatas / Boletos de Fornecedores)
+================================================================================
+
+2.1 TÍTULO / INSTRUMENTOS DA TELA
+  - Breadcrumb: "MÓDULO FINANCEIRO / CONTAS A PAGAR & FORNECEDORES".
+  - Título: "Contas a Pagar & Compromissos de Insumos" + badge
+    "DDA Sincronizado (11:42)" (pulsante).
+  - Subtítulo: "Gestão de duplicatas e boletos de fornecedores (papéis,
+    lonas, tintas), contas fixas da gráfica e centros de custo."
+  - Botões de ação no topo (com atalhos):
+      * "Plano de Contas" [Ctrl+K] (ícone account_tree).
+      * "Importar XML / DDA" [F8] (ícone receipt_long).
+      * "+ Nova Conta" [F6] (ícone add_circle).
+      * "Autorizar Pagamentos em Lote" [F9] (primário, ícone verified).
+  - Barra de atalhos (dock inferior): F6 Nova Conta, Enter Baixar / Pagar,
+    F8 Importar DDA / XML, F9 Pagar em Lote, Ctrl+K Plano de Contas,
+    Esc Voltar / Cancelar.
+  - Selo final: "API Bancária Pluggy/Cora: Sincronismo Contínuo Ativo".
+
+2.2 CARDS DE INDICADORES (KPIs — 5 cards)
+  1. Total a Pagar (Mês): R$ 68.450,00 — "34 compromissos cadastrados".
+  2. Boletos Vencendo Hoje (alerta pulsante priority_high): R$ 8.920,00 —
+     badge "4 TÍTULOS" — "Suzano Papel & Alvorada".
+  3. Insumos Gráficos (CMV): R$ 42.100,00 — "61.5% do total apurado" —
+     tag "Bobinas/Papel".
+  4. Despesas Fixas & Oper.: R$ 26.350,00 — "Galpão, trifásica, internet".
+  5. Crédito Fabricantes: R$ 450.000,00 — barra 62% — "62% limite
+     disponível".
+
+2.3 COLUNAS DA TABELA — Contas a Pagar (na ordem exata)
+  0. Checkbox de seleção (check-all + por linha; rodapé soma seleção).
+  1. TÍTULO / NOTA — número do título (ex.: #PAG-0412).
+  2. BENEFICIÁRIO / FORNECEDOR — nome + CNPJ / instalação.
+  3. CATEGORIA / PLANO — código do plano + descrição (ex.: "1.02.01 -
+     Insumos / Papéis Couché e Cartões").
+  4. VINCULAÇÃO — Pedido de Compra / NF / contrato (ex.: PC-0182 (NF
+     18492), Contrato Locação 2026).
+  5. VENCIMENTO — badge (HOJE 17:00 [alarm], 28/10/2026 (Em 5 dias),
+     22/10 (Atraso 2d) [warning]).
+  6. FORMA — Boleto Itaú DDA, Boleto Santander (35 DDL), Débito Automático
+     Cora, Boleto Bradesco, Transferência TED/Pix.
+  7. VALOR (R$) — direita (ex.: 6.450,00; 2.470,00; 3.820,00; 4.250,00;
+     8.500,00; 1.890,00).
+  8. STATUS — badges "Pendente" (vermelho) / "Programado" (ciano) /
+     "Vencido" (vermelho sólido).
+  9. AÇÃO — botão "Pagar" [Enter] (linha destaque), "Detalhes",
+     "Renegociar" (vermelho p/ vencido).
+  - Linhas de exemplo:
+      1. #PAG-0412 Suzano Papel e Celulose S/A (16.404.287/0001-55)
+         HOJE 17:00 • Boleto Itaú DDA • 6.450,00 • Pendente • Pagar [Enter]
+         (linha selecionada).
+      2. #PAG-0413 Serilon Comunicação Visual (04.992.831/0002-19)
+         HOJE 18:00 • Boleto Santander (35 DDL) • 2.470,00 • Pendente.
+      3. #PAG-0414 Enel Distribuição SP (Inst. 981240-9) • 2.01.03 Energia
+         Elétrica • 28/10/2026 (Em 5 dias) • Débito Automático Cora •
+         3.820,00 • Programado • Detalhes.
+      4. #PAG-0415 Sun Chemical do Brasil (54.120.444/0001-88) • 1.02.03
+         Tintas Eco-Solv & UV • 02/11/2026 • Boleto Bradesco • 4.250,00 •
+         Programado.
+      5. #PAG-0416 Locadora de Galpão Pinheiros (Ref. Mês Outubro) •
+         2.01.01 Aluguel Imóvel • 05/11/2026 • TED/Pix • 8.500,00 •
+         Programado.
+      6. #PAG-0410 Plásticos Alvorada ME (09.314.887/0001-20) • 1.02.04
+         Chapas Acrílico e PVC • 22/10 (Atraso 2d) • Boleto Bradesco •
+         1.890,00 • Vencido • Renegociar (linha destacada em vermelho).
+  - Filtros por status (contadores): Todos (34), Insumos / Matéria-Prima
+    (22), Despesas Fixas / Infra (8), Vencendo Hoje (4), Vencidas (1),
+    Pagas no Mês (28) + botão sync ao lado de "Filtro Ativo: Todos".
+  - Busca: placeholder "[Ctrl+F] Buscar por Fornecedor, CNPJ, Número do
+    Pedido de Compra, Código de Barras..." — contador "34 registros".
+  - Rodapé da grade: "Mostrando 6 de 34 títulos" | "1 selecionado
+    (R$ 6.450,00)" (soma dinâmica via checkbox) | paginação Primeira /
+    1 2 3 / Última.
+
+2.4 PAINEL LATERAL DIREITO
+  a) Card "Baixa de Pagamento Rápida" (badge "VENCE HOJE", foco #PAG-0412):
+     - Fornecedor Vinculado: Suzano Papel e Celulose S/A; NF-e 18492;
+       Centro de Custo: 1.02.01 (Papéis Planos).
+     - "Linha Digitável / Código Boleto": 34191.09008 01284.184928
+       64000.120401 8 98710000645000 — Banco Itaú (341) + botão copiar
+       (clipboard + alert em JS).
+     - "Saldo em Conta Operacional (Banco Cora)": R$ 18.940,20 — badge
+       "Saldo Suficiente".
+     - "Valor a Liquidar: R$ 6.450,00".
+     - Botões: "Anexar Comprovante" e "Registrar Saída" [F10] (primário).
+  b) Gráfico "Distribuição por Centro de Custo" (Outubro / 2026) — donut
+     com 5 fatias:
+       1. Insumos: Papéis & Substratos — R$ 28.500,00 (41,6%)
+       2. Bobinas, Lonas & Vinis — R$ 13.600,00 (19,8%)
+       3. Pessoal & Pró-labore Técnico — R$ 14.350,00 (21,0%)
+       4. Infraestrutura & Energia Trifásica — R$ 7.200,00 (10,5%)
+       5. Manutenção de Máquinas & RIP — R$ 4.800,00 (7,0%)
+     - Botão "Abrir DRE Gerencial de Insumos".
+  c) Faixa "Integração Direta com Estoque & Recebimento de Carga":
+     "NF-e 18492 já conferida na doca: 12 bobinas Couché 150g pesadas e
+     liberadas sem avaria." + botão "Ver Espelho da Carga".
+
+2.5 CRUD / REGRAS VISÍVEIS
+  - Status de título: Pendente / Programado / Vencido, com filtros e badges;
+    vencimento mostra hora para vencimentos do próprio dia ("HOJE (17:00)") e
+    atraso em dias ("Atraso 2d").
+  - Fluxo de baixa: selecionar título (checkbox / Enter) → conferir linha
+    digitável + saldo bancário → "Registrar Saída" [F10] → anexar
+    comprovante; pagamentos em lote via [F9].
+  - DDA sincronizado + importação de XML (F8); API bancária Pluggy/Cora
+    com sincronismo contínuo (saldo consultado em tempo real).
+  - Vinculação de contas a Pedido de Compra / NF-e / contrato e a Centro de
+    Custo (plano de contas 1.02.x Insumos, 2.01.x Despesas Fixas).
+  - CMV (61.5% do total) com ênfase em insumos gráficos (Bobinas/Papel);
+    DRE gerencial de insumos acessível pelo painel.
+  - Juros/multa: não há campo explícito; para título vencido a ação ofertada
+    é "Renegociar" (com destacamento em vermelho). Vencimentos são tratados
+    por data+horário e contagem de dias de atraso.
+
+--------------------------------------------------------------------------------
+DESTAQUES CRUZADOS DOS TERMOS SOLICITADOS
+--------------------------------------------------------------------------------
+  - Caixa: tela inteira 5.1 ("Gestão de Caixa", "Caixa Operacional Diário",
+    "Fechar Caixa [F10]", "Confirmar Fechamento & Bloquear");
+    rodapé global "[F7 Caixa]".
+  - Sangria: KPI "Sangrias p/ Cofre -R$ 1.500,00 / 2 retiradas auditadas",
+    botão "Sangria / Retirada [F7]" e linhas #SAN-013/#SAN-014 no extrato
+    (exige autorização gerencial).
+  - Suprimento: botão "Suprimento [F6]", linha #SUP-001 "Troco Inicial de
+    Gaveta (Abertura de Caixa)" R$ 250,00; tecla F6 "Novo Suprimento".
+  - Fechamento: "Turno 01 — ABERTO", conferência cega de gaveta (físico x
+    esperado → "Sem Quebra"), F10 "Fechamento Cego", hash fiscal MD5 e
+    impressão ESC/POS 80mm (Ctrl+P).
+  - Contas a pagar: tela inteira 5.3 (títulos #PAG-04xx, "Total a Pagar
+    R$ 68.450,00", "Boletos Vencendo Hoje R$ 8.920,00"); F9 "Autorizar
+    Pagamentos em Lote", F6 "+ Nova Conta", F8 "Importar XML / DDA".
+  - Vencimento: coluna VENCIMENTO (5.3) com badge "HOJE (17:00)",
+    datas futuras "(Em 5 dias)" e atraso "(Atraso 2d)"; filtro "Vencendo
+    Hoje (4)" e "Vencidas (1)".
+  - Juros / multa: não há campos explícitos de juros/multa nos mockups;
+    para vencido o sistema oferece "Renegociar" (sem valores de encargos
+    visíveis).
+  - Insumos: categoria central da 5.3 — "Contas a Pagar & Compromissos de
+    Insumos", KPI CMV "Insumos Gráficos R$ 42.100,00 (61.5%)", plano de
+    contas "1.02.x - Insumos" (Papéis, Bobinas Lona/Vinil, Tintas, Chapas
+    Acrílico/PVC) e donut de centros de custo; integração com Estoque
+    (NF-e conferida na doca).
+  - Fornecedores: beneficiários com CNPJ (Suzano, Serilon, Sun Chemical,
+    Alvorada), DDA sincronizado, linhas digitáveis de boletos e saldo em
+    conta (Banco Cora).
+  - Formas de pagamento / meios: Pix Cora (QR Dinâmico), Cartão Débito e
+    Crédito (Cielo LIO), Dinheiro, Boleto/DDA, Débito Automático, TED/Pix —
+    presentes nos dois mockups (conciliação em 5.1, baixa em 5.3).
+  - Centro de custo / plano de contas: códigos 1.02.01–1.02.04 e
+    2.01.01–2.01.03 (5.3) + didtribuição donut e "Ctrl+K Plano de Contas".
+  - Recebimento / créditos: não mockado — resumo dos fluxos que ficam fora
+    por ausência do 5.2 (Contas a Receber): cobrança de O.S. faturadas,
+    parcelas a receber, inadimplência e conciliação de créditos.
+
+MÓDULO QUE REPRESENTA: "Financeiro & Caixa" (Operacional) — fluxo diário de
+caixa (turno/sangria/suprimento/fechamento cego) em 5.1 e contas a pagar de
+insumos/despesas fixas em 5.3, integrado ao PDV (F5), O.S. (sinais e
+faturamento), Fiscal NFC-e, Estoque (recebimento de carga) e API bancária
+Pluggy/Cora.
