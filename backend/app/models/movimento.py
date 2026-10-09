@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.cadastros import Cliente, Funcionario
+from app.models.core import Usuario
 from app.models.enums import (
     FormaPagamento,
     StatusAgenda,
@@ -210,6 +211,10 @@ class VendaBalcao(Base):
     )
 
     itens: Mapped[list["VendaBalcaoItem"]] = relationship(back_populates="venda")
+
+    cliente: Mapped[Cliente | None] = relationship(foreign_keys=[cliente_id])
+    vendedor: Mapped[Funcionario | None] = relationship(foreign_keys=[vendedor_id])
+    operador: Mapped[Usuario | None] = relationship(foreign_keys=[operador_caixa])
 
 
 class VendaBalcaoItem(Base):

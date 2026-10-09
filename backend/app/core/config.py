@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     redgest_sistema: str = "grafica_erp"
     licenca_refresh_intervalo_segundos: int = 300
     licenca_renova_antes_segundos: int = 3600
+    licenca_desabilitada: bool = False
 
     model_config = {"env_prefix": "PRINTGEST_"}
 

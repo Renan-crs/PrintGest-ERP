@@ -18,6 +18,7 @@ from app.schemas.cadastros import (
     ProdutoUpdate,
 )
 from app.schemas.common import ItemResponse, ListaResponse
+from app.schemas.dashboard import DashboardResumoOut, DashboardVendaDiaOut
 from app.schemas.licenca import LicencaAtivarIn, LicencaSituacaoOut
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
 
@@ -42,6 +43,8 @@ __all__ = [
     "ProdutoOut",
     "ProdutoUpdate",
     "ProdutoEstoqueOut",
+    "DashboardResumoOut",
+    "DashboardVendaDiaOut",
     "LicencaAtivarIn",
     "LicencaSituacaoOut",
     "UsuarioCreate",

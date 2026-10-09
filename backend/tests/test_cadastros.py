@@ -172,6 +172,7 @@ def test_funcionario_crud(client, admin_token):
             "e_atendente": True,
             "e_vendedor": True,
             "comissao_pct": 3.5,
+            "observacoes": "Regime parcial.",
         },
     )
     assert created.status_code == 200, created.text
@@ -180,6 +181,7 @@ def test_funcionario_crud(client, admin_token):
     assert created.json()["data"]["e_atendente"] is True
     assert created.json()["data"]["e_vendedor"] is True
     assert Decimal(created.json()["data"]["comissao_pct"]) == Decimal("3.500")
+    assert created.json()["data"]["observacoes"] == "Regime parcial."
 
     resp = client.get("/v1/funcionarios", params={"q": "Atendente"},
                       headers=auth(client, admin_token))

@@ -11,7 +11,7 @@ from app.schemas.common import ORMModel
 class UsuarioCreate(ORMModel):
     nome: str = Field(min_length=1, max_length=120)
     login: str = Field(min_length=3, max_length=60, pattern=r"^[a-zA-Z0-9_.-]+$")
-    senha: str = Field(min_length=4, max_length=128)
+    senha: str = Field(min_length=8, max_length=128)
     email: str | None = Field(default=None, max_length=120)
     nivel_acesso: NivelAcesso = NivelAcesso.OPERADOR
     filial_id: int | None = None
@@ -24,7 +24,7 @@ class UsuarioUpdate(ORMModel):
     nivel_acesso: NivelAcesso | None = None
     filial_id: int | None = None
     ativo: bool | None = None
-    senha: str | None = Field(default=None, min_length=4, max_length=128)
+    senha: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class UsuarioOut(ORMModel):

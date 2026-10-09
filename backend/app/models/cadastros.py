@@ -137,6 +137,7 @@ class Funcionario(Base):
         Boolean, nullable=False, server_default="false"
     )
     comissao_pct: Mapped[float] = mapped_column(Numeric(6, 3), server_default="0")
+    observacoes: Mapped[str | None] = mapped_column(Text)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

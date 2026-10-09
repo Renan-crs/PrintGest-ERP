@@ -24,8 +24,14 @@ _MSG_MODO_LEITURA = (
     "ou regularize a comunicação com o servidor de licenças."
 )
 
+# Em modo leitura só seguem livres: rotas de licença (para a tela de ativação e
+# renovação), login/logout (usadas pela UI 1.x), autenticação de leitura (`/me`,
+# já GET, mantido por clareza) e documentação. `/v1/auth/trocar-senha` é uma
+# escrita e permanece bloqueada (423) no modo leitura.
 _CAMINHOS_PERMITIDOS = (
-    "/v1/auth/",
+    "/v1/auth/login",
+    "/v1/auth/logout",
+    "/v1/auth/me",
     "/v1/licenca",
     "/health",
     "/docs",
@@ -55,7 +61,7 @@ app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifesp
 async def controle_modo_leitura(request: Request, call_next):
     if request.method in {"GET", "HEAD", "OPTIONS"} or _caminho_permitido(request.url.path):
         return await call_next(request)
-    if licensa_service.ESTADO["modo_leitura"]:
+    if not settings.licenca_desabilitada and licensa_service.ESTADO["modo_leitura"]:
         return JSONResponse(
             status_code=423,
             content={"detail": _MSG_MODO_LEITURA},

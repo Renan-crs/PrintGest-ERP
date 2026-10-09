@@ -41,7 +41,7 @@ def listar(
 ) -> ListaResponse[VendaOut]:
     itens, total = venda_service.listar(
         db,
-        filial_id=filial.id,
+        filial_id=filial,
         status_venda=status_venda,
         forma_pagamento=forma_pagamento,
         q=q,
@@ -61,17 +61,17 @@ def criar(
     usuario: UsuarioDep,
 ) -> ItemResponse[VendaOut]:
     return ItemResponse(data=venda_service.criar(
-        db, filial_id=filial.id, usuario_id=usuario.id, dados=payload
+        db, filial_id=filial, usuario_id=usuario.id, dados=payload
     ))
 
 
 @router.get("/{venda_id}")
 def buscar(venda_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[VendaOut]:
     return ItemResponse(data=_para_out(venda_service.buscar(
-        db, filial_id=filial.id, venda_id=venda_id
+        db, filial_id=filial, venda_id=venda_id
     )))
 
 
 @router.delete("/{venda_id}", status_code=status.HTTP_204_NO_CONTENT)
 def cancelar(venda_id: int, db: DbDep, filial: FilialDep) -> None:
-    venda_service.cancelar(db, filial_id=filial.id, venda_id=venda_id)
+    venda_service.cancelar(db, filial_id=filial, venda_id=venda_id)

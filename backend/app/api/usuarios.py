@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.security import hash_password
-from app.deps import DbDep, require_nivel
+from app.deps import DbDep, RANK, require_nivel, UsuarioDep
 from app.models.core import Usuario
 from app.models.enums import NivelAcesso
 from app.schemas import ItemResponse, ListaResponse
@@ -18,6 +18,31 @@ router = APIRouter(
     tags=["usuários"],
     dependencies=[Depends(require_nivel(NivelAcesso.ADMIN))],
 )
+
+
+def _garantir_nao_auto_lockout(
+    db: DbDep, usuario_atual: Usuario, item_id: int, body: UsuarioUpdate
+) -> None:
+    """Impede que um admin desative/rebaixe a si mesmo e lock-out o sistema.
+
+    P13 (RBAC) e P16 (anti-lockout): o usuário autenticado não pode remover o
+    próprio acesso — seja desativando, excluindo ou rebaixando o próprio nível.
+    """
+    if item_id != usuario_atual.id:
+        return
+    alvo = db.get(Usuario, item_id) or usuario_atual
+    dados = body.model_dump(exclude_unset=True)
+    if dados.get("ativo") is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Você não pode desativar o próprio usuário.",
+        )
+    novo_nivel = dados.get("nivel_acesso")
+    if novo_nivel is not None and RANK[novo_nivel] < RANK[alvo.nivel_acesso]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Você não pode rebaixar o próprio nível de acesso.",
+        )
 
 
 @router.get("")
@@ -60,8 +85,9 @@ def criar_usuario(body: UsuarioCreate, db: DbDep) -> ItemResponse[UsuarioOut]:
 
 @router.put("/{item_id}")
 def atualizar_usuario(
-    item_id: int, body: UsuarioUpdate, db: DbDep
+    item_id: int, body: UsuarioUpdate, db: DbDep, usuario: UsuarioDep
 ) -> ItemResponse[UsuarioOut]:
+    _garantir_nao_auto_lockout(db, usuario, item_id, body)
     dados = body.model_dump(exclude_unset=True)
     if "senha" in dados:
         dados["senha_hash"] = hash_password(dados.pop("senha"))
@@ -69,5 +95,10 @@ def atualizar_usuario(
 
 
 @router.delete("/{item_id}", status_code=204)
-def remover(item_id: int, db: DbDep) -> None:
+def remover(item_id: int, db: DbDep, usuario: UsuarioDep) -> None:
+    if item_id == usuario.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Você não pode excluir o próprio usuário.",
+        )
     desativar(db, Usuario, item_id)

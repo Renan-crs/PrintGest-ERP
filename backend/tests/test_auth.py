@@ -65,3 +65,40 @@ def test_trocar_senha(client, admin_token):
         json={"senha_atual": "novaSenha1", "nova_senha": "admin123"},
     )
     assert resp.status_code == 200, resp.text
+
+
+def test_trocar_senha_invalida_outras_sessoes(client, admin_token):
+    """Troca de senha encerra as demais sessões ativas, mantendo a atual (P16 §5)."""
+    login = _login_unico("trc")
+    resp = client.post(
+        "/v1/usuarios",
+        headers=auth(client, admin_token),
+        json={"nome": "Troca Senha", "login": login, "senha": "senha123",
+              "nivel_acesso": "operador"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    sessao_a = client.post("/v1/auth/login", json={"login": login, "senha": "senha123"})
+    sessao_b = client.post("/v1/auth/login", json={"login": login, "senha": "senha123"})
+    assert sessao_a.status_code == 200 and sessao_b.status_code == 200
+    token_a = sessao_a.json()["data"]["token"]
+    token_b = sessao_b.json()["data"]["token"]
+
+    resp = client.post(
+        "/v1/auth/trocar-senha",
+        headers=auth(client, token_a),
+        json={"senha_atual": "senha123", "nova_senha": "novaSenha2"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # sessão B (outra) foi encerrada; sessão A (que trocou) permanece válida
+    resp_b = client.get("/v1/auth/me", headers=auth(client, token_b))
+    assert resp_b.status_code == 401
+    resp_a = client.get("/v1/auth/me", headers=auth(client, token_a))
+    assert resp_a.status_code == 200
+
+    # login com a nova senha funciona; com a antiga não
+    resp_antiga = client.post("/v1/auth/login", json={"login": login, "senha": "senha123"})
+    assert resp_antiga.status_code in (401, 423)
+    resp_nova = client.post("/v1/auth/login", json={"login": login, "senha": "novaSenha2"})
+    assert resp_nova.status_code == 200
