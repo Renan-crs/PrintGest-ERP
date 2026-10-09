@@ -632,4 +632,27 @@ def downgrade() -> None:
     op.execute("DROP SEQUENCE seq_os_numero")
     op.execute("DROP SEQUENCE seq_venda_numero")
     op.execute("DROP SEQUENCE seq_pedido_numero")
+    # Enums nativos do PostgreSQL não são removidos pelo drop_table; sem isto o
+    # ciclo downgrade→upgrade falha com "type ... already exists" (P12).
+    for _tipo in (
+        "tipo_pessoa",
+        "tipo_plano_conta",
+        "nivel_acesso",
+        "status_caixa",
+        "tipo_os",
+        "status_os",
+        "forma_pagamento",
+        "status_pedido",
+        "tipo_produto",
+        "tipo_agenda",
+        "status_agenda",
+        "status_conta",
+        "tipo_mov_estoque",
+        "origem_mov",
+        "status_venda",
+        "modelo_fiscal",
+        "status_fiscal",
+        "tipo_mov_caixa",
+    ):
+        op.execute(f"DROP TYPE IF EXISTS {_tipo}")
     # ### end Alembic commands ###

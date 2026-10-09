@@ -12,9 +12,11 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
+from sqlalchemy import String, cast, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.cadastros import MovimentoEstoque, Produto, ProdutoEstoque
+from app.models.cadastros import Cliente, MovimentoEstoque, Produto, ProdutoEstoque
 from app.models.enums import FormaPagamento, OrigemMov, StatusVenda, TipoMovEstoque
 from app.models.movimento import VendaBalcao, VendaBalcaoItem
 from app.schemas.venda import (
@@ -29,6 +31,13 @@ _TWO = Decimal("0.01")
 
 def _q(v: Decimal) -> Decimal:
     return v.quantize(_TWO, rounding=ROUND_HALF_UP)
+
+
+def _erro_integridade() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Dados inválidos: referência inexistente ou violação de unicidade.",
+    )
 
 
 def _montar_item(payload: VendaItemIn, seq: int) -> VendaBalcaoItem:
@@ -175,9 +184,13 @@ def criar(
         itens=itens,
     )
     db.add(venda)
-    db.flush()  # garante venda.id para o kardex antes do commit
-    _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
-    db.commit()
+    try:
+        db.flush()  # garante venda.id para o kardex antes do commit
+        _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise _erro_integridade() from exc
     db.refresh(venda)
     return _para_out(venda)
 
@@ -225,9 +238,13 @@ def listar(
         base = base.filter(VendaBalcao.data_venda <= data_fim)
     if q:
         termo = f"%{q.strip()}%"
-        base = base.join(VendaBalcao.cliente).filter(
-            VendaBalcao.numero.cast(String).ilike(termo)
-            | VendaBalcao.cliente.has(cliente_nome.ilike(termo))
+        base = base.outerjoin(
+            Cliente, VendaBalcao.cliente_id == Cliente.id
+        ).filter(
+            or_(
+                Cliente.nome_razao.ilike(termo),
+                cast(VendaBalcao.numero, String).ilike(termo),
+            )
         )
     total = base.count()
     itens = (

@@ -6,12 +6,10 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-print("ENV: inicio", flush=True)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-print("ENV: a importar app.models", flush=True)
 import app.models  # noqa: F401  — registra todas as tabelas no metadata
-print("ENV: app.models importado", flush=True)
+
 from app.core.config import settings
 from app.db import Base
 
@@ -39,16 +37,13 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    print("ENV: create engine", flush=True)
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
-    print("ENV: conectar", flush=True)
     with connectable.connect() as connection:
-        print("ENV: conectado, configurar alembic", flush=True)
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -56,7 +51,6 @@ def run_migrations_online() -> None:
         )
 
         with context.begin_transaction():
-            print("ENV: run_migrations", flush=True)
             context.run_migrations()
 
 

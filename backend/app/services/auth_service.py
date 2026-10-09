@@ -100,3 +100,22 @@ def logout(db: Session, token: str) -> None:
     if sessao:
         sessao.encerrada = True
         db.commit()
+
+
+def revogar_sessoes(db: Session, usuario_id: int) -> None:
+    """Encerra todas as sessões ativas de um usuário (P13/P16).
+
+    Usado no reset de senha por admin: quem redefine a credencial invalida os
+    acessos abertos do alvo, forçando novo login com a senha nova.
+    """
+    sessoes = (
+        db.query(UsuarioSessao)
+        .filter(
+            UsuarioSessao.usuario_id == usuario_id,
+            UsuarioSessao.encerrada.is_(False),
+        )
+        .all()
+    )
+    for sessao in sessoes:
+        sessao.encerrada = True
+    db.commit()

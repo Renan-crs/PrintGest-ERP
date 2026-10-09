@@ -7,7 +7,7 @@ padrão exigido pelas listas do sistema (busca rápida por código/nome/document
 from typing import Any, TypeVar
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 

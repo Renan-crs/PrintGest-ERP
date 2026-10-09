@@ -13,7 +13,6 @@ class LicencaAtivarIn(BaseModel):
 class LicencaSituacaoOut(BaseModel):
     sistema: str
     cnpj: str | None = None
-    codigo_licenca: str | None = None
     plano: str | None = None
     status: str
     modo_leitura: bool

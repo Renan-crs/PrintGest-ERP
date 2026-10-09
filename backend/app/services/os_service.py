@@ -248,7 +248,11 @@ def converter_em_os(db: Session, *, filial_id: int, orcamento_id: int) -> OsOut:
     )
     orcamento.status = StatusOs.CONVERTIDO
     db.add(nova)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise _erro_integridade() from exc
     db.refresh(nova)
     return _para_out(nova)
 

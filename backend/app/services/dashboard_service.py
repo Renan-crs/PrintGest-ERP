@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.deps import RANK
 from app.models.core import Filial
@@ -175,7 +175,7 @@ def _entregas_do_dia(
 ) -> list[DashboardEntregaOut]:
     abertas = (
         db.query(OrdemServico)
-        .options(joinedload(OrdemServico.cliente), joinedload(OrdemServico.itens))
+        .options(joinedload(OrdemServico.cliente), selectinload(OrdemServico.itens))
         .filter(
             OrdemServico.filial_id == filial_id,
             OrdemServico.tipo == TipoOs.OS,

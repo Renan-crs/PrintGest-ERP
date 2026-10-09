@@ -19,6 +19,7 @@ import asyncio
 import datetime as dt
 import logging
 import re
+from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
@@ -62,8 +63,32 @@ def _garantir_resposta(cliente: httpx.Client, resp: httpx.Response, contexto: st
             pass
         codigo = status.HTTP_423_LOCKED if resp.status_code == 403 else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=codigo, detail=f"{contexto}: {detalhe}")
-    dados = resp.json().get("data", {})
-    return dados
+    try:
+        corpo = resp.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"{contexto}: resposta não-JSON do servidor de licenças.",
+        ) from exc
+    return corpo.get("data", {})
+
+
+def _campo(dados: dict, chave: str, contexto: str) -> Any:
+    """Extrai campo obrigatório do payload do RedGest com erro claro (P4).
+
+    Evita `KeyError` → HTTP 500 quando o servidor externo responde 2xx com
+    payload incompleto; converte em 502 (Bad Gateway) com mensagem acionável.
+    """
+    valor = dados.get(chave)
+    if valor is None or valor == "":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Resposta inválida do servidor de licenças "
+                f"({contexto}: campo '{chave}' ausente)."
+            ),
+        )
+    return valor
 
 
 def _licenca_local(db: Session) -> Licenca | None:
@@ -89,7 +114,6 @@ def situacao(db: Session) -> dict:
         return {
             "sistema": settings.redgest_sistema,
             "cnpj": None,
-            "codigo_licenca": None,
             "plano": None,
             "status": "nao_ativada",
             "modo_leitura": ESTADO["modo_leitura"],
@@ -101,7 +125,6 @@ def situacao(db: Session) -> dict:
     return {
         "sistema": lic.sistema,
         "cnpj": lic.cnpj,
-        "codigo_licenca": lic.codigo_licenca,
         "plano": lic.plano,
         "status": lic.status,
         "modo_leitura": ESTADO["modo_leitura"],
@@ -164,14 +187,14 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
             json={"sistema": settings.redgest_sistema, "cnpj": cnpj_limpo, "codigo_licenca": codigo_licenca},
         )
         dados = _garantir_resposta(cliente, resp, "Falha ao registrar a licença")
-        licenca_redgest_id = dados["licenca_id"]
+        licenca_redgest_id = _campo(dados, "licenca_id", "registro")
 
         resp = cliente.post(f"/api/v1/licencas/{licenca_redgest_id}/ativar")
         dados = _garantir_resposta(cliente, resp, "Falha na ativação da licença")
-        client_id = dados["client_id"]
-        client_secret = dados["client_secret"]
-        token = dados["access_token"]
-        expires_in = dados["expires_in"]
+        client_id = _campo(dados, "client_id", "ativação")
+        client_secret = _campo(dados, "client_secret", "ativação")
+        token = _campo(dados, "access_token", "ativação")
+        expires_in = int(_campo(dados, "expires_in", "ativação"))
 
         resp = cliente.get(f"/api/v1/licencas/{licenca_redgest_id}")
         dados = _garantir_resposta(cliente, resp, "Falha ao consultar a licença")
@@ -228,8 +251,10 @@ def renovar(db: Session) -> dict:
 
     agora = _agora()
     lic.status = STATUS_ATIVA
-    lic.token_jwt = dados["access_token"]
-    lic.token_expira_em = agora + dt.timedelta(seconds=dados["expires_in"])
+    lic.token_jwt = _campo(dados, "access_token", "renovação")
+    lic.token_expira_em = agora + dt.timedelta(
+        seconds=int(_campo(dados, "expires_in", "renovação"))
+    )
     lic.ultima_validacao = agora
     lic.entitlements = {
         "cnpj_vinculado": dados.get("cnpj_vinculado"),

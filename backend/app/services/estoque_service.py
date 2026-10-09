@@ -13,6 +13,7 @@ Regras centrais (mockups 4.1–4.3):
 
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, or_
@@ -85,7 +86,7 @@ def _rows_produtos(
     q: str | None = None,
     categoria_id: int | None = None,
     abaixo_minimo: bool = False,
-) -> list:
+) -> Any:
     """Linhas (Produto + categoria + saldo/reservado) dos insumos da filial."""
     filtros = [
         Produto.filial_id == filial_id,
@@ -134,7 +135,7 @@ def _rows_produtos(
     return qry
 
 
-def _linha_out(r) -> EstoqueLinhaOut:
+def _linha_out(r: Any) -> EstoqueLinhaOut:
     saldo = _q(Decimal(r.saldo))
     reservado = _q(Decimal(r.reservado))
     custo = _money(Decimal(r.preco_custo))

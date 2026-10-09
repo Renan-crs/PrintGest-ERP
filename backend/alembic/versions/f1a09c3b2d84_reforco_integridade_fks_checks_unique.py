@@ -150,9 +150,21 @@ def upgrade() -> None:
 
     # --- 5) multi-filial: categoria por filial + filial_id obrigatório ---
     op.drop_constraint("produto_categoria_nome_key", "produto_categoria", type_="unique")
+    # Backfill antes do NOT NULL: bancos já populados podem ter linhas sem filial
+    # (P12 — sem isto o upgrade falharia). Assume a filial de menor id (MVP).
+    op.execute(
+        "UPDATE produto_categoria SET filial_id = "
+        "COALESCE((SELECT id FROM filial ORDER BY id LIMIT 1), 1) "
+        "WHERE filial_id IS NULL"
+    )
     op.alter_column("produto_categoria", "filial_id", existing_type=sa.BigInteger(), nullable=False)
     op.create_unique_constraint(
         "uq_produto_categoria_filial_nome", "produto_categoria", ["filial_id", "nome"]
+    )
+    op.execute(
+        "UPDATE plano_contas SET filial_id = "
+        "COALESCE((SELECT id FROM filial ORDER BY id LIMIT 1), 1) "
+        "WHERE filial_id IS NULL"
     )
     op.alter_column("plano_contas", "filial_id", existing_type=sa.BigInteger(), nullable=False)
 
