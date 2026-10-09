@@ -11,6 +11,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://printgest:printgest@127.0.0.1:5432/printgest"
     )
     cors_origins: list[str] = []
+    auto_migrate: bool = True
     session_ttl_minutes: int = 60
     login_max_falhas: int = 5
     bloqueio_minutos: int = 30
