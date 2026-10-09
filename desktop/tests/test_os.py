@@ -6,7 +6,7 @@ import json
 
 import httpx
 import pytest
-from PySide6.QtWidgets import QMessageBox, QPushButton
+from PySide6.QtWidgets import QLabel, QMessageBox, QPushButton
 
 from printgest.core.api import Api
 from printgest.ui.modulos.os import PaginaOS, PaginaOrcamento
@@ -42,7 +42,10 @@ _OSS = [
     {"id": 6, "numero": 3100, "tipo": "orcamento", "status": "aberto", "cliente_id": 2, "cliente_nome": "Biz"},
 ]
 
-_CLIENTES = [{"id": 1, "nome_razao": "Ana"}, {"id": 2, "nome_razao": "Biz"}]
+_CLIENTES = [
+    {"id": 1, "nome_razao": "Ana"},
+    {"id": 2, "nome_razao": "Biz", "sinal": True, "sinal_pct": "50"},
+]
 _FUNCIONARIOS = [
     {"id": 10, "nome": "Vina", "e_vendedor": True, "e_atendente": True},
     {"id": 11, "nome": "José", "e_vendedor": False, "e_atendente": True},
@@ -133,6 +136,16 @@ def _sem_dialogos(monkeypatch):
             return None
 
     monkeypatch.setattr("printgest.ui.modulos.os.QMessageBox", Falso)
+
+
+def test_cabecalho_itens_nao_duplica_titulo(app, pagina):
+    titulos = [titulo for titulo, _campos in pagina._lista_secoes]
+    assert titulos.count("Itens") == 1
+    # O rótulo próprio da grade sai de cena; fica só o título da seção.
+    assert pagina._itens.rotulo_widget is None
+    assert "ITENS & DIMENSIONAMENTO" not in [
+        w.text() for w in pagina.findChildren(QLabel)
+    ]
 
 
 def test_carrega_grade_so_de_os(app, pumpar, pagina):
@@ -273,3 +286,73 @@ def test_orcamento_envia_tipo_orcamento_no_post(app, pumpar):
     pumpar(lambda: any(escr[0] == "POST" for escr in _ESCRITAS))
     corpo = json.loads(_ESCRITAS[-1][2])
     assert corpo["tipo"] == "orcamento"
+
+
+# --- Pagamento antecipado / sinal -----------------------------------------------
+
+
+def _adicionar_item(pagina, produto_id=5, qtd="1", unit="10"):
+    combo = pagina._itens._combo_produto
+    combo.setCurrentIndex(combo.findData(produto_id))
+    pagina._itens._qtd.setText(qtd)
+    pagina._itens._unit.setText(unit)
+    botoes = [
+        b for b in pagina._itens.findChildren(QPushButton) if b.text() == "Adicionar"
+    ]
+    botoes[0].click()
+
+
+def test_os_exige_confirmacao_para_cliente_com_sinal(app, pumpar, pagina, monkeypatch):
+    avisos = []
+
+    class Falso:
+        StandardButton = QMessageBox.StandardButton
+
+        @staticmethod
+        def warning(*_a, **_k):
+            avisos.append(_a[-1] if _a else "")
+
+        @staticmethod
+        def information(*_a, **_k):
+            return None
+
+        @staticmethod
+        def critical(*_a, **_k):
+            return None
+
+    monkeypatch.setattr("printgest.ui.modulos.pagina_crud.QMessageBox", Falso)
+
+    pumpar(
+        lambda: pagina._tabela.rowCount() == 2
+        and pagina._cliente.widget.count() == 2
+        and pagina._itens._combo_produto.count() > 1
+    )
+    pagina._btn_novo.click()
+    pagina._cliente.definir(2)
+    assert "sinal" in pagina._pagamento_confirmado.widget.text().lower()
+    _adicionar_item(pagina)
+    pumpar(lambda: len(pagina._itens.valor()) == 1)
+
+    pagina._btn_salvar.click()
+    assert _ESCRITAS == []
+    assert avisos and "sinal" in avisos[0].lower()
+
+
+def test_os_confirmada_envia_pagamento_confirmado(app, pumpar, pagina):
+    pumpar(
+        lambda: pagina._tabela.rowCount() == 2
+        and pagina._cliente.widget.count() == 2
+        and pagina._itens._combo_produto.count() > 1
+    )
+    pagina._btn_novo.click()
+    pagina._cliente.definir(2)
+    _adicionar_item(pagina)
+    pumpar(lambda: len(pagina._itens.valor()) == 1)
+
+    pagina._pagamento_confirmado.definir(True)
+    pagina._btn_salvar.click()
+    pumpar(lambda: any(escr[0] == "POST" and escr[1] == "" for escr in _ESCRITAS))
+
+    enviado = json.loads(_ESCRITAS[-1][2])
+    assert enviado["cliente_id"] == 2
+    assert enviado["pagamento_confirmado"] is True

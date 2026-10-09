@@ -8,15 +8,14 @@ endereço. (Cotações ficam para a etapa de Compras.)
 
 from __future__ import annotations
 
-from printgest.core.api import Api
+from printgest.ui.endereco import BlocoEndereco
 from printgest.ui.formulario import (
-    MASCARA_CEP,
     MASCARA_CNPJ,
-    MASCARA_UF,
     CampoArea,
     CampoCombo,
     CampoTexto,
     limpo,
+    primeiro_valor,
 )
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 
@@ -39,9 +38,6 @@ class PaginaFornecedores(PaginaCrud):
     LUGAR_BUSCA = "Buscar por razão social, CNPJ, telefone ou representante..."
     CAMPO_NOME = "nome_razao"
 
-    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
-        super().__init__(api, modo_leitura)
-
     # ----------------------------------------------------------- formulário
 
     def _secoes(self):
@@ -59,13 +55,7 @@ class PaginaFornecedores(PaginaCrud):
         self._celular = CampoTexto("Celular / WhatsApp", mono=True, maximo=20)
         self._obs = CampoArea("Observações (insumos / cond. pagto)", linhas=3)
 
-        self._logradouro = CampoTexto("Logradouro", maximo=160)
-        self._numero = CampoTexto("Número", maximo=12)
-        self._complemento = CampoTexto("Complemento", maximo=80)
-        self._bairro = CampoTexto("Bairro", maximo=80)
-        self._cidade = CampoTexto("Cidade", maximo=80)
-        self._uf = CampoTexto("UF", mono=True, maximo=2, mascara=MASCARA_UF)
-        self._cep = CampoTexto("CEP", mono=True, maximo=8, mascara=MASCARA_CEP)
+        self._end = BlocoEndereco()
 
         return [
             (
@@ -82,18 +72,7 @@ class PaginaFornecedores(PaginaCrud):
                     self._obs,
                 ],
             ),
-            (
-                "Endereço",
-                [
-                    self._logradouro,
-                    self._numero,
-                    self._complemento,
-                    self._bairro,
-                    self._cidade,
-                    self._uf,
-                    self._cep,
-                ],
-            ),
+            ("Endereço", self._end.campos),
         ]
 
     def _padroes_do_form(self) -> None:
@@ -102,15 +81,12 @@ class PaginaFornecedores(PaginaCrud):
     # -------------------------------------------------------------- leitura
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
-        if chave == "id":
-            ident = dado.get("id")
-            return f"#{ident:05d}" if isinstance(ident, int) else ""
         if chave == "local":
             return f"{dado.get('cidade', '')}/{dado.get('uf', '')}".strip("/")
         if chave == "representante":
             return dado.get("contato_nome") or ""
         if chave == "contato":
-            return dado.get("celular") or dado.get("telefone") or ""
+            return primeiro_valor(dado, "celular", "telefone")
         return super()._formatar_texto(dado, chave)
 
     def _preencher_campos(self, dado: dict) -> None:
@@ -123,13 +99,7 @@ class PaginaFornecedores(PaginaCrud):
         self._telefone.definir(dado.get("telefone"))
         self._celular.definir(dado.get("celular"))
         self._obs.definir(dado.get("observacoes"))
-        self._logradouro.definir(dado.get("logradouro"))
-        self._numero.definir(dado.get("numero"))
-        self._complemento.definir(dado.get("complemento"))
-        self._bairro.definir(dado.get("bairro"))
-        self._cidade.definir(dado.get("cidade"))
-        self._uf.definir(dado.get("uf"))
-        self._cep.definir(dado.get("cep"))
+        self._end.preencher(dado)
 
     # ---------------------------------------------------------------- salvar
 
@@ -149,11 +119,5 @@ class PaginaFornecedores(PaginaCrud):
             "telefone": limpo(self._telefone.valor()),
             "celular": limpo(self._celular.valor()),
             "observacoes": limpo(self._obs.valor()),
-            "logradouro": limpo(self._logradouro.valor()),
-            "numero": limpo(self._numero.valor()),
-            "complemento": limpo(self._complemento.valor()),
-            "bairro": limpo(self._bairro.valor()),
-            "cidade": limpo(self._cidade.valor()),
-            "uf": limpo(self._uf.valor()),
-            "cep": limpo(self._cep.valor()),
+            **self._end.payload(),
         }

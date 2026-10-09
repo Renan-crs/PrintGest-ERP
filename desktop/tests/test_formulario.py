@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from printgest.ui.formulario import (
+    CampoCheck,
     formatar_data_iso,
     limpo,
     numero,
@@ -56,3 +57,11 @@ def test_formatar_data_iso():
     assert formatar_data_iso(None) == ""
     assert formatar_data_iso("") == ""
     assert formatar_data_iso("inválida") == ""
+
+
+def test_campo_check_nao_duplica_rotulo(app):
+    # O texto fica só no próprio checkbox (sem QLabel de campo repetindo-o).
+    campo = CampoCheck("Sinal")
+    assert campo.rotulo_widget is None
+    assert campo.widget.text() == "Sinal"
+    assert campo.valor() is False

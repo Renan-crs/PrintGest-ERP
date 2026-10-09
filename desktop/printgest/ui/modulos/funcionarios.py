@@ -7,7 +7,6 @@ atendimento (vendedor/atendente/produção) e comissão.
 
 from __future__ import annotations
 
-from printgest.core.api import Api
 from printgest.ui.formulario import (
     MASCARA_CPF,
     CampoArea,
@@ -18,6 +17,7 @@ from printgest.ui.formulario import (
     data_iso,
     limpo,
     numero,
+    primeiro_valor,
 )
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 
@@ -36,9 +36,6 @@ class PaginaFuncionarios(PaginaCrud):
     COLUNAS = COLUNAS
     LUGAR_BUSCA = "Buscar por nome, cargo ou CPF..."
     CAMPO_NOME = "nome"
-
-    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
-        super().__init__(api, modo_leitura)
 
     # ----------------------------------------------------------- formulário
 
@@ -85,11 +82,8 @@ class PaginaFuncionarios(PaginaCrud):
     # -------------------------------------------------------------- leitura
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
-        if chave == "id":
-            ident = dado.get("id")
-            return f"#{ident:05d}" if isinstance(ident, int) else ""
         if chave == "contato":
-            return dado.get("telefone") or dado.get("email") or ""
+            return primeiro_valor(dado, "telefone", "email")
         if chave == "funcoes":
             papéis = [
                 rot for rot, ligado in

@@ -14,6 +14,7 @@ from printgest.core.dominio import FORMAS_PAGAMENTO
 from printgest.core.tarefas import rodar
 from printgest.ui.formulario import (
     CampoArea,
+    CampoCheck,
     CampoCombo,
     CampoTexto,
     CampoValor,
@@ -21,12 +22,13 @@ from printgest.ui.formulario import (
     formatar_moeda,
 )
 from printgest.ui.grade_itens import GradeItens
+from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.widgets import botao_com_atalho
 
 
-class PaginaVendaBalcao(PaginaCrud):
+class PaginaVendaBalcao(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "vendas"
     ROTULO_PAGINA = "Venda Balcão / PDV"
     ROTULO_NOVO = "Nova Venda de Balcão"
@@ -44,45 +46,56 @@ class PaginaVendaBalcao(PaginaCrud):
 
     def __init__(self, api, modo_leitura: bool = False) -> None:
         super().__init__(api, modo_leitura)
-        self._carregar_clientes()
+        self._carregar_clientes_flags()
         self._carregar_vendedores()
 
     # ----------------------------------------------------------- formulário
 
     def _secoes(self):
+        self._iniciar_condicao_pagamento()  # flags de pagamento por cliente
         self._cliente = CampoCombo("Cliente", [])
         self._vendedor = CampoCombo("Vendedor", [])
         self._forma = CampoCombo("Forma de Pagamento", FORMAS_PAGAMENTO).obrigatorio()
         self._parcelas = CampoTexto("Parcelas", valor="1", maximo=2)
         self._desconto = CampoValor("Desconto")
         self._obs = CampoArea("Observações", linhas=2)
-        self._itens = GradeItens("Itens do Cupom", api=self._api)
+        self._pagamento_confirmado = CampoCheck(
+            "Recebimento confirmado (adiantamento/sinal)"
+        )
+        self._itens = GradeItens("", api=self._api)
         return [
-            ("Cliente & Condições", [self._cliente, self._vendedor, self._forma, self._parcelas, self._desconto, self._obs]),
+            (
+                "Cliente & Condições",
+                [
+                    self._cliente,
+                    self._vendedor,
+                    self._forma,
+                    self._parcelas,
+                    self._desconto,
+                    self._obs,
+                    self._pagamento_confirmado,
+                ],
+            ),
             ("Itens do Cupom", [self._itens]),
         ]
+
+    def _conectar_campos(self) -> None:
+        self._cliente.widget.currentIndexChanged.connect(self._cliente_mudou)
 
     def _padroes_do_form(self) -> None:
         self._parcelas.definir("1")
         self._desconto.definir(None)
+        self._pagamento_confirmado.definir(False)
+        self._cliente_mudou()
 
     # ---------------------------------------------------------------- busca
 
-    def recarregar(self, q: str = "", offset: int | None = None) -> None:
-        if offset is None:
-            offset = self._offset
-        rodar(
-            lambda: self._api.listar_vendas(
-                q=q, status_venda=self._filtro or None, limit=LOTE, offset=offset
-            ),
-            on_ok=lambda out: self._recebidos(q, offset, out),
-            on_erro=lambda msg: self._erro_carga(msg),
+    def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        return self._api.listar_vendas(
+            q=q, status_venda=self._filtro or None, limit=LOTE, offset=offset
         )
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
-        if chave == "id":
-            ident = dado.get("id")
-            return f"#{ident:05d}" if isinstance(ident, int) else ""
         if chave == "forma_pagamento":
             return str(dado.get("forma_pagamento", "")).upper()
         if chave == "status":
@@ -94,17 +107,6 @@ class PaginaVendaBalcao(PaginaCrud):
         return super()._formatar_texto(dado, chave)
 
     # ------------------------------------------------------------ carregar
-
-    def _carregar_clientes(self) -> None:
-        catalogos.carregar(
-            "clientes",
-            lambda: self._api.listar("clientes", limit=1000),
-            on_ok=self._clientes_recebidos,
-        )
-
-    def _clientes_recebidos(self, saida: dict) -> None:
-        dados = saida.get("data", [])
-        self._cliente.alterar_opcoes([(r["id"], r["nome_razao"]) for r in dados])
 
     def _carregar_vendedores(self) -> None:
         catalogos.carregar(
@@ -125,6 +127,7 @@ class PaginaVendaBalcao(PaginaCrud):
         self._parcelas.definir(str(dado.get("parcelas") or 1))
         self._desconto.definir(dado.get("desconto"))
         self._obs.definir(dado.get("observacoes"))
+        self._pagamento_confirmado.definir(False)
         self._itens.definir(dado.get("itens") or [])
 
     # ---------------------------------------------------------------- salvar
@@ -137,6 +140,13 @@ class PaginaVendaBalcao(PaginaCrud):
             return ("Parcelas deve ser um número maior que zero.", self._parcelas)
         if not self._itens.valor():
             return ("Adicione ao menos um item ao cupom.", self._itens.widget)
+        exigencia = self._exigencia_pendente()
+        if exigencia:
+            return (
+                f"O cliente exige {exigencia}. Marque 'Recebimento confirmado' "
+                "para fechar a venda.",
+                self._pagamento_confirmado,
+            )
         return None
 
     def _payload(self) -> dict:
@@ -148,6 +158,7 @@ class PaginaVendaBalcao(PaginaCrud):
             "forma_pagamento": self._forma.valor(),
             "parcelas": int(parcelas or "1"),
             "observacoes": (self._obs.valor() or None),
+            "pagamento_confirmado": self._pagamento_confirmado.valor(),
             "itens": self._itens.valor(),
         }
 

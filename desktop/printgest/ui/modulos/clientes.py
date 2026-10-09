@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from printgest.core.api import Api
+from printgest.ui.endereco import BlocoEndereco
 from printgest.ui.formulario import (
-    MASCARA_CEP,
     MASCARA_CNPJ,
     MASCARA_CPF,
-    MASCARA_UF,
     CampoArea,
+    CampoCheck,
     CampoCombo,
     CampoData,
     CampoTexto,
+    CampoValor,
     data_iso,
     limpo,
+    numero,
+    primeiro_valor,
 )
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 
@@ -37,9 +39,6 @@ class PaginaClientes(PaginaCrud):
     LUGAR_BUSCA = "Buscar por nome, razão social, CNPJ/CPF, telefone ou e-mail..."
     CAMPO_NOME = "nome_razao"
 
-    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
-        super().__init__(api, modo_leitura)
-
     # ----------------------------------------------------------- formulário
 
     def _secoes(self):
@@ -57,13 +56,11 @@ class PaginaClientes(PaginaCrud):
         self._celular = CampoTexto("Celular / WhatsApp", mono=True, maximo=20)
         self._obs = CampoArea("Observações Técnicas", linhas=2)
 
-        self._logradouro = CampoTexto("Logradouro", maximo=160)
-        self._numero = CampoTexto("Número", maximo=12)
-        self._complemento = CampoTexto("Complemento", maximo=80)
-        self._bairro = CampoTexto("Bairro", maximo=80)
-        self._cidade = CampoTexto("Cidade", maximo=80)
-        self._uf = CampoTexto("UF", mono=True, maximo=2, mascara=MASCARA_UF)
-        self._cep = CampoTexto("CEP", mono=True, maximo=8, mascara=MASCARA_CEP)
+        self._adiantado = CampoCheck("Pagamento adiantado (total)")
+        self._sinal = CampoCheck("Sinal")
+        self._sinal_pct = CampoValor("Percentual do Sinal", prefixo="%")
+
+        self._end = BlocoEndereco()
 
         return [
             (
@@ -80,36 +77,43 @@ class PaginaClientes(PaginaCrud):
                     self._obs,
                 ],
             ),
+            ("Endereço & Entrega", self._end.campos),
             (
-                "Endereço & Entrega",
-                [
-                    self._logradouro,
-                    self._numero,
-                    self._complemento,
-                    self._bairro,
-                    self._cidade,
-                    self._uf,
-                    self._cep,
-                ],
+                "Condições de Pagamento",
+                [self._adiantado, self._sinal, self._sinal_pct],
             ),
         ]
 
     def _conectar_campos(self) -> None:
         self._tipo.widget.currentIndexChanged.connect(self._tipo_mudou)
+        self._adiantado.widget.toggled.connect(self._so_adiantado)
+        self._sinal.widget.toggled.connect(self._so_sinal)
+        self._atualizar_sinal()
 
     def _tipo_mudou(self) -> None:
         self._doc.definir_mascara(MASCARA_CNPJ if self._tipo.valor() == "pj" else MASCARA_CPF)
 
+    def _so_adiantado(self, ligado: bool) -> None:
+        # Condições mutuamente exclusivas: pagamento adiantado OU sinal.
+        if ligado and self._sinal.valor():
+            self._sinal.definir(False)
+        self._atualizar_sinal()
+
+    def _so_sinal(self, ligado: bool) -> None:
+        if ligado and self._adiantado.valor():
+            self._adiantado.definir(False)
+        self._atualizar_sinal()
+
+    def _atualizar_sinal(self) -> None:
+        self._sinal_pct.widget.setEnabled(self._sinal.valor() and not self._modo_leitura)
+
     # -------------------------------------------------------------- leitura
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
-        if chave == "id":
-            ident = dado.get("id")
-            return f"#{ident:05d}" if isinstance(ident, int) else ""
         if chave == "tipo_pessoa":
             return str(dado.get("tipo_pessoa", "")).upper()
         if chave == "contato":
-            return dado.get("celular") or dado.get("telefone") or ""
+            return primeiro_valor(dado, "celular", "telefone")
         if chave == "_acoes":
             return ""
         return super()._formatar_texto(dado, chave)
@@ -124,23 +128,31 @@ class PaginaClientes(PaginaCrud):
         self._telefone.definir(dado.get("telefone"))
         self._celular.definir(dado.get("celular"))
         self._obs.definir(dado.get("observacoes"))
-        self._logradouro.definir(dado.get("logradouro"))
-        self._numero.definir(dado.get("numero"))
-        self._complemento.definir(dado.get("complemento"))
-        self._bairro.definir(dado.get("bairro"))
-        self._cidade.definir(dado.get("cidade"))
-        self._uf.definir(dado.get("uf"))
-        self._cep.definir(dado.get("cep"))
+        self._adiantado.definir(dado.get("pagamento_adiantado"))
+        self._sinal.definir(dado.get("sinal"))
+        self._sinal_pct.definir(dado.get("sinal_pct"))
+        self._end.preencher(dado)
 
     def _padroes_do_form(self) -> None:
         self._tipo.definir("pf")
         self._doc.definir_mascara(MASCARA_CPF)
+        self._sinal_pct.definir("50")
+        self._atualizar_sinal()
 
     # ---------------------------------------------------------------- salvar
 
     def _validar(self):
         if not self._nome.valido():
             return ("Informe o nome / razão social.", self._nome)
+        if self._adiantado.valor() and self._sinal.valor():
+            return (
+                "Escolha apenas uma condição: pagamento adiantado OU sinal.",
+                self._sinal,
+            )
+        if self._sinal.valor():
+            pct = self._sinal_pct.valor()
+            if pct is None or pct <= 0 or pct > 100:
+                return ("Informe um percentual de sinal entre 0 e 100.", self._sinal_pct)
         return None
 
     def _payload(self) -> dict:
@@ -154,11 +166,8 @@ class PaginaClientes(PaginaCrud):
             "telefone": limpo(self._telefone.valor()),
             "celular": limpo(self._celular.valor()),
             "observacoes": limpo(self._obs.valor()),
-            "logradouro": limpo(self._logradouro.valor()),
-            "numero": limpo(self._numero.valor()),
-            "complemento": limpo(self._complemento.valor()),
-            "bairro": limpo(self._bairro.valor()),
-            "cidade": limpo(self._cidade.valor()),
-            "uf": limpo(self._uf.valor()),
-            "cep": limpo(self._cep.valor()),
+            "pagamento_adiantado": self._adiantado.valor(),
+            "sinal": self._sinal.valor(),
+            "sinal_pct": numero(self._sinal_pct, "50"),
+            **self._end.payload(),
         }
