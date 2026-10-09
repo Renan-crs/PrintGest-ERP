@@ -193,10 +193,10 @@ class ModoLeituraWindow(QMainWindow):
         diag.addWidget(titulo)
         self._diag_texto = QPlainTextEdit()
         self._diag_texto.setPlainText(
-            "Status da Internet na máquina servidora: Sem resposta do servidor "
-            "RedGest. Assim que a internet for restabelecida ou o serviço renovado, "
-            "o sistema voltará ao funcionamento normal automaticamente sem perda "
-            "de dados."
+            "Status da Internet na máquina servidora: a renovação automática não "
+            "obteve resposta do RedGest na última tentativa. Clique em \"Verificar "
+            "Rede Local\" para conferir a conectividade do daemon; quando a "
+            "internet/serviço voltar, o sistema retoma o funcionamento normal."
         )
         self._diag_texto.setReadOnly(True)
         self._diag_texto.setMaximumHeight(84)
@@ -260,11 +260,17 @@ class ModoLeituraWindow(QMainWindow):
             "Verificando conectividade com o Local API Service (127.0.0.1:8000)…"
         )
 
-        def ok(_) -> None:
-            self._diag_texto.setPlainText(
-                "Rede local OK — daemon respondendo em 127.0.0.1:8000. "
-                "A pendência está na comunicação com o RedGest (internet)."
-            )
+        def ok(resultado) -> None:
+            if resultado:
+                self._diag_texto.setPlainText(
+                    "Rede local OK — daemon respondendo em 127.0.0.1:8000. "
+                    "A pendência está na comunicação com o RedGest (internet)."
+                )
+            else:
+                self._diag_texto.setPlainText(
+                    "Falha ao contatar o daemon em 127.0.0.1:8000. "
+                    "Verifique se o Local API Service está em execução."
+                )
 
         def erro(_) -> None:
             self._diag_texto.setPlainText(
@@ -277,7 +283,7 @@ class ModoLeituraWindow(QMainWindow):
     def _suporte(self) -> None:
         self._mensagem.setProperty("role", "muted")
         self._mensagem.setText(
-            "Canais de atendimento RedGest: WhatsApp Financeiro (11) 98765-4321 · "
-            "Central 0800 700 8920 (Opção 2 — Licenciamento)."
+            "Canais de atendimento RedGest: WhatsApp Financeiro e Central 0800 "
+            "(Opção 2 — Licenciamento). Consulte o contrato para os canais oficiais."
         )
         aplicar_estilo(self._mensagem)
