@@ -20,6 +20,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# A suíte roda as migrations ela mesma (subprocesso, banco `printgest_test`).
+# Desliga o auto-migrate do lifespan para nunca tocar no banco de desenvolvimento.
+os.environ["PRINTGEST_AUTO_MIGRATE"] = "false"
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEST_DB = "printgest_test"
 _HOST = "127.0.0.1:5432"
