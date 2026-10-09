@@ -124,3 +124,13 @@ def test_busca_dispara_recarga_com_q(app, pumpar, pagina):
     pagina._busca._publicar()  # simula fim do debounce com o texto atual
     pumpar(lambda: len(_GETS) > antes)
     assert "q" in _GETS[-1].url.params
+
+
+def test_filtro_tipo_pessoa_vai_ao_servidor(app, pumpar, pagina):
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._btn_filtros["pj"].click()
+    pumpar(lambda: any("tipo_pessoa" in g.url.params for g in _GETS))
+    assert _GETS[-1].url.params["tipo_pessoa"] == "pj"
+    # a página exibida também respeita o filtro (fallback local sobre a resposta)
+    pumpar(lambda: pagina._tabela.rowCount() == 1)
+    assert pagina._tabela.item(0, 2).text() == "Agência Criativa SP"
