@@ -215,7 +215,8 @@ class CampoCombo(CampoForm):
 
 class CampoCheck(CampoForm):
     def __init__(self, rotulo: str) -> None:
-        super().__init__(rotulo)
+        # O próprio checkbox já exibe o rótulo; sem QLabel de campo (evita texto 2×).
+        super().__init__(None)
         self._check = QCheckBox(rotulo)
 
     @property
@@ -254,6 +255,20 @@ def formatar_moeda(valor) -> str:
     inteiro, _, decimais = f"{abs(dec):.2f}".partition(".")
     sinal = "-" if dec < 0 else ""
     return f"{sinal}R$ {inteiro},{decimais}"
+
+
+def formatar_percentual(valor) -> str:
+    """'50.00' → '50'; '33.50' → '33,5'; None/vazio → ''."""
+    if valor is None or valor == "":
+        return ""
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        dec = Decimal(str(valor))
+    except (InvalidOperation, ValueError):
+        return str(valor)
+    texto = f"{dec:.2f}".rstrip("0").rstrip(".")
+    return (texto or "0").replace(".", ",")
 
 
 class CampoValor(CampoForm):
@@ -347,6 +362,15 @@ def numero(campo, padrao="0") -> str:
     """Valor de campo numérico como string; `None` vira `padrao`."""
     valor = campo.valor()
     return str(valor) if valor is not None else padrao
+
+
+def primeiro_valor(dado: dict, *chaves: str) -> str:
+    """Primeiro valor não vazio entre `chaves` (ex.: celular → telefone → e-mail)."""
+    for chave in chaves:
+        valor = dado.get(chave)
+        if valor:
+            return str(valor)
+    return ""
 
 
 def para_decimal(texto, prefixo="R$"):

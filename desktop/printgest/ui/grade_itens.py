@@ -50,8 +50,10 @@ class GradeItens(QWidget):
         self._itens: list[dict] = []
         self._produtos: dict[int, dict] = {}
 
-        self._rotulo = QLabel(rotulo.upper())
-        self._rotulo.setObjectName("labelForm")
+        # Sem rótulo próprio: o cabeçalho da seção do formulário já nomeia a grade.
+        self._rotulo = QLabel(rotulo.upper()) if rotulo else None
+        if self._rotulo is not None:
+            self._rotulo.setObjectName("labelForm")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -228,7 +230,7 @@ class GradeItens(QWidget):
     # ---------------------------------------------------------- formulário
 
     @property
-    def rotulo_widget(self) -> QWidget:
+    def rotulo_widget(self) -> QWidget | None:
         return self._rotulo
 
     @property

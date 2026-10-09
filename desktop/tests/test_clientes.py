@@ -134,3 +134,64 @@ def test_filtro_tipo_pessoa_vai_ao_servidor(app, pumpar, pagina):
     # a página exibida também respeita o filtro (fallback local sobre a resposta)
     pumpar(lambda: pagina._tabela.rowCount() == 1)
     assert pagina._tabela.item(0, 2).text() == "Agência Criativa SP"
+
+
+# --- Condição de pagamento antecipado -------------------------------------------
+
+
+def test_condicoes_pagamento_sao_mutuamente_exclusivas(app, pumpar, pagina):
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._btn_novo.click()
+
+    pagina._adiantado.definir(True)
+    assert pagina._adiantado.valor() is True
+    assert pagina._sinal_pct.widget.isEnabled() is False
+
+    pagina._sinal.definir(True)
+    assert pagina._sinal.valor() is True
+    assert pagina._adiantado.valor() is False
+    assert pagina._sinal_pct.widget.isEnabled() is True
+
+
+def test_salvar_cliente_com_sinal_envia_condicao(app, pumpar, pagina):
+    import json
+
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._btn_novo.click()
+    pagina._nome.definir("Cliente com Sinal")
+    pagina._sinal.definir(True)
+    pagina._sinal_pct.definir("30")
+    pagina._btn_salvar.click()
+    pumpar(lambda: any(escr[0] == "POST" for escr in _ESCRITAS))
+
+    enviado = json.loads(_ESCRITAS[-1][2])
+    assert enviado["sinal"] is True
+    assert enviado["pagamento_adiantado"] is False
+    assert enviado["sinal_pct"] == "30"
+
+
+def test_sinal_sem_percentual_bloqueia_salvar(app, pumpar, pagina, monkeypatch):
+    avisos = []
+
+    class Falso:
+        StandardButton = object()
+
+        @staticmethod
+        def warning(*_a, **_k):
+            avisos.append(_a[-1] if _a else "")
+
+        @staticmethod
+        def critical(*_a, **_k):
+            return None
+
+    monkeypatch.setattr("printgest.ui.modulos.pagina_crud.QMessageBox", Falso)
+
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._btn_novo.click()
+    pagina._nome.definir("Cliente Sinal")
+    pagina._sinal.definir(True)
+    pagina._sinal_pct.definir(None)
+    pagina._btn_salvar.click()
+
+    assert _ESCRITAS == []
+    assert avisos and "percentual" in avisos[0].lower()

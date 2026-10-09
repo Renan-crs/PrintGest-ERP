@@ -101,9 +101,6 @@ class PaginaProdutos(PaginaCrud):
     # -------------------------------------------------------------- leitura
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
-        if chave == "id":
-            ident = dado.get("id")
-            return f"#{ident:05d}" if isinstance(ident, int) else ""
         if chave == "tipo":
             return str(dado.get("tipo", "")).upper()
         if chave == "categoria_nome":

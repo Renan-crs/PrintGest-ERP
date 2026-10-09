@@ -121,16 +121,9 @@ class PaginaEstoqueBase(PaginaCrud):
 
     # ------------------------------------------------------------ carregar
 
-    def recarregar(self, q: str = "", offset: int | None = None) -> None:
-        if offset is None:
-            offset = self._offset
-        baixo = self._filtro == "abaixo"
-        rodar(
-            lambda: self._api.consulta_estoque(
-                q=q, abaixo_minimo=baixo, limit=LOTE, offset=offset
-            ),
-            on_ok=lambda out: self._recebidos(q, offset, out),
-            on_erro=lambda msg: self._erro_carga(msg),
+    def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        return self._api.consulta_estoque(
+            q=q, abaixo_minimo=self._filtro == "abaixo", limit=LOTE, offset=offset
         )
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
@@ -465,15 +458,9 @@ class PaginaEstoqueReposicao(PaginaEstoqueBase):
         self._badge_valor = badge("Reposição (pág.): –", "primary")
         return [self._badge_itens, self._badge_valor]
 
-    def recarregar(self, q: str = "", offset: int | None = None) -> None:
-        if offset is None:
-            offset = self._offset
-        rodar(
-            lambda: self._api.reposicao_estoque(
-                q=q, apenas_abaixo=self._filtro != "tudo", limit=LOTE, offset=offset
-            ),
-            on_ok=lambda out: self._recebidos(q, offset, out),
-            on_erro=lambda msg: self._erro_carga(msg),
+    def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        return self._api.reposicao_estoque(
+            q=q, apenas_abaixo=self._filtro != "tudo", limit=LOTE, offset=offset
         )
 
     def _recebidos(self, q: str, offset: int, saida: dict) -> None:

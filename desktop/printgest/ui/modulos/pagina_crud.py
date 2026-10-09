@@ -281,11 +281,18 @@ class PaginaCrud(QWidget):
         if self.CHAVE_FILTRO and self._filtro:
             filtros[self.CHAVE_FILTRO] = self._filtro
         rodar(
-            lambda: self._api.listar_com_filtros(
-                self.ENTIDADE, q=q, limit=LOTE, offset=offset, **filtros
-            ),
+            lambda: self._listar(q, offset, filtros),
             on_ok=_receber,
             on_erro=lambda msg: self._erro_carga(msg),
+        )
+
+    def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        """Hook: subclasse troca o endpoint de listagem mantendo a guarda `_seq`.
+
+        Recebe os `filtros` já resolvidos a partir de `CHAVE_FILTRO`/`_filtro`.
+        """
+        return self._api.listar_com_filtros(
+            self.ENTIDADE, q=q, limit=LOTE, offset=offset, **filtros
         )
 
     def _recebidos(self, q: str, offset: int, saida: dict) -> None:

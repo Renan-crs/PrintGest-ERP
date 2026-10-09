@@ -15,6 +15,7 @@ from printgest.core.dominio import FORMAS_PAGAMENTO
 from printgest.core.tarefas import rodar
 from printgest.ui.formulario import (
     CampoArea,
+    CampoCheck,
     CampoCombo,
     CampoData,
     CampoValor,
@@ -24,6 +25,7 @@ from printgest.ui.formulario import (
     limpo,
 )
 from printgest.ui.grade_itens import GradeItens
+from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.widgets import botao_com_atalho
@@ -36,7 +38,7 @@ _PROXIMO_STATUS = {
 }
 
 
-class PaginaOS(PaginaCrud):
+class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "os"
     TIPO = "os"
     ROTULO_PAGINA = "Gestão de Ordens de Serviço (O.S.)"
@@ -58,12 +60,13 @@ class PaginaOS(PaginaCrud):
 
     def __init__(self, api, modo_leitura: bool = False) -> None:
         super().__init__(api, modo_leitura)
-        self._carregar_clientes()
+        self._carregar_clientes_flags()
         self._carregar_funcionarios()
 
     # ----------------------------------------------------------- formulário
 
     def _secoes(self):
+        self._iniciar_condicao_pagamento()  # flags de pagamento por cliente
         self._cliente = CampoCombo("Cliente", []).obrigatorio()
         self._vendedor = CampoCombo("Vendedor", [])
         self._atendente = CampoCombo("Atendente", [])
@@ -71,33 +74,41 @@ class PaginaOS(PaginaCrud):
         self._forma = CampoCombo("Forma de Pagamento", FORMAS_PAGAMENTO)
         self._desconto = CampoValor("Desconto")
         self._obs = CampoArea("Observações", linhas=2)
-        self._itens = GradeItens("Itens & Dimensionamento", api=self._api)
+        self._pagamento_confirmado = CampoCheck(
+            "Recebimento confirmado (adiantamento/sinal)"
+        )
+        self._itens = GradeItens("", api=self._api)
         return [
             ("Cliente & Equipe", [self._cliente, self._vendedor, self._atendente]),
-            ("Prazos & Financeiro", [self._previsao, self._forma, self._desconto, self._obs]),
+            (
+                "Prazos & Financeiro",
+                [
+                    self._previsao,
+                    self._forma,
+                    self._desconto,
+                    self._obs,
+                    self._pagamento_confirmado,
+                ],
+            ),
             ("Itens", [self._itens]),
         ]
 
+    def _conectar_campos(self) -> None:
+        self._cliente.widget.currentIndexChanged.connect(self._cliente_mudou)
+
     def _padroes_do_form(self) -> None:
         self._desconto.definir(None)
+        self._pagamento_confirmado.definir(False)
+        self._cliente_mudou()
 
     # ---------------------------------------------------------------- busca
 
-    def recarregar(self, q: str = "", offset: int | None = None) -> None:
-        if offset is None:
-            offset = self._offset
-        rodar(
-            lambda: self._api.listar_os(
-                q=q, status=self._filtro or None, tipo=self.TIPO, limit=LOTE, offset=offset
-            ),
-            on_ok=lambda out: self._recebidos(q, offset, out),
-            on_erro=lambda msg: self._erro_carga(msg),
+    def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        return self._api.listar_os(
+            q=q, status=self._filtro or None, tipo=self.TIPO, limit=LOTE, offset=offset
         )
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
-        if chave == "id":
-            ident = dado.get("id")
-            return f"#{ident:05d}" if isinstance(ident, int) else ""
         if chave == "status":
             return str(dado.get("status", "")).upper()
         if chave == "valor_total":
@@ -107,17 +118,6 @@ class PaginaOS(PaginaCrud):
         return super()._formatar_texto(dado, chave)
 
     # ------------------------------------------------------------ carregar
-
-    def _carregar_clientes(self) -> None:
-        catalogos.carregar(
-            "clientes",
-            lambda: self._api.listar("clientes", limit=1000),
-            on_ok=self._clientes_recebidos,
-        )
-
-    def _clientes_recebidos(self, saida: dict) -> None:
-        dados = saida.get("data", [])
-        self._cliente.alterar_opcoes([(r["id"], r["nome_razao"]) for r in dados])
 
     def _carregar_funcionarios(self) -> None:
         catalogos.carregar(
@@ -141,6 +141,7 @@ class PaginaOS(PaginaCrud):
         self._forma.definir(dado.get("forma_pagamento"))
         self._desconto.definir(dado.get("desconto"))
         self._obs.definir(dado.get("observacoes"))
+        self._pagamento_confirmado.definir(False)
         self._itens.definir(dado.get("itens") or [])
 
     # ---------------------------------------------------------------- salvar
@@ -150,6 +151,14 @@ class PaginaOS(PaginaCrud):
             return ("Informe o cliente.", self._cliente)
         if not self._itens.valor():
             return ("Adicione ao menos um item.", self._itens.widget)
+        if self._editando_id is None and self.TIPO == "os":
+            exigencia = self._exigencia_pendente()
+            if exigencia:
+                return (
+                    f"O cliente exige {exigencia}. Marque 'Recebimento confirmado' "
+                    "para lançar a O.S.",
+                    self._pagamento_confirmado,
+                )
         return None
 
     def _payload(self) -> dict:
@@ -162,6 +171,7 @@ class PaginaOS(PaginaCrud):
             "desconto": str(self._desconto.valor() or "0"),
             "forma_pagamento": self._forma.valor(),
             "observacoes": limpo(self._obs.valor()),
+            "pagamento_confirmado": self._pagamento_confirmado.valor(),
             "itens": self._itens.valor(),
         }
 
@@ -256,16 +266,31 @@ class PaginaOrcamento(PaginaOS):
         )
         if not dado:
             return
-        resposta = QMessageBox.question(
-            self,
-            "Converter em O.S.",
-            f"Converter o orçamento Nº {dado.get('numero')} em ordem de serviço?",
-        )
-        if resposta != QMessageBox.StandardButton.Yes:
-            return
+        exigencia = self._exigencia_do_cliente(dado.get("cliente_id"))
+        confirmado = False
+        if exigencia:
+            resposta = QMessageBox.question(
+                self,
+                "Converter em O.S.",
+                f"O cliente exige {exigencia}.\nConfirmar o recebimento e converter "
+                f"o orçamento Nº {dado.get('numero')} em ordem de serviço?",
+            )
+            if resposta != QMessageBox.StandardButton.Yes:
+                return
+            confirmado = True
+        else:
+            resposta = QMessageBox.question(
+                self,
+                "Converter em O.S.",
+                f"Converter o orçamento Nº {dado.get('numero')} em ordem de serviço?",
+            )
+            if resposta != QMessageBox.StandardButton.Yes:
+                return
         item_id = dado["id"]
         rodar(
-            lambda: self._api.acao("os", item_id, "converter"),
+            lambda: self._api.acao(
+                "os", item_id, "converter", {"pagamento_confirmado": confirmado}
+            ),
             on_ok=self._convertido,
             on_erro=lambda msg: self._erro_salvar(msg),
         )
