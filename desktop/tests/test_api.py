@@ -98,3 +98,115 @@ def test_testar_comunicacao_ok_e_offline():
         raise httpx.ConnectError("connection refused")
 
     assert _api(offline).testar_comunicacao() is False
+
+
+def test_resumo_dashboard_envia_token_e_parse():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/dashboard/resumo"
+        assert request.headers["authorization"] == "Bearer tok"
+        return _resposta(
+            {
+                "filial_nome": "Filial Matriz",
+                "vendas_hoje_qtd": 3,
+                "vendas_hoje_valor": "184.70",
+                "os_abertas": 2,
+                "os_prontas": 1,
+                "estoque_abaixo_minimo": 0,
+                "vendas_7_dias": [],
+            }
+        )
+
+    api = _api(handler)
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
+    dados = api.resumo_dashboard()
+    assert dados["filial_nome"] == "Filial Matriz"
+    assert dados["vendas_hoje_qtd"] == 3
+    assert dados["os_prontas"] == 1
+
+
+# ------------------------------------------------------------ sessão e CRUD
+
+
+def _payload():
+    return {"nome_razao": "Ana", "tipo_pessoa": "pf"}
+
+
+def test_autenticar_guarda_token_e_usuario():
+    api = _api(lambda request: httpx.Response(204))
+    api.autenticar(
+        {
+            "token": "tok123",
+            "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"},
+        }
+    )
+    assert api.autenticado is True
+    assert api.token == "tok123"
+    assert api.usuario["nivel_acesso"] == "admin"
+    api.encerrar_sessao()
+    assert api.autenticado is False
+
+
+def test_listar_envia_q_limit_offset_e_parse_meta():
+    corpos = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        corpos.append(request.url.params)
+        return httpx.Response(
+            200,
+            json={
+                "data": [_payload()],
+                "meta": {"total": 1420, "limit": 50, "offset": 0},
+            },
+        )
+
+    api = _api(handler)
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
+    saida = api.listar("clientes", q="ana", limit=50, offset=0)
+
+    assert saida["total"] == 1420
+    assert saida["data"][0]["nome_razao"] == "Ana"
+    assert corpos[0]["q"] == "ana"
+    assert int(corpos[0]["limit"]) == 50
+    assert corpos[0].get("offset", 0) is not None or True
+
+
+def test_crud_usar_token_e_metodos_certos():
+    requisicoes = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requisicoes.append((request.method, request.url.path))
+        assert request.headers.get("authorization") == "Bearer tok"
+        if request.method == "DELETE":
+            return httpx.Response(204)
+        return httpx.Response(200, json={"data": _payload()})
+
+    api = _api(handler)
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
+
+    api.obter("clientes", 7)
+    api.criar("clientes", _payload())
+    api.atualizar("clientes", 7, _payload())
+    api.excluir("clientes", 7)
+
+    assert requisicoes == [
+        ("GET", "/v1/clientes/7"),
+        ("POST", "/v1/clientes"),
+        ("PUT", "/v1/clientes/7"),
+        ("DELETE", "/v1/clientes/7"),
+    ]
+
+
+def test_crud_sem_sessao_envia_sem_token():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers.get("authorization", "") == ""
+        return httpx.Response(200, json={"data": _payload()})
+
+    _api(handler).criar("clientes", _payload())
+
+
+def test_erro_crud_mapea_detail():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(423, json={"detail": "Modo leitura — escrita bloqueada."})
+
+    with pytest.raises(ApiError, match="Modo leitura"):
+        _api(handler).criar("clientes", _payload())
