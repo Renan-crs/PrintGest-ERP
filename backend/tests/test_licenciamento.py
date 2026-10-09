@@ -119,6 +119,26 @@ def test_sem_ativacao_modo_leitura_bloqueia_escritas(client):
     assert client.get("/health").status_code == 200
 
 
+def test_licenca_desabilitada_libera_escritas(client, admin_token, monkeypatch):
+    """Dev build (`PRINTGEST_LICENCA_DESABILITADA=true`): escritas liberadas mesmo sem ativação."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "licenca_desabilitada", True)
+    licensa_service.ESTADO["modo_leitura"] = True  # força — o middleware deve ignorar
+
+    resp = client.get("/v1/licenca")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["modo_leitura"] is False
+
+    resp = client.post(
+        "/v1/clientes",
+        json={"nome_razao": "Dev sem licença", "tipo_pessoa": "pf"},
+        headers=auth(client, admin_token),
+    )
+    assert resp.status_code in (200, 201), resp.text
+    assert resp.status_code != 423
+
+
 def test_ativacao_libera_escritas(client, admin_token, monkeypatch):
     _mock_stub(monkeypatch, _respostas_ok())
 
@@ -188,5 +208,16 @@ def test_revogacao_volta_ao_modo_leitura(client, admin_token, monkeypatch):
 
 
 def test_renovar_sem_ativacao_400(client):
+    # O banco de teste é compartilhado entre os testes da suíte — testes
+    # anteriores de ativação deixam uma linha local com credenciais. Garante
+    # estado "sem ativação" isolando este teste.
+    from app.models.licenca import Licenca
+    from app.db import SessionLocal
+
+    sessao = SessionLocal()
+    sessao.query(Licenca).delete()
+    sessao.commit()
+    sessao.close()
+
     resp = client.post("/v1/licenca/renovar")
     assert resp.status_code == 400

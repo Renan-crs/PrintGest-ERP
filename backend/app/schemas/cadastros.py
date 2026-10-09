@@ -88,6 +88,7 @@ class FuncionarioBase(ORMModel):
     e_atendente: bool = False
     e_producao: bool = False
     comissao_pct: Decimal | None = Field(default=Decimal("0"), ge=0, le=100)
+    observacoes: str | None = None
 
 
 class FuncionarioCreate(FuncionarioBase):

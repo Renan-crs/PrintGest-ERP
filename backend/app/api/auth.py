@@ -1,12 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header
 
 from app.deps import DbDep, UsuarioDep
 from app.schemas import ItemResponse, LoginIn, LoginOut, TrocarSenhaIn, UsuarioSessaoOut
-from app.services.auth_service import login, logout, sessao_por_token
-from app.core.security import hash_password, verify_password
-from app.models.core import Usuario
+from app.services.auth_service import login, logout, trocar_senha as service_trocar_senha
 
 router = APIRouter(prefix="/auth", tags=["autenticação"])
 
@@ -43,12 +41,8 @@ def trocar_senha(
     body: TrocarSenhaIn,
     usuario: UsuarioDep,
     db: DbDep,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> dict[str, bool]:
-    if not verify_password(body.senha_atual, usuario.senha_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Senha atual incorreta.",
-        )
-    usuario.senha_hash = hash_password(body.nova_senha)
-    db.commit()
+    token = (authorization or "").removeprefix("Bearer ").strip() or None
+    service_trocar_senha(db, usuario, body.senha_atual, body.nova_senha, token)
     return {"data": True}

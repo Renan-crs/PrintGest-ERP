@@ -67,7 +67,7 @@ def _para_out(venda: VendaBalcao) -> VendaOut:
     dados["cliente_nome"] = venda.cliente.nome_razao if venda.cliente else None
     dados["vendedor_nome"] = venda.vendedor.nome if venda.vendedor else None
     dados["operador_caixa_nome"] = (
-        venda.operador_caixa.nome if venda.operador_caixa else None
+        venda.operador.nome if venda.operador else None
     )
     dados["itens"] = [
         VendaItemOut(
@@ -188,7 +188,7 @@ def buscar(db: Session, venda_id: int, *, filial_id: int) -> VendaBalcao:
         .options(
             joinedload(VendaBalcao.cliente),
             joinedload(VendaBalcao.vendedor),
-            joinedload(VendaBalcao.operador_caixa),
+            joinedload(VendaBalcao.operador),
             selectinload(VendaBalcao.itens),
         )
         .filter(VendaBalcao.id == venda_id, VendaBalcao.filial_id == filial_id)
@@ -234,7 +234,7 @@ def listar(
         base.options(
             joinedload(VendaBalcao.cliente),
             joinedload(VendaBalcao.vendedor),
-            joinedload(VendaBalcao.operador_caixa),
+            joinedload(VendaBalcao.operador),
             selectinload(VendaBalcao.itens),
         )
         .order_by(VendaBalcao.numero.desc())

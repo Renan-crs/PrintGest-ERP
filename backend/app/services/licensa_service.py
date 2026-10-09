@@ -17,6 +17,7 @@ Credenciais e endpoints seguem o contrato congelado no `scripts/redgest_stub.py`
 
 import asyncio
 import datetime as dt
+import logging
 import re
 
 import httpx
@@ -27,10 +28,16 @@ from app.core.config import settings
 from app.db import SessionLocal
 from app.models.licenca import Licenca
 
+logger = logging.getLogger(__name__)
+
 STATUS_ATIVA = "ativa"
 STATUS_REVOGADA = "revogada"
 
-ESTADO: dict[str, bool] = {"modo_leitura": True}
+ESTADO: dict[str, bool] = {"modo_leitura": not settings.licenca_desabilitada}
+
+
+def _desabilitada() -> bool:
+    return settings.licenca_desabilitada
 
 
 def _agora() -> dt.datetime:
@@ -76,6 +83,8 @@ def _recalcular_estado(lic: Licenca | None) -> None:
 def situacao(db: Session) -> dict:
     lic = _licenca_local(db)
     _recalcular_estado(lic)
+    if _desabilitada():
+        ESTADO["modo_leitura"] = False
     if lic is None:
         return {
             "sistema": settings.redgest_sistema,
@@ -83,7 +92,7 @@ def situacao(db: Session) -> dict:
             "codigo_licenca": None,
             "plano": None,
             "status": "nao_ativada",
-            "modo_leitura": True,
+            "modo_leitura": ESTADO["modo_leitura"],
             "max_estacoes": None,
             "modulos_habilitados": [],
             "token_expira_em": None,
@@ -143,6 +152,11 @@ def _persistir_ativa(
 
 
 def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
+    if _desabilitada():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Licenciamento desabilitado nesta build de desenvolvimento.",
+        )
     cnpj_limpo = _normalizar_cnpj(cnpj)
     with _cliente() as cliente:
         resp = cliente.post(
@@ -183,6 +197,11 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
 
 
 def renovar(db: Session) -> dict:
+    if _desabilitada():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Licenciamento desabilitado nesta build de desenvolvimento.",
+        )
     lic = _licenca_local(db)
     if lic is None or not lic.client_id or not lic.client_secret:
         raise HTTPException(
@@ -244,8 +263,9 @@ def _tentativa_renovacao() -> None:
 
 async def loop_renovacao() -> None:
     while True:
-        try:
-            await asyncio.to_thread(_tentativa_renovacao)
-        except Exception:
-            pass
+        if not _desabilitada():
+            try:
+                await asyncio.to_thread(_tentativa_renovacao)
+            except Exception:  # noqa: BLE001 — falha externa não derruba o loop
+                logger.exception("Falha inesperada na renovação automática da licença.")
         await asyncio.sleep(settings.licenca_refresh_intervalo_segundos)

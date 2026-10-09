@@ -1,4 +1,4 @@
-from app.services.auth_service import login, logout, sessao_por_token
+from app.services.auth_service import login, logout, trocar_senha
 from app.services.crud import (
     atualizar,
     buscar_por_id,
@@ -10,7 +10,7 @@ from app.services.crud import (
 __all__ = [
     "login",
     "logout",
-    "sessao_por_token",
+    "trocar_senha",
     "listar",
     "buscar_por_id",
     "criar",

@@ -82,10 +82,6 @@ def get_usuario_atual(
 UsuarioDep = Annotated[Usuario, Depends(get_usuario_atual)]
 
 
-def _nivel_minimo(nivel_necessario: NivelAcesso) -> int:
-    return RANK.get(nivel_necessario, 1)
-
-
 def require_nivel(*niveis: NivelAcesso):
     """Permite apenas usuários com nível igual ou superior ao menor nível informado."""
 

@@ -77,6 +77,44 @@ def test_admin_gerencia_usuarios(client, admin_token):
     assert "admin" in logins
 
 
+def _id_admin(client, admin_token) -> int:
+    resp = client.get("/v1/usuarios", headers=auth(client, admin_token))
+    assert resp.status_code == 200
+    return next(u["id"] for u in resp.json()["data"] if u["login"] == "admin")
+
+
+def test_admin_nao_pode_desativar_a_si_mesmo(client, admin_token):
+    """Guarda anti-lockout: admin não pode desativar o próprio usuário (P13/16)."""
+    admin_id = _id_admin(client, admin_token)
+    resp = client.put(
+        f"/v1/usuarios/{admin_id}",
+        headers=auth(client, admin_token),
+        json={"ativo": False},
+    )
+    assert resp.status_code == 400
+    assert "próprio" in resp.json()["detail"].lower()
+
+
+def test_admin_nao_pode_rebaixar_a_si_mesmo(client, admin_token):
+    """Guarda anti-lockout: admin não pode rebaixar o próprio nível (P13/16)."""
+    admin_id = _id_admin(client, admin_token)
+    resp = client.put(
+        f"/v1/usuarios/{admin_id}",
+        headers=auth(client, admin_token),
+        json={"nivel_acesso": "caixa"},
+    )
+    assert resp.status_code == 400
+    assert "rebaixar" in resp.json()["detail"].lower()
+
+
+def test_admin_nao_pode_excluir_a_si_mesmo(client, admin_token):
+    """Guarda anti-lockout: admin não pode excluir o próprio usuário (P13/16)."""
+    admin_id = _id_admin(client, admin_token)
+    resp = client.delete(f"/v1/usuarios/{admin_id}", headers=auth(client, admin_token))
+    assert resp.status_code == 400
+    assert "próprio" in resp.json()["detail"].lower()
+
+
 def test_token_invalido_401(client):
     resp = client.get("/v1/clientes", headers=auth(client, "token-que-nao-existe"))
     assert resp.status_code == 401

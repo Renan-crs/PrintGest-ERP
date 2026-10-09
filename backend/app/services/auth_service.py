@@ -1,4 +1,4 @@
-"""Serviços de autenticação: login com bloqueio por tentativas, sessão e logout."""
+"""Serviços de autenticação: login com bloqueio por tentativas, sessão, troca de senha e logout."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -6,15 +6,25 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import gerar_token_sessao, hash_token, verify_password
+from app.core.security import (
+    gerar_token_sessao,
+    hash_password,
+    hash_token,
+    verify_password,
+)
 from app.deps import verificar_bloqueio
 from app.models.core import Usuario, UsuarioSessao
+
+# Hash "neutro" usado para normalizar o tempo de resposta quando o login não
+# existe (evita timing oracle de enumeração de usuários — P16 §3.5).
+_HASH_NEUTRO = hash_password("--neutralizacao-dummy--")
 
 
 def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usuario]:
     agora = datetime.now(timezone.utc)
     usuario = db.query(Usuario).filter(Usuario.login == login_input).first()
     if not usuario:
+        verify_password(senha, _HASH_NEUTRO)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário ou senha inválidos.",
@@ -48,10 +58,37 @@ def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usu
     return token, expira, usuario
 
 
-def sessao_por_token(db: Session, token: str) -> Usuario:
-    from app.deps import _autenticar  # evita import circular
+def trocar_senha(
+    db: Session,
+    usuario: Usuario,
+    senha_atual: str,
+    nova_senha: str,
+    token_atual: str | None = None,
+) -> None:
+    """Troca a senha e invalida as demais sessões ativas (P16 §5).
 
-    return _autenticar(token, db)
+    A sessão que executou a troca (identificada por `token_atual`) permanece
+    válida; todas as outras sessões do usuário são encerradas.
+    """
+    if not verify_password(senha_atual, usuario.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha atual incorreta.",
+        )
+    usuario.senha_hash = hash_password(nova_senha)
+    hash_da_sessao_atual = hash_token(token_atual) if token_atual else None
+    ativas = (
+        db.query(UsuarioSessao)
+        .filter(
+            UsuarioSessao.usuario_id == usuario.id,
+            UsuarioSessao.encerrada.is_(False),
+        )
+        .all()
+    )
+    for sessao in ativas:
+        if sessao.token_hash != hash_da_sessao_atual:
+            sessao.encerrada = True
+    db.commit()
 
 
 def logout(db: Session, token: str) -> None:
