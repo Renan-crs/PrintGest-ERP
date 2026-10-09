@@ -30,6 +30,8 @@ class VendaCreate(BaseModel):
     forma_pagamento: FormaPagamento
     parcelas: int = Field(default=1, ge=1)
     observacoes: str | None = None
+    # Confirmação do recebimento antecipado (exigido pelo cliente, quando houver).
+    pagamento_confirmado: bool = False
     itens: list[VendaItemIn] = Field(min_length=1)
 
 

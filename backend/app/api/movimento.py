@@ -16,7 +16,7 @@ from app.models.enums import NivelAcesso, StatusOs, TipoOs
 from app.models.movimento import OrdemServico
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
-from app.schemas.movimento import OsCreate, OsOut, OsStatusIn, OsUpdate
+from app.schemas.movimento import OsConverterIn, OsCreate, OsOut, OsStatusIn, OsUpdate
 from app.services import os_service
 
 router = APIRouter(
@@ -104,10 +104,21 @@ def cancelar(os_id: int, db: DbDep, filial: FilialDep) -> None:
 
 @router.post("/{os_id}/converter")
 def converter(
-    os_id: int, db: DbDep, filial: FilialDep
+    os_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    body: OsConverterIn | None = None,
 ) -> ItemResponse[OsOut]:
+    confirmado = body.pagamento_confirmado if body else False
     return ItemResponse(
-        data=os_service.converter_em_os(db, filial_id=filial, orcamento_id=os_id)
+        data=os_service.converter_em_os(
+            db,
+            filial_id=filial,
+            orcamento_id=os_id,
+            usuario_id=usuario.id,
+            pagamento_confirmado=confirmado,
+        )
     )
 
 
