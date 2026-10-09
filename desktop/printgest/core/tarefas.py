@@ -8,6 +8,7 @@ sem depender do mecanismo de conexão direta de callables Python entre threads.
 from __future__ import annotations
 
 import atexit
+from typing import Callable
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
@@ -39,7 +40,12 @@ class _Controle(QObject):
         self._worker._resultado.connect(self._entregar)
         self._pedido.connect(self._worker._executar)
 
-    def rodar(self, chamada, on_ok, on_erro) -> int:
+    def rodar(
+        self,
+        chamada: Callable[[], object],
+        on_ok: Callable[[object], None],
+        on_erro: Callable[[str], None],
+    ) -> int:
         pedido_id = self._proximo_id
         self._proximo_id += 1
         self._cotas[pedido_id] = (on_ok, on_erro)
@@ -58,10 +64,35 @@ class _Controle(QObject):
             self._thread.wait(3000)
 
 
-_controle = _Controle()
-atexit.register(_controle.finalizar)
+_controle: _Controle | None = None
 
 
-def rodar(fn, on_ok, on_erro) -> int:
+def _encerrar() -> None:
+    global _controle
+    if _controle is not None:
+        _controle.finalizar()
+
+
+atexit.register(_encerrar)
+
+
+def _obter_controle() -> _Controle:
+    """Cria a thread de trabalho sob demanda — só depois de existir um QApplication.
+
+    Criar um `QThread` no import (antes do `QApplication(sys.argv)` do `main`) faz
+    o Qt emitir "QEventLoop: Cannot be used without QApplication" e derruba a
+    entrega dos resultados na thread da UI.
+    """
+    global _controle
+    if _controle is None:
+        _controle = _Controle()
+    return _controle
+
+
+def rodar(
+    fn: Callable[[], object],
+    on_ok: Callable[[object], None],
+    on_erro: Callable[[str], None],
+) -> int:
     """Executa `fn` em background; `on_ok(resultado)` ou `on_erro(msg)` no main."""
-    return _controle.rodar(fn, on_ok, on_erro)
+    return _obter_controle().rodar(fn, on_ok, on_erro)

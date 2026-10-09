@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from printgest import APP_NAME, __version__
 from printgest.core.api import Api
 from printgest.core.tarefas import rodar
 from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
@@ -47,7 +48,7 @@ class LoginWindow(QMainWindow):
         cabeçalho = QVBoxLayout()
         cabeçalho.setSpacing(6)
         linha_top = QHBoxLayout()
-        linha_top.addWidget(badge("Build 2.0.0-PROD", "primary"))
+        linha_top.addWidget(badge(f"Build {__version__}", "primary"))
         linha_top.addStretch(1)
         daemon = QLabel("Local API Service: 127.0.0.1:8000")
         daemon.setProperty("role", "muted")
@@ -68,7 +69,7 @@ class LoginWindow(QMainWindow):
         card_layout.addWidget(self._erro)
 
         self._campo_usuario = self._linha_form(
-            card_layout, "Usuário", "atendente.juliana", False
+            card_layout, "Usuário", "seu.usuario", False
         )
         self._campo_senha = self._linha_form(
             card_layout, "Senha", "", True
@@ -101,7 +102,7 @@ class LoginWindow(QMainWindow):
         layout.addStretch(1)
 
         status_bar = self.statusBar()
-        status_bar.showMessage("Daemon v2.4 conectado")
+        status_bar.showMessage(f"Local API Service: {self._api.base_url_display}")
 
         self.setCentralWidget(base)
         self._botao_entrar = btn_entrar[1]

@@ -150,11 +150,7 @@ class AtivacaoWindow(QMainWindow):
         self._campo_codigo.setMaxLength(25)
         self._campo_codigo.setProperty("mono", "true")
         self._campo_codigo.setPlaceholderText("PGST-XXXX-XXXX-XXXX-XXXX")
-        self._campo_codigo.textChanged.connect(
-            lambda t: self._campo_codigo.setText(t.upper())
-            if t != t.upper()
-            else None
-        )
+        self._campo_codigo.textChanged.connect(self._manter_codigo_maiusculo)
         form.addWidget(self._campo_codigo)
         formato = QLabel("Formato padrão: PGST-XXXX-XXXX-XXXX-XXXX (25 caracteres alfanuméricos)")
         formato.setObjectName("subtitulo")
@@ -168,7 +164,7 @@ class AtivacaoWindow(QMainWindow):
 
         form.addStretch(1)
 
-        btn_testar = botao_com_atalho("Testar Comunicação com RedGest")
+        btn_testar = botao_com_atalho("Testar Local API Service")
         btn_testar[1].clicked.connect(self._testar)
         btn_ativar = botao_com_atalho("Validar e Ativar Licença Online", "F10", "primary")
         btn_ativar[1].clicked.connect(self._ativar)
@@ -261,21 +257,37 @@ class AtivacaoWindow(QMainWindow):
         label.setObjectName("labelForm")
         return label
 
+    def _manter_codigo_maiusculo(self, texto: str) -> None:
+        """Código de licença é case-insensitive — normaliza para maiúsculas sem
+        mover o cursor para o fim (P5: não roubar o foco do usuário).
+        """
+        if texto == texto.upper():
+            return
+        posicao = self._campo_codigo.cursorPosition()
+        self._campo_codigo.blockSignals(True)
+        self._campo_codigo.setText(texto.upper())
+        self._campo_codigo.blockSignals(False)
+        self._campo_codigo.setCursorPosition(posicao)
+
     # --------------------------------------------------------------- ações
 
     def _testar(self) -> None:
         self._botao_testar.setEnabled(False)
-        self._status.setText("Testando comunicação com RedGest…")
+        self._status.setText("Testando Local API Service…")
 
-        def ok(_) -> None:
+        def ok(resultado) -> None:
             self._botao_testar.setEnabled(True)
-            self._status.setText("● RedGest respondendo — HTTP 200 OK")
-            self._status.setProperty("role", "success")
+            if resultado:
+                self._status.setText("● Local API Service respondendo — HTTP 200 OK")
+                self._status.setProperty("role", "success")
+            else:
+                self._status.setText("● Sem resposta do Local API Service — verifique o daemon")
+                self._status.setProperty("role", "error")
             aplicar_estilo(self._status)
 
         def erro(_) -> None:
             self._botao_testar.setEnabled(True)
-            self._status.setText("● Sem resposta do RedGest — verifique a conexão")
+            self._status.setText("● Sem resposta do Local API Service — verifique o daemon")
             self._status.setProperty("role", "error")
             aplicar_estilo(self._status)
 
@@ -284,8 +296,8 @@ class AtivacaoWindow(QMainWindow):
     def _ativar(self) -> None:
         cnpj = self._campo_cnpj.text().strip()
         codigo = self._campo_codigo.text().strip()
-        if len(cnpj) < 14 or len(codigo) < 8:
-            self._erro.setText("Informe o CNPJ completo e o código de licença.")
+        if sum(c.isdigit() for c in cnpj) != 14 or len(codigo) < 8:
+            self._erro.setText("Informe o CNPJ completo (14 dígitos) e o código de licença.")
             return
 
         self._erro.setText("")

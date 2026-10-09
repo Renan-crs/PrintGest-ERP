@@ -5,8 +5,6 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-ROLES_BOTAO_PRIMARIO = "primary"
-
 
 def aplicar_estilo(widget: QWidget) -> None:
     """Recompila o QSS de `widget` após mudanças de propriedade dinâmica."""
