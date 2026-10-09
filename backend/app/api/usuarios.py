@@ -9,6 +9,7 @@ from app.models.enums import NivelAcesso
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
+from app.services.auth_service import revogar_sessoes
 from app.services.crud import atualizar, buscar_por_id, criar, desativar
 from sqlalchemy import or_
 
@@ -63,10 +64,12 @@ def lista(
             )
         )
     total = query.count()
-    itens = query.order_by(Usuario.id.desc()).limit(min(max(limit, 1), 200)).offset(max(offset, 0)).all()
+    limite = min(max(limit, 1), 200)
+    desloc = max(offset, 0)
+    itens = query.order_by(Usuario.id.desc()).limit(limite).offset(desloc).all()
     return ListaResponse(
         data=[UsuarioOut.model_validate(u) for u in itens],
-        meta=MetaPaginacao(total=total, limit=limit, offset=offset),
+        meta=MetaPaginacao(total=total, limit=limite, offset=desloc),
     )
 
 
@@ -89,9 +92,14 @@ def atualizar_usuario(
 ) -> ItemResponse[UsuarioOut]:
     _garantir_nao_auto_lockout(db, usuario, item_id, body)
     dados = body.model_dump(exclude_unset=True)
-    if "senha" in dados:
+    redefine_senha = "senha" in dados
+    if redefine_senha:
         dados["senha_hash"] = hash_password(dados.pop("senha"))
-    return ItemResponse(data=UsuarioOut.model_validate(atualizar(db, Usuario, item_id, dados)))
+    atualizado = atualizar(db, Usuario, item_id, dados)
+    if redefine_senha:
+        # P13/P16: o reset de senha por um admin encerra as sessões ativas do alvo.
+        revogar_sessoes(db, item_id)
+    return ItemResponse(data=UsuarioOut.model_validate(atualizado))
 
 
 @router.delete("/{item_id}", status_code=204)
