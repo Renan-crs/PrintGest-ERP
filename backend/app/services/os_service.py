@@ -13,9 +13,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.models.cadastros import Cliente
 from app.models.movimento import OrdemServico, OrdemServicoItem
 from app.models.enums import StatusOs, TipoOs
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
+from app.services import adiantamento_service
 
 _TWO = Decimal("0.01")
 
@@ -111,7 +113,23 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
     )
     db.add(os_obj)
     try:
+        db.flush()  # garante os_obj.id para o lançamento de adiantamento
+        if dados.tipo == TipoOs.OS:
+            cliente = db.get(Cliente, dados.cliente_id) if dados.cliente_id else None
+            adiantamento_service.exigir_e_registrar(
+                db,
+                filial_id=filial_id,
+                usuario_id=usuario_id,
+                cliente=cliente,
+                valor_total=valor_total,
+                confirmado=dados.pagamento_confirmado,
+                documento=f"O.S. #{os_obj.id}",
+                ordem_servico_id=os_obj.id,
+            )
         db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
     except IntegrityError as exc:
         db.rollback()
         raise _erro_integridade() from exc
@@ -203,7 +221,14 @@ def mudar_status(
     return _para_out(os_obj)
 
 
-def converter_em_os(db: Session, *, filial_id: int, orcamento_id: int) -> OsOut:
+def converter_em_os(
+    db: Session,
+    *,
+    filial_id: int,
+    orcamento_id: int,
+    usuario_id: int,
+    pagamento_confirmado: bool = False,
+) -> OsOut:
     orcamento = buscar(db, orcamento_id, filial_id=filial_id)
     if orcamento.tipo != TipoOs.ORCAMENTO:
         raise HTTPException(
@@ -249,7 +274,21 @@ def converter_em_os(db: Session, *, filial_id: int, orcamento_id: int) -> OsOut:
     orcamento.status = StatusOs.CONVERTIDO
     db.add(nova)
     try:
+        db.flush()  # garante nova.id para o lançamento de adiantamento
+        adiantamento_service.exigir_e_registrar(
+            db,
+            filial_id=filial_id,
+            usuario_id=usuario_id,
+            cliente=orcamento.cliente,
+            valor_total=orcamento.valor_total,
+            confirmado=pagamento_confirmado,
+            documento=f"O.S. #{nova.id}",
+            ordem_servico_id=nova.id,
+        )
         db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
     except IntegrityError as exc:
         db.rollback()
         raise _erro_integridade() from exc

@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.models.enums import TipoPessoa, TipoProduto
 from app.schemas.common import ORMModel
@@ -30,6 +30,17 @@ class ClienteBase(EnderecoBase):
     celular: str | None = Field(default=None, max_length=20)
     foto_path: str | None = Field(default=None, max_length=500)
     observacoes: str | None = None
+    pagamento_adiantado: bool = False
+    sinal: bool = False
+    sinal_pct: Decimal = Field(default=Decimal("50"), ge=0, le=100)
+
+    @model_validator(mode="after")
+    def _adiantamento_exclusivo(self) -> "ClienteBase":
+        if self.pagamento_adiantado and self.sinal:
+            raise ValueError(
+                "O cliente não pode ser 'pagamento adiantado' e 'sinal' ao mesmo tempo."
+            )
+        return self
 
 
 class ClienteCreate(ClienteBase):

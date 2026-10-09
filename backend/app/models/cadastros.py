@@ -32,6 +32,13 @@ from app.models.enums import (
 class Cliente(Base):
     __tablename__ = "cliente"
     __table_args__ = (
+        # Um cliente exige (no máximo) uma condição de pagamento antecipado: o
+        # total adiantado ou um sinal percentual — nunca os dois.
+        CheckConstraint(
+            "NOT (pagamento_adiantado AND sinal)",
+            name="ck_cliente_adiantamento_exclusivo",
+        ),
+        CheckConstraint("sinal_pct BETWEEN 0 AND 100", name="ck_cliente_sinal_pct"),
         Index("idx_cliente_nome", "nome_razao"),
         Index(
             "idx_cliente_dt_nas",
@@ -63,6 +70,18 @@ class Cliente(Base):
     cep: Mapped[str | None] = mapped_column(CHAR(8))
     foto_path: Mapped[str | None] = mapped_column(String(500))
     observacoes: Mapped[str | None] = mapped_column(Text)
+    # Condição de pagamento antecipado exigida do cliente (PRD tela 2.1):
+    # `pagamento_adiantado` = 100% na abertura da OS/venda; `sinal` = percentual
+    # informado em `sinal_pct`. Mutuamente exclusivos (CHECK).
+    pagamento_adiantado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    sinal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    sinal_pct: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False, server_default="50"
+    )
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

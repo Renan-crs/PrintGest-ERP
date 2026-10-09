@@ -45,6 +45,8 @@ class OsCreate(BaseModel):
     desconto: Decimal = Field(default=Decimal("0"), ge=0)
     forma_pagamento: FormaPagamento | None = None
     observacoes: str | None = None
+    # Confirmação do recebimento antecipado (exigido pelo cliente, quando houver).
+    pagamento_confirmado: bool = False
     itens: list[OsItemIn] = Field(min_length=1)
 
 
@@ -63,6 +65,12 @@ class OsUpdate(BaseModel):
 
 class OsStatusIn(BaseModel):
     status: StatusOs
+
+
+class OsConverterIn(BaseModel):
+    """Corpo opcional da conversão de orçamento em O.S."""
+
+    pagamento_confirmado: bool = False
 
 
 class OsItemOut(ORMModel):

@@ -25,6 +25,7 @@ from app.schemas.venda import (
     VendaItemOut,
     VendaOut,
 )
+from app.services import adiantamento_service
 
 _TWO = Decimal("0.01")
 
@@ -186,8 +187,23 @@ def criar(
     db.add(venda)
     try:
         db.flush()  # garante venda.id para o kardex antes do commit
+        if dados.cliente_id:
+            cliente = db.get(Cliente, dados.cliente_id)
+            adiantamento_service.exigir_e_registrar(
+                db,
+                filial_id=filial_id,
+                usuario_id=usuario_id,
+                cliente=cliente,
+                valor_total=valor_total,
+                confirmado=dados.pagamento_confirmado,
+                documento=f"Venda #{venda.id}",
+                venda_balcao_id=venda.id,
+            )
         _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
         db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
     except IntegrityError as exc:
         db.rollback()
         raise _erro_integridade() from exc
