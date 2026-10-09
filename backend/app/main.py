@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from app.api import api
 from app.bootstrap import rodar_bootstrap
 from app.core.config import settings
+from app.core.migrations import aplicar_migrations
 from app.services import licensa_service
 
 logger = logging.getLogger("printgest")
@@ -83,6 +84,8 @@ def _caminho_permitido(path: str) -> bool:
 async def lifespan(_: FastAPI):
     # P17: falha cedo quando defaults de desenvolvimento estão ativos em produção.
     settings.validar_producao()
+    # Aplica migrations pendentes (idempotente) — evita drift de schema do banco.
+    aplicar_migrations()
     # Fase 1: garantia de empresa/filial/admin de fábrica no primeiro start.
     rodar_bootstrap()
     # Fase 4: mantém a licença renovada; sem ativação, apenas recalcula o modo.
