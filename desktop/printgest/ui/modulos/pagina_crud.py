@@ -275,8 +275,15 @@ class PaginaCrud(QWidget):
                 return
             self._recebidos(q, offset, saida)
 
+        # Filtro de campo (ex.: `tipo_pessoa`) vai ao servidor, para paginar sobre
+        # o conjunto filtrado — não apenas recortar a página atual.
+        filtros = {}
+        if self.CHAVE_FILTRO and self._filtro:
+            filtros[self.CHAVE_FILTRO] = self._filtro
         rodar(
-            lambda: self._api.listar(self.ENTIDADE, q=q, limit=LOTE, offset=offset),
+            lambda: self._api.listar_com_filtros(
+                self.ENTIDADE, q=q, limit=LOTE, offset=offset, **filtros
+            ),
             on_ok=_receber,
             on_erro=lambda msg: self._erro_carga(msg),
         )
