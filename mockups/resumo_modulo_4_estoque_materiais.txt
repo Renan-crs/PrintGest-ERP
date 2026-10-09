@@ -1,0 +1,333 @@
+================================================================================
+ RESUMO CONSOLIDADO — MÓDULO 4 (ESTOQUE / MATERIAIS) — PRINTGEST ERP v2.0
+================================================================================
+ Fonte: C:\Compart\Projetos\Printgest\mockups
+  - 4.1_consulta_de_estoque_e_bobinas_printgest_erp\code.html
+  - 4.2_movimenta_o_manual_e_kardex_printgest_erp\code.html
+  - 4.3_relat_rio_de_reposi_o_e_giro_printgest_erp\code.html
+  (cada pasta contém apenas 1 arquivo code.html + 1 screen.png)
+================================================================================
+
+CONTEXTO COMUM AOS TRÊS MOCKUPS (idêntico em todos):
+  - Sidebar lateral com PRESTGEST ERP v2.0 (menu em grupos), rodapé fixo com
+    telemetria: "Daemon: 127.0.0.1:8000 Conectado | Estação: 02 (Balcão
+    Atendimento) | Banco: PostgreSQL 15 Local".
+  - Rodapé de atalhos globais: [F1] Ajuda | [F2] Clientes | [F3] Produtos |
+    [F4] O.S. | [F5] PDV | [F6] Estoque | [Esc] Voltar | v2.0.0.
+  - Itens do Menu Principal (sidebar): Dashboard / Início; Cadastros >
+    Clientes (F2), Produtos e Serviços (F3), Fornecedores, Funcionários;
+    Operacional > Ordens de Serviço (F4), Orçamentos Gráficos, Venda Balcão /
+    PDV (F5), Pedidos de Compra, Estoque e Bobinas, Financeiro & Caixa,
+    Fiscal (NFC-e / NF-e), Relatórios & Config.
+  - Design: Material 3 (Tailwind), fonte Inter, ícones Material Symbols.
+  - Termos recorrentes: custo médio (ponderado), saldo físico, estoque
+    mínimo, ponto de pedido, autonomia, giro, reposição, fornecedor
+    homologado, localização física, bobinas/m²/metros lineares.
+
+--------------------------------------------------------------------------------
+SEÇÃO 1 — 4.1 GESTÃO DE ESTOQUE & BOBINAS (Consulta de Estoque e Bobinas)
+--------------------------------------------------------------------------------
+
+1.1 TÍTULO / INSTRUMENTOS DA TELA
+  - Breadcrumb: "Almoxarifado & Produção / Módulo Operacional".
+  - Título: "Gestão de Estoque & Bobinas" + badge "Estoque Central".
+  - Subtítulo: "Monitoramento de matérias-primas gráficas, papéis, lonas,
+    chapas e insumos de acabamento em tempo real."
+  - Barra de busca (input texto): placeholder "Buscar por Código, Descrição,
+    Fabricante ou Localização Física... [Ctrl+F]" (Ctrl+F foca o campo).
+  - Quick Switcher de Local (botões segmentados): "Geral (Todos)",
+    "Balcão Rápido", "Galpão C3070", "Estoque Frio".
+  - Filtro por abas de categoria (com contadores): Todos (842),
+    Papéis & Cartões (310), Bobinas & Lonas (142), Tintas, Toners & Químicos
+    (68), Chapas & CTP (44), Acabamento & Suprimentos (278) e badge
+    "Abaixo do Mínimo" (12, em vermelho).
+  - Botões de ação no topo (com atalhos):
+      * "Balanço / Inventário" [Ctrl+B]
+      * "Relat. Reposição" [F7]
+      * "Nova Entrada / Ajuste" [F6] (primário, ação principal)
+  - Barra de atalhos operacionais (dock interno): F1 Ajuda Insumos,
+    F2 Localizar Lote, F6 Movimentar Estoque (destaque), F7 Reposição &
+    Compras, Ctrl+B Abrir Inventário, Enter Detalhes / Kardex, Esc Limpar
+    Filtro.
+  - Indicador "Cálculo Custo Médio Ponderado: Ativo".
+
+1.2 CARDS DE INDICADORES (KPIs)
+  1. Itens Cadastrados: 842 itens, 98.6% ativos, Avaliação Total R$ 148.920,45.
+  2. Reposição Crítica: 12 "abaixo do mín." (badge "Ação urgente"),
+     "Risco de parada: 3 O.S. aguardando".
+  3. Bobinas em Linha: 38 bobinas ativas, 1.840 m lin., "Uso diário
+     estimado: 142 m / dia".
+  4. Entradas Previstas: 4 pedidos em trânsito ("Próx: Amanhã"),
+     Volume previsto R$ 18.340,00.
+
+1.3 COLUNAS DA TABELA (Planilha Dinâmica de Insumos — 6 de 842 filtrados)
+  Na ordem exata:
+  1. SKU / Cód — código do item (ex.: INS-0209, PAP-0104, LON-0012, TNT-0034,
+     ACAB-005).
+  2. Descrição do Insumo & Especificação — nome + especificação técnica
+     (ex.: "Bobina 1.26m × 50m") + badge de categoria (Bobinas & Mídias,
+     Papéis, Comunicação Visual, Toners, Acabamento).
+  3. Localização — local físico/endereço (Porta-Bobina A3, Prateleira B1,
+     Palete C2, Armário Seguro, Gaveta 04).
+  4. Saldo Atual (direita) — quantidade em 2 linhas: unidade principal +
+     equivalente (ex.: "2.5 rolos / 125 metros lin."; "4.800 fls / 9.6
+     resmas"; "1 un / ~7.200 imp. est."; "18 bobinas / ~1.800 blocos").
+  5. Status (centralizado) — badges: "Crítico (Mín: 4)" [vermelho pulsante],
+     "Normal (Mín: 2.500)", "Atenção (Mín: 1.000)", "Crítico (Mín: 2)".
+  6. Custo Médio (direita) — valor monetário/unidade (ex.: R$ 180,00,
+     R$ 0,38, R$ 1,45, R$ 240,00, R$ 680,00, R$ 42,00).
+  7. Valor Total (direita) — saldo × custo médio (ex.: R$ 450,00,
+     R$ 1.824,00).
+  8. Ações (centralizado) — 3 botões por linha:
+       * Kardex / Histórico (ícone history, primário).
+       * Ajuste Rápido (ícone tune, secundário).
+       * Pedir Insumo (ícone shopping_cart, terciário; "Pedir Urgente" em
+         vermelho para item crítico).
+  - Linha em foco (INS-0209) selecionada. Rodapé da grade: "Mostrando 1–6 de
+    842 registros", dica teclado ↑/↓ para navegar, paginação Primeira /
+    1 2 3 ... 42 / Última. Ações do cabeçalho: "Ordenar por Saldo" e
+    "Exportar CSV".
+
+1.4 PAINEL LATERAL (item em foco INS-0209 — Adesivo Vinil Fosco 0.10mm)
+  - Cabeçalho: "Item em Foco [INS-0209]" + badge "REPOSIÇÃO URGENTE".
+  - Fabricante: Imprimax; Local: Porta-Bobina A3 (Nível 2).
+  - Métricas (2 mini-gauges):
+      * Consumo Médio: 8.4 m/dia (base: últimos 30 dias).
+      * Autonomia Estimada: ~14 dias úteis ("Requer pedido até 18:00").
+  - Gauge visual "Nível Físico vs Mínimo de Segurança": 62.5% do mínimo;
+    "Atual: 2.5 rolos (125m)" vs "Ponto Pedido: 4 rolos (200m)".
+  - Última Movimentação: Saída de 15m alocados na O.S. #8942 (Banner Frontal
+    - Plotter Roland SG-540), Operador Lucas M. (Produção CV), "Hoje, 10:14".
+  - Fornecedor Homologado: Serilon Comunicação Visual; prazo médio entrega
+    3 dias úteis; botão "Ligar / Cotar".
+  - Botões de ação: "Extrato Kardex" (primário) e "Emitir Pedido" (erro).
+  - Card "Atividade Recente do Almoxarifado": Entrada NF-e #10429 (+10 resmas
+    SRA3), Baixa O.S. #8938 Konica C3070 (-400 fls Triplex),
+    Ajuste Balanço Gaveta 04 (+2 Wire-O).
+
+1.5 CRUD / REGRAS VISÍVEIS
+  - Flagship de consulta (visualização), com atalhos diretos para criação de
+    movimentação (F6 "Nova Entrada / Ajuste") e relatório de reposição (F7).
+  - Regras de status por mínimo de segurança: Crítico (abaixo do mínimo,
+    vermelho) / Atenção / Normal; destaque visual de ruptura.
+  - Interação JS simulada: Ctrl+F foca busca, Esc limpa, clique na linha
+    "seleciona" o item (barra lateral colorida).
+
+================================================================================
+SEÇÃO 2 — 4.2 MOVIMENTAÇÃO MANUAL DE ESTOQUE & FICHA KARDEX
+================================================================================
+
+2.1 TÍTULO / INSTRUMENTOS DA TELA
+  - Título: "Movimentação Manual de Estoque & Ficha Kardex" + badge
+    "MOD-ESTQ #4.2".
+  - Subtítulo: "Registro de ajustes operacionais, perdas de máquina, sobras
+    e auditoria de movimentações."
+  - Telemetria: "Daemon ativo • PostgreSQL Realtime".
+  - Botões de ação (com atalhos):
+      * "Importar XML NF-e" [F9]
+      * "Imprimir Ficha" [Ctrl+P]
+      * "Novo Lançamento" [F6] (primário, abre/foca o formulário)
+  - Barra de atalhos (dock): F1 Manual de Perdas Gráficas, F3 Catálogo
+    Bobinas, F6 Focar Lançamento, F9 Ler Chave NF-e, F10 Salvar Kardex,
+    Ctrl+P Imprimir Auditoria, Esc Limpar / Fechar.
+  - Rodapé da área: "Sessão: Roberto Silva (Gerência)".
+
+2.2 PAINEL FORMULÁRIO ESQUERDO — "Entrada / Saída Manual"
+  - Badge "LANÇAMENTO DIRETO".
+  - Campo INSUMO / BOBINA / SUBSTRATO: input texto com autocomplete
+    (placeholder preenchido "INS-0209 — Adesivo Vinil Fosco 0.10mm Bobina
+    1.26m"), atalho "[F3 Busca Geral]".
+  - Card de telemetria do material: Lote ativo #2024-LT88B, local ALMOX.
+    MATRIZ (A-04), Saldo Físico Atual "125,00 m (2.5 rolos de 50m)",
+    Custo Médio R$ 3,60 / m.
+  - TIPO DE MOVIMENTAÇÃO — seletor segmentado (4 tipos):
+      1. Entrada Avulsa / NF
+      2. Perda Técnica Máquina (pré-selecionado, destaque vermelho)
+      3. Ajuste Balanço / Inv.
+      4. Transf. Almoxarifado
+  - Motor de simulação quantitativa:
+      * "Qtd a Lançar (-)" — input numérico (type=number, step 0.5, valor
+        inicial 15.0, sufixo "Metros").
+      * "Saldo Projetado" — campo calculado em tempo real (ex.: 110,00 m /
+        2.2 rolos). Regra JS: entrada soma; perda/transferência subtrai
+        (mín 0); ajuste iguala ao valor digitado.
+  - Campos operacionais:
+      * Vínculo O.S. (Opcional) — input texto (valor "#OS-8942").
+      * Setor / Máquina — combo (select): Plotter Roland SG3 (Solvente);
+        Konica Minolta C3070 (Digital); Mesa de Corte CNC & Acabamento;
+        Impressão UV Plana.
+      * Motivo / Justificativa Técnica Detalhada — textarea (texto de
+        exemplo sobre perda na calibragem da Roland SG3).
+      * Operador (Roberto Silva) e Estação (#02 Balcão) — somente leitura.
+  - Botões: "Confirmar Lançamento" [F10] (primário, valida qtd > 0) e
+    "Cancelar" [Esc].
+  - Widget "Taxa de Quebra Técnica (Mês)": 2.41% (Meta: < 3.0%) + sparkline
+    (SVG) de perdas recentes.
+
+2.3 BANNER DO SUBSTRATO (mídia visual) — INS-0209
+  - Foto ilustrativa de bobina; descrição + badge "Bobina 1.26m";
+    Fabricante: Imprimax GoldMax • Armazenamento: Rack Vertical Bobineiro B
+    • Cód. Barra: 789948291024.
+  - Métricas 30 dias: Entradas (30d) +500,00 m; Consumo Prod. -375,00 m;
+    Perdas Reg. -15,00 m.
+
+2.4 FILTROS DO KARDEX
+  - Período (botões): Hoje | Últimos 7 dias | Este Mês (ativo) |
+    Personalizado.
+  - Tipo de movimento (combo): Todos os Movimentos; Entradas NF / Fornecedor;
+    Baixas Diretas O.S.; Vendas Balcão PDV; Perdas & Avarias Técnicas;
+    Ajustes de Balanço. Contador "4 de 128 registros".
+
+2.5 COLUNAS DA TABELA KARDEX (na ordem exata)
+  1. Data / Hora
+  2. Tipo Movimento — badge (Baixa O.S., Perda Técnica, Entrada NF,
+     Venda Balcão).
+  3. Origem / Doc — documento (O.S. #8942, Ajuste #088, NF-e 18492,
+     Cupom #2870).
+  4. Operador — nome + estação (Juliana M. Est. 02, Marcos V. C3070,
+     Roberto S. Admin, Camila D. Caixa).
+  5. Entrada (+) — direita, verde/primário.
+  6. Saída (-) — direita, vermelho.
+  7. Saldo — direita, destaque.
+  8. Custo Unit. — direita.
+  9. Destino / Obs. — texto truncado com tooltip (ex.: "Banner Lona 440g
+     Roland", "Atolamento gaveta 2").
+  - Rodapé do razão: "Valoração Atual do Estoque Deste Insumo: R$ 450,00 |
+    Média de Giro: 18.4 dias"; paginação "Página 1 de 1" (◀ Anterior/
+    Próxima ▶).
+
+2.6 MÓDULO ADICIONAL — "Devolução de Sobra de Rolo / Retalho Aproveitável"
+  - Botão "Gerar Etiqueta de Sobra (Aproveitamento)": identifica retalho
+    com etiqueta de código de barras para reutilização em trabalhos pequenos.
+
+2.7 CRUD / REGRAS VISÍVEIS
+  - Criação via "Confirmar Lançamento" insere linha nova no topo do Kardex
+    via JS (badge conforme tipo, entrada/saída e saldo recalculados);
+    feedback visual no botão.
+  - Regras de cálculo de saldo projetado (soma/subtrai/ajusta) e trava de
+    quantidade (>0).
+  - Atalhos implementados: F6 foca o campo de quantidade, F10 confirma,
+    Esc limpa/fecha.
+
+================================================================================
+SEÇÃO 3 — 4.3 RELATÓRIO DE REPOSIÇÃO & GIRO (Curva de Consumo de Insumos)
+================================================================================
+
+3.1 TÍTULO / INSTRUMENTOS DA TELA
+  - Badge "Diagnóstico Crítico" (vermelho) + nota "Módulo Estoque &
+    Suprimentos • PRD 2.0 §1.3/§1.4".
+  - Título: "Relatório de Reposição & Curva de Consumo de Insumos".
+  - Subtítulo: "Diagnóstico de ruptura de estoque, previsão de autonomia e
+    solicitação direta a fornecedores homologados."
+  - Botões de ação (com atalhos):
+      * "Exportar Excel / PDF" [Ctrl+E]
+      * "Imprimir Ordem" [Ctrl+P]
+      * "Gerar Pedidos de Compra" [F9] (primário), com contador
+        "(6 selecionados)".
+  - Barra de atalhos: [F1] Ajuda Operacional, [F2] Pesquisar Insumo / Cód,
+    [F9] Emitir Ordem de Reposição (destaque), [Ctrl+E] Exportar XLS,
+    [Ctrl+P] Imprimir Relatório, [Esc] Retornar ao Menu.
+  - Indicador "Cálculo de Segurança Atualizado: Hoje às 14:32".
+
+3.2 CARDS DE INDICADORES (KPIs)
+  1. Itens em Ruptura Crítica: 12 Insumos (badge "Risco Máquina"),
+     "Parada de prensa Konica e Plotter iminente".
+  2. Valor Estimado Reposição: R$ 24.680,00 ("Lotes econômicos
+     consolidados").
+  3. Fornecedores a Acionar: 4 Fabricantes (badge "Homologados"):
+     Suzano, Serilon, Sun Chemical, Plásticos Alv.
+  4. Prazo Médio (Lead-time): 3.2 dias úteis ponderados.
+
+3.3 FILTROS RÁPIDOS
+  - Botões: "Abaixo do Mínimo (12)" (ativo), "Ruptura < 48h (5)",
+    "Papéis & Mídias (4)", "Químicos & Tintas (3)".
+  - Legenda: ● Ruptura Crítica (≤ 2d) | ● Atenção (≤ 5d);
+    "Base de Cálculo: Últimos 30 dias".
+
+3.4 COLUNAS DA TABELA DE REPOSIÇÃO (na ordem exata)
+  0. Checkbox de seleção (check-all + checkboxes por linha, com
+     data-cost p/ soma).
+  1. Insumo / Especificação Gráfica — nome + bolinha colorida por tipo +
+     código e máquina-alvo (ex.: "TON-KM619-C • Prensa C3070").
+  2. Fornecedor Homologado — nome + CNPJ.
+  3. Saldo Atual — direita, vermelho.
+  4. Est. Mínimo — direita.
+  5. Giro Diário — direita (ex.: 0.2 un/dia, 450 fls/dia).
+  6. Autonomia — centralizado, badges: "2 dias" (crítico, alarme),
+     "1.3 dias" (pulsante), "5 dias", "3 dias".
+  7. Sugestão (Lote) — direita: qtd sugerida + descrição do lote
+     (ex.: 4 un "Lote Econômico"; 6 rolos "Embalagem Fechada"; 5.000 fls
+     "10 pacotes de 500"; 50 un "Caixa Protegida"; 5.000 un "Caixa
+     Industrial"; 5 litros "Galão Lacrado").
+  8. Custo Est. — direita, monetário (R$ 2.720,00; R$ 1.080,00 ...).
+  9. Ações Operacionais — centralizado: botões "Cotar" e "Pedir (F9)".
+  - Linhas de exemplo: Toner Konica TN-619 Cyan; Adesivo Vinil Fosco; Papel
+    Couché Fosco 115g SRA3; Chapa Térmica CTP 0.30; Ilhós Metálico Nº54;
+    Solvente Eco-Solvente DX5.
+  - Rodapé: "Exibindo 6 de 12 itens com recomendação ativa",
+    "Total Selecionado: R$ 7.755,00" (soma dinâmica via JS dos checkbox),
+    "Página 1 de 2", botões Anterior/Próxima.
+
+3.5 "CURVA DE INSUMOS MAIS CONSUMIDOS (ÚLTIMOS 30 DIAS)" — gráfico de barras
+  (ordenado por volume; barras com % da capacidade + sparkline):
+  1. Papel Couché 150g SRA3 (Laser/Digital) — 24.500 fls (100%, barra 92%),
+     Média 816 fls/dia • Pico sextas; sugestão 30.000 fls.
+  2. Lona Frontlight 440g 1.50m (Comunicação Visual) — 480 m linear (74%),
+     Média 16 m/dia • Roland Solvente; sugestão 10 bobinas.
+  3. Adesivo Vinil Brilho 1.26m × 50m — 340 m consumidos (56%),
+     Média 11.3 m/dia • Rótulos; sugestão 8 rolos.
+  4. Tinta Eco-Solvente Black Premium — 12 litros (42%),
+     Média 0.40 L/dia; sugestão 15 litros.
+
+3.6 "CANAL DIRETO DE SUPRIMENTOS" (widget lateral)
+  - Descrição: geração de Ordem de Compra automatizada por EDI / WhatsApp e
+    integração XML.
+  - Lista de fornecedores com canal: Suzano Papel S/A (EDI Ativo • 24h Frete
+    Grátis, 1 Pedido); Serilon Distribuidora (WhatsApp API Integrada,
+    1 Pedido); Sun Chemical Latam (Portal B2B Conectado, 2 Pedidos).
+  - Box "Disparo Consolidado por Fornecedor": ao acionar [F9], o sistema
+    separa 3 minutas de compra divididas automaticamente por CNPJ homologado.
+
+3.7 CRUD / REGRAS VISÍVEIS
+  - Seleção múltipla por checkbox com soma automática de custo e contador
+    "(N selecionados)".
+  - F9 gera ordens de compra (JS: alert "3 Ordens de Fornecimento foram
+    roteadas"); Ctrl+E exporta .xlsx; Ctrl+P imprime (window.print()).
+  - Regra de negócio exposta: sugestão de lote econômico baseada em
+    giro diário × lead-time (prazo médio ponderado 3.2 dias).
+
+--------------------------------------------------------------------------------
+DESTAQUES CRUZADOS DOS TERMOS SOLICITADOS
+--------------------------------------------------------------------------------
+  - Bobinas: central em 4.1 (KPI "Bobinas em Linha", categorias "Bobinas &
+    Lonas", local "Porta-Bobina A3/A1") e 4.2 (campo "Insumo/Bobina/
+    Substrato", módulo de retalho/sobra de rolo).
+  - Kardex: em 4.1 (ações "Kardex/Histórico", botão "Extrato Kardex") e
+    tela inteira 4.2 (grade "Ficha Kardex", F10 "Salvar Kardex").
+  - Saldo: colunas "Saldo Atual" (4.1, 4.3), "Saldo Projetado"/raciocínio de
+    saldo no formulário (4.2).
+  - Reservado: não há coluna explícita de "reservado"; há "ponto de pedido"
+    e "O.S. aguardando" como proxy de compromissos.
+  - Estoque mínimo: coluna "Est. Mínimo" (4.3) e "Mín:" nos badges de status
+    (4.1); filtro "Abaixo do Mínimo (12)".
+  - Giro mensal: "Média de Giro: 18.4 dias" (4.2), "Giro Diário" (4.3),
+    "Curva de consumo últimos 30 dias" (4.3), consumo médio (4.1).
+  - Reposição: botões "Relat. Reposição [F7]" (4.1), "Reposição Crítica"
+    (4.1), tela 4.3 inteira ("Relatório de Reposição", "Emitir Ordem de
+    Reposição [F9]", sugestões de lote).
+  - Categoria: abas/ badges de categoria (Papéis, Bobinas & Lonas, Toners,
+    Chapas & CTP, Acabamento, Comunicação Visual) em 4.1; filtros por
+    matéria-prima em 4.3.
+  - Fornecedor: "Fornecedor Homologado" + prazo de entrega (4.1); coluna
+    "Fornecedor Homologado" com CNPJ (4.3); "Canal Direto de Suprimentos"
+    (4.3).
+  - Custo médio: coluna "Custo Médio" (4.1); "Custo Médio R$ 3,60/m" e col.
+    "Custo Unit." (4.2); "Cálculo Custo Médio Ponderado: Ativo" (4.1);
+    "Custo Est." (4.3).
+  - Valor de estoque: "Avaliação Total R$ 148.920,45" (4.1), "Valor Total"
+    por item (4.1), "Valoração Atual do Estoque" R$ 450,00 (4.2), "Valor
+    Estimado Reposição" e "Total Selecionado" (4.3).
+
+MODÚLO QUE REPRESENTA: "Estoque e Bobinas" (submodulo central de
+Almoxarifado & Produção / Módulo Operacional), integrado ao fluxo de
+Pedidos de Compra, O.S. (baixas por produção) e PDV (vendas de balcão).
