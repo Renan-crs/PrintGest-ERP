@@ -33,15 +33,19 @@ def listar(
     filial_id: int | None,
     q: str | None = None,
     campos_busca: list[str] | None = None,
+    filtros: dict[str, str] | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[ModelT], int]:
     query = _pagina(db, model, filial_id=filial_id)
-    total = query.count()
+    for campo, valor in (filtros or {}).items():
+        if hasattr(model, campo):
+            query = query.filter(getattr(model, campo) == valor)
     termo = (q or "").strip()
     if termo and campos_busca and hasattr(model, "id"):
-        filtros = [getattr(model, campo).ilike(f"%{termo}%") for campo in campos_busca]
-        query = query.filter(or_(*filtros))
+        ilike = [getattr(model, campo).ilike(f"%{termo}%") for campo in campos_busca]
+        query = query.filter(or_(*ilike))
+    total = query.count()
     items = query.order_by(model.id.desc()).limit(limit).offset(offset).all()
     return items, total
 

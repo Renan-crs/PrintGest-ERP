@@ -13,7 +13,7 @@ RBAC: o menor nível informado é exigido em todas as rotas do router (via Depen
 
 from typing import Any, Generic, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from app.deps import DbDep, FilialDep
@@ -42,6 +42,7 @@ def criar_router_crud(
     schema_update: type[UpdateT],
     schema_out: type[OutT],
     campos_busca: list[str],
+    campos_filtro: list[str] | None = None,
     tags: list[str],
     nivel_acesso: NivelAcesso = NivelAcesso.OPERADOR,
 ) -> APIRouter:
@@ -58,6 +59,7 @@ def criar_router_crud(
 
     @router.get("")
     def lista(
+        request: Request,
         db: DbDep,
         filial: FilialDep,
         q: str | None = None,
@@ -66,12 +68,20 @@ def criar_router_crud(
     ) -> ListaResponse[OutT]:
         limite = min(max(limit, 1), 200)
         desloc = max(offset, 0)
+        # Filtros por campo (ex.: `tipo_pessoa=pj`); só os campos declarados na
+        # rota são aceitos — campos desconhecidos são ignorados (whitelist).
+        filtros = {}
+        for campo in campos_filtro or []:
+            valor = request.query_params.get(campo)
+            if valor is not None and valor.strip():
+                filtros[campo] = valor.strip()
         itens, total = listar(
             db,
             model,
             filial_id=filial,
             q=q,
             campos_busca=campos_busca,
+            filtros=filtros,
             limit=limite,
             offset=desloc,
         )

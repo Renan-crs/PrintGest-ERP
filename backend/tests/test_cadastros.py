@@ -50,6 +50,31 @@ def test_cliente_busca_rapida(client, admin_token):
     assert nome in nomes
 
 
+def test_cliente_filtra_por_tipo_pessoa(client, admin_token):
+    nome_pf = f"Filtro PF {_u()}"
+    nome_pj = f"Filtro PJ {_u()}"
+    for nome, tipo in ((nome_pf, "pf"), (nome_pj, "pj")):
+        criado = client.post(
+            "/v1/clientes",
+            headers=auth(client, admin_token),
+            json={"nome_razao": nome, "tipo_pessoa": tipo},
+        )
+        assert criado.status_code == 200, criado.text
+
+    resp = client.get(
+        "/v1/clientes",
+        params={"tipo_pessoa": "pj", "limit": 200},
+        headers=auth(client, admin_token),
+    )
+    assert resp.status_code == 200
+    corpo = resp.json()
+    por_nome = {c["nome_razao"]: c["tipo_pessoa"] for c in corpo["data"]}
+    assert all(tipo == "pj" for tipo in por_nome.values())
+    assert nome_pj in por_nome
+    assert nome_pf not in por_nome
+    assert corpo["meta"]["total"] == len(corpo["data"])
+
+
 def test_cliente_detalhe_404(client, admin_token):
     resp = client.get("/v1/clientes/999999", headers=auth(client, admin_token))
     assert resp.status_code == 404
