@@ -41,6 +41,7 @@ clientes = criar_router_crud(
     schema_update=ClienteUpdate,
     schema_out=ClienteOut,
     campos_busca=["nome_razao", "cpf_cnpj", "email", "telefone", "celular"],
+    campos_filtro=["tipo_pessoa"],
     tags=["cadastros"],
 )
 
