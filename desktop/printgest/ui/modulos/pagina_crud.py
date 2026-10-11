@@ -132,8 +132,10 @@ class PaginaCrud(QWidget):
         layout.addWidget(self._busca, 1)
 
         self._btn_filtros: dict[str, QPushButton] = {}
+        self._filtros_widget = None
         if self.FILTROS:
             filtros = QWidget()
+            self._filtros_widget = filtros
             fluxo = FlowLayout(filtros, espaco_h=8, espaco_v=8)
             for valor, rotulo in self.FILTROS:
                 botao = QPushButton(rotulo)
