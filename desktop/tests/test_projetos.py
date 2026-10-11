@@ -1,18 +1,24 @@
 """Testes do menu Projetos: visões Quadro (Kanban) e Lista.
 
 O quadro reusa `/v1/os` (1 projeto = 1 O.S., tipo `os`) — uma consulta por
-etapa — e o cartão abre o registro na visão Lista. O calendário e o arrastar
-entre colunas ficam fora desta entrega (ver docs/revisao_projetos.md).
+etapa — e o cartão abre o registro na visão Lista. O arrastar-e-soltar entre
+colunas usa `PATCH /v1/os/{id}/status` (mesma regra de transição do formulário).
+O calendário segue fora desta entrega (ver docs/revisao_projetos.md).
 """
 
 from __future__ import annotations
 
+import copy
+import json
+
 import httpx
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QMimeData, QPointF, Qt
+from PySide6.QtGui import QDropEvent
+from PySide6.QtWidgets import QLabel, QMessageBox, QVBoxLayout, QWidget
 
 from printgest.core.api import Api
+from printgest.ui.kanban import MIME_CARTAO
 from printgest.ui.modulos.os import PaginaProjetos
 
 _OSS = [
@@ -54,13 +60,34 @@ _FUNCIONARIOS = [{"id": 10, "nome": "Vina", "e_vendedor": True, "e_atendente": T
 _PRODUTOS = [{"id": 5, "codigo": "B015", "nome": "Adesivo", "preco_venda": "10.00"}]
 
 _GETS: list[httpx.Request] = []
+_PATCHES: list[httpx.Request] = []
+
+# Espelho local da regra de transição do backend (OsStatus) só para o teste
+# decidir o 200/400 do `PATCH /v1/os/{id}/status`.
+_TRANSICOES = {
+    "aberto": {"aprovado", "producao", "pronta", "entregue", "cancelado"},
+    "aprovado": {"producao", "pronta", "entregue", "cancelado"},
+    "producao": {"pronta", "entregue", "cancelado"},
+    "pronta": {"entregue", "cancelado"},
+    "entregue": set(),
+    "cancelado": set(),
+}
+
+# `oss` é a cópia mutável usada pelo handler (a `_OSS` é o molde).
+ESTADO: dict = {"oss": []}
+
+
+@pytest.fixture(autouse=True)
+def _dados_limpos():
+    ESTADO["oss"] = copy.deepcopy(_OSS)
+    yield
 
 
 def _handler(request: httpx.Request) -> httpx.Response:
     if request.method == "GET" and request.url.path == "/v1/os":
         _GETS.append(request)
         params = request.url.params
-        linhas = _OSS
+        linhas = ESTADO["oss"]
         if params.get("tipo"):
             linhas = [o for o in linhas if o["tipo"] == params["tipo"]]
         if params.get("status"):
@@ -68,9 +95,25 @@ def _handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200, json={"data": linhas, "meta": {"total": len(linhas), "limit": 200, "offset": 0}}
         )
+    if request.method == "PATCH" and request.url.path.endswith("/status"):
+        _PATCHES.append(request)
+        ident = int(request.url.path.split("/")[3])
+        novo = json.loads(request.content)["status"]
+        alvo = next((o for o in ESTADO["oss"] if o["id"] == ident), None)
+        if alvo is None:
+            return httpx.Response(404, json={"detail": "O.S. inexistente"})
+        if novo not in _TRANSICOES.get(alvo["status"], set()):
+            return httpx.Response(
+                400,
+                json={
+                    "detail": f"Transição de status inválida: {alvo['status']} → {novo}."
+                },
+            )
+        alvo["status"] = novo
+        return httpx.Response(200, json={"data": alvo})
     if request.method == "GET" and request.url.path.startswith("/v1/os/"):
         ident = int(request.url.path.rsplit("/", 1)[1])
-        dado = next(o for o in _OSS if o["id"] == ident)
+        dado = next(o for o in ESTADO["oss"] if o["id"] == ident)
         return httpx.Response(200, json={"data": dado})
     if request.url.path == "/v1/clientes":
         return httpx.Response(200, json={"data": _CLIENTES, "meta": {"total": 2, "limit": 50, "offset": 0}})
@@ -83,9 +126,24 @@ def _handler(request: httpx.Request) -> httpx.Response:
 
 def _pagina(modo_leitura: bool = False) -> PaginaProjetos:
     _GETS.clear()
+    _PATCHES.clear()
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
     return PaginaProjetos(api, modo_leitura=modo_leitura)
+
+
+def _soltar(coluna, item_id) -> None:
+    """Simula o soltar de um cartão sobre a coluna (o drop real do Qt)."""
+    dados = QMimeData()
+    dados.setData(MIME_CARTAO, str(item_id).encode("utf-8"))
+    evento = QDropEvent(
+        QPointF(12, 12),
+        Qt.DropAction.MoveAction,
+        dados,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    coluna.dropEvent(evento)
 
 
 @pytest.fixture
@@ -228,3 +286,77 @@ def test_quadro_sem_rolagem_horizontal(app, pumpar, largura, altura, escala):
     tabela = pagina._tabela
     assert tabela.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
     container.close()
+
+
+# ------------------------------------------------ arrastar-e-soltar (Quadro)
+def test_cartao_conhece_origem_e_destinos(pagina):
+    cartao = pagina._quadro.coluna("pronta").cartoes()[0]
+    assert cartao.coluna_origem == "pronta"
+    assert cartao.arrastavel is True
+    assert [chave for chave, _rotulo in cartao.destinos] == [
+        "aguardando",
+        "producao",
+        "pronta",
+        "entregue",
+    ]
+
+
+def test_arraste_carrega_o_id_no_mime(pagina):
+    cartao = pagina._quadro.coluna("producao").cartoes()[0]
+    assert cartao.id_registro == 3
+    arraste = cartao._preparar_arraste()
+    assert bytes(arraste.mimeData().data(MIME_CARTAO)) == b"3"
+
+
+def test_soltar_em_outra_coluna_avanca_status(pagina, pumpar):
+    # Cartão 3 está "producao"; soltar em "pronta" → PATCH status "pronta".
+    _soltar(pagina._quadro.coluna("pronta"), 3)
+    pumpar(lambda: pagina._quadro.coluna_do(3) == "pronta")
+
+    assert _PATCHES[-1].url.path == "/v1/os/3/status"
+    assert json.loads(_PATCHES[-1].content)["status"] == "pronta"
+    assert next(o for o in ESTADO["oss"] if o["id"] == 3)["status"] == "pronta"
+
+
+def test_soltar_na_mesma_coluna_nao_chama_api(pagina):
+    _soltar(pagina._quadro.coluna("producao"), 3)
+    assert _PATCHES == []
+
+
+def test_menu_mover_dispara_a_mesma_rota(pagina, pumpar):
+    cartao = pagina._quadro.coluna("producao").cartoes()[0]
+    cartao.mover_solicitado.emit(cartao.id_registro, "pronta")
+    pumpar(lambda: pagina._quadro.coluna_do(3) == "pronta")
+    assert json.loads(_PATCHES[-1].content)["status"] == "pronta"
+
+
+def test_mover_para_tras_avisa_e_reverte(pagina, pumpar, monkeypatch):
+    avisos: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: avisos.append(a[1]))
+    # Cartão 5 está "entregue"; a transição para "pronta" é recusada pelo backend.
+    _soltar(pagina._quadro.coluna("pronta"), 5)
+    pumpar(lambda: bool(avisos))
+    assert pagina._quadro.coluna_do(5) == "entregue"
+    assert len(_PATCHES) == 1
+    assert next(o for o in ESTADO["oss"] if o["id"] == 5)["status"] == "entregue"
+    assert "Não foi possível mover" in avisos
+
+
+def test_modo_leitura_bloqueia_arraste_e_movimento(app, pumpar, monkeypatch):
+    avisos: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: avisos.append(a[1]))
+    pagina = _pagina(modo_leitura=True)
+    pumpar(lambda: pagina._quadro.contagem("aguardando") == 2)
+
+    coluna = pagina._quadro.coluna("producao")
+    assert coluna.acceptDrops() is False
+    cartao = coluna.cartoes()[0]
+    assert cartao.arrastavel is False
+    assert cartao.destinos == []
+
+    # Soltar (não aceito) não dispara nada; tentar mover pelo menu avisa e não grava.
+    _soltar(coluna, cartao.id_registro)
+    assert _PATCHES == []
+    pagina._mover_projeto(cartao.id_registro, "pronta")
+    assert _PATCHES == []
+    assert "Modo leitura" in avisos
