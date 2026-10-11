@@ -1,3 +1,8 @@
+from app.schemas.agendamento import (
+    AgendamentoCreate,
+    AgendamentoOut,
+    AgendamentoUpdate,
+)
 from app.schemas.auth import LoginIn, LoginOut, TrocarSenhaIn, UsuarioSessaoOut
 from app.schemas.cadastros import (
     CategoriaCreate,
@@ -47,6 +52,9 @@ from app.schemas.licenca import LicencaAtivarIn, LicencaSituacaoOut
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
 
 __all__ = [
+    "AgendamentoCreate",
+    "AgendamentoOut",
+    "AgendamentoUpdate",
     "LoginIn",
     "LoginOut",
     "TrocarSenhaIn",

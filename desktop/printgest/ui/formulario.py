@@ -7,9 +7,9 @@ simples usada antes do POST).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, QTime
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -207,6 +208,56 @@ class CampoData(CampoForm):
             self._data.setDate(d)
             if self._aceita_sem_data:
                 self._sem.setChecked(False)
+
+    def habilitar(self, ligado: bool) -> None:
+        self._caixa.setEnabled(ligado)
+
+
+class CampoDataHora(CampoForm):
+    """Data + hora em dois controles lado a lado (início/fim de um agendamento)."""
+
+    def __init__(self, rotulo: str, obrigatorio: bool = True) -> None:
+        super().__init__(rotulo)
+        self._obrigatorio_fixo = obrigatorio
+        self._data = QDateEdit()
+        self._data.setCalendarPopup(True)
+        self._data.setDisplayFormat("dd/MM/yyyy")
+        self._data.setDate(QDate.currentDate())
+        self._hora = QTimeEdit()
+        self._hora.setDisplayFormat("HH:mm")
+        self._hora.setTime(QTime(9, 0))
+        caixa = QWidget()
+        linha = QHBoxLayout(caixa)
+        linha.setContentsMargins(0, 0, 0, 0)
+        linha.setSpacing(8)
+        linha.addWidget(self._data, 1)
+        linha.addWidget(self._hora, 1)
+        self._caixa = caixa
+
+    @property
+    def widget(self) -> QWidget:
+        return self._caixa
+
+    def valor(self) -> datetime | None:
+        d = self._data.date()
+        if not d.isValid():
+            return None
+        t = self._hora.time()
+        return datetime(d.year(), d.month(), d.day(), t.hour(), t.minute())
+
+    def definir(self, valor) -> None:
+        if valor is None or valor == "":
+            self._data.setDate(QDate.currentDate())
+            self._hora.setTime(QTime(9, 0))
+            return
+        if isinstance(valor, datetime):
+            dt = valor
+        else:
+            dt = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+            if dt.tzinfo is not None:
+                dt = dt.astimezone().replace(tzinfo=None)
+        self._data.setDate(QDate(dt.year, dt.month, dt.day))
+        self._hora.setTime(QTime(dt.hour, dt.minute))
 
     def habilitar(self, ligado: bool) -> None:
         self._caixa.setEnabled(ligado)

@@ -141,6 +141,43 @@ class Api:
         )
         return self._tratar(resp)
 
+    # --------------------------------------------------------- agendamento
+
+    def listar_agendamentos(
+        self,
+        inicio: str | None = None,
+        fim: str | None = None,
+        tipo: str | None = None,
+        status: str | None = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> dict:
+        """Janela de datas (ISO) para o calendário: `GET /v1/agendamento`."""
+        return self.listar_com_filtros(
+            "agendamento",
+            inicio=inicio,
+            fim=fim,
+            tipo=tipo,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+
+    def criar_agendamento(self, payload: dict) -> dict:
+        return self._post("/v1/agendamento", payload)
+
+    def obter_agendamento(self, item_id: int) -> dict:
+        return self._get(f"/v1/agendamento/{item_id}")
+
+    def atualizar_agendamento(self, item_id: int, payload: dict) -> dict:
+        return self._put(f"/v1/agendamento/{item_id}", payload)
+
+    def concluir_agendamento(self, item_id: int) -> dict:
+        return self._patch(f"/v1/agendamento/{item_id}/concluir")
+
+    def remover_agendamento(self, item_id: int) -> None:
+        self._delete(f"/v1/agendamento/{item_id}")
+
     # ------------------------------------------------------------ estoque
 
     def consulta_estoque(
@@ -354,6 +391,12 @@ class Api:
 
     def _put(self, path: str, payload: dict, token: str | None = None) -> dict:
         resp = self._cliente.put(path, json=payload, headers=self._headers(token))
+        return self._tratar(resp)
+
+    def _patch(self, path: str, payload: dict | None = None, token: str | None = None) -> dict:
+        resp = self._cliente.patch(
+            path, json=payload or {}, headers=self._headers(token)
+        )
         return self._tratar(resp)
 
     def _delete(self, path: str, token: str | None = None) -> None:

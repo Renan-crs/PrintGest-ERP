@@ -389,6 +389,27 @@ QFrame#cartaoKanban:hover { border-color: %primary%; }
 QFrame#cartaoKanban:focus { border: 2px solid %primary%; }
 QLabel#tituloCartao { font-weight: 700; }
 
+/* Calendário mensal (Agendamento) — grade de 6 semanas, sem rolagem lateral. */
+QWidget[role="painelDia"] {
+    background-color: %surface-muted%;
+    border: 1px solid %borda%;
+    border-radius: 8px;
+}
+QPushButton[navCalendario="true"] { padding: 4px 12px; }
+QPushButton[chipEvento="true"] {
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-size: 11px;
+    text-align: left;
+}
+QPushButton[chipEvento="true"][chipTipo="primary"] { background-color: %primary%; color: %on-primary%; }
+QPushButton[chipEvento="true"][chipTipo="success"] { background-color: %sucesso-container%; color: %sucesso%; border: 1px solid %sucesso%; }
+QWidget[celulaDia="true"] { background-color: %surface%; border: 1px solid %borda%; border-radius: 6px; }
+QWidget[celulaDia="true"][foraDoMes="true"] { background-color: %surface-muted%; }
+QWidget[celulaDia="true"]:hover { border-color: %primary%; }
+QWidget[celulaDia="true"][selecionada="true"] { border: 2px solid %primary%; }
+QWidget[celulaDia="true"][hoje="true"] { border: 2px solid %sucesso%; }
+
 /* Botão de ação compacto dentro de uma linha da grade (ex.: Cancelar). */
 QPushButton#acaoLinha {
     padding: 3px 10px;
