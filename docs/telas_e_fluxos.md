@@ -23,6 +23,7 @@ Baseado no PRD v2.0 (escopo MVP: 5 estações, 1 filial, licenciamento online-fi
 - Ordem de Serviço — Lista (com filtro por status)
 - Ordem de Serviço — Formulário (dados do cliente, itens, valores, status)
 - Orçamento — Formulário (mesma base da OS, com opção "converter em OS")
+- Projetos — Quadro (Kanban por etapa) e Lista (1 projeto = 1 O.S., tipo `os`)
 - Venda Balcão — Tela de Venda (busca rápida de produto, totalizador, forma de pagamento)
 - Pedido de Compra — Lista
 - Pedido de Compra — Formulário (fornecedor, itens, previsão de entrega)
@@ -234,15 +235,18 @@ No **PDV**, com o foco dentro da página:
 | `Ctrl+F` | Foca a busca da visão ativa (produto na *Nova venda*; vendas no *Histórico*) |
 | `Enter` (na busca de produto) | Adiciona o item selecionado |
 
-Nas telas de **cadastro** (Clientes, Fornecedores, Produtos & Serviços, O.S.),
-com o foco dentro da página:
+Nas telas de **cadastro** (Clientes, Fornecedores, Produtos & Serviços, O.S.) e em
+**Projetos**, com o foco dentro da página:
 
 | Tecla | Ação |
 | --- | --- |
-| `F6` | Novo registro (limpa o formulário e foca o primeiro campo) |
+| `F6` | Novo registro (limpa o formulário e foca o primeiro campo) — em Projetos, "Novo Projeto" |
 | `F10` | Salvar alterações |
 | `Esc` | Cancelar a edição (limpa o formulário) |
 | `Ctrl+F` | Foca a busca da lista |
+
+No **Quadro** de Projetos (visão Kanban), os cartões são focáveis: `Tab` percorre
+as etapas e `Enter`/`Espaço` abrem o projeto na visão Lista.
 
 > Os atalhos globais `F2`/`F3`/`F5` continuam valendo em qualquer tela; o `F6`
 > de cada cadastro é local e não colide com o `F6` do PDV (que alterna para

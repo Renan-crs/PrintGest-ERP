@@ -354,6 +354,37 @@ QPushButton#chaveRapida {
 QPushButton#chaveRapida:hover { border-color: %primary%; color: %texto%; }
 QPushButton#chaveRapida:checked { background-color: %primary%; border-color: %primary%; color: #FFFFFF; }
 
+/* Quadro Kanban (Projetos) — uma coluna por etapa, cartões sem corte. */
+QScrollArea#areaQuadro { background: transparent; border: none; }
+QFrame#colunaKanban {
+    background-color: %surface-muted%;
+    border: 1px solid %borda%;
+    border-radius: 10px;
+}
+QLabel#tituloColunaKanban {
+    font-size: 11px;
+    font-weight: 700;
+    color: %texto-muted%;
+    letter-spacing: 0.04em;
+}
+QLabel#contagemKanban {
+    background-color: %surface%;
+    border: 1px solid %borda-forte%;
+    border-radius: 999px;
+    color: %texto-muted%;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 8px;
+}
+QFrame#cartaoKanban {
+    background-color: %surface%;
+    border: 1px solid %borda%;
+    border-radius: 8px;
+}
+QFrame#cartaoKanban:hover { border-color: %primary%; }
+QFrame#cartaoKanban:focus { border: 2px solid %primary%; }
+QLabel#tituloCartao { font-weight: 700; }
+
 /* Botão de ação compacto dentro de uma linha da grade (ex.: Cancelar). */
 QPushButton#acaoLinha {
     padding: 3px 10px;
