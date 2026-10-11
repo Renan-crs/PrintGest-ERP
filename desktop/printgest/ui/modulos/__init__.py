@@ -26,7 +26,7 @@ from printgest.ui.modulos.venda_balcao import PaginaVendaBalcao
 
 
 def criar_pagina(
-    item_id: str, rotulo: str, api: Api, modo_leitura: bool
+    item_id: str, rotulo: str, api: Api, modo_leitura: bool, nivel: str | None = None
 ) -> QWidget:
     """Fábrica de páginas por item de menu (§1). Itens não entregues caem no placeholder."""
     paginas = {
@@ -49,4 +49,7 @@ def criar_pagina(
     construtora = paginas.get(item_id, PaginaEmConstrucao)
     if construtora is PaginaEmConstrucao:
         return PaginaEmConstrucao(rotulo)
+    if construtora is PaginaVendaBalcao:
+        # O PDV usa o nível para esconder ações que o perfil não pode executar.
+        return PaginaVendaBalcao(api, modo_leitura=modo_leitura, nivel=nivel)
     return construtora(api, modo_leitura=modo_leitura)

@@ -180,7 +180,7 @@ def test_consulta_carrega_grade_filtra_e_kpis(app, pumpar):
     )
     assert pagina._contador.text() == "2 registros"
     assert pagina._badges_kpi["itens"].text() == "Itens: 842"
-    assert "R$ 148920,45" in pagina._badges_kpi["valor"].text()
+    assert "R$ 148.920,45" in pagina._badges_kpi["valor"].text()
     assert pagina._badges_kpi["bobinas"].text() == "Bobinas: 38"
     assert pagina._badges_kpi["abaixo"].text() == "Abaixo mín.: 12"
 

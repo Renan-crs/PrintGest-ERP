@@ -253,6 +253,7 @@ def formatar_moeda(valor) -> str:
     except (InvalidOperation, ValueError):
         return texto
     inteiro, _, decimais = f"{abs(dec):.2f}".partition(".")
+    inteiro = f"{int(inteiro):,}".replace(",", ".")
     sinal = "-" if dec < 0 else ""
     return f"{sinal}R$ {inteiro},{decimais}"
 

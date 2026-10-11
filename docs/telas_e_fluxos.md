@@ -214,6 +214,30 @@ Tela Principal
       [Fim]
 ```
 
+### 3.4 Atalhos do teclado
+
+Atalhos **globais** (ativos em qualquer tela, respeitando o RBAC — só navegam
+para módulos que o usuário pode abrir):
+
+| Tecla | Ação |
+| --- | --- |
+| `F2` | Abre **Clientes** |
+| `F3` | Abre **Produtos** |
+| `F5` | Abre **PDV** (Venda Balcão) |
+
+No **PDV**, com o foco dentro da página:
+
+| Tecla | Ação |
+| --- | --- |
+| `F6` | Alterna para **Nova venda** |
+| `F9` | **Finalizar venda** |
+| `Ctrl+F` | Foca a busca da visão ativa (produto na *Nova venda*; vendas no *Histórico*) |
+| `Enter` (na busca de produto) | Adiciona o item selecionado |
+
+> Nas telas de cadastro (Clientes, Produtos, O.S.) os atalhos indicados ao lado
+> dos botões (`F6` Novo, `Esc` Cancelar, `F9` ação principal) são pistas visuais;
+> a navegação por teclado garantida hoje é a da tabela acima.
+
 ---
 
 ## 4. Observações de Design

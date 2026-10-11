@@ -18,6 +18,10 @@ from printgest.ui.formulario import formatar_percentual
 class CondicaoPagamentoCliente:
     """Fonte única da regra de confirmação de pagamento para a UI."""
 
+    # Primeira opção do combo de clientes (ex.: venda balcão usa "Consumidor
+    # final"); O.S. deixa vazio porque o cliente é obrigatório.
+    CLIENTE_OPCAO_PADRAO: tuple | None = None
+
     def _iniciar_condicao_pagamento(self) -> None:
         self._cliente_flags: dict = {}
 
@@ -38,7 +42,10 @@ class CondicaoPagamentoCliente:
             )
             for r in dados
         }
-        self._cliente.alterar_opcoes([(r["id"], r["nome_razao"]) for r in dados])
+        opcoes = [(r["id"], r["nome_razao"]) for r in dados]
+        if self.CLIENTE_OPCAO_PADRAO is not None:
+            opcoes.insert(0, self.CLIENTE_OPCAO_PADRAO)
+        self._cliente.alterar_opcoes(opcoes)
         self._cliente_mudou()
 
     def _cliente_mudou(self) -> None:
@@ -46,11 +53,11 @@ class CondicaoPagamentoCliente:
             self._cliente.valor(), (False, False, None)
         )
         if adiantado:
-            texto = "Recebimento confirmado — pagamento adiantado (total)"
+            texto = "Pagamento já recebido — adiantamento (total)"
         elif sinal:
-            texto = f"Recebimento confirmado — sinal de {formatar_percentual(pct)}%"
+            texto = f"Pagamento já recebido — sinal de {formatar_percentual(pct)}%"
         else:
-            texto = "Recebimento confirmado (sem exigência do cliente)"
+            texto = "Pagamento já recebido"
         self._pagamento_confirmado.widget.setText(texto)
 
     def _exigencia_pendente(self) -> str | None:

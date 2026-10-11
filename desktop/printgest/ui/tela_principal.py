@@ -1,13 +1,14 @@
 """Tela Principal (mockups 2.x): shell de navegação do ERP desktop.
 
-- Cabeçalho: marca, filial, busca global (clientes/produtos/O.S.), status de
-  licença (3 estados), usuário + nível e sair.
+- Cabeçalho: marca, filial, indicador de servidor local, busca global
+  (clientes/produtos/O.S.), sino (alertas), engrenagem (preferências), licença
+  clicável e um único menu de usuário (preferências/trocar senha/sair).
 - Barra lateral: menu por módulos (§3.2 telas_e_fluxos) filtrado por RBAC
-  (oculta itens sem permissão, conforme observação de design §4), com botão de
-  colapso e atalhos rápidos ("Nova Venda Balcão", "Nova O.S.").
+  (oculta itens sem permissão, conforme observação de design §4) e botão de
+  colapso. As ações de criação ficam só no "Acesso rápido" do Início.
 - Área central: `QStackedWidget` com a página ativa (Início ou módulo).
-- Rodapé: relógio, estação (hostname), conectividade do daemon e atalhos
-  globais (F2 clientes, F3 produtos, F5 PDV) + versão.
+- Rodapé: relógio, estação (hostname), conectividade do servidor local e
+  atalhos globais (F2 clientes, F3 produtos, F5 PDV) + versão.
 - Em modo leitura, exibe banner amber e repassa o estado às páginas (a API
   também reforça com 423).
 """
@@ -21,14 +22,20 @@ from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
+    QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -46,10 +53,16 @@ from printgest.core.tarefas import rodar
 from printgest.ui.busca_global import BuscaGlobal
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
-from printgest.ui.widgets import aplicar_estilo, badge
+from printgest.ui.widgets import ElideLabel, FlowLayout, aplicar_estilo, badge
 
 ITEM_INICIO = "inicio"
 _COR_ATRASO = QColor("#dc2626")
+_PERFIL_CURTO = {
+    "admin": "Admin",
+    "gerente": "Gerente",
+    "operador": "Operador",
+    "caixa": "Caixa",
+}
 
 
 def _eh_gerente_ou_mais(nivel: str) -> bool:
@@ -61,7 +74,13 @@ def _eh_operador_ou_mais(nivel: str) -> bool:
 
 
 class PaginaInicial(QWidget):
-    """Tela Início (v2.1 §2.2) — saudação, cards, acesso rápido, entregas e faturamento."""
+    """Tela Início (v2.1 §2.2) — saudação, 3 KPIs, acesso rápido, entregas,
+    faturamento e indicador de estoque crítico.
+
+    O conteúdo fica dentro de um `QScrollArea` (scroll vertical quando a janela
+    for menor que o conteúdo) e os cartões usam layouts/`QSizePolicy` — nunca
+    altura fixa.
+    """
 
     filial_obtida = Signal(str)
     navegar = Signal(str)
@@ -76,17 +95,24 @@ class PaginaInicial(QWidget):
         self._modo_leitura = modo_leitura
         self._dias = 7
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(10)
+        raiz = QVBoxLayout(self)
+        raiz.setContentsMargins(0, 0, 0, 0)
+        raiz.setSpacing(0)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        conteudo = QWidget()
+        self._scroll.setWidget(conteudo)
+        raiz.addWidget(self._scroll)
 
-        saudacao = QLabel(self._saudacao(nome_usuario))
+        layout = QVBoxLayout(conteudo)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(12)
+
+        saudacao = ElideLabel(self._saudacao(nome_usuario))
         saudacao.setObjectName("titulo")
         layout.addWidget(saudacao)
-
-        self._lbl_relogio_pagina = QLabel(datetime.now().strftime("%H:%M"))
-        self._lbl_relogio_pagina.setObjectName("subtitulo")
-        layout.addWidget(self._lbl_relogio_pagina)
 
         if modo_leitura:
             aviso = QLabel(
@@ -94,30 +120,45 @@ class PaginaInicial(QWidget):
                 "apenas, escrita e emissão fiscal bloqueadas)."
             )
             aviso.setObjectName("bannerLeitura")
+            aviso.setWordWrap(True)
             layout.addWidget(aviso)
 
-        # ------------------------------------------------ cards do resumo
-        self._lbl_vendas_hoje = QLabel("—")
-        self._lbl_valor_hoje = QLabel("—")
-        self._lbl_vendas_ontem = QLabel("—")
-        linha = QHBoxLayout()
-        linha.setSpacing(12)
-        linha.addWidget(self._medidor("Vendas hoje (qtd)", self._lbl_vendas_hoje))
-        linha.addWidget(self._medidor("Vendas hoje (R$)", self._lbl_valor_hoje))
-        linha.addWidget(self._medidor("Ontem", self._lbl_vendas_ontem))
-        if _eh_gerente_ou_mais(nivel):
-            self._lbl_receber_hoje = QLabel("—")
-            self._lbl_receber_atrasado = QLabel("—")
-            linha.addWidget(self._medidor("A receber hoje", self._lbl_receber_hoje))
-            linha.addWidget(self._medidor("A receber atrasado", self._lbl_receber_atrasado))
-        if _eh_operador_ou_mais(nivel):
-            self._lbl_projetos_producao = QLabel("—")
-            self._lbl_projetos_atrasados = QLabel("—")
-            linha.addWidget(self._medidor("Projetos em produção", self._lbl_projetos_producao))
-            linha.addWidget(self._medidor("Projetos atrasados", self._lbl_projetos_atrasados))
-        layout.addLayout(linha)
+        # Alerta de conexão — só aparece quando o servidor local falha (o card
+        # "Status operacional" foi removido do Início para não duplicar info).
+        self._alerta_conexao = QLabel("")
+        self._alerta_conexao.setObjectName("bannerErro")
+        self._alerta_conexao.setWordWrap(True)
+        self._alerta_conexao.setVisible(False)
+        layout.addWidget(self._alerta_conexao)
 
-        # ------------------------------------------------ acesso rápido
+        # ---------------------------------------------------- KPIs (3 cartões)
+        self._kpi_vendas_valor = ElideLabel("—")
+        self._kpi_vendas_sub = ElideLabel("")
+
+        grade = FlowLayout(espaco_h=12, espaco_v=12)
+        self._grade_kpi = grade
+        grade.addWidget(
+            self._cartao_kpi("Vendas hoje", self._kpi_vendas_valor, self._kpi_vendas_sub)
+        )
+        if _eh_gerente_ou_mais(nivel):
+            self._kpi_receber_valor = ElideLabel("—")
+            self._kpi_receber_sub = ElideLabel("")
+            grade.addWidget(
+                self._cartao_kpi("A receber", self._kpi_receber_valor, self._kpi_receber_sub)
+            )
+        if _eh_operador_ou_mais(nivel):
+            self._kpi_projetos_valor = ElideLabel("—")
+            self._kpi_projetos_sub = ElideLabel("")
+            grade.addWidget(
+                self._cartao_kpi(
+                    "Projetos em produção",
+                    self._kpi_projetos_valor,
+                    self._kpi_projetos_sub,
+                )
+            )
+        layout.addLayout(grade)
+
+        # ---------------------------------------------------- acesso rápido
         rapido = QWidget()
         rapido.setObjectName("card")
         rl = QVBoxLayout(rapido)
@@ -130,9 +171,9 @@ class PaginaInicial(QWidget):
         for rotulo, destino in self._atajos_rapidos(nivel):
             botao = QPushButton(rotulo)
             botao.setProperty("role", "primary")
-            botao.clicked.connect(
-                lambda _=False, d=destino: self.navegar.emit(d)
-            )
+            botao.setMinimumHeight(32)
+            botao.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            botao.clicked.connect(lambda _=False, d=destino: self.navegar.emit(d))
             self._botoes_rapidos.append(botao)
             fila.addWidget(botao)
         fila.addStretch(1)
@@ -148,6 +189,7 @@ class PaginaInicial(QWidget):
             el.setSpacing(8)
             el.addWidget(self._cabecalho_card("Entregas de hoje e atrasadas"))
             self._lista_entregas = QListWidget()
+            self._lista_entregas.setMinimumHeight(120)
             self._lista_entregas.itemClicked.connect(
                 lambda _item: self.navegar.emit("projetos")
             )
@@ -158,23 +200,28 @@ class PaginaInicial(QWidget):
         if _eh_gerente_ou_mais(nivel):
             grafico = QWidget()
             grafico.setObjectName("card")
+            grafico.setMinimumHeight(220)
             gl = QVBoxLayout(grafico)
             gl.setContentsMargins(16, 12, 16, 12)
             gl.setSpacing(8)
+            gl.addWidget(self._cabecalho_card("Faturamento"))
             topo = QHBoxLayout()
-            topo.addWidget(self._cabecalho_card("Faturamento — realizado × previsto"))
+            subtitulo = QLabel("Realizado × previsto")
+            subtitulo.setProperty("role", "muted")
+            topo.addWidget(subtitulo)
+            topo.addStretch(1)
             self._combo_dias = QComboBox()
             self._combo_dias.addItem("7 dias", 7)
             self._combo_dias.addItem("30 dias", 30)
             self._combo_dias.currentIndexChanged.connect(self._mudar_dias)
             topo.addWidget(self._combo_dias)
-            topo.addStretch(1)
             ver = QPushButton("Ver relatórios →")
             ver.setProperty("role", "ghost")
             ver.clicked.connect(lambda: self.navegar.emit("relatorios"))
             topo.addWidget(ver)
             gl.addLayout(topo)
-            self._lbl_grafico = QLabel("Aguardando dados de vendas...", wordWrap=True)
+            self._lbl_grafico = ElideLabel("")
+            self._lbl_grafico.setProperty("role", "muted")
             gl.addWidget(self._lbl_grafico)
             self._barras_realizado: list[tuple[QProgressBar, QLabel]] = []
             self._barras_previsto: list[tuple[QProgressBar, QLabel]] = []
@@ -189,7 +236,9 @@ class PaginaInicial(QWidget):
                 gl.addWidget(nome)
                 caixas = QHBoxLayout(container)
                 caixas.setSpacing(6)
+                container.setMinimumHeight(70)
                 gl.addWidget(container)
+            gl.addStretch(1)
             layout.addWidget(grafico)
 
         # ------------------------------------------- estoque crítico (operador+)
@@ -198,26 +247,18 @@ class PaginaInicial(QWidget):
             estoque.setObjectName("card")
             el = QVBoxLayout(estoque)
             el.setContentsMargins(16, 12, 16, 12)
-            el.setSpacing(8)
+            el.setSpacing(6)
             el.addWidget(self._cabecalho_card("Estoque crítico"))
-            self._lbl_estoque = QLabel("Aguardando dados de estoque...", wordWrap=True)
+            self._lbl_estoque = ElideLabel("Aguardando dados de estoque...")
+            self._lbl_estoque.setProperty("role", "muted")
             el.addWidget(self._lbl_estoque)
-            ver = QPushButton("Ver Produtos")
-            ver.setProperty("role", "primary")
-            ver.clicked.connect(lambda: self.navegar.emit("produto"))
-            el.addWidget(ver)
+            self._btn_estoque = QPushButton("Ver Produtos › Estoque")
+            self._btn_estoque.setProperty("link", "true")
+            self._btn_estoque.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._btn_estoque.clicked.connect(lambda: self.navegar.emit("produto"))
+            self._btn_estoque.setVisible(False)
+            el.addWidget(self._btn_estoque)
             layout.addWidget(estoque)
-
-        # ------------------------------------------------------ status operacional
-        status = QWidget()
-        status.setObjectName("card")
-        sl = QVBoxLayout(status)
-        sl.setContentsMargins(16, 12, 16, 12)
-        sl.setSpacing(8)
-        sl.addWidget(self._cabecalho_card("Status operacional"))
-        self._lbl_status = QLabel("Verificando daemon...", wordWrap=True)
-        sl.addWidget(self._lbl_status)
-        layout.addWidget(status)
 
         layout.addStretch(1)
 
@@ -226,11 +267,6 @@ class PaginaInicial(QWidget):
         self._timer_resumo.setInterval(0)
         self._timer_resumo.timeout.connect(self._carregar_resumo)
         self._timer_resumo.start()
-
-        self._timer_relogio_pagina = QTimer(self)
-        self._timer_relogio_pagina.setInterval(30000)
-        self._timer_relogio_pagina.timeout.connect(self._tick_relogio_pagina)
-        self._timer_relogio_pagina.start()
 
     # ------------------------------------------------------ carregamento
 
@@ -257,9 +293,6 @@ class PaginaInicial(QWidget):
         ]
         return [(rotulo, d) for rotulo, d in atalhos if pode_abrir(nivel, d)]
 
-    def _tick_relogio_pagina(self) -> None:
-        self._lbl_relogio_pagina.setText(datetime.now().strftime("%H:%M"))
-
     def _mudar_dias(self) -> None:
         self._dias = int(self._combo_dias.currentData() or 7)
         self._carregar_resumo()
@@ -276,39 +309,60 @@ class PaginaInicial(QWidget):
         if not isinstance(dados, dict):
             self._sem_resumo(str(dados))
             return
-        self._lbl_vendas_hoje.setText(str(dados.get("vendas_hoje_qtd", 0)))
-        self._lbl_valor_hoje.setText(self._moeda(dados.get("vendas_hoje_valor")))
-        self._lbl_vendas_ontem.setText(self._texto_ontem(dados))
+
+        qtd_hoje = self._int(dados.get("vendas_hoje_qtd"))
+        qtd_ontem = self._int(dados.get("vendas_ontem_qtd"))
+        self._kpi_vendas_valor.setText(self._moeda(dados.get("vendas_hoje_valor")))
+        self._kpi_vendas_sub.setText(
+            f"{self._plural(qtd_hoje, 'venda', 'vendas')} · ontem: {qtd_ontem}"
+        )
 
         if dados.get("filial_nome"):
             self.filial_obtida.emit(dados["filial_nome"])
 
         if _eh_gerente_ou_mais(self._nivel):
-            self._lbl_receber_hoje.setText(self._moeda(dados.get("a_receber_vence_hoje")))
-            self._lbl_receber_atrasado.setText(self._moeda(dados.get("a_receber_atrasado")))
+            self._kpi_receber_valor.setText(self._moeda(dados.get("a_receber_vence_hoje")))
+            self._kpi_receber_sub.setText(
+                f"atrasado: {self._moeda(dados.get('a_receber_atrasado'))}"
+            )
             self._preencher_faturamento(
                 dados.get("vendas_7_dias"), dados.get("faturamento_previsto")
             )
 
         if _eh_operador_ou_mais(self._nivel):
-            self._lbl_projetos_producao.setText(
-                str(dados.get("projetos_em_producao", 0))
+            atrasados = self._int(dados.get("projetos_atrasados"))
+            self._kpi_projetos_valor.setText(
+                str(self._int(dados.get("projetos_em_producao")))
             )
-            self._lbl_projetos_atrasados.setText(str(dados.get("projetos_atrasados", 0)))
+            self._kpi_projetos_sub.setText(
+                self._plural(atrasados, "atrasado", "atrasados")
+            )
             self._aplicar_estoque(dados.get("estoque_abaixo_minimo"))
             self._aplicar_entregas(dados.get("entregas_hoje"))
 
     def _aplicar_estoque(self, abaixo) -> None:
         if abaixo is None:
             self._lbl_estoque.setText("Dados de estoque indisponíveis para o seu perfil.")
+            self._lbl_estoque.setProperty("role", "muted")
+            self._btn_estoque.setVisible(False)
+        elif self._int(abaixo) > 0:
+            n = self._int(abaixo)
+            self._lbl_estoque.setText(
+                f"{self._plural(n, 'item', 'itens')} abaixo do mínimo"
+            )
+            self._lbl_estoque.setProperty("role", "atencao")
+            self._btn_estoque.setVisible(True)
         else:
-            self._lbl_estoque.setText(f"{abaixo} item(ns) com saldo abaixo do mínimo.")
+            self._lbl_estoque.setText("Nenhum item abaixo do mínimo")
+            self._lbl_estoque.setProperty("role", "success")
+            self._btn_estoque.setVisible(False)
+        aplicar_estilo(self._lbl_estoque)
 
     def _aplicar_entregas(self, entregas) -> None:
         self._lista_entregas.clear()
         itens = entregas if isinstance(entregas, list) else []
         if not itens:
-            item = QListWidgetItem("Nenhuma entrega para hoje.")
+            item = QListWidgetItem("Nenhuma entrega para hoje ou atrasada.")
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
             self._lista_entregas.addItem(item)
             return
@@ -331,12 +385,6 @@ class PaginaInicial(QWidget):
         prefixo = "⚠ " if e.get("atrasada") else ""
         return f"{prefixo}{cliente} · {servico} · {prazo} · {status}"
 
-    @staticmethod
-    def _texto_ontem(dados: dict) -> str:
-        qtd = dados.get("vendas_ontem_qtd", 0)
-        valor = dados.get("vendas_ontem_valor", 0)
-        return f"{qtd} venda(s) · {formatar_moeda(valor) or 'R$ 0,00'}"
-
     def _preencher_faturamento(self, realizado, previsto) -> None:
         self._preencher_barras(
             self._container_realizado, self._barras_realizado, realizado
@@ -347,9 +395,7 @@ class PaginaInicial(QWidget):
         vazio = (not isinstance(realizado, list) or not realizado) and (
             not isinstance(previsto, list) or not previsto
         )
-        self._lbl_grafico.setText(
-            "Sem dados de faturamento para o período." if vazio else ""
-        )
+        self._lbl_grafico.setText("Sem dados no período" if vazio else "")
 
     def _preencher_barras(self, container, barras_ref, serie) -> None:
         barras_ref.clear()
@@ -382,34 +428,47 @@ class PaginaInicial(QWidget):
             barras_ref.append((barra, dia))
 
     def _status_conexao(self, conectado: bool) -> None:
-        if self._modo_leitura:
-            self._lbl_status.setText("Daemon conectado — sistema em modo leitura.")
-        elif conectado:
-            self._lbl_status.setText(
-                f"Local API Service conectado ({self._api.base_url_display})."
-            )
+        if conectado or self._modo_leitura:
+            self._alerta_conexao.setVisible(False)
         else:
-            self._lbl_status.setText("Local API Service sem resposta — verifique o daemon.")
+            self._alerta_conexao.setText(
+                "Servidor local sem resposta — verifique se o serviço está em execução."
+            )
+            self._alerta_conexao.setVisible(True)
         self.conexao_verificada.emit(conectado)
 
     def _sem_status(self, msg: str) -> None:
-        self._lbl_status.setText(f"Falha ao verificar o daemon: {msg}")
+        self._alerta_conexao.setText(f"Servidor local indisponível: {msg}")
+        self._alerta_conexao.setVisible(True)
         self.conexao_verificada.emit(False)
 
     def _sem_resumo(self, msg) -> None:
-        self._lbl_vendas_hoje.setText("—")
-        self._lbl_valor_hoje.setText("—")
-        self._lbl_vendas_ontem.setText("—")
+        self._kpi_vendas_valor.setText("—")
+        self._kpi_vendas_sub.setText("")
         if _eh_gerente_ou_mais(self._nivel):
-            self._lbl_receber_hoje.setText("—")
-            self._lbl_receber_atrasado.setText("—")
-            self._lbl_grafico.setText("Gráfico de faturamento indisponível no momento.")
+            self._kpi_receber_valor.setText("—")
+            self._kpi_receber_sub.setText("")
+            self._lbl_grafico.setText("Sem dados no período")
         if _eh_operador_ou_mais(self._nivel):
-            self._lbl_projetos_producao.setText("—")
-            self._lbl_projetos_atrasados.setText("—")
+            self._kpi_projetos_valor.setText("—")
+            self._kpi_projetos_sub.setText("")
             self._lbl_estoque.setText("Resumo de estoque indisponível no momento.")
+            self._lbl_estoque.setProperty("role", "muted")
+            self._btn_estoque.setVisible(False)
+            aplicar_estilo(self._lbl_estoque)
 
     # -------------------------------------------------------------- helpers
+
+    @staticmethod
+    def _int(v) -> int:
+        try:
+            return int(v or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _plural(n: int, singular: str, plural: str) -> str:
+        return f"{n} {singular if n == 1 else plural}"
 
     @staticmethod
     def _num(v) -> int:
@@ -439,17 +498,21 @@ class PaginaInicial(QWidget):
         return rotulo
 
     @staticmethod
-    def _medidor(rotulo: str, valor: QLabel) -> QWidget:
+    def _cartao_kpi(titulo: str, valor: QLabel, sub: QLabel) -> QWidget:
         caixa = QWidget()
         caixa.setObjectName("cardLow")
+        caixa.setMinimumWidth(230)
+        caixa.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         layout = QVBoxLayout(caixa)
-        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setContentsMargins(14, 10, 14, 10)
         layout.setSpacing(2)
-        nome = QLabel(rotulo)
+        nome = ElideLabel(titulo)
         nome.setProperty("role", "muted")
         valor.setObjectName("valorCard")
+        sub.setProperty("role", "muted")
         layout.addWidget(nome)
         layout.addWidget(valor)
+        layout.addWidget(sub)
         return caixa
 
 
@@ -473,6 +536,7 @@ class TelaPrincipal(QMainWindow):
         self._base_url = base_url
         self._paginas: dict[str, QWidget] = {}
         self._colapsada = False
+        self._detalhe_licenca = "Licença ainda não verificada."
 
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(1100, 660)
@@ -526,26 +590,99 @@ class TelaPrincipal(QMainWindow):
         self._lbl_filial.setProperty("role", "muted")
         linha.addWidget(self._lbl_filial)
 
-        servidor = badge(f"Daemon: {self._base_url}", "primary")
-        self._lbl_licenca = badge("", "success")
-        linha.addWidget(servidor)
-        linha.addWidget(self._lbl_licenca)
+        # Indicador do servidor local — sem IP:porta exposto (só no tooltip).
+        self._lbl_servidor = QLabel("● Servidor local")
+        self._lbl_servidor.setProperty("role", "muted")
+        self._lbl_servidor.setToolTip(f"Servidor local: {self._base_url}")
+        linha.addWidget(self._lbl_servidor)
         linha.addStretch(1)
 
         self._busca = BuscaGlobal(self._api, self._nivel)
         self._busca.navegar.connect(self._navegar)
         linha.addWidget(self._busca)
 
-        nome = QLabel(self._usuario.get("nome", self._usuario.get("login", "?")))
-        nome.setProperty("role", "muted")
-        linha.addWidget(nome)
-        linha.addWidget(badge(nivel_rotulo(self._nivel)))
+        self._btn_alertas = QPushButton("🔔")
+        self._btn_alertas.setProperty("icone", "true")
+        self._btn_alertas.setToolTip("Central de alertas")
+        self._btn_alertas.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_alertas.clicked.connect(self._abrir_alertas)
+        linha.addWidget(self._btn_alertas)
 
-        sair = QPushButton("Sair")
-        sair.setProperty("role", "ghost")
-        sair.clicked.connect(self._sair)
-        linha.addWidget(sair)
+        self._btn_prefs = QPushButton("⚙")
+        self._btn_prefs.setProperty("icone", "true")
+        self._btn_prefs.setToolTip("Preferências")
+        self._btn_prefs.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_prefs.clicked.connect(self._abrir_preferencias)
+        linha.addWidget(self._btn_prefs)
+
+        self._lbl_licenca = QPushButton("● Licença")
+        self._lbl_licenca.setProperty("role", "atencao")
+        self._lbl_licenca.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lbl_licenca.setToolTip("Situação da licença")
+        self._lbl_licenca.clicked.connect(self._abrir_licenca)
+        linha.addWidget(self._lbl_licenca)
+
+        nome = self._usuario.get("nome") or self._usuario.get("login", "?")
+        perfil = _PERFIL_CURTO.get(self._nivel, self._nivel)
+        self._menu_usuario = QToolButton()
+        self._menu_usuario.setObjectName("menuUsuario")
+        # Quando nome e perfil são o mesmo conceito (ex.: "Administrador"/"Admin",
+        # "Caixa"/"Caixa"), mostra só um — evita repetir a mesma palavra (spec C6).
+        texto_menu = f"{self._iniciais(nome)}  {nome}"
+        nome_norm = nome.strip().casefold()
+        perfil_norm = perfil.strip().casefold()
+        repetido = bool(nome_norm) and bool(perfil_norm) and (
+            nome_norm.startswith(perfil_norm)
+            or perfil_norm.startswith(nome_norm)
+        )
+        if not repetido:
+            texto_menu += f"  · {perfil}"
+        self._menu_usuario.setText(texto_menu)
+        self._menu_usuario.setToolTip(f"{nome} — {nivel_rotulo(self._nivel)}")
+        self._menu_usuario.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._menu_usuario.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(self._menu_usuario)
+        menu.addAction("Preferências", self._abrir_preferencias)
+        menu.addAction("Trocar senha", self._abrir_trocar_senha)
+        menu.addSeparator()
+        menu.addAction("Sair", self._sair)
+        self._menu_usuario.setMenu(menu)
+        linha.addWidget(self._menu_usuario)
         return cabecalho
+
+    @staticmethod
+    def _iniciais(nome: str) -> str:
+        partes = [p for p in str(nome).split() if p]
+        if not partes:
+            return "?"
+        if len(partes) == 1:
+            return partes[0][:2].upper()
+        return (partes[0][0] + partes[-1][0]).upper()
+
+    def _abrir_alertas(self) -> None:
+        menu = QMenu(self)
+        menu.addAction("Nenhum alerta no momento").setEnabled(False)
+        menu.exec(
+            self._btn_alertas.mapToGlobal(self._btn_alertas.rect().bottomLeft())
+        )
+
+    def _abrir_preferencias(self) -> None:
+        alvo = "personalizacao" if pode_abrir(self._nivel, "personalizacao") else "configuracoes"
+        if pode_abrir(self._nivel, alvo):
+            self._navegar(alvo)
+
+    def _abrir_trocar_senha(self) -> None:
+        if pode_abrir(self._nivel, "usuarios"):
+            self._navegar("usuarios")
+        else:
+            QMessageBox.information(
+                self,
+                "Trocar senha",
+                "Solicite ao administrador a alteração da sua senha.",
+            )
+
+    def _abrir_licenca(self) -> None:
+        QMessageBox.information(self, "Licença", self._detalhe_licenca)
 
     def _carregar_licenca(self) -> None:
         rodar(
@@ -558,15 +695,18 @@ class TelaPrincipal(QMainWindow):
         if not isinstance(sit, dict):
             self._sem_licenca("resposta inesperada")
             return
-        self._lbl_licenca.setText(self._texto_licenca(sit, self._modo_leitura))
-        self._lbl_licenca.setProperty("badgeStyle", self._estilo_licenca(sit, self._modo_leitura))
-        aplicar_estilo(self._lbl_licenca)
+        self._pintar_licenca(sit)
 
     def _sem_licenca(self, msg) -> None:
-        self._lbl_licenca.setText(self._texto_licenca({}, self._modo_leitura))
+        self._pintar_licenca({})
+
+    def _pintar_licenca(self, sit: dict) -> None:
+        self._detalhe_licenca = self._texto_licenca(sit, self._modo_leitura)
+        self._lbl_licenca.setText("● Licença")
         self._lbl_licenca.setProperty(
-            "badgeStyle", self._estilo_licenca({}, self._modo_leitura)
+            "role", self._estilo_licenca(sit, self._modo_leitura)
         )
+        self._lbl_licenca.setToolTip(self._detalhe_licenca)
         aplicar_estilo(self._lbl_licenca)
 
     @staticmethod
@@ -636,15 +776,8 @@ class TelaPrincipal(QMainWindow):
 
         layout.addStretch(1)
 
-        # Atalhos rápidos no fim da lateral (RBAC próprio via `pode_abrir`).
-        if pode_abrir(self._nivel, "pdv"):
-            nova_venda = self._botao_menu("Nova Venda Balcão", checkavel=False)
-            nova_venda.clicked.connect(lambda: self._navegar("pdv"))
-            layout.addWidget(nova_venda)
-        if pode_abrir(self._nivel, "projetos"):
-            nova_os = self._botao_menu("Nova OS", checkavel=False)
-            nova_os.clicked.connect(lambda: self._navegar("projetos"))
-            layout.addWidget(nova_os)
+        # As ações de criação ("Nova venda"/"Nova OS/Orçamento") vivem apenas no
+        # "Acesso rápido" do Início — evita duplicar ações com rótulos diferentes.
         return lateral
 
     def _alternar_colapso(self) -> None:
@@ -742,6 +875,8 @@ class TelaPrincipal(QMainWindow):
         self._lbl_conexao.setText("● online" if ok else "○ offline")
         self._lbl_conexao.setProperty("role", "success" if ok else "error")
         aplicar_estilo(self._lbl_conexao)
+        self._lbl_servidor.setProperty("role", "success" if ok else "error")
+        aplicar_estilo(self._lbl_servidor)
 
     # ------------------------------------------------------------ navegação
 
@@ -763,9 +898,14 @@ class TelaPrincipal(QMainWindow):
         pagina = self._paginas.get(item_id)
         if pagina is None:
             rotulo = rotulo_do_item(item_id)
-            pagina = criar_pagina(item_id, rotulo, self._api, self._modo_leitura)
+            pagina = criar_pagina(
+                item_id, rotulo, self._api, self._modo_leitura, self._nivel
+            )
             self._paginas[item_id] = pagina
             self._stack_paginas.addWidget(pagina)
+            # Páginas que pedem para abrir outro módulo (ex.: PDV → Nova OS).
+            if hasattr(pagina, "navegar"):
+                pagina.navegar.connect(self._navegar)
         self._marcar(item_id)
         self._stack_paginas.setCurrentWidget(pagina)
         self.navegado.emit(item_id)
