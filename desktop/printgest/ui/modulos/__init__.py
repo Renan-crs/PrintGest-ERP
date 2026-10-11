@@ -53,19 +53,21 @@ def criar_pagina(
         # menu v2.1 — entregues
         "pdv": PaginaVendaBalcao,
         "projetos": PaginaProjetos,
+        "agendamento": PaginaAgendamento,
         "cliente": PaginaClientes,
         "fornecedor": PaginaFornecedores,
         "produto": PaginaProdutos,
         "servico": PaginaServicos,
+        "categoria": PaginaCategorias,
+        "funcionario": PaginaFuncionarios,
         "financeiro": PaginaFinanceiro,
         "fiscal": PaginaFiscal,
+        "estoque": PaginaEmConstrucao,  # TODO: host Estoque (sub-abas: consulta/movimento/reposição)
+        "relatorios": PaginaEmConstrucao,  # TODO: host Relatórios (sub-abras: vendas/clientes/servicos/aniversariantes)
         "configuracoes": PaginaConfiguracoes,
         # ids granulares internos (fora do menu v2.1, ainda navegáveis)
-        "funcionario": PaginaFuncionarios,
-        "categoria": PaginaCategorias,
         "os": PaginaOS,
         "orcamento": PaginaOrcamento,
-        "agendamento": PaginaAgendamento,
         "venda_balcao": PaginaVendaBalcao,
         "estoque_consulta": PaginaEstoqueConsulta,
         "estoque_movimento": PaginaEstoqueMovimento,

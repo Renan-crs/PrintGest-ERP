@@ -30,16 +30,21 @@ def test_menu_v21_tem_nove_ids_com_niveis_explícitos():
     assert ids == {
         "pdv",
         "projetos",
+        "agendamento",
         "cliente",
         "fornecedor",
         "produto",
         "servico",
+        "categoria",
+        "funcionario",
         "financeiro",
         "fiscal",
+        "estoque",
+        "relatorios",
         "configuracoes",
     }
     grupos = [_g for _g, _itens in MENU]
-    assert grupos == ["Operação", "Cadastros", "Gestão", "Sistema"]
+    assert grupos == ["Operação", "Cadastros", "Gestão", "Relatórios", "Sistema"]
     for _grupo, itens in MENU:
         for item in itens:
             assert isinstance(item.get("niveis"), list) and item["niveis"]
@@ -52,15 +57,35 @@ def test_matriz_nao_hierarquica_caixa_ve_financeiro_e_fiscal():
 
 def test_operador_ve_operacao_e_cadastros_mas_nao_gestao():
     ids = {i["id"] for _g, itens in menu_visivel("operador") for i in itens}
-    assert ids == {"pdv", "projetos", "cliente", "produto", "servico"}
+    assert ids == {
+        "pdv",
+        "projetos",
+        "agendamento",
+        "cliente",
+        "produto",
+        "servico",
+        "categoria",
+        "funcionario",
+        "estoque",
+    }
     assert "fornecedor" not in ids
     assert "financeiro" not in ids and "fiscal" not in ids
+    assert "relatorios" not in ids
     assert "configuracoes" not in ids
 
 
 def test_gerente_ve_gestao_e_cadastros_completos():
     ids = {i["id"] for _g, itens in menu_visivel("gerente") for i in itens}
-    assert {"fornecedor", "financeiro", "fiscal", "pdv", "projetos"} <= ids
+    assert {
+        "fornecedor",
+        "financeiro",
+        "fiscal",
+        "estoque",
+        "relatorios",
+        "pdv",
+        "projetos",
+        "agendamento",
+    } <= ids
     assert "configuracoes" not in ids
 
 
