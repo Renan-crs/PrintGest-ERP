@@ -1,13 +1,14 @@
 """Testes do Dashboard (Tela Inicial) do desktop v2.1 — cards, RBAC, faturamento e rodapé.
 
-Cobre os contratos do §2.2 de `telas_e_fluxos`:
-  - cards reais alimentados por `GET /v1/dashboard/resumo?dias=`;
-  - RBAC de cards: vendas para todos, gerenciais (a receber/faturamento) gerente+,
-    operacionais (projetos/entregas/estoque) operador+;
+Cobre os contratos do §2.2 de `telas_e_fluxos` (revisão A1–D3):
+  - 3 KPIs consolidados (Vendas hoje / A receber / Projetos em produção) com
+    subtexto e pluralização correta, alimentados por `GET /v1/dashboard/resumo`;
+  - RBAC de cards: vendas para todos, "A receber"/faturamento gerente+,
+    projetos/entregas/estoque operador+;
   - combo 7/30 dias recarrega as barras realizado × previsto;
-  - acesso rápido filtrado por perfil;
-  - filial no cabeçalho via signal; colapso, atalhos e rodapé;
-  - BuscaGlobal com sugestões e navegação; resumo vazio tolerado.
+  - indicador compacto de estoque crítico (0 itens ≠ N itens);
+  - acesso rápido filtrado por perfil; filial no cabeçalho via signal;
+  - colapso, atalhos e rodapé; BuscaGlobal; resumo vazio tolerado.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from datetime import date, timedelta
 import httpx
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton, QScrollArea
 
 from printgest.core.api import Api
 from printgest.ui.tela_principal import TelaPrincipal
@@ -109,22 +110,20 @@ def _textos_botoes(principal):
 
 def test_admin_ve_cards_reais_e_filial_no_cabecalho(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
-    pumpar(lambda: principal._pagina_inicio._lbl_vendas_hoje.text() == "7")
+    pumpar(lambda: "112,40" in principal._pagina_inicio._kpi_vendas_valor.text())
 
     inicio = principal._pagina_inicio
-    assert inicio._lbl_vendas_hoje.text() == "7"
-    assert "112,40" in inicio._lbl_valor_hoje.text()
-    assert "5" in inicio._lbl_vendas_ontem.text()  # compara com ontem
-    assert "88,20" in inicio._lbl_vendas_ontem.text()
-    assert "150,00" in inicio._lbl_receber_hoje.text()
-    assert "40,50" in inicio._lbl_receber_atrasado.text()
-    assert inicio._lbl_projetos_producao.text() == "3"
-    assert inicio._lbl_projetos_atrasados.text() == "1"
+    assert "112,40" in inicio._kpi_vendas_valor.text()
+    assert inicio._kpi_vendas_sub.text() == "7 vendas · ontem: 5"
+    assert "150,00" in inicio._kpi_receber_valor.text()
+    assert "40,50" in inicio._kpi_receber_sub.text()
+    assert inicio._kpi_projetos_valor.text() == "3"
+    assert inicio._kpi_projetos_sub.text() == "1 atrasado"
     assert "4" in inicio._lbl_estoque.text()
+    assert not inicio._btn_estoque.isHidden()  # com N>0 há link para o estoque
 
     # entregas do dia
     assert inicio._lista_entregas.count() == 2
-    assert "Ana" in inicio._lista_entregas.item(0).text()
     assert inicio._lista_entregas.item(0).text() == (
         f"Ana · Impressão de cartões · {_HOJE.isoformat()} · PRODUCAO"
     )
@@ -137,6 +136,27 @@ def test_admin_ve_cards_reais_e_filial_no_cabecalho(app, pumpar):
 
     # filial chega no cabeçalho pelo signal do resumo
     assert principal._lbl_filial.text() == "Filial Matriz"
+
+
+def test_kpis_pluralizam_corretamente(app, pumpar):
+    def _handler_um(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/dashboard/resumo":
+            dados = _resumo()
+            dados["vendas_hoje_qtd"] = 1
+            dados["vendas_ontem_qtd"] = 0
+            dados["projetos_atrasados"] = 0
+            return httpx.Response(200, json={"data": dados})
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(404, json={"detail": "rota não esperada"})
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler_um))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}})
+    principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
+    inicio = principal._pagina_inicio
+    pumpar(lambda: inicio._kpi_vendas_sub.text() != "")
+    assert inicio._kpi_vendas_sub.text() == "1 venda · ontem: 0"
+    assert inicio._kpi_projetos_sub.text() == "0 atrasados"
 
 
 def test_combo_dias_recarrega_faturamento(app, pumpar):
@@ -152,13 +172,13 @@ def test_combo_dias_recarrega_faturamento(app, pumpar):
 
 def test_caixa_ve_apenas_cards_de_vendas(app, pumpar):
     principal = _principal({"id": 1, "nome": "Zé", "login": "ze", "nivel_acesso": "caixa"})
-    pumpar(lambda: principal._pagina_inicio._lbl_vendas_hoje.text() == "7")
+    pumpar(lambda: "112,40" in principal._pagina_inicio._kpi_vendas_valor.text())
 
     inicio = principal._pagina_inicio
-    assert inicio._lbl_vendas_hoje.text() == "7"
+    assert "112,40" in inicio._kpi_vendas_valor.text()
     # cards gerenciais e operacionais ocultos para caixa
-    assert not hasattr(inicio, "_lbl_receber_hoje")
-    assert not hasattr(inicio, "_lbl_projetos_producao")
+    assert not hasattr(inicio, "_kpi_receber_valor")
+    assert not hasattr(inicio, "_kpi_projetos_valor")
     assert not hasattr(inicio, "_lbl_estoque")
     assert not hasattr(inicio, "_lista_entregas")
     assert not hasattr(inicio, "_combo_dias")
@@ -168,20 +188,22 @@ def test_caixa_ve_apenas_cards_de_vendas(app, pumpar):
     textos = [b.text() for b in inicio._botoes_rapidos]
     assert textos == ["Nova venda", "Emitir NFC-e"]
 
+    # a lateral não duplica mais as ações de criação
     botoes = _textos_botoes(principal)
     assert "Nova OS" not in botoes
-    assert "Nova Venda Balcão" in botoes
+    assert "Nova Venda Balcão" not in botoes
+    assert "Nova OS/Orçamento" not in botoes
 
 
 def test_operador_ve_cards_operacionais_mas_nao_gerenciais(app, pumpar):
     principal = _principal({"id": 1, "nome": "Jo", "login": "jo", "nivel_acesso": "operador"})
-    pumpar(lambda: principal._pagina_inicio._lbl_vendas_hoje.text() == "7")
+    pumpar(lambda: principal._pagina_inicio._kpi_vendas_valor.text() != "—")
 
     inicio = principal._pagina_inicio
-    assert inicio._lbl_projetos_producao.text() == "3"
+    assert inicio._kpi_projetos_valor.text() == "3"
     assert inicio._lista_entregas.count() == 2
     assert "4" in inicio._lbl_estoque.text()
-    assert not hasattr(inicio, "_lbl_receber_hoje")  # gerencial oculto
+    assert not hasattr(inicio, "_kpi_receber_valor")  # gerencial oculto
     assert not hasattr(inicio, "_combo_dias")
     assert not hasattr(inicio, "_barras_realizado")
 
@@ -189,9 +211,66 @@ def test_operador_ve_cards_operacionais_mas_nao_gerenciais(app, pumpar):
     assert textos == ["Nova venda", "Nova OS/Orçamento", "Novo cliente"]
 
 
+def test_estoque_critico_zerado_estado_neutro(app, pumpar):
+    def _handler_zero(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/dashboard/resumo":
+            dados = _resumo()
+            dados["estoque_abaixo_minimo"] = 0
+            return httpx.Response(200, json={"data": dados})
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(404, json={"detail": "rota não esperada"})
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler_zero))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Jo", "login": "jo", "nivel_acesso": "operador"}})
+    principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
+    inicio = principal._pagina_inicio
+    pumpar(lambda: not inicio._lbl_estoque.text().startswith("Aguardando"))
+    assert inicio._lbl_estoque.text() == "Nenhum item abaixo do mínimo"
+    assert inicio._lbl_estoque.property("role") == "success"
+    assert inicio._btn_estoque.isHidden()  # sem barra nem link com 0 itens
+
+
+def test_entregas_vazias_usam_texto_do_spec(app, pumpar):
+    def _handler_vazio_entregas(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/dashboard/resumo":
+            dados = _resumo()
+            dados["entregas_hoje"] = []
+            return httpx.Response(200, json={"data": dados})
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(404, json={"detail": "rota não esperada"})
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler_vazio_entregas))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Jo", "login": "jo", "nivel_acesso": "operador"}})
+    principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
+    inicio = principal._pagina_inicio
+    pumpar(lambda: inicio._lista_entregas.count() == 1)
+    assert inicio._lista_entregas.item(0).text() == "Nenhuma entrega para hoje ou atrasada."
+
+
+def test_faturamento_vazio_mostra_sem_dados(app, pumpar):
+    def _handler_sem_fat(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/dashboard/resumo":
+            dados = _resumo()
+            dados["vendas_7_dias"] = []
+            dados["faturamento_previsto"] = []
+            return httpx.Response(200, json={"data": dados})
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(404, json={"detail": "rota não esperada"})
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler_sem_fat))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}})
+    principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
+    inicio = principal._pagina_inicio
+    pumpar(lambda: inicio._lbl_grafico.text() == "Sem dados no período")
+    assert inicio._lbl_grafico.text() == "Sem dados no período"
+
+
 def test_acesso_rapido_navega_para_cliente(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
-    pumpar(lambda: principal._pagina_inicio._lbl_vendas_hoje.text() == "7")
+    pumpar(lambda: principal._pagina_inicio._kpi_vendas_valor.text() != "—")
     botoes = {b.text(): b for b in principal._pagina_inicio._botoes_rapidos}
     assert set(botoes) == {"Nova venda", "Nova OS/Orçamento", "Novo cliente", "Emitir NFC-e"}
     navegados = []
@@ -206,17 +285,60 @@ def test_modo_leitura_banner_e_licenca_vermelha(app, pumpar):
     principal = _principal(
         {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}, modo_leitura=True
     )
-    pumpar(lambda: principal._lbl_licenca.text() == "Modo Leitura")
+    pumpar(lambda: principal._lbl_licenca.property("role") == "erro")
     banners = [w for w in principal.findChildren(QLabel) if w.objectName() == "bannerLeitura"]
     assert len(banners) == 1
     assert "modo leitura" in banners[0].text().lower()
-    assert principal._lbl_licenca.property("badgeStyle") == "erro"
+    assert principal._lbl_licenca.text() == "● Licença"
+    assert principal._lbl_licenca.property("role") == "erro"
 
 
 def test_licenca_ativa_verde(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
-    pumpar(lambda: principal._lbl_licenca.text() == "Licença Ativa")
-    assert principal._lbl_licenca.property("badgeStyle") == "success"
+    pumpar(lambda: principal._lbl_licenca.property("role") == "success")
+    assert principal._lbl_licenca.text() == "● Licença"
+    assert principal._lbl_licenca.property("role") == "success"
+
+
+def test_cabecalho_sem_duplicar_usuario_nem_daemon(app):
+    principal = _principal({"id": 1, "nome": "Ana Silva", "login": "ana", "nivel_acesso": "admin"})
+    textos = _textos_botoes(principal)
+    # badge técnico "Daemon: ..." e botão "Sair" solto deram lugar ao menu único
+    assert not any("Daemon" in t for t in textos)
+    assert "Sair" not in textos
+    labels = [w.text() for w in principal.findChildren(QLabel)]
+    assert "● Servidor local" in labels
+    # menu de usuário único com iniciais + nome + perfil
+    assert "AS" in principal._menu_usuario.text()
+    assert "Ana Silva" in principal._menu_usuario.text()
+    assert "Admin" in principal._menu_usuario.text()
+    acoes = [a.text() for a in principal._menu_usuario.menu().actions() if a.text()]
+    assert acoes == ["Preferências", "Trocar senha", "Sair"]
+
+
+def test_cabecalho_nao_repete_perfil_igual_ao_nome(app):
+    principal = _principal(
+        {"id": 1, "nome": "Administrador", "login": "admin", "nivel_acesso": "admin"}
+    )
+    texto = principal._menu_usuario.text()
+    assert "AD" in texto
+    assert texto.count("Admin") == 1
+    assert "·" not in texto
+
+
+def test_servidor_local_deixa_ip_apenas_no_tooltip(app, pumpar):
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    pumpar(lambda: "online" in principal._lbl_conexao.text())
+    assert principal._lbl_servidor.text() == "● Servidor local"
+    assert "127.0.0.1:8000" in principal._lbl_servidor.toolTip()
+    assert "127.0.0.1" not in principal._lbl_servidor.text()
+
+
+def test_conteudo_do_inicio_tem_scroll(app):
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    assert principal._pagina_inicio._scroll.widgetResizable() is True
+    scrolls = principal._pagina_inicio.findChildren(QScrollArea)
+    assert scrolls
 
 
 def test_colapso_da_lateral(app):
@@ -229,11 +351,14 @@ def test_colapso_da_lateral(app):
     assert principal._sidebar.width() == 224
 
 
-def test_atalhos_rapidos_na_lateral(app):
+def test_atalhos_de_criacao_so_no_acesso_rapido(app):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     botoes = _textos_botoes(principal)
-    assert "Nova Venda Balcão" in botoes
-    assert "Nova OS" in botoes
+    assert "Nova Venda Balcão" not in botoes
+    assert "Nova OS" not in botoes
+    rapidos = [b.text() for b in principal._pagina_inicio._botoes_rapidos]
+    assert "Nova venda" in rapidos
+    assert "Nova OS/Orçamento" in rapidos
 
 
 def test_rodape_relogio_estacao_e_conexao(app, pumpar):
@@ -266,6 +391,21 @@ def test_busca_global_sugere_e_navega(app, pumpar):
     assert navegados == ["cliente"]
 
 
+def test_sem_conexao_mostra_alerta_e_libera_banner(app, pumpar):
+    def _handler_off(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/dashboard/resumo":
+            return httpx.Response(200, json={"data": _resumo()})
+        return httpx.Response(503, json={"detail": "indisponível"})
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler_off))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}})
+    principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
+    inicio = principal._pagina_inicio
+    pumpar(lambda: not inicio._alerta_conexao.isHidden())
+    assert "Servidor local" in inicio._alerta_conexao.text()
+    assert principal._lbl_servidor.property("role") == "error"
+
+
 def _vazio_handler(request: httpx.Request) -> httpx.Response:
     return httpx.Response(
         200,
@@ -280,5 +420,5 @@ def test_dashboard_tolera_resumo_vazio(app, pumpar):
         api, usuario=api.usuario, modo_leitura=False, base_url="127.0.0.1:8000"
     )
     pumpar(lambda: not principal._pagina_inicio._lbl_estoque.text().startswith("Aguardando"))
-    assert principal._pagina_inicio._lbl_vendas_hoje.text() == "—"
+    assert principal._pagina_inicio._kpi_vendas_valor.text() == "—"
     assert not principal._pagina_inicio._lbl_estoque.text().startswith("Aguardando")

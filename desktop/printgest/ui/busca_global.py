@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -67,7 +68,13 @@ class BuscaGlobal(QWidget):
 
         self._campo.textChanged.connect(self._agendar)
         self._sugestoes.itemClicked.connect(self._escolher)
-        self.setFixedWidth(320)
+        # Largura preferida 320, mas encolhe em telas estreitas (nada de
+        # `setFixedWidth`, que forçava o cabeçalho a ~1401px e estourava 1280).
+        self.setMinimumWidth(180)
+        self.setMaximumWidth(360)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
 
     # ------------------------------------------------------------- entrada
 

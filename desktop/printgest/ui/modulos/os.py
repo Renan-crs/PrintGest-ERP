@@ -75,7 +75,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._desconto = CampoValor("Desconto")
         self._obs = CampoArea("Observações", linhas=2)
         self._pagamento_confirmado = CampoCheck(
-            "Recebimento confirmado (adiantamento/sinal)"
+            "Pagamento já recebido"
         )
         self._itens = GradeItens("", api=self._api)
         return [
@@ -155,7 +155,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             exigencia = self._exigencia_pendente()
             if exigencia:
                 return (
-                    f"O cliente exige {exigencia}. Marque 'Recebimento confirmado' "
+                    f"O cliente exige {exigencia}. Marque 'Pagamento já recebido' "
                     "para lançar a O.S.",
                     self._pagamento_confirmado,
                 )

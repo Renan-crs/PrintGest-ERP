@@ -85,6 +85,21 @@ QLabel { background: transparent; color: %texto%; }
 QLabel[role="muted"] { color: %texto-muted%; }
 QLabel[role="error"] { color: %erro%; font-weight: 600; }
 QLabel[role="success"] { color: %sucesso%; font-weight: 600; }
+QLabel[role="atencao"] { color: %atencao%; font-weight: 600; }
+
+/* Indicadores clicáveis (licença/servidor) e links de card. */
+QPushButton[role="success"], QPushButton[role="atencao"], QPushButton[role="error"] {
+    border: none;
+    background: transparent;
+    font-weight: 700;
+    padding: 2px 6px;
+}
+QPushButton[role="success"] { color: %sucesso%; }
+QPushButton[role="atencao"] { color: %atencao%; }
+QPushButton[role="error"] { color: %erro%; }
+QPushButton[role="success"]:hover,
+QPushButton[role="atencao"]:hover,
+QPushButton[role="error"]:hover { background-color: %surface-muted%; }
 
 QLabel#titulo { font-size: 20px; font-weight: 700; }
 QLabel#subtitulo { color: %texto-muted%; font-size: 13px; }
@@ -100,6 +115,41 @@ QLineEdit {
 }
 QLineEdit:focus { border: 1px solid %primary%; }
 QLineEdit[mono="true"] { font-family: "Consolas"; letter-spacing: 1px; }
+
+/* Combos no mesmo desenho dos campos (sem o "artefato" do estilo nativo do
+   Windows: setas/bordas mistas com o restante do formulário). */
+QComboBox {
+    background-color: %surface-muted%;
+    border: 1px solid %borda-forte%;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: %texto%;
+}
+QComboBox:focus, QComboBox:on { border: 1px solid %primary%; }
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+}
+QComboBox::down-arrow {
+    image: none;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid %texto-muted%;
+    margin-right: 8px;
+}
+QComboBox QAbstractItemView {
+    background-color: %surface%;
+    border: 1px solid %borda-forte%;
+    border-radius: 6px;
+    color: %texto%;
+    outline: none;
+    selection-background-color: %primary%;
+    selection-color: %on-primary%;
+}
 
 QPushButton {
     background: transparent;
@@ -157,6 +207,34 @@ QFrame#divider { background-color: %borda%; }
 
 QScrollArea { background: transparent; border: none; }
 
+/* Scrollbars finas, sem setas — evita o visual clássico do Windows (B1). */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background-color: %borda-forte%;
+    border-radius: 5px;
+    min-height: 30px;
+}
+QScrollBar::handle:vertical:hover { background-color: %texto-muted%; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border: none; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 0;
+}
+QScrollBar::handle:horizontal {
+    background-color: %borda-forte%;
+    border-radius: 5px;
+    min-width: 30px;
+}
+QScrollBar::handle:horizontal:hover { background-color: %texto-muted%; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; }
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
+
 QStatusBar { background-color: %surface-muted%; color: %texto-muted%; border-top: 1px solid %borda%; }
 
 /* ------------------------------------------------------- tela principal */
@@ -194,7 +272,9 @@ QLabel#grupoMenu {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.06em;
-    padding: 10px 10px 4px 10px;
+    /* padding-left 5px + o inset interno do QLabel alinham o rótulo ao texto
+       dos itens (QPushButton[nav]) — ver B4. */
+    padding: 10px 5px 4px 5px;
 }
 QPushButton[nav="true"] {
     border: none;
@@ -216,6 +296,46 @@ QLabel#bannerLeitura {
     padding: 8px 12px;
 }
 
+QLabel#bannerErro {
+    background-color: %erro-container%;
+    border: 1px solid %erro-borda%;
+    border-radius: 8px;
+    color: %erro%;
+    font-weight: 600;
+    padding: 8px 12px;
+}
+
+QToolButton#menuUsuario {
+    background-color: %surface%;
+    border: 1px solid %borda-forte%;
+    border-radius: 16px;
+    color: %texto%;
+    font-weight: 600;
+    padding: 4px 10px;
+}
+QToolButton#menuUsuario:hover { border-color: %primary%; background-color: %surface-muted%; }
+QToolButton#menuUsuario::menu-indicator { image: none; width: 0; }
+
+QPushButton[icone="true"] {
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 15px;
+    color: %texto-muted%;
+}
+QPushButton[icone="true"]:hover { background-color: %surface-muted%; color: %texto%; }
+
+QPushButton[link="true"] {
+    border: none;
+    background: transparent;
+    color: %primary%;
+    font-weight: 600;
+    padding: 2px 0;
+    text-align: left;
+}
+QPushButton[link="true"]:hover { color: %primary-hover%; }
+
 QPushButton[chave="true"] {
     background-color: %surface-muted%;
     border: 1px solid %borda-forte%;
@@ -227,6 +347,26 @@ QPushButton[chave="true"] {
 }
 QPushButton[chave="true"]:hover { border-color: %primary%; color: %texto%; }
 QPushButton[chave="true"]:checked { background-color: %primary%; border-color: %primary%; color: #FFFFFF; }
+
+/* Controle segmentado (visões/filtros) — mesmo visual, por objectName. */
+QPushButton#chaveRapida {
+    background-color: %surface-muted%;
+    border: 1px solid %borda-forte%;
+    border-radius: 999px;
+    color: %texto-muted%;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+}
+QPushButton#chaveRapida:hover { border-color: %primary%; color: %texto%; }
+QPushButton#chaveRapida:checked { background-color: %primary%; border-color: %primary%; color: #FFFFFF; }
+
+/* Botão de ação compacto dentro de uma linha da grade (ex.: Cancelar). */
+QPushButton#acaoLinha {
+    padding: 3px 10px;
+    font-size: 12px;
+    border-radius: 5px;
+}
 
 QLabel#secaoForm {
     color: %primary%;
