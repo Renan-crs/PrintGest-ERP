@@ -19,6 +19,19 @@ from app.schemas.cadastros import (
 )
 from app.schemas.common import ItemResponse, ListaResponse
 from app.schemas.dashboard import DashboardResumoOut, DashboardVendaDiaOut
+from app.schemas.financeiro import (
+    AbrirCaixaIn,
+    BaixaIn,
+    CaixaOut,
+    ContaPagarOut,
+    ContaReceberOut,
+    FecharCaixaIn,
+    MovimentoCaixaIn,
+    MovimentoCaixaOut,
+    PlanoContaCreate,
+    PlanoContaOut,
+    PlanoContaUpdate,
+)
 from app.schemas.licenca import LicencaAtivarIn, LicencaSituacaoOut
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
 
@@ -45,6 +58,17 @@ __all__ = [
     "ProdutoEstoqueOut",
     "DashboardResumoOut",
     "DashboardVendaDiaOut",
+    "AbrirCaixaIn",
+    "BaixaIn",
+    "CaixaOut",
+    "ContaPagarOut",
+    "ContaReceberOut",
+    "FecharCaixaIn",
+    "MovimentoCaixaIn",
+    "MovimentoCaixaOut",
+    "PlanoContaCreate",
+    "PlanoContaOut",
+    "PlanoContaUpdate",
     "LicencaAtivarIn",
     "LicencaSituacaoOut",
     "UsuarioCreate",

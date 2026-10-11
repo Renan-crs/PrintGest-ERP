@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.auth import router as auth_router
-from app.api import cadastros
+from app.api import cadastros, financeiro
 from app.api.balcao import router as balcao_router
 from app.api.dashboard import router as dashboard_router
 from app.api.estoque import router as estoque_router
@@ -15,6 +15,7 @@ api = APIRouter(prefix="/v1")
 
 api.include_router(auth_router)
 cadastros.registrar(api)
+financeiro.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)
 api.include_router(estoque_router)

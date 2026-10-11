@@ -18,6 +18,13 @@ from printgest.ui.modulos.estoque import (
     PaginaEstoqueMovimento,
     PaginaEstoqueReposicao,
 )
+from printgest.ui.modulos.financeiro import (
+    PaginaCaixa,
+    PaginaContasPagar,
+    PaginaContasReceber,
+    PaginaFinanceiro,
+    PaginaPlanoContas,
+)
 from printgest.ui.modulos.fornecedores import PaginaFornecedores
 from printgest.ui.modulos.funcionarios import PaginaFuncionarios
 from printgest.ui.modulos.os import PaginaOS, PaginaOrcamento, PaginaProjetos
@@ -37,6 +44,7 @@ def criar_pagina(
         "fornecedor": PaginaFornecedores,
         "produto": PaginaProdutos,
         "servico": PaginaServicos,
+        "financeiro": PaginaFinanceiro,
         # ids granulares internos (fora do menu v2.1, ainda navegáveis)
         "funcionario": PaginaFuncionarios,
         "categoria": PaginaCategorias,
@@ -46,10 +54,17 @@ def criar_pagina(
         "estoque_consulta": PaginaEstoqueConsulta,
         "estoque_movimento": PaginaEstoqueMovimento,
         "estoque_reposicao": PaginaEstoqueReposicao,
+        "caixa": PaginaCaixa,
+        "contas_receber": PaginaContasReceber,
+        "contas_pagar": PaginaContasPagar,
+        "plano_contas": PaginaPlanoContas,
     }
     construtora = paginas.get(item_id, PaginaEmConstrucao)
     if construtora is PaginaEmConstrucao:
         return PaginaEmConstrucao(rotulo)
+    if construtora is PaginaFinanceiro:
+        # O host de Financeiro esconde as abas que o perfil não pode abrir.
+        return PaginaFinanceiro(api, modo_leitura=modo_leitura, nivel=nivel)
     if construtora is PaginaVendaBalcao:
         # O PDV usa o nível para esconder ações que o perfil não pode executar.
         return PaginaVendaBalcao(api, modo_leitura=modo_leitura, nivel=nivel)

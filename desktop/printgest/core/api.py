@@ -216,6 +216,31 @@ class Api:
         """Lançamento manual de estoque: `POST /v1/estoque/movimentar`."""
         return self._post("/v1/estoque/movimentar", payload, self._token)
 
+    # ---------------------------------------------------------- financeiro
+
+    def caixa_atual(self) -> dict | None:
+        """Caixa aberto do usuário (ou `None`): `GET /v1/financeiro/caixa/atual`."""
+        return self._get("/v1/financeiro/caixa/atual", self._token)
+
+    def abrir_caixa(self, payload: dict) -> dict:
+        return self._post("/v1/financeiro/caixa/abrir", payload, self._token)
+
+    def fechar_caixa(self, caixa_id: int, payload: dict) -> dict:
+        return self._post(f"/v1/financeiro/caixa/{caixa_id}/fechar", payload, self._token)
+
+    def movimento_caixa(self, caixa_id: int, payload: dict) -> dict:
+        return self._post(f"/v1/financeiro/caixa/{caixa_id}/movimento", payload, self._token)
+
+    def extrato_caixa(self, caixa_id: int, limit: int = 200, offset: int = 0) -> dict:
+        """Extrato (movimentos) de um caixa: `GET /v1/financeiro/caixa/{id}/extrato`."""
+        return self.listar_com_filtros(
+            f"financeiro/caixa/{caixa_id}/extrato", limit=limit, offset=offset
+        )
+
+    def baixa_conta(self, tipo: str, conta_id: int, payload: dict) -> dict:
+        """Baixa de título: `POST /v1/financeiro/{contas-receber|contas-pagar}/{id}/baixa`."""
+        return self._post(f"/v1/financeiro/{tipo}/{conta_id}/baixa", payload, self._token)
+
     def acao(self, entidade: str, item_id: int, acao: str, payload: dict | None = None) -> dict:
         """POST de ação de negócio, ex.: `/v1/os/5/converter`."""
         resp = self._cliente.post(
