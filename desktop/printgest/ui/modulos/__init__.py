@@ -12,6 +12,13 @@ from PySide6.QtWidgets import QWidget
 from printgest.core.api import Api
 from printgest.ui.modulos.clientes import PaginaClientes
 from printgest.ui.modulos.categorias import PaginaCategorias
+from printgest.ui.modulos.configuracao import (
+    PaginaConfiguracoes,
+    PaginaEmpresa,
+    PaginaPersonalizacao,
+    PaginaReajuste,
+    PaginaUsuarios,
+)
 from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
 from printgest.ui.modulos.estoque import (
     PaginaEstoqueConsulta,
@@ -51,6 +58,7 @@ def criar_pagina(
         "servico": PaginaServicos,
         "financeiro": PaginaFinanceiro,
         "fiscal": PaginaFiscal,
+        "configuracoes": PaginaConfiguracoes,
         # ids granulares internos (fora do menu v2.1, ainda navegáveis)
         "funcionario": PaginaFuncionarios,
         "categoria": PaginaCategorias,
@@ -66,6 +74,10 @@ def criar_pagina(
         "plano_contas": PaginaPlanoContas,
         "documentos_fiscais": PaginaDocumentosFiscais,
         "contingencia": PaginaContingencia,
+        "dados_empresa": PaginaEmpresa,
+        "personalizacao": PaginaPersonalizacao,
+        "reajuste_bloco": PaginaReajuste,
+        "usuarios": PaginaUsuarios,
     }
     construtora = paginas.get(item_id, PaginaEmConstrucao)
     if construtora is PaginaEmConstrucao:
@@ -76,6 +88,9 @@ def criar_pagina(
     if construtora is PaginaFiscal:
         # O host de Fiscal também recebe o nível (abas por perfil).
         return PaginaFiscal(api, modo_leitura=modo_leitura, nivel=nivel)
+    if construtora is PaginaConfiguracoes:
+        # O host de Configuração também recebe o nível (abas por perfil).
+        return PaginaConfiguracoes(api, modo_leitura=modo_leitura, nivel=nivel)
     if construtora is PaginaVendaBalcao:
         # O PDV usa o nível para esconder ações que o perfil não pode executar.
         return PaginaVendaBalcao(api, modo_leitura=modo_leitura, nivel=nivel)

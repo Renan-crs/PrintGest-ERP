@@ -18,6 +18,16 @@ from app.schemas.cadastros import (
     ProdutoUpdate,
 )
 from app.schemas.common import ItemResponse, ListaResponse
+from app.schemas.config import (
+    EmpresaOut,
+    EmpresaUpdate,
+    ReajusteAplicarIn,
+    ReajusteHistoricoOut,
+    ReajusteItemOut,
+    ReajusteResultadoOut,
+    ReajusteSimulacaoIn,
+    ReajusteSimulacaoOut,
+)
 from app.schemas.dashboard import DashboardResumoOut, DashboardVendaDiaOut
 from app.schemas.financeiro import (
     AbrirCaixaIn,
@@ -72,6 +82,14 @@ __all__ = [
     "PlanoContaUpdate",
     "DocumentoFiscalOut",
     "ResumoFiscal",
+    "EmpresaOut",
+    "EmpresaUpdate",
+    "ReajusteSimulacaoIn",
+    "ReajusteAplicarIn",
+    "ReajusteItemOut",
+    "ReajusteSimulacaoOut",
+    "ReajusteResultadoOut",
+    "ReajusteHistoricoOut",
     "LicencaAtivarIn",
     "LicencaSituacaoOut",
     "UsuarioCreate",
