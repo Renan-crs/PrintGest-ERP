@@ -22,6 +22,7 @@ from printgest.ui.modulos.configuracao import (
 )
 from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
 from printgest.ui.modulos.estoque import (
+    PaginaEstoque,
     PaginaEstoqueConsulta,
     PaginaEstoqueMovimento,
     PaginaEstoqueReposicao,
@@ -42,6 +43,7 @@ from printgest.ui.modulos.fornecedores import PaginaFornecedores
 from printgest.ui.modulos.funcionarios import PaginaFuncionarios
 from printgest.ui.modulos.os import PaginaOS, PaginaOrcamento, PaginaProjetos
 from printgest.ui.modulos.produtos import PaginaProdutos, PaginaServicos
+from printgest.ui.modulos.relatorios import PaginaRelatorios
 from printgest.ui.modulos.venda_balcao import PaginaVendaBalcao
 
 
@@ -62,8 +64,8 @@ def criar_pagina(
         "funcionario": PaginaFuncionarios,
         "financeiro": PaginaFinanceiro,
         "fiscal": PaginaFiscal,
-        "estoque": PaginaEmConstrucao,  # TODO: host Estoque (sub-abas: consulta/movimento/reposição)
-        "relatorios": PaginaEmConstrucao,  # TODO: host Relatórios (sub-abras: vendas/clientes/servicos/aniversariantes)
+        "estoque": PaginaEstoque,
+        "relatorios": PaginaRelatorios,
         "configuracoes": PaginaConfiguracoes,
         # ids granulares internos (fora do menu v2.1, ainda navegáveis)
         "os": PaginaOS,
