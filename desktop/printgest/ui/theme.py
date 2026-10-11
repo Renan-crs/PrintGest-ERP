@@ -361,6 +361,10 @@ QFrame#colunaKanban {
     border: 1px solid %borda%;
     border-radius: 10px;
 }
+QFrame#colunaKanban[alvoDrop="true"] {
+    background-color: %surface%;
+    border: 2px dashed %primary%;
+}
 QLabel#tituloColunaKanban {
     font-size: 11px;
     font-weight: 700;

@@ -55,6 +55,16 @@ _COLUNAS_QUADRO = [
     ("entregue", "Entregues", ("entregue",)),
 ]
 
+# Status aplicado ao soltar um cartão em cada coluna. "Aguardando" agrupa
+# `aberto`/`aprovado`; como não há transição *para trás* até essa etapa (o
+# backend recusa), o alvo é apenas nominal — a mensagem de erro cobre o caso.
+_STATUS_DESTINO = {
+    "aguardando": "aprovado",
+    "producao": "producao",
+    "pronta": "pronta",
+    "entregue": "entregue",
+}
+
 
 class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "os"
@@ -327,12 +337,16 @@ class PaginaProjetos(PaginaOS):
 
     Duas visões sobre o mesmo cadastro de O.S.:
 
-    - **Quadro** (Kanban): colunas por etapa, cartões clicáveis. Clicar num
-      cartão abre o registro na visão Lista (o formulário é o mesmo de O.S.).
+    - **Quadro** (Kanban): colunas por etapa, cartões clicáveis e arrastáveis.
+      Clicar num cartão abre o registro na visão Lista (o formulário é o mesmo
+      de O.S.); **arrastar** um cartão para outra coluna avança o status pelo
+      endpoint existente `PATCH /v1/os/{id}/status` (mesma regra de transição do
+      formulário — nada é contornado). O menu de contexto do cartão oferece
+      "Mover para" como alternativa por teclado.
     - **Lista**: grade densa + formulário lateral, como no restante do sistema.
 
-    O calendário e o arrastar-e-soltar entre colunas ficam para a fase 3 do
-    roadmap (ver `docs/revisao_projetos.md`) — aqui o quadro é somente leitura.
+    O calendário continua para a fase 3 do roadmap (ver
+    `docs/revisao_projetos.md`).
     """
 
     ROTULO_PAGINA = "Projetos"
@@ -373,6 +387,8 @@ class PaginaProjetos(PaginaOS):
             fabrica=self._cartao,
         )
         self._quadro.selecionado.connect(self._abrir_registro)
+        self._quadro.movido.connect(self._mover_projeto)
+        self._quadro.permitir_movimento(not self._modo_leitura)
 
         raiz = self.layout()
         # Troca a "lista + formulário" pelo quadro e vice-versa. Um
@@ -475,6 +491,36 @@ class PaginaProjetos(PaginaOS):
             self._etapa_recebida(seq, chave, acumulado, pendentes)([])
 
         return _aplicar
+
+    # -------------------------------------------------------- mover cartão
+
+    def _mover_projeto(self, item_id, destino_chave: str) -> None:
+        """Solta um cartão em outra etapa: avança o status pela mesma rota do form."""
+        if self._modo_leitura:
+            QMessageBox.warning(
+                self,
+                "Modo leitura",
+                "A licença está em modo leitura; não é possível alterar o status.",
+            )
+            self._atualizar_quadro(self._busca.texto())
+            return
+        origem = self._quadro.coluna_do(item_id)
+        if origem is None or origem == destino_chave:
+            return  # solto na própria coluna (ou cartão já atualizado): nada a fazer
+        status_alvo = _STATUS_DESTINO.get(destino_chave)
+        if status_alvo is None:
+            return
+        rodar(
+            lambda: self._api.atualizar_status(item_id, status_alvo),
+            on_ok=lambda _dado: self.recarregar(self._busca.texto()),
+            on_erro=self._erro_mover,
+        )
+
+    def _erro_mover(self, msg: str) -> None:
+        # Transição recusada (ex.: "entregue" → etapa anterior) ou falha de rede:
+        # avisa e recarrega para o cartão voltar à coluna de origem.
+        QMessageBox.warning(self, "Não foi possível mover", msg)
+        self._atualizar_quadro(self._busca.texto())
 
     # ----------------------------------------------------------- abrir cartão
 

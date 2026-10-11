@@ -18,8 +18,11 @@ Documento de entrega da tela de **Projetos** (menu `projetos`), alinhada a
    `producao`, `pronta`, `entregue`, `cancelado`, `convertido`). Decisão
    registrada: **`aprovado` agrupa com `aberto`** na coluna “Aguardando” — o
    orçamento aprovado ainda não entrou em produção.
-3. **Calendário** e **arrastar-e-soltar** entre colunas ficam fora desta
-   entrega (fase 3 do roadmap) — o quadro é somente leitura.
+3. **Calendário** de produção/entregas fica fora desta entrega (fase 3 do
+   roadmap). O **arrastar-e-soltar** entre colunas foi **entregue** (ver §4): o
+   quadro continua lendo `GET /v1/os` e o movimento usa o endpoint existente
+   `PATCH /v1/os/{id}/status` — sem rota nova e sem contornar a regra de
+   transição de status.
 
 ---
 
@@ -27,17 +30,18 @@ Documento de entrega da tela de **Projetos** (menu `projetos`), alinhada a
 
 | Arquivo | Papel | Tipo |
 | --- | --- | --- |
-| `desktop/printgest/ui/kanban.py` | **Novo.** `QuadroKanban` (colunas), `ColunaKanban` (cabeçalho + pilha), `CartaoKanban` (cartão clicável/focável, elidido com tooltip). Sem rede: recebe colunas, uma fábrica de cartões e os dados | compartilhado (novo) |
-| `desktop/printgest/ui/modulos/os.py` | `PaginaProjetos` reescrita: alternador **Quadro/Lista**, carregamento por etapa, cartões, “abrir no formulário” | tela |
+| `desktop/printgest/ui/kanban.py` | **Novo.** `QuadroKanban` (colunas), `ColunaKanban` (cabeçalho + pilha + alvo de soltura), `CartaoKanban` (cartão clicável/focável, elidido com tooltip, arrastável e com menu “Mover para”). Sem rede: recebe colunas, uma fábrica de cartões e os dados; anuncia o movimento por `movido(id, chave)` | compartilhado (novo) |
+| `desktop/printgest/ui/modulos/os.py` | `PaginaProjetos`: alternador **Quadro/Lista**, carregamento por etapa, cartões, “abrir no formulário” e **mover cartão** via `PATCH /v1/os/{id}/status` (`_mover_projeto`) | tela |
 | `desktop/printgest/ui/modulos/pagina_crud.py` | Guarda `self._filtros_widget` (para ocultar os filtros de status na visão Quadro) | compartilhado (1 linha) |
-| `desktop/printgest/ui/theme.py` | QSS do quadro: `#colunaKanban`, `#cartaoKanban`, `#tituloColunaKanban`, `#contagemKanban`, `#tituloCartao`, `#areaQuadro` | compartilhado |
-| `desktop/tests/test_projetos.py` | **Novo.** 20 testes (etapas, agrupamento, elide+tooltip, clique→formulário, alternador, estado vazio, modo leitura, 9 combinações de layout) | testes |
+| `desktop/printgest/ui/theme.py` | QSS do quadro: `#colunaKanban` (inclui estado `[alvoDrop="true"]`), `#cartaoKanban`, `#tituloColunaKanban`, `#contagemKanban`, `#tituloCartao`, `#areaQuadro` | compartilhado |
+| `desktop/tests/test_projetos.py` | **Novo.** 27 testes (etapas, agrupamento, elide+tooltip, clique→formulário, alternador, estado vazio, modo leitura, **arrastar-e-soltar**, 9 combinações de layout) | testes |
 | `docs/telas_e_fluxos.md` | Tela de Projetos em §1.3 e atalhos/teclado em §3.4 | doc |
 | `docs/evidencias/projetos/` | Capturas **antes/depois** (1280x720, 1366x768, 1920x1080 × 100/125/150%) | evidência |
 
 Nenhum endpoint novo, nenhuma regra de negócio alterada, nenhuma dependência
 adicional. O quadro usa exclusivamente `GET /v1/os?tipo=os&status=…` (uma
-consulta por etapa; “Aguardando” consulta `aberto` **e** `aprovado`).
+consulta por etapa; “Aguardando” consulta `aberto` **e** `aprovado`) e o
+movimento de cartão usa `PATCH /v1/os/{id}/status` (já existente).
 
 ---
 
@@ -67,16 +71,19 @@ consulta por etapa; “Aguardando” consulta `aberto` **e** `aprovado`).
 | Cartão marcado como **atrasado** | ✅ | Prazo vencido e status ≠ `entregue`/`cancelado` ⇒ badge “Atrasado” |
 | Contagem por etapa | ✅ | Badge com o número de projetos de cada coluna |
 | Filtros de status **só na Lista** | ✅ | No Quadro as próprias colunas já são os status; os chips ficam ocultos |
-| Progresso da O.S. sem arrastar | ✅ (mínimo) | O avanço de status continua pelo botão “Avançar status” do formulário (fluxo `aberto→aprovado→producao→pronta→entregue`) |
+| **Arrastar-e-soltar** entre colunas | ✅ | Solta o cartão em outra etapa ⇒ `PATCH /v1/os/{id}/status` com o status da coluna de destino; a regra de transição do backend decide (movimento para trás mostra aviso e o cartão volta). Soltar na mesma coluna não chama a API |
+| **Menu “Mover para”** (teclado) | ✅ | Menu de contexto do cartão (tecla Aplicativo / Shift+F10) lista as demais etapas — alternativa por teclado ao arraste |
+| Alvo de soltura destacado | ✅ | A coluna sob o cursor ganha borda tracejada (`QFrame#colunaKanban[alvoDrop="true"]`) |
+| Progresso da O.S. pelo formulário | ✅ | O botão “Avançar status” continua disponível na Lista (mesmo endpoint) |
 
-Sem calendário e sem drag-and-drop — ver §7.
+Sem calendário (fase 3) — ver §7.
 
 ---
 
 ## 5. Layout / testes
 
-- Suíte completa: **198 passed** (`pytest -q`), incluindo
-  `desktop/tests/test_projetos.py` (novo, 20 testes).
+- Suíte completa: **232 passed** (`pytest -q`), incluindo
+  `desktop/tests/test_projetos.py` (27 testes).
 - O teste de layout roda a página na **largura lógica real** em 1280x720,
   1366x768 e 1920x1080 × 100/125/150% e verifica que o **piso da página cabe** e
   que o **quadro não rola na horizontal** (lateral recolhida, o pior caso real).
@@ -91,9 +98,10 @@ Sem calendário e sem drag-and-drop — ver §7.
 Versionados em `docs/evidencias/projetos/`:
 
 ```
-docs/evidencias/projetos/antes/    projetos_antes_<res>_<escala>.png     (9)  — Lista única de O.S.
-docs/evidencias/projetos/depois/   projetos_quadro_<res>_<escala>.png    (9)  — Kanban (padrão)
-docs/evidencias/projetos/depois/   projetos_lista_<res>_<escala>.png     (9)  — Lista + formulário
+docs/evidencias/projetos/antes/    projetos_antes_<res>_<escala>.png        (9)  — Lista única de O.S.
+docs/evidencias/projetos/depois/   projetos_quadro_<res>_<escala>.png       (9)  — Kanban (padrão)
+docs/evidencias/projetos/depois/   projetos_quadro_drop_<res>_<escala>.png  (9)  — alvo de soltura destacado
+docs/evidencias/projetos/depois/   projetos_lista_<res>_<escala>.png        (9)  — Lista + formulário
 ```
 
 Resoluções: `1280x720`, `1366x768`, `1920x1080`; escalas: `100`, `125`, `150`.
@@ -104,9 +112,10 @@ Resoluções: `1280x720`, `1366x768`, `1920x1080`; escalas: `100`, `125`, `150`.
 
 1. **Calendário** de produção/entregas (Agendamento): exige decisão de widget Qt
    (o próprio roadmap registra isso) e não existe no backend de Projetos.
-2. **Arrastar-e-soltar** cartões entre colunas: mudaria status por drag;
-   optou-se por manter o avanço explícito pelo formulário (evita alterar regra
-   de negócio sem spec).
+2. **Movimento “para trás”** pelo quadro: o backend recusa transições de
+   retorno (`_TRANSICOES`, ex.: `entregue → pronta`); o quadro mostra o aviso e
+   devolve o cartão à coluna de origem. É a regra de negócio vigente, não um
+   limite da UI.
 3. **Orçamentos no quadro:** o quadro lista só `tipo = os`; orçamentos têm a
    página própria (`PaginaOrcamento`). Se quiser “funil único”, é uma decisão de
    produto.
@@ -122,6 +131,8 @@ Resoluções: `1280x720`, `1366x768`, `1920x1080`; escalas: `100`, `125`, `150`.
 
 - **RBAC preservado**: Projetos é movimento (nível **Operador**+); nenhum item
   novo de menu, nenhuma rota nova. Em **modo leitura**, o quadro continua
-  consultável e as ações de escrita ficam desabilitadas (herdado).
-- Sem regressão em cabeçalho, lateral, Início, PDV e Cadastros — a suíte
-  completa (198 testes) segue verde e nenhum endpoint foi alterado.
+  consultável, o arraste fica desabilitado e as ações de escrita ficam
+  desabilitadas (herdado).
+- Sem regressão em cabeçalho, lateral, Início, PDV, Cadastros, Financeiro,
+  Fiscal e Configuração — a suíte completa (**232 testes**) segue verde e nenhum
+  endpoint foi alterado.
