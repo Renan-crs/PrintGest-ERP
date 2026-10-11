@@ -151,7 +151,7 @@ def test_cabecalho_itens_nao_duplica_titulo(app, pagina):
 def test_carrega_grade_so_de_os(app, pumpar, pagina):
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     assert pagina._total == 2
-    assert "2" in pagina._contador.text()
+    assert "de 2 registros" in pagina._paginador._info.text()
     assert pagina._tabela.item(0, 2).text() == "Ana"
     assert pagina._formatar_texto({"status": "aberto"}, "status") == "ABERTO"
 

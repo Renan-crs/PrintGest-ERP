@@ -18,7 +18,7 @@ class BlocoEndereco:
     """Campos de endereço com `campos` (para `_secoes`/grade), `preencher` e `payload`."""
 
     def __init__(self) -> None:
-        self.logradouro = CampoTexto("Logradouro", maximo=160)
+        self.logradouro = CampoTexto("Logradouro", maximo=160).larga()
         self.numero = CampoTexto("Número", maximo=12)
         self.complemento = CampoTexto("Complemento", maximo=80)
         self.bairro = CampoTexto("Bairro", maximo=80)

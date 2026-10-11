@@ -168,10 +168,11 @@ def test_filtro_finalizadas_vai_ao_daemon(app, pumpar, pagina):
 
 
 def test_historico_usa_ctrl_f_sem_conflito_com_f2(app, pagina):
-    # C3: o chip de atalho da busca é Ctrl+F (F2 é global para Clientes).
-    dicas = [w.text() for w in pagina._busca.findChildren(QLabel)]
-    assert "Ctrl+F" in dicas
-    assert "F2" not in dicas
+    # C3: a busca local usa Ctrl+F (F2 é global para Clientes) e não exibe chip.
+    from PySide6.QtGui import QKeySequence
+
+    assert pagina._busca._atalho.key() == QKeySequence("Ctrl+F")
+    assert pagina._busca._atalho.key() != QKeySequence("F2")
 
 
 # --- Nova venda: itens e totais ------------------------------------------------

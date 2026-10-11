@@ -131,7 +131,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.ui.modulos.clientes import PaginaClientes
     from printgest.ui.modulos.fornecedores import PaginaFornecedores
     from printgest.ui.modulos.os import PaginaProjetos
-    from printgest.ui.modulos.produtos import PaginaProdutos
+    from printgest.ui.modulos.produtos import PaginaProdutos, PaginaServicos
     from printgest.ui.modulos.venda_balcao import PaginaVendaBalcao
 
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_vazio_handler))
@@ -145,8 +145,8 @@ def test_navega_por_todo_o_menu_sem_erro(app):
         "cliente": PaginaClientes,
         "fornecedor": PaginaFornecedores,
         "produto": PaginaProdutos,
+        "servico": PaginaServicos,
         # módulos previstos no roadmap ainda não entregues → placeholder honesto
-        "servico": PaginaEmConstrucao,
         "financeiro": PaginaEmConstrucao,
         "fiscal": PaginaEmConstrucao,
         "configuracoes": PaginaEmConstrucao,

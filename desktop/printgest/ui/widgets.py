@@ -69,6 +69,11 @@ class ElideLabel(QLabel):
         super().__init__(texto, parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
 
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (API Qt)
+        # Não impõe a largura do texto: o rótulo pode encolher (elide) para
+        # liberar espaço em telas estreitas, sem travar o layout.
+        return QSize(0, super().minimumSizeHint().height())
+
     def paintEvent(self, evento) -> None:  # noqa: N802 (API Qt)
         painter = QPainter(self)
         metrics = self.fontMetrics()

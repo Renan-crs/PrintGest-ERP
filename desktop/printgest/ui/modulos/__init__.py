@@ -21,7 +21,7 @@ from printgest.ui.modulos.estoque import (
 from printgest.ui.modulos.fornecedores import PaginaFornecedores
 from printgest.ui.modulos.funcionarios import PaginaFuncionarios
 from printgest.ui.modulos.os import PaginaOS, PaginaOrcamento, PaginaProjetos
-from printgest.ui.modulos.produtos import PaginaProdutos
+from printgest.ui.modulos.produtos import PaginaProdutos, PaginaServicos
 from printgest.ui.modulos.venda_balcao import PaginaVendaBalcao
 
 
@@ -36,6 +36,7 @@ def criar_pagina(
         "cliente": PaginaClientes,
         "fornecedor": PaginaFornecedores,
         "produto": PaginaProdutos,
+        "servico": PaginaServicos,
         # ids granulares internos (fora do menu v2.1, ainda navegáveis)
         "funcionario": PaginaFuncionarios,
         "categoria": PaginaCategorias,
@@ -52,4 +53,7 @@ def criar_pagina(
     if construtora is PaginaVendaBalcao:
         # O PDV usa o nível para esconder ações que o perfil não pode executar.
         return PaginaVendaBalcao(api, modo_leitura=modo_leitura, nivel=nivel)
+    if construtora in (PaginaProdutos, PaginaServicos):
+        # Operador não edita preços (RBAC §1.1); o backend segue a mesma regra.
+        return construtora(api, modo_leitura=modo_leitura, nivel=nivel)
     return construtora(api, modo_leitura=modo_leitura)

@@ -1,14 +1,17 @@
-"""Campo de busca rápida com debounce e atalho F2 (padrão dos mockups).
+"""Campo de busca rápida com debounce e atalho Ctrl+F (padrão dos mockups).
 
 Dispara `buscado(texto)` ~250ms após a última digitação — evita spam de
 requests a cada tecla no daemon local.
+
+O chip do atalho saiu: F2 é global (abre Clientes) e a busca local usa Ctrl+F,
+sem duplicar a tecla na tela.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QShortcut, QKeySequence
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QWidget
+from PySide6.QtCore import QTimer, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QWidget
 
 from printgest.ui.widgets import aplicar_estilo
 
@@ -19,7 +22,7 @@ class CampoBusca(QWidget):
     buscado = Signal(str)
 
     def __init__(
-        self, placeholder: str = "Buscar...", nivel_hint: str = "F2"
+        self, placeholder: str = "Buscar...", nivel_hint: str = "Ctrl+F"
     ) -> None:
         super().__init__()
         layout = QHBoxLayout(self)
@@ -30,11 +33,6 @@ class CampoBusca(QWidget):
         self._entrada.setPlaceholderText(placeholder)
         self._entrada.setClearButtonEnabled(True)
         layout.addWidget(self._entrada, 1)
-
-        hint = QLabel(nivel_hint)
-        hint.setProperty("kbdHint", "true")
-        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(hint, 0)
 
         self._temporizador = QTimer(self)
         self._temporizador.setSingleShot(True)

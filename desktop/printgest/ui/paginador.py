@@ -5,10 +5,11 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QWidget,
 )
+
+from printgest.ui.widgets import ElideLabel
 
 LOTE = 50
 
@@ -22,13 +23,13 @@ class Paginador(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        self._info = QLabel()
+        self._info = ElideLabel()
         self._info.setProperty("role", "muted")
         layout.addWidget(self._info, 1)
 
         self._primeira = self._botao("|‹")
         self._anterior = self._botao("‹")
-        self._pagina = QLabel("Pág 1 de 1")
+        self._pagina = ElideLabel("Pág 1 de 1")
         self._pagina.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._proxima = self._botao("›")
         self._ultima = self._botao("›|")
@@ -57,7 +58,10 @@ class Paginador(QWidget):
         self._offset = offset
         inicio = offset + 1 if total else 0
         fim = min(offset + limit, total)
-        self._info.setText(f"Exibindo {inicio}–{fim} de {total} registros")
+        self._info.setText(
+            f"Exibindo {inicio}–{fim} de {total} "
+            + ("registro" if total == 1 else "registros")
+        )
         total_paginas = max((total + limit - 1) // limit, 1)
         pagina_atual = min(offset // limit + 1, total_paginas)
         self._pagina.setText(f"Pág {pagina_atual} de {total_paginas}")

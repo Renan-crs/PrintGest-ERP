@@ -7,6 +7,7 @@ from printgest.ui.formulario import (
     MASCARA_CNPJ,
     MASCARA_CPF,
     CampoArea,
+    CampoArquivo,
     CampoCheck,
     CampoCombo,
     CampoData,
@@ -34,10 +35,12 @@ class PaginaClientes(PaginaCrud):
     GRUPO_LISTA = "REGISTROS DE BALCÃO E CONTRATOS"
     CHAVES = CHAVES
     COLUNAS = COLUNAS
+    PESOS = [1, 1, 5, 3, 3, 1]
     FILTROS = FILTROS
     CHAVE_FILTRO = "tipo_pessoa"
     LUGAR_BUSCA = "Buscar por nome, razão social, CNPJ/CPF, telefone ou e-mail..."
     CAMPO_NOME = "nome_razao"
+    VAZIO = "Nenhum cliente encontrado. Clique em Novo Cliente (F6)."
 
     # ----------------------------------------------------------- formulário
 
@@ -47,14 +50,15 @@ class PaginaClientes(PaginaCrud):
             [("pf", "Pessoa Física"), ("pj", "Pessoa Jurídica")],
             padrao="pf",
         )
-        self._nome = CampoTexto("Nome / Razão Social", maximo=200).obrigatorio()
+        self._nome = CampoTexto("Nome / Razão Social", maximo=200).obrigatorio().larga()
         self._doc = CampoTexto("CPF / CNPJ", mono=True, maximo=18, mascara=MASCARA_CPF)
         self._ie = CampoTexto("Inscrição Estadual", mono=True, maximo=20)
         self._nasc = CampoData("Data de Nascimento")
-        self._email = CampoTexto("E-mail", maximo=120)
+        self._email = CampoTexto("E-mail", maximo=120).larga()
         self._telefone = CampoTexto("Telefone", mono=True, maximo=20)
         self._celular = CampoTexto("Celular / WhatsApp", mono=True, maximo=20)
-        self._obs = CampoArea("Observações Técnicas", linhas=2)
+        self._obs = CampoArea("", linhas=2).larga()
+        self._foto = CampoArquivo("Foto do Cliente").larga()
 
         self._adiantado = CampoCheck("Pagamento adiantado (total)")
         self._sinal = CampoCheck("Sinal")
@@ -67,17 +71,18 @@ class PaginaClientes(PaginaCrud):
                 "Dados Gerais",
                 [
                     self._tipo,
-                    self._nome,
                     self._doc,
+                    self._nome,
                     self._ie,
                     self._nasc,
                     self._email,
                     self._telefone,
                     self._celular,
-                    self._obs,
+                    self._foto,
                 ],
             ),
             ("Endereço & Entrega", self._end.campos),
+            ("Observações", [self._obs]),
             (
                 "Condições de Pagamento",
                 [self._adiantado, self._sinal, self._sinal_pct],
@@ -88,10 +93,15 @@ class PaginaClientes(PaginaCrud):
         self._tipo.widget.currentIndexChanged.connect(self._tipo_mudou)
         self._adiantado.widget.toggled.connect(self._so_adiantado)
         self._sinal.widget.toggled.connect(self._so_sinal)
+        self._tipo_mudou()
         self._atualizar_sinal()
 
     def _tipo_mudou(self) -> None:
-        self._doc.definir_mascara(MASCARA_CNPJ if self._tipo.valor() == "pj" else MASCARA_CPF)
+        pf = self._tipo.valor() == "pf"
+        self._doc.definir_mascara(MASCARA_CPF if pf else MASCARA_CNPJ)
+        # Data de nascimento só faz sentido para pessoa física; IE para jurídica.
+        self._nasc.visivel(pf)
+        self._ie.visivel(not pf)
 
     def _so_adiantado(self, ligado: bool) -> None:
         # Condições mutuamente exclusivas: pagamento adiantado OU sinal.
@@ -128,6 +138,7 @@ class PaginaClientes(PaginaCrud):
         self._telefone.definir(dado.get("telefone"))
         self._celular.definir(dado.get("celular"))
         self._obs.definir(dado.get("observacoes"))
+        self._foto.definir(dado.get("foto_path"))
         self._adiantado.definir(dado.get("pagamento_adiantado"))
         self._sinal.definir(dado.get("sinal"))
         self._sinal_pct.definir(dado.get("sinal_pct"))
@@ -166,6 +177,7 @@ class PaginaClientes(PaginaCrud):
             "telefone": limpo(self._telefone.valor()),
             "celular": limpo(self._celular.valor()),
             "observacoes": limpo(self._obs.valor()),
+            "foto_path": limpo(self._foto.valor()),
             "pagamento_adiantado": self._adiantado.valor(),
             "sinal": self._sinal.valor(),
             "sinal_pct": numero(self._sinal_pct, "50"),
