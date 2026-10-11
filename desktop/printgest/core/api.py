@@ -241,6 +241,35 @@ class Api:
         """Baixa de título: `POST /v1/financeiro/{contas-receber|contas-pagar}/{id}/baixa`."""
         return self._post(f"/v1/financeiro/{tipo}/{conta_id}/baixa", payload, self._token)
 
+    # -------------------------------------------------------------- fiscal
+
+    def documentos_fiscais(
+        self,
+        q: str = "",
+        status_fiscal: str | None = None,
+        modelo: str | None = None,
+        contingencia: bool | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """Consulta de documentos fiscais: `GET /v1/fiscal/documentos`."""
+        return self.listar_com_filtros(
+            "fiscal/documentos",
+            q=q,
+            status_fiscal=status_fiscal,
+            modelo=modelo,
+            contingencia=contingencia,
+            limit=limit,
+            offset=offset,
+        )
+
+    def documento_fiscal(self, item_id: int) -> dict:
+        return self.obter("fiscal/documentos", item_id)
+
+    def resumo_fiscal(self) -> dict:
+        """Panorama fiscal usado pela tela de contingência: `GET /v1/fiscal/resumo`."""
+        return self._get("/v1/fiscal/resumo", self._token)
+
     def acao(self, entidade: str, item_id: int, acao: str, payload: dict | None = None) -> dict:
         """POST de ação de negócio, ex.: `/v1/os/5/converter`."""
         resp = self._cliente.post(

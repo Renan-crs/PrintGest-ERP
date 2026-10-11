@@ -32,6 +32,7 @@ from app.schemas.financeiro import (
     PlanoContaOut,
     PlanoContaUpdate,
 )
+from app.schemas.fiscal import DocumentoFiscalOut, ResumoFiscal
 from app.schemas.licenca import LicencaAtivarIn, LicencaSituacaoOut
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
 
@@ -69,6 +70,8 @@ __all__ = [
     "PlanoContaCreate",
     "PlanoContaOut",
     "PlanoContaUpdate",
+    "DocumentoFiscalOut",
+    "ResumoFiscal",
     "LicencaAtivarIn",
     "LicencaSituacaoOut",
     "UsuarioCreate",

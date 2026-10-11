@@ -98,6 +98,25 @@ def require_nivel(*niveis: NivelAcesso):
     return _check
 
 
+def require_perfis(*niveis: NivelAcesso):
+    """Permite apenas os perfis listados (RBAC **não hierárquico** — PRD v2.1 §5).
+
+    Diferente de `require_nivel`, não usa o rank: `caixa` vê Financeiro/Fiscal,
+    enquanto `operador` (rank maior) não vê. É o que o menu v2.1 expressa.
+    """
+    permitidos = set(niveis)
+
+    def _check(usuario: UsuarioDep) -> Usuario:
+        if usuario.nivel_acesso not in permitidos:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: nível de permissão insuficiente.",
+            )
+        return usuario
+
+    return _check
+
+
 def get_filial_atual(usuario: UsuarioDep) -> int:
     """Filial efetiva do usuário — MVP opera com filial 1 quando não definida."""
     return usuario.filial_id or 1
