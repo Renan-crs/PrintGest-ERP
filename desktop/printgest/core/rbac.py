@@ -5,7 +5,7 @@ o enxergam (`niveis`). Ex.: caixa vê Financeiro/Fiscal enquanto operador não �
 isso não é expressável por um "nível mínimo" único. Itens sem permissão **não
 aparecem** no menu (o backend reforça com 403/omitindo campos).
 
-Ids granulares antigos (O.S., orçamento, venda balcão, estoque, funcionários…)
+Itens granulares (O.S., orçamento, venda balcão, estoque, funcionários…)
 saíram do menu v2.1 mas continuam navegáveis via atalho/busca/acesso rápido
 através de `ITENS_INTERNOS` e do helper `pode_abrir`.
 """
@@ -32,6 +32,7 @@ MENU = [
         [
             {"id": "pdv", "rotulo": "PDV", "niveis": ["admin", "gerente", "operador", "caixa"]},
             {"id": "projetos", "rotulo": "Projetos", "niveis": ["admin", "gerente", "operador"]},
+            {"id": "agendamento", "rotulo": "Agendamento", "niveis": ["admin", "gerente", "operador"]},
         ],
     ),
     (
@@ -41,6 +42,8 @@ MENU = [
             {"id": "fornecedor", "rotulo": "Fornecedores", "niveis": ["admin", "gerente"]},
             {"id": "produto", "rotulo": "Produtos", "niveis": ["admin", "gerente", "operador"]},
             {"id": "servico", "rotulo": "Serviços", "niveis": ["admin", "gerente", "operador"]},
+            {"id": "categoria", "rotulo": "Categorias", "niveis": ["admin", "gerente", "operador"]},
+            {"id": "funcionario", "rotulo": "Funcionários", "niveis": ["admin", "gerente", "operador"]},
         ],
     ),
     (
@@ -48,6 +51,13 @@ MENU = [
         [
             {"id": "financeiro", "rotulo": "Financeiro", "niveis": ["admin", "gerente", "caixa"]},
             {"id": "fiscal", "rotulo": "Fiscal", "niveis": ["admin", "gerente", "caixa"]},
+            {"id": "estoque", "rotulo": "Estoque", "niveis": ["admin", "gerente", "operador"]},
+        ],
+    ),
+    (
+        "Relatórios",
+        [
+            {"id": "relatorios", "rotulo": "Relatórios", "niveis": ["admin", "gerente"]},
         ],
     ),
     (
@@ -67,13 +77,10 @@ ITENS_INTERNOS = [
     {"id": "orcamento", "rotulo": "Orçamentos", "nivel": "operador"},
     {"id": "venda_balcao", "rotulo": "Venda Balcão", "nivel": "caixa"},
     {"id": "pedido_compra", "rotulo": "Pedido de Compra", "nivel": "operador"},
-    {"id": "agendamento", "rotulo": "Agendamento", "nivel": "operador"},
     {"id": "estoque_consulta", "rotulo": "Consulta de Estoque", "nivel": "operador"},
     {"id": "estoque_movimento", "rotulo": "Movimentação Manual", "nivel": "operador"},
     {"id": "estoque_reposicao", "rotulo": "Relatório de Reposição", "nivel": "operador"},
     {"id": "estoque_mais_vendidos", "rotulo": "Mais Vendidos", "nivel": "operador"},
-    {"id": "funcionario", "rotulo": "Funcionários", "nivel": "operador"},
-    {"id": "categoria", "rotulo": "Categorias", "nivel": "operador"},
     {"id": "caixa", "rotulo": "Caixa", "nivel": "caixa"},
     {"id": "contas_receber", "rotulo": "Contas a Receber", "nivel": "gerente"},
     {"id": "contas_pagar", "rotulo": "Contas a Pagar", "nivel": "gerente"},
@@ -84,7 +91,6 @@ ITENS_INTERNOS = [
     {"id": "rel_clientes", "rotulo": "Clientes que Mais Compram", "nivel": "gerente"},
     {"id": "rel_servicos", "rotulo": "Serviços Mais Executados", "nivel": "gerente"},
     {"id": "rel_aniversariantes", "rotulo": "Aniversariantes", "nivel": "gerente"},
-    {"id": "relatorios", "rotulo": "Relatórios", "nivel": "gerente"},
     {"id": "dados_empresa", "rotulo": "Dados da Empresa", "nivel": "admin"},
     {"id": "personalizacao", "rotulo": "Personalização", "nivel": "admin"},
     {"id": "reajuste_bloco", "rotulo": "Reajuste de Preços", "nivel": "admin"},

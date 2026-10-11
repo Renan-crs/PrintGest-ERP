@@ -7,6 +7,10 @@ import pytest
 from PySide6.QtWidgets import QLabel, QPushButton
 
 from printgest.core.api import Api
+from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
+from printgest.ui.modulos.agendamento import PaginaAgendamento
+from printgest.ui.modulos.categorias import PaginaCategorias
+from printgest.ui.modulos.funcionarios import PaginaFuncionarios
 from printgest.ui.tela_principal import ITEM_INICIO, TelaPrincipal
 
 _CLIENTES = [
@@ -144,12 +148,17 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     esperadas = {
         "pdv": PaginaVendaBalcao,
         "projetos": PaginaProjetos,
+        "agendamento": PaginaAgendamento,
         "cliente": PaginaClientes,
         "fornecedor": PaginaFornecedores,
         "produto": PaginaProdutos,
         "servico": PaginaServicos,
+        "categoria": PaginaCategorias,
+        "funcionario": PaginaFuncionarios,
         "financeiro": PaginaFinanceiro,
         "fiscal": PaginaFiscal,
+        "estoque": PaginaEmConstrucao,
+        "relatorios": PaginaEmConstrucao,
         "configuracoes": PaginaConfiguracoes,
     }
     visitadas = set()
