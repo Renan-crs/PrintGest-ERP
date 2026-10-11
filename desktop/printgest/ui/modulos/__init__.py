@@ -10,6 +10,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QWidget
 
 from printgest.core.api import Api
+from printgest.ui.modulos.agendamento import PaginaAgendamento
 from printgest.ui.modulos.clientes import PaginaClientes
 from printgest.ui.modulos.categorias import PaginaCategorias
 from printgest.ui.modulos.configuracao import (
@@ -64,6 +65,7 @@ def criar_pagina(
         "categoria": PaginaCategorias,
         "os": PaginaOS,
         "orcamento": PaginaOrcamento,
+        "agendamento": PaginaAgendamento,
         "venda_balcao": PaginaVendaBalcao,
         "estoque_consulta": PaginaEstoqueConsulta,
         "estoque_movimento": PaginaEstoqueMovimento,
