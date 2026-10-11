@@ -10,7 +10,9 @@ from printgest.core.api import Api
 from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
 from printgest.ui.modulos.agendamento import PaginaAgendamento
 from printgest.ui.modulos.categorias import PaginaCategorias
+from printgest.ui.modulos.estoque import PaginaEstoque
 from printgest.ui.modulos.funcionarios import PaginaFuncionarios
+from printgest.ui.modulos.relatorios import PaginaRelatorios
 from printgest.ui.tela_principal import ITEM_INICIO, TelaPrincipal
 
 _CLIENTES = [
@@ -157,8 +159,8 @@ def test_navega_por_todo_o_menu_sem_erro(app):
         "funcionario": PaginaFuncionarios,
         "financeiro": PaginaFinanceiro,
         "fiscal": PaginaFiscal,
-        "estoque": PaginaEmConstrucao,
-        "relatorios": PaginaEmConstrucao,
+        "estoque": PaginaEstoque,
+        "relatorios": PaginaRelatorios,
         "configuracoes": PaginaConfiguracoes,
     }
     visitadas = set()

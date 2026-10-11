@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from printgest.core.tarefas import rodar
@@ -35,7 +36,7 @@ from printgest.ui.formulario import (
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import badge, botao_com_atalho
+from printgest.ui.widgets import badge, botao_com_atalho, ElideLabel
 
 _STATUS = {
     "critico": "CRÍTICO (repor)",
@@ -538,8 +539,68 @@ class PaginaEstoqueReposicao(PaginaEstoqueBase):
 
 
 __all__ = [
+    "PaginaEstoque",
     "PaginaEstoqueConsulta",
     "PaginaEstoqueMovimento",
     "PaginaEstoqueReposicao",
     "PaginaEstoqueBase",
 ]
+
+
+# ================================================================ host Estoque
+
+
+class PaginaEstoque(QWidget):
+    """Menu "Estoque": hospeda as sub-abas (Consulta, Movimentação, Reposição)."""
+
+    def __init__(self, api, modo_leitura: bool = False) -> None:
+        super().__init__()
+        self._api = api
+        self._modo_leitura = modo_leitura
+        self._abas = [
+            ("Consulta", PaginaEstoqueConsulta),
+            ("Movimentação", PaginaEstoqueMovimento),
+            ("Reposição", PaginaEstoqueReposicao),
+        ]
+        self._atual: QWidget | None = None
+
+        col = QVBoxLayout(self)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(0)
+        col.addWidget(self._barra())
+        self._corpo = QWidget()
+        self._corpo_layout = QVBoxLayout(self._corpo)
+        self._corpo_layout.setContentsMargins(0, 0, 0, 0)
+        col.addWidget(self._corpo, 1)
+        self._trocar(0)
+
+    def _barra(self) -> QWidget:
+        caixa = QWidget()
+        linha = QHBoxLayout(caixa)
+        linha.setContentsMargins(20, 16, 20, 0)
+        linha.setSpacing(8)
+        titulo = ElideLabel("Estoque")
+        titulo.setObjectName("titulo")
+        linha.addWidget(titulo)
+        linha.addStretch(1)
+        self._botoes = []
+        for indice, (rotulo, _classe) in enumerate(self._abas):
+            botao = QPushButton(rotulo)
+            botao.setObjectName("chaveRapida")
+            botao.setCheckable(True)
+            botao.setChecked(indice == 0)
+            botao.clicked.connect(lambda _=False, i=indice: self._trocar(i))
+            self._botoes.append(botao)
+            linha.addWidget(botao)
+        return caixa
+
+    def _trocar(self, indice: int) -> None:
+        _rotulo, classe = self._abas[indice]
+        pagina = classe(self._api, modo_leitura=self._modo_leitura)
+        if self._atual is not None:
+            self._corpo_layout.removeWidget(self._atual)
+            self._atual.deleteLater()
+        self._corpo_layout.addWidget(pagina)
+        self._atual = pagina
+        for i, botao in enumerate(self._botoes):
+            botao.setChecked(i == indice)
