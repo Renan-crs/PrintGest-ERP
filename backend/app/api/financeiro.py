@@ -4,10 +4,10 @@ RBAC: caixa (abertura/extrato/fechamento e sangria/suprimento) exige CAIXA;
 contas a receber/pagar e plano de contas exigem GERENTE (PRD §5).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 
 from app.api.crud_factory import criar_router_crud
-from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
+from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel, require_perfis
 from app.models.enums import NivelAcesso, StatusConta
 from app.models.financeiro import PlanoContas
 from app.schemas.common import ItemResponse, ListaResponse, MetaPaginacao
@@ -29,26 +29,8 @@ from app.services import financeiro_service
 router = APIRouter(prefix="/financeiro", tags=["financeiro"])
 
 
-def _perfis(*niveis: NivelAcesso):
-    """RBAC não hierárquico (PRD §5): só os perfis que veem Financeiro no menu.
-
-    `require_nivel` não serve aqui porque `operador` tem rank maior que `caixa`,
-    mas não tem acesso ao Financeiro.
-    """
-    permitidos = set(niveis)
-
-    def _check(usuario: UsuarioDep) -> UsuarioDep:
-        if usuario.nivel_acesso not in permitidos:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado: nível de permissão insuficiente.",
-            )
-        return usuario
-
-    return _check
-
-
-_caixa = [Depends(_perfis(NivelAcesso.CAIXA, NivelAcesso.GERENTE, NivelAcesso.ADMIN))]
+# --------------------------------------------------------------------- caixa
+_caixa = [Depends(require_perfis(NivelAcesso.CAIXA, NivelAcesso.GERENTE, NivelAcesso.ADMIN))]
 _gerente = [Depends(require_nivel(NivelAcesso.GERENTE))]
 
 

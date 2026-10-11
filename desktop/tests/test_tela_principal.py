@@ -130,6 +130,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
     from printgest.ui.modulos.clientes import PaginaClientes
     from printgest.ui.modulos.financeiro import PaginaFinanceiro
+    from printgest.ui.modulos.fiscal import PaginaFiscal
     from printgest.ui.modulos.fornecedores import PaginaFornecedores
     from printgest.ui.modulos.os import PaginaProjetos
     from printgest.ui.modulos.produtos import PaginaProdutos, PaginaServicos
@@ -148,8 +149,8 @@ def test_navega_por_todo_o_menu_sem_erro(app):
         "produto": PaginaProdutos,
         "servico": PaginaServicos,
         "financeiro": PaginaFinanceiro,
+        "fiscal": PaginaFiscal,
         # módulos previstos no roadmap ainda não entregues → placeholder honesto
-        "fiscal": PaginaEmConstrucao,
         "configuracoes": PaginaEmConstrucao,
     }
     visitadas = set()

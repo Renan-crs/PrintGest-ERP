@@ -40,6 +40,7 @@ from printgest.ui.formulario import (
     CampoValor,
     data_iso,
     em_volta,
+    formatar_data_hora,
     formatar_data_iso,
     formatar_moeda,
     limpo,
@@ -62,15 +63,8 @@ _MOV_SAIDA = ("saida", "sangria")
 
 
 def _dt(valor) -> str:
-    if not valor:
-        return ""
-    texto = str(valor)[:19].replace("T", " ")
-    partes = texto.split(" ")
-    if len(partes) != 2:
-        return texto
-    datas, horario = partes
-    d = datas.split("-")
-    return f"{d[2]}/{d[1]}/{d[0]} {horario[:5]}" if len(d) == 3 else texto
+    """Data/hora ISO → 'DD/MM/AAAA HH:MM' (helper compartilhado)."""
+    return formatar_data_hora(valor)
 
 
 def _valor_movimento(mov: dict) -> str:

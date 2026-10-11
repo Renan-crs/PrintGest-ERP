@@ -515,6 +515,18 @@ def formatar_data_iso(valor) -> str:
     return f"{dia}/{mes}/{ano}"
 
 
+def formatar_data_hora(valor) -> str:
+    """ISO 'AAAA-MM-DDTHH:MM:SS' (ou só data) → 'DD/MM/AAAA HH:MM'; vazio → ''."""
+    if not valor:
+        return ""
+    texto = str(valor)[:19].replace("T", " ")
+    partes = texto.split(" ")
+    data = formatar_data_iso(partes[0])
+    if not data:
+        return ""
+    return f"{data} {partes[1][:5]}" if len(partes) == 2 else data
+
+
 def rotulo_secao(texto: str) -> QLabel:
     lbl = QLabel(texto.upper())
     lbl.setObjectName("secaoForm")
