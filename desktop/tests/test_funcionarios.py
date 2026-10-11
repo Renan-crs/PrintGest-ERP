@@ -63,12 +63,12 @@ def _pagina(modo_leitura: bool = False):
     return PaginaFuncionarios(api, modo_leitura=modo_leitura)
 
 
-def test_carrega_grade_e_contador(app, pumpar):
+def test_carrega_grade_e_total(app, pumpar):
     _GETS.clear()
     pagina = _pagina()
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     assert pagina._total == 2
-    assert "2" in pagina._contador.text()
+    assert "de 2 registros" in pagina._paginador._info.text()
     assert pagina._tabela.item(0, 1).text() == "Marta Souza"
     assert pagina._tabela.item(0, 5).text() == "Atend. / Prod."
 

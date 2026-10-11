@@ -53,7 +53,7 @@ def test_selecionar_preenche(app, pumpar):
     pumpar(lambda: pagina._editando_id == 2)
     assert pagina._nome.valor() == "Suprimentos"
     assert pagina._descricao.valor() == "Toners, tintas e químicos"
-    assert pagina._form_badge.text() == "#00002"
+    assert "#00002" in pagina._form_titulo.text()
 
 
 def test_criar_nova_envia_post(app, pumpar):

@@ -74,7 +74,7 @@ def test_carrega_grade_e_categorias(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     pumpar(lambda: pagina._categoria.widget.count() == 3)
-    assert pagina._contador.text() == "2 registros"
+    assert "de 2 registros" in pagina._paginador._info.text()
     assert "Papel A4" in pagina._tabela.item(0, 2).text()
     assert pagina._tabela.item(0, 5).text() == "R$ 38,50"
     assert pagina._nomes_cat.get(2) == "Suprimentos"

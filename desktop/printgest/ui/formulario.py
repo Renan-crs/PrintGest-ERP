@@ -9,16 +9,20 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDateEdit,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -59,6 +63,16 @@ class CampoForm:
 
     def habilitar(self, ligado: bool) -> None:
         self.widget.setEnabled(ligado)
+
+    def larga(self) -> "CampoForm":
+        """Marca o campo para ocupar a linha inteira (2 colunas) da grade."""
+        self.largo = True
+        return self
+
+    def visivel(self, ligado: bool) -> None:
+        """Mostra/oculta o campo inteiro (rótulo acima + controle)."""
+        alvo = getattr(self, "_celula", None) or self.widget
+        alvo.setVisible(ligado)
 
     def obrigatorio(self, ligado: bool = True) -> "CampoForm":
         self._obrigatorio = ligado
@@ -122,7 +136,10 @@ class CampoArea(CampoForm):
     def __init__(self, rotulo: str, valor="", linhas: int = 3) -> None:
         super().__init__(rotulo)
         self._area = QPlainTextEdit(valor)
-        self._area.setFixedHeight(20 + linhas * 16)
+        self._area.setMinimumHeight(20 + linhas * 16)
+        self._area.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
 
     @property
     def widget(self) -> QPlainTextEdit:
@@ -144,6 +161,10 @@ class CampoData(CampoForm):
         self._data.setDisplayFormat("dd/MM/yyyy")
         self._data.setMinimumDate(QDate(1900, 1, 1))
         self._data.setMaximumDate(QDate(2100, 12, 31))
+        # No mínimo da faixa o QDateEdit exibe `specialValueText` — usamos um
+        # espaço para o campo "sem data" ficar realmente vazio (nunca 01/01/1900).
+        self._data.setSpecialValueText(" ")
+        self._aceita_sem_data = aceita_sem_data
         caixa = QWidget()
         linha = QHBoxLayout(caixa)
         linha.setContentsMargins(0, 0, 0, 0)
@@ -151,28 +172,41 @@ class CampoData(CampoForm):
         linha.addWidget(self._data, 1)
         if aceita_sem_data:
             linha.addWidget(self._sem)
-            self._sem.toggled.connect(self._data.setDisabled)
+            self._sem.toggled.connect(self._sem_data_mudou)
         self._caixa = caixa
-        self._sem.setChecked(False)
+        # Padrão dos cadastros: data opcional e vazia (sem data gravada).
+        self._sem.setChecked(aceita_sem_data)
+        self._sem_data_mudou(aceita_sem_data)
 
     @property
     def widget(self) -> QWidget:
         return self._caixa
 
+    def _sem_data_mudou(self, ligado: bool) -> None:
+        self._data.setDisabled(ligado)
+        if ligado:
+            self._data.setDate(self._data.minimumDate())
+        elif self._data.date() == self._data.minimumDate():
+            self._data.setDate(QDate.currentDate())
+
     def valor(self) -> date | None:
-        if self._sem.isChecked():
+        if self._aceita_sem_data and self._sem.isChecked():
             return None
         d = self._data.date()
         return date(d.year(), d.month(), d.day())
 
     def definir(self, valor) -> None:
-        if valor is None:
-            self._sem.setChecked(True)
+        if valor is None or valor == "":
+            if self._aceita_sem_data:
+                self._sem.setChecked(True)
+            else:
+                self._data.setDate(QDate.currentDate())
             return
         d = QDate.fromString(str(valor)[:10], "yyyy-MM-dd")
         if d.isValid():
             self._data.setDate(d)
-            self._sem.setChecked(False)
+            if self._aceita_sem_data:
+                self._sem.setChecked(False)
 
     def habilitar(self, ligado: bool) -> None:
         self._caixa.setEnabled(ligado)
@@ -230,13 +264,92 @@ class CampoCheck(CampoForm):
         self._check.setChecked(bool(valor))
 
 
+class CampoArquivo(CampoForm):
+    """Caminho de arquivo (ex.: foto) com botão para escolher no disco."""
+
+    def __init__(
+        self, rotulo: str, filtro: str = "Imagens (*.png *.jpg *.jpeg *.webp)"
+    ) -> None:
+        super().__init__(rotulo)
+        self._filtro = filtro
+        self._edicao = QLineEdit()
+        self._edicao.setReadOnly(True)
+        self._edicao.setPlaceholderText("Nenhum arquivo selecionado")
+        botao = QPushButton("Escolher…")
+        botao.setObjectName("acaoLinha")
+        botao.clicked.connect(self._escolher)
+        caixa = QWidget()
+        linha = QHBoxLayout(caixa)
+        linha.setContentsMargins(0, 0, 0, 0)
+        linha.setSpacing(6)
+        linha.addWidget(self._edicao, 1)
+        linha.addWidget(botao)
+        self._caixa = caixa
+
+    @property
+    def widget(self) -> QWidget:
+        return self._caixa
+
+    def _escolher(self) -> None:
+        caminho, _ = QFileDialog.getOpenFileName(
+            self._caixa, "Selecionar arquivo", "", self._filtro
+        )
+        if caminho:
+            self._edicao.setText(caminho)
+
+    def valor(self) -> str:
+        return self._edicao.text().strip()
+
+    def definir(self, valor) -> None:
+        self._edicao.setText("" if valor is None else str(valor))
+
+    def habilitar(self, ligado: bool) -> None:
+        self._caixa.setEnabled(ligado)
+
+
 def grade_campos() -> QGridLayout:
+    """Grade de 2 colunas iguais; cada célula recebe rótulo acima do controle."""
     grade = QGridLayout()
     grade.setHorizontalSpacing(16)
     grade.setVerticalSpacing(10)
-    grade.setColumnStretch(1, 3)
-    grade.setColumnStretch(3, 3)
+    grade.setColumnStretch(0, 1)
+    grade.setColumnStretch(1, 1)
     return grade
+
+
+def em_volta(campo: CampoForm) -> QWidget:
+    """Empilha rótulo acima do controle (padrão do formulário, evita G1)."""
+    caixa = QWidget()
+    coluna = QVBoxLayout(caixa)
+    coluna.setContentsMargins(0, 0, 0, 0)
+    coluna.setSpacing(4)
+    if campo.rotulo_widget is not None:
+        coluna.addWidget(campo.rotulo_widget)
+    coluna.addWidget(campo.widget)
+    campo._celula = caixa
+    return caixa
+
+
+def dispor_campos(grade: QGridLayout, campos: list) -> None:
+    """Dispõe os campos em 2 colunas; campos marcados com `larga()` ocupam a linha."""
+    linha = 0
+    pendente: list = []
+    for campo in campos:
+        if getattr(campo, "largo", False):
+            if pendente:
+                grade.addWidget(em_volta(pendente.pop()), linha, 0)
+                linha += 1
+            grade.addWidget(em_volta(campo), linha, 0, 1, 2)
+            linha += 1
+            continue
+        pendente.append(campo)
+        if len(pendente) == 2:
+            grade.addWidget(em_volta(pendente[0]), linha, 0)
+            grade.addWidget(em_volta(pendente[1]), linha, 1)
+            pendente = []
+            linha += 1
+    if pendente:
+        grade.addWidget(em_volta(pendente[0]), linha, 0)
 
 
 def formatar_moeda(valor) -> str:
@@ -282,13 +395,14 @@ class CampoValor(CampoForm):
         super().__init__(rotulo)
         self._prefixo = prefixo
         self._edicao = QLineEdit(valor)
-        rot = QLabel(prefixo)
-        rot.setObjectName("labelForm")
         caixa = QWidget()
         linha = QHBoxLayout(caixa)
         linha.setContentsMargins(0, 0, 0, 0)
         linha.setSpacing(6)
-        linha.addWidget(rot)
+        if prefixo:
+            rot = QLabel(prefixo)
+            rot.setObjectName("labelForm")
+            linha.addWidget(rot)
         linha.addWidget(self._edicao, 1)
         self._caixa = caixa
 
@@ -322,21 +436,14 @@ class CampoValor(CampoForm):
 
 
 def adicionar_linha(grade: QGridLayout, linha: int, *campos: CampoForm):
-    """Posiciona até 2 campos por linha; os pares ficam lado a lado."""
-    rota = [(0, 0), (2, 1)]
-    for par, campo in zip(rota, campos, strict=False):
-        if campo.rotulo_widget is not None:
-            grade.addWidget(campo.rotulo_widget, linha, par[0], Qt.AlignmentFlag.AlignTop)
-        grade.addWidget(campo.widget, linha, par[1], Qt.AlignmentFlag.AlignTop)
+    """Posiciona até 2 campos por linha (rótulo acima de cada controle)."""
+    for coluna, campo in enumerate(campos[:2]):
+        grade.addWidget(em_volta(campo), linha, coluna)
 
 
 def adicionar_linha_larga(grade: QGridLayout, linha: int, campo: CampoForm):
-    """Campo que ocupa as 4 colunas do formulário (ex.: grade de itens)."""
-    if campo.rotulo_widget is not None:
-        grade.addWidget(
-            campo.rotulo_widget, linha, 0, 1, 4, Qt.AlignmentFlag.AlignTop
-        )
-    grade.addWidget(campo.widget, linha, 0, 1, 4)
+    """Campo que ocupa as 2 colunas do formulário (ex.: grade de itens)."""
+    grade.addWidget(em_volta(campo), linha, 0, 1, 2)
 
 
 def data_iso(valor):

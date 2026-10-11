@@ -12,13 +12,15 @@ A subclasse declara `ENTIDADE`/`CHAVES`/`COLUNAS`/`FILTROS` e os hooks:
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -29,14 +31,13 @@ from printgest.core.tarefas import rodar
 from printgest.ui.busca import CampoBusca
 from printgest.ui.formulario import (
     CampoCheck,
-    adicionar_linha,
-    adicionar_linha_larga,
+    dispor_campos,
     grade_campos,
     rotulo_secao,
 )
 from printgest.ui.paginador import LOTE, Paginador
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
+from printgest.ui.widgets import ElideLabel, FlowLayout, botao_com_atalho
 
 
 class PaginaCrud(QWidget):
@@ -48,11 +49,14 @@ class PaginaCrud(QWidget):
     GRUPO_LISTA = "REGISTROS"
     CHAVES: list[str] = []
     COLUNAS: list[str] = []
+    PESOS: list[int] = []
     FILTROS: list[tuple[str, str]] = []
     CHAVE_FILTRO = ""
+    FILTRO_LOCAL = False
     LUGAR_BUSCA = "Buscar..."
     CAMPO_NOME = "nome_razao"
     ROTULO_EXPORTAR = "Exportar Excel"
+    VAZIO = "Nenhum registro encontrado. Clique em {novo} (F6)."
 
     def __init__(self, api: Api, modo_leitura: bool = False) -> None:
         super().__init__()
@@ -71,13 +75,20 @@ class PaginaCrud(QWidget):
         layout.setSpacing(10)
         layout.addWidget(self._barra_titulo())
         layout.addWidget(self._barra_busca())
-        layout.addLayout(self._split(), 1)
+        layout.addWidget(self._split(), 1)
 
         self._montar_form()
         self._conectar_campos()
+        self._instalar_atalhos()
         self.recarregar()
 
     # ----------------------------------------------------------- construção
+
+    def _instalar_atalhos(self) -> None:
+        """Atalhos do cadastro: F6 = Novo (nesta tela), F10 = Salvar, Esc = cancelar."""
+        QShortcut(QKeySequence("F6"), self, self._novo)
+        QShortcut(QKeySequence("F10"), self, self._salvar)
+        QShortcut(QKeySequence("Esc"), self, self._limpar_form)
 
     def _campos(self) -> list:
         todos: list = []
@@ -95,16 +106,9 @@ class PaginaCrud(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        esquerda = QWidget()
-        linha = QHBoxLayout(esquerda)
-        linha.setContentsMargins(0, 0, 0, 0)
-        linha.setSpacing(8)
-        titulo = QLabel(self.ROTULO_PAGINA)
+        titulo = ElideLabel(self.ROTULO_PAGINA)
         titulo.setObjectName("titulo")
-        linha.addWidget(titulo)
-        self._contador = badge("0 registros", "primary")
-        linha.addWidget(self._contador)
-        layout.addWidget(esquerda, 1)
+        layout.addWidget(titulo, 1)
 
         for badge_extra in self._badges_barra():
             layout.addWidget(badge_extra)
@@ -128,34 +132,36 @@ class PaginaCrud(QWidget):
         layout.addWidget(self._busca, 1)
 
         self._btn_filtros: dict[str, QPushButton] = {}
-        for valor, rotulo in self.FILTROS:
-            botao = QPushButton(rotulo)
-            botao.setCheckable(True)
-            botao.setObjectName("chaveRapida")
-            if valor == "":
-                botao.setChecked(True)
-            botao.clicked.connect(lambda _=False, v=valor: self._aplicar_filtro(v))
-            self._btn_filtros[valor] = botao
-            layout.addWidget(botao)
+        if self.FILTROS:
+            filtros = QWidget()
+            fluxo = FlowLayout(filtros, espaco_h=8, espaco_v=8)
+            for valor, rotulo in self.FILTROS:
+                botao = QPushButton(rotulo)
+                botao.setCheckable(True)
+                botao.setObjectName("chaveRapida")
+                if valor == "":
+                    botao.setChecked(True)
+                botao.clicked.connect(lambda _=False, v=valor: self._aplicar_filtro(v))
+                self._btn_filtros[valor] = botao
+                fluxo.addWidget(botao)
+            layout.addWidget(filtros, 0)
         return caixa
 
-    def _split(self) -> QHBoxLayout:
-        split = QHBoxLayout()
-        split.setSpacing(12)
+    def _split(self) -> QSplitter:
+        divisor = QSplitter(Qt.Orientation.Horizontal)
+        divisor.setChildrenCollapsible(False)
+        divisor.setHandleWidth(10)
 
         esquerda = QWidget()
         esquerda.setObjectName("card")
         col = QVBoxLayout(esquerda)
-        col.setContentsMargins(0, 0, 0, 0)
+        # Folga no topo do card: separa o cabeçalho da tabela da borda.
+        col.setContentsMargins(0, 8, 0, 0)
         col.setSpacing(0)
 
-        toolbar = QLabel(self.GRUPO_LISTA)
-        toolbar.setObjectName("labelForm")
-        toolbar.setContentsMargins(14, 10, 14, 0)
-        col.addWidget(toolbar)
-
-        self._tabela = TabelaDensa(self.CHAVES, self.COLUNAS)
+        self._tabela = TabelaDensa(self.CHAVES, self.COLUNAS, self.PESOS or None)
         self._tabela.formata = self._formatar_texto
+        self._tabela.estado_vazio(self.VAZIO.format(novo=self.ROTULO_NOVO))
         self._tabela.itemSelectionChanged.connect(self._selecao_mudou)
         col.addWidget(self._tabela, 1)
 
@@ -167,28 +173,38 @@ class PaginaCrud(QWidget):
         pag_layout.addWidget(self._paginador)
         col.addWidget(pag_linha)
 
-        split.addWidget(esquerda, 3)
+        divisor.addWidget(esquerda)
+
+        painel = QWidget()
+        painel.setObjectName("card")
+        self._painel_col = QVBoxLayout(painel)
+        self._painel_col.setContentsMargins(0, 0, 0, 0)
+        self._painel_col.setSpacing(0)
 
         self._painel_form = QScrollArea()
         self._painel_form.setWidgetResizable(True)
-        split.addWidget(self._painel_form, 4)
-        return split
+        self._painel_form.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._painel_col.addWidget(self._painel_form, 1)
+
+        # Largura útil para a grade de 2 colunas; a lista fica com o restante.
+        painel.setMinimumWidth(520)
+        divisor.addWidget(painel)
+
+        divisor.setStretchFactor(0, 1)
+        divisor.setStretchFactor(1, 0)
+        divisor.setSizes([700, 520])
+        return divisor
 
     def _montar_form(self) -> None:
         conteudo = QWidget()
+        conteudo.setMinimumWidth(460)
         self._form_grade = QVBoxLayout(conteudo)
         self._form_grade.setContentsMargins(16, 14, 16, 14)
         self._form_grade.setSpacing(10)
 
-        cabeca = QWidget()
-        ch = QHBoxLayout(cabeca)
-        ch.setContentsMargins(0, 0, 0, 0)
-        self._form_titulo = QLabel(self.ROTULO_NOVO)
+        self._form_titulo = ElideLabel(self.ROTULO_NOVO)
         self._form_titulo.setObjectName("titulo")
-        ch.addWidget(self._form_titulo, 1)
-        self._form_badge = badge("NOVO", "primary")
-        ch.addWidget(self._form_badge)
-        self._form_grade.addWidget(cabeca)
+        self._form_grade.addWidget(self._form_titulo)
 
         if self._modo_leitura:
             aviso = QLabel("Modo leitura: consulta habilitada, escrita bloqueada.")
@@ -199,17 +215,16 @@ class PaginaCrud(QWidget):
             if titulo_secao:
                 self._form_grade.addWidget(rotulo_secao(titulo_secao))
             grade = grade_campos()
-            for linha in range(0, len(campos), 2):
-                dupla = campos[linha : linha + 2]
-                if any(getattr(c, "largo", False) for c in dupla):
-                    adicionar_linha_larga(grade, linha // 2, dupla[0])
-                else:
-                    adicionar_linha(grade, linha // 2, *dupla)
+            dispor_campos(grade, campos)
             self._form_grade.addLayout(grade)
 
+        self._form_grade.addStretch(1)
+
+        # Rodapé fixo: fora da área rolável, sempre visível.
         rodape = QWidget()
+        rodape.setObjectName("rodape")
         rl = QHBoxLayout(rodape)
-        rl.setContentsMargins(0, 6, 0, 0)
+        rl.setContentsMargins(16, 10, 16, 10)
         rl.addStretch(1)
         self._acoes_extra = self._acao_extra()
         for botao in self._acoes_extra:
@@ -218,12 +233,12 @@ class PaginaCrud(QWidget):
         salvar, self._btn_salvar = botao_com_atalho("Salvar Alterações", "F10", "primary")
         rl.addWidget(cancelar)
         rl.addWidget(salvar)
-        self._form_grade.addWidget(rodape)
 
         self._btn_cancelar.clicked.connect(self._limpar_form)
         self._btn_salvar.clicked.connect(self._salvar)
 
         self._painel_form.setWidget(conteudo)
+        self._painel_col.addWidget(rodape)
         self._aplicar_modo_leitura_acoes()
 
     def _conectar_campos(self) -> None:
@@ -278,7 +293,7 @@ class PaginaCrud(QWidget):
         # Filtro de campo (ex.: `tipo_pessoa`) vai ao servidor, para paginar sobre
         # o conjunto filtrado — não apenas recortar a página atual.
         filtros = {}
-        if self.CHAVE_FILTRO and self._filtro:
+        if self.CHAVE_FILTRO and self._filtro and not self.FILTRO_LOCAL:
             filtros[self.CHAVE_FILTRO] = self._filtro
         rodar(
             lambda: self._listar(q, offset, filtros),
@@ -299,15 +314,12 @@ class PaginaCrud(QWidget):
         self._linhas = saida["data"]
         self._total = saida["total"]
         self._offset = offset
-        self._contador.setText(f"{self._total} registros")
         self._paginador.atualizar(self._total, offset, LOTE)
         self._tabela.preencher(self._aplicar_filtro_local(self._linhas))
 
     def _erro_carga(self, msg: str) -> None:
         self._tabela.limpar()
         self._form_titulo.setText(f"Erro ao carregar {self.ENTIDADE}")
-        self._form_badge.setProperty("badgeStyle", "erro")
-        aplicar_estilo(self._form_badge)
         QMessageBox.warning(self, "Local API Service", msg)
 
     # ------------------------------------------------------------ seleção
@@ -320,10 +332,11 @@ class PaginaCrud(QWidget):
 
     def _carregar_no_form(self, dado: dict) -> None:
         self._editando_id = dado.get("id")
-        self._form_titulo.setText(f"Editando: {self._rotulo_registro(dado)}")
-        self._form_badge.setText(self._numero_registro(dado.get("id")))
-        self._form_badge.setProperty("badgeStyle", "primary")
-        aplicar_estilo(self._form_badge)
+        rotulo = self._rotulo_registro(dado)
+        titulo = f"Editando {self._numero_registro(dado.get('id'))}"
+        if rotulo:
+            titulo = f"{titulo}: {rotulo}"
+        self._form_titulo.setText(titulo)
         self._preencher_campos(dado)
 
     def _rotulo_registro(self, dado: dict) -> str:
@@ -348,9 +361,6 @@ class PaginaCrud(QWidget):
     def _limpar_form(self) -> None:
         self._editando_id = None
         self._form_titulo.setText(self.ROTULO_NOVO)
-        self._form_badge.setText("NOVO")
-        self._form_badge.setProperty("badgeStyle", "primary")
-        aplicar_estilo(self._form_badge)
         for campo in self._campos():
             if isinstance(campo, CampoCheck):
                 campo.definir(False)

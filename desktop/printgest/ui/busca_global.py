@@ -51,7 +51,10 @@ class BuscaGlobal(QWidget):
 
         self._campo = QLineEdit()
         self._campo.setObjectName("buscaGlobal")
-        self._campo.setPlaceholderText("Buscar clientes, produtos, O.S...")
+        # Placeholder curto para não elidir em telas estreitas (1280px); o
+        # escopo completo fica no tooltip.
+        self._campo.setPlaceholderText("Buscar…")
+        self._campo.setToolTip("Buscar clientes, produtos e O.S.")
         self._campo.setClearButtonEnabled(True)
         layout.addWidget(self._campo)
 

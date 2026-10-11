@@ -11,6 +11,7 @@ from __future__ import annotations
 from printgest.ui.endereco import BlocoEndereco
 from printgest.ui.formulario import (
     MASCARA_CNPJ,
+    MASCARA_CPF,
     CampoArea,
     CampoCombo,
     CampoTexto,
@@ -35,8 +36,10 @@ class PaginaFornecedores(PaginaCrud):
     GRUPO_LISTA = "FORNECEDORES E LINHAS DE INSUMO"
     CHAVES = CHAVES
     COLUNAS = COLUNAS
+    PESOS = [1, 5, 3, 3, 3, 3]
     LUGAR_BUSCA = "Buscar por razão social, CNPJ, telefone ou representante..."
     CAMPO_NOME = "nome_razao"
+    VAZIO = "Nenhum fornecedor encontrado. Clique em Novo Fornecedor (F6)."
 
     # ----------------------------------------------------------- formulário
 
@@ -46,14 +49,16 @@ class PaginaFornecedores(PaginaCrud):
             [("pj", "Pessoa Jurídica"), ("pf", "Pessoa Física")],
             padrao="pj",
         )
-        self._nome = CampoTexto("Razão Social / Nome Fantasia", maximo=200).obrigatorio()
+        self._nome = (
+            CampoTexto("Razão Social / Nome Fantasia", maximo=200).obrigatorio().larga()
+        )
         self._cnpj = CampoTexto("CNPJ / CPF", mono=True, maximo=18, mascara=MASCARA_CNPJ)
         self._ie = CampoTexto("Inscrição Estadual", mono=True, maximo=20)
         self._representante = CampoTexto("Representante Comercial", maximo=120)
-        self._email = CampoTexto("E-mail", maximo=120)
+        self._email = CampoTexto("E-mail", maximo=120).larga()
         self._telefone = CampoTexto("Telefone", mono=True, maximo=20)
         self._celular = CampoTexto("Celular / WhatsApp", mono=True, maximo=20)
-        self._obs = CampoArea("Observações (insumos / cond. pagto)", linhas=3)
+        self._obs = CampoArea("", linhas=3).larga()
 
         self._end = BlocoEndereco()
 
@@ -62,18 +67,27 @@ class PaginaFornecedores(PaginaCrud):
                 "Dados Cadastrais",
                 [
                     self._tipo,
-                    self._nome,
                     self._cnpj,
+                    self._nome,
                     self._ie,
                     self._representante,
                     self._email,
                     self._telefone,
                     self._celular,
-                    self._obs,
                 ],
             ),
             ("Endereço", self._end.campos),
+            ("Observações", [self._obs]),
         ]
+
+    def _conectar_campos(self) -> None:
+        self._tipo.widget.currentIndexChanged.connect(self._tipo_mudou)
+        self._tipo_mudou()
+
+    def _tipo_mudou(self) -> None:
+        pj = self._tipo.valor() == "pj"
+        self._cnpj.definir_mascara(MASCARA_CNPJ if pj else MASCARA_CPF)
+        self._ie.visivel(pj)
 
     def _padroes_do_form(self) -> None:
         self._tipo.definir("pj")

@@ -105,42 +105,35 @@ QLabel#titulo { font-size: 20px; font-weight: 700; }
 QLabel#subtitulo { color: %texto-muted%; font-size: 13px; }
 QLabel#labelForm { font-size: 11px; font-weight: 700; color: %texto-muted%; text-transform: uppercase; }
 
-QLineEdit {
+QLineEdit, QDateEdit, QTimeEdit, QSpinBox, QDoubleSpinBox {
     background-color: %surface-muted%;
     border: 1px solid %borda-forte%;
     border-radius: 6px;
     padding: 8px 10px;
+    min-height: 22px;
     color: %texto%;
     selection-background-color: %primary%;
 }
-QLineEdit:focus { border: 1px solid %primary%; }
+QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid %primary%;
+}
 QLineEdit[mono="true"] { font-family: "Consolas"; letter-spacing: 1px; }
+/* Controles sem setas próprias de incremento (o usuário digita os valores). */
+QSpinBox::up-button, QSpinBox::down-button,
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0; border: none; }
 
 /* Combos no mesmo desenho dos campos (sem o "artefato" do estilo nativo do
-   Windows: setas/bordas mistas com o restante do formulário). */
+   Windows). A seta fica a nativa: em versionamentos recentes do Qt o truque de
+   "triângulo por bordas" em `::down-arrow` vira um bloco preto (G6). */
 QComboBox {
     background-color: %surface-muted%;
     border: 1px solid %borda-forte%;
     border-radius: 6px;
     padding: 8px 10px;
+    min-height: 22px;
     color: %texto%;
 }
 QComboBox:focus, QComboBox:on { border: 1px solid %primary%; }
-QComboBox::drop-down {
-    border: none;
-    width: 24px;
-    subcontrol-origin: padding;
-    subcontrol-position: center right;
-}
-QComboBox::down-arrow {
-    image: none;
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid %texto-muted%;
-    margin-right: 8px;
-}
 QComboBox QAbstractItemView {
     background-color: %surface%;
     border: 1px solid %borda-forte%;
@@ -401,6 +394,13 @@ QHeaderView::section {
     padding: 6px 8px;
 }
 QTableCornerButton::section { background-color: %surface-muted%; border: none; }
+
+QLabel#vazioTabela {
+    background: transparent;
+    color: %texto-muted%;
+    font-size: 13px;
+    padding: 12px;
+}
 
 QPushButton#pagBotao {
     border: 1px solid %borda-forte%;

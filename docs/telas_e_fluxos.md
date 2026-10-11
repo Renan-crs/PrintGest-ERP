@@ -234,9 +234,19 @@ No **PDV**, com o foco dentro da página:
 | `Ctrl+F` | Foca a busca da visão ativa (produto na *Nova venda*; vendas no *Histórico*) |
 | `Enter` (na busca de produto) | Adiciona o item selecionado |
 
-> Nas telas de cadastro (Clientes, Produtos, O.S.) os atalhos indicados ao lado
-> dos botões (`F6` Novo, `Esc` Cancelar, `F9` ação principal) são pistas visuais;
-> a navegação por teclado garantida hoje é a da tabela acima.
+Nas telas de **cadastro** (Clientes, Fornecedores, Produtos & Serviços, O.S.),
+com o foco dentro da página:
+
+| Tecla | Ação |
+| --- | --- |
+| `F6` | Novo registro (limpa o formulário e foca o primeiro campo) |
+| `F10` | Salvar alterações |
+| `Esc` | Cancelar a edição (limpa o formulário) |
+| `Ctrl+F` | Foca a busca da lista |
+
+> Os atalhos globais `F2`/`F3`/`F5` continuam valendo em qualquer tela; o `F6`
+> de cada cadastro é local e não colide com o `F6` do PDV (que alterna para
+> "Nova venda") porque só a página visível tem os atalhos ativos.
 
 ---
 

@@ -178,7 +178,7 @@ def test_consulta_carrega_grade_filtra_e_kpis(app, pumpar):
         lambda: pagina._tabela.rowCount() == 2
         and not pagina._badges_kpi["itens"].text().endswith("–")
     )
-    assert pagina._contador.text() == "2 registros"
+    assert "de 2 registros" in pagina._paginador._info.text()
     assert pagina._badges_kpi["itens"].text() == "Itens: 842"
     assert "R$ 148.920,45" in pagina._badges_kpi["valor"].text()
     assert pagina._badges_kpi["bobinas"].text() == "Bobinas: 38"
@@ -188,7 +188,7 @@ def test_consulta_carrega_grade_filtra_e_kpis(app, pumpar):
     pumpar(lambda: pagina._produto_atual is not None)
     assert pagina._f_codigo.valor() == "INS-0209"
     assert str(pagina._f_saldo.valor()) == "2.5"
-    assert pagina._form_badge.text() == "INS-0209"
+    assert "INS-0209" in pagina._form_titulo.text()
 
     pagina._btn_filtros["abaixo"].click()
     pumpar(lambda: pagina._tabela.rowCount() == 1)
@@ -265,7 +265,7 @@ def test_reposicao_carrega_badges_e_selecao(app, pumpar):
     pumpar(lambda: pagina._produto_atual is not None)
     assert pagina._f_autonomia.valor() == "3.1 dias"
     assert str(pagina._f_sugestao.valor()) == "6"
-    assert pagina._form_badge.text() == "INS-0209"
+    assert "INS-0209" in pagina._form_titulo.text()
 
 
 def test_reposicao_define_produto_para_emitir_pedido(app, pumpar, monkeypatch):

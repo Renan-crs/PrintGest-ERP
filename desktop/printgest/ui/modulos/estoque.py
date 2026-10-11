@@ -35,7 +35,7 @@ from printgest.ui.formulario import (
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
+from printgest.ui.widgets import badge, botao_com_atalho
 
 _STATUS = {
     "critico": "CRÍTICO (repor)",
@@ -137,10 +137,11 @@ class PaginaEstoqueBase(PaginaCrud):
 
     def _carregar_no_form(self, dado: dict) -> None:
         self._produto_atual = dado
-        self._form_titulo.setText(f"Insumo: {self._rotulo_registro(dado)}")
-        self._form_badge.setText(str(dado.get("codigo") or ""))
-        self._form_badge.setProperty("badgeStyle", "primary")
-        aplicar_estilo(self._form_badge)
+        codigo = str(dado.get("codigo") or "")
+        titulo = f"Insumo: {self._rotulo_registro(dado)}"
+        if codigo:
+            titulo = f"{titulo} · {codigo}"
+        self._form_titulo.setText(titulo)
         self._preencher_campos(dado)
 
     def _aplicar_modo_leitura_acoes(self) -> None:

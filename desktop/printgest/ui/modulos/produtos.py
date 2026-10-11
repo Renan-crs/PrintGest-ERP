@@ -11,6 +11,7 @@ from printgest.core import catalogos
 from printgest.core.api import Api
 from printgest.ui.formulario import (
     CampoArea,
+    CampoArquivo,
     CampoCheck,
     CampoCombo,
     CampoTexto,
@@ -36,12 +37,24 @@ class PaginaProdutos(PaginaCrud):
     GRUPO_LISTA = "CATÁLOGO DE PRODUTOS E SERVIÇOS"
     CHAVES = CHAVES
     COLUNAS = COLUNAS
+    PESOS = [1, 2, 6, 2, 3, 3]
+    FILTROS = [("", "Todos"), ("produto", "Produtos"), ("servico", "Serviços")]
+    CHAVE_FILTRO = "tipo"
+    FILTRO_LOCAL = True  # a lista já filtra pelo tipo; o servidor não tem esse filtro
     LUGAR_BUSCA = "Buscar por código, código de barras/EAN-13 ou descrição..."
     CAMPO_NOME = "nome"
+    VAZIO = "Nenhum produto ou serviço encontrado. Clique em Novo Produto / Serviço (F6)."
+    TIPO_FIXO = ""
 
-    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
+    def __init__(
+        self, api: Api, modo_leitura: bool = False, nivel: str | None = None
+    ) -> None:
         super().__init__(api, modo_leitura)
         self._nomes_cat: dict[int, str] = {}
+        if nivel == "operador":
+            # RBAC: operador consulta o catálogo, mas não altera preços.
+            self._preco_custo.habilitar(False)
+            self._preco_venda.habilitar(False)
         self._carregar_categorias()
 
     # ----------------------------------------------------------- formulário
@@ -49,25 +62,25 @@ class PaginaProdutos(PaginaCrud):
     def _secoes(self):
         self._codigo = CampoTexto("Código Interno", mono=True, maximo=30).obrigatorio()
         self._barras = CampoTexto("Código de Barras / EAN-13", mono=True, maximo=30)
-        self._nome = CampoTexto("Descrição do Item", maximo=160).obrigatorio()
-        self._descricao = CampoArea("Descrição Técnica", linhas=2)
+        self._nome = CampoTexto("Descrição do Item", maximo=160).obrigatorio().larga()
+        self._descricao = CampoArea("Descrição Técnica", linhas=2).larga()
         self._tipo = CampoCombo("Tipo", _TIPOS, padrao="produto")
         self._unidade = CampoTexto("Unidade de Medida", maximo=12, valor="un")
-        self._categoria = CampoCombo(
-            "Categoria", [], padrao=None
-        )
+        self._categoria = CampoCombo("Categoria", [], padrao=None)
 
         self._preco_custo = CampoValor("Preço de Custo")
         self._preco_venda = CampoValor("Preço de Venda")
 
         self._controla = CampoCheck("Controla estoque")
-        self._estoque_min = CampoValor("Estoque Mínimo")
+        self._estoque_min = CampoValor("Estoque Mínimo", prefixo="")
         self._dimensoes = CampoTexto("Dimensões (L×A×E)", maximo=40)
         self._bloqueado = CampoCheck("Bloquear reajuste")
+        self._foto1 = CampoArquivo("Foto 1").larga()
+        self._foto2 = CampoArquivo("Foto 2").larga()
 
         return [
             (
-                "Identificação",
+                "Cadastro",
                 [
                     self._codigo,
                     self._barras,
@@ -76,6 +89,8 @@ class PaginaProdutos(PaginaCrud):
                     self._tipo,
                     self._unidade,
                     self._categoria,
+                    self._foto1,
+                    self._foto2,
                 ],
             ),
             (
@@ -83,7 +98,7 @@ class PaginaProdutos(PaginaCrud):
                 [self._preco_custo, self._preco_venda],
             ),
             (
-                "Estoque & Controle",
+                "Estoque",
                 [
                     self._controla,
                     self._estoque_min,
@@ -93,10 +108,27 @@ class PaginaProdutos(PaginaCrud):
             ),
         ]
 
+    def _conectar_campos(self) -> None:
+        self._tipo.widget.currentIndexChanged.connect(self._tipo_mudou)
+        if self.TIPO_FIXO:
+            self._tipo.visivel(False)
+        self._tipo_mudou()
+
+    def _tipo_mudou(self) -> None:
+        produto = self._tipo_atual() == "produto"
+        for campo in (self._controla, self._estoque_min, self._dimensoes, self._bloqueado):
+            campo.visivel(produto)
+        if not produto:
+            self._controla.definir(False)
+
+    def _tipo_atual(self) -> str:
+        return self.TIPO_FIXO or self._tipo.valor() or "produto"
+
     def _padroes_do_form(self) -> None:
-        self._tipo.definir("produto")
+        self._tipo.definir(self.TIPO_FIXO or "produto")
         self._unidade.definir("un")
-        self._controla.definir(True)
+        self._controla.definir(self.TIPO_FIXO != "servico")
+        self._tipo_mudou()
 
     # -------------------------------------------------------------- leitura
 
@@ -124,6 +156,9 @@ class PaginaProdutos(PaginaCrud):
         self._estoque_min.definir(dado.get("estoque_minimo"))
         self._dimensoes.definir(dado.get("dimensoes"))
         self._bloqueado.definir(dado.get("bloqueado_reajuste"))
+        self._foto1.definir(dado.get("foto1_path"))
+        self._foto2.definir(dado.get("foto2_path"))
+        self._tipo_mudou()
 
     # ------------------------------------------------------------ categorias
 
@@ -149,18 +184,47 @@ class PaginaProdutos(PaginaCrud):
         return None
 
     def _payload(self) -> dict:
+        servico = self._tipo_atual() == "servico"
         return {
             "codigo": self._codigo.valor(),
             "codigo_barras": limpo(self._barras.valor()),
             "nome": self._nome.valor(),
             "descricao": limpo(self._descricao.valor()),
-            "tipo": self._tipo.valor(),
+            "tipo": self._tipo_atual(),
             "unidade": self._unidade.valor() or "un",
             "categoria_id": self._categoria.valor(),
             "preco_custo": numero(self._preco_custo),
             "preco_venda": numero(self._preco_venda),
-            "controla_estoque": self._controla.valor(),
-            "estoque_minimo": numero(self._estoque_min),
+            "controla_estoque": False if servico else self._controla.valor(),
+            "estoque_minimo": "0" if servico else numero(self._estoque_min),
             "dimensoes": limpo(self._dimensoes.valor()),
+            "foto1_path": limpo(self._foto1.valor()),
+            "foto2_path": limpo(self._foto2.valor()),
             "bloqueado_reajuste": self._bloqueado.valor(),
         }
+
+    # --------------------------------------------------------------- filtros
+
+    def _aplicar_filtro_local(self, linhas: list[dict]) -> list[dict]:
+        linhas = super()._aplicar_filtro_local(linhas)
+        if self.TIPO_FIXO:
+            linhas = [r for r in linhas if r.get("tipo") == self.TIPO_FIXO]
+        return linhas
+
+
+class PaginaServicos(PaginaProdutos):
+    """Mesma tela de Produtos filtrada por `tipo=servico` (item de menu "Serviços")."""
+
+    ROTULO_PAGINA = "Cadastro de Serviços"
+    ROTULO_NOVO = "Novo Serviço"
+    FILTROS: list[tuple[str, str]] = []
+    FILTRO_LOCAL = True
+    CHAVE_FILTRO = ""
+    VAZIO = "Nenhum serviço encontrado. Clique em Novo Serviço (F6)."
+    TIPO_FIXO = "servico"
+
+    def _padroes_do_form(self) -> None:
+        self._tipo.definir("servico")
+        self._unidade.definir("un")
+        self._controla.definir(False)
+        self._tipo_mudou()
