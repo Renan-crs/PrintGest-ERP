@@ -270,6 +270,30 @@ class Api:
         """Panorama fiscal usado pela tela de contingência: `GET /v1/fiscal/resumo`."""
         return self._get("/v1/fiscal/resumo", self._token)
 
+    # --------------------------------------------------------- configuração
+
+    def empresa(self) -> dict:
+        """Dados da empresa ativa: `GET /v1/config/empresa`."""
+        return self._get("/v1/config/empresa", self._token)
+
+    def atualizar_empresa(self, payload: dict) -> dict:
+        """Dados da Empresa / Personalização (parcial): `PUT /v1/config/empresa`."""
+        return self._put("/v1/config/empresa", payload, self._token)
+
+    def simular_reajuste(self, payload: dict) -> dict:
+        """Prévia do reajuste em bloco: `POST /v1/config/reajuste/simular`."""
+        return self._post("/v1/config/reajuste/simular", payload, self._token)
+
+    def aplicar_reajuste(self, payload: dict) -> dict:
+        """Aplica o reajuste (exige senha): `POST /v1/config/reajuste/aplicar`."""
+        return self._post("/v1/config/reajuste/aplicar", payload, self._token)
+
+    def reajuste_historico(self, limit: int = 20, offset: int = 0) -> dict:
+        """Trilha de auditoria: `GET /v1/config/reajuste/historico`."""
+        return self.listar_com_filtros(
+            "config/reajuste/historico", limit=limit, offset=offset
+        )
+
     def acao(self, entidade: str, item_id: int, acao: str, payload: dict | None = None) -> dict:
         """POST de ação de negócio, ex.: `/v1/os/5/converter`."""
         resp = self._cliente.post(

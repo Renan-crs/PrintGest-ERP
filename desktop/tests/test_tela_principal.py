@@ -127,8 +127,8 @@ def _vazio_handler(request: httpx.Request) -> httpx.Response:
 
 def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.core.rbac import MENU
-    from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
     from printgest.ui.modulos.clientes import PaginaClientes
+    from printgest.ui.modulos.configuracao import PaginaConfiguracoes
     from printgest.ui.modulos.financeiro import PaginaFinanceiro
     from printgest.ui.modulos.fiscal import PaginaFiscal
     from printgest.ui.modulos.fornecedores import PaginaFornecedores
@@ -150,8 +150,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
         "servico": PaginaServicos,
         "financeiro": PaginaFinanceiro,
         "fiscal": PaginaFiscal,
-        # módulos previstos no roadmap ainda não entregues → placeholder honesto
-        "configuracoes": PaginaEmConstrucao,
+        "configuracoes": PaginaConfiguracoes,
     }
     visitadas = set()
 
