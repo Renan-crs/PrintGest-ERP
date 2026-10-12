@@ -8,7 +8,6 @@ from PySide6.QtWidgets import QLabel, QPushButton
 
 from printgest.core.api import Api
 from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
-from printgest.ui.modulos.agendamento import PaginaAgendamento
 from printgest.ui.modulos.categorias import PaginaCategorias
 from printgest.ui.modulos.estoque import PaginaEstoque
 from printgest.ui.modulos.funcionarios import PaginaFuncionarios
@@ -147,6 +146,8 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     principal = TelaPrincipal(
         api, usuario=api.usuario, modo_leitura=False, base_url="127.0.0.1:8000"
     )
+    from printgest.ui.modulos.agendamento import PaginaAgendamento
+    from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
     esperadas = {
         "pdv": PaginaVendaBalcao,
         "projetos": PaginaProjetos,

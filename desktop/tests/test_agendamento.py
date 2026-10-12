@@ -14,8 +14,19 @@ import pytest
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QMessageBox
 
+# Patch `rodar` ANTES de importar módulos que o usam
+import printgest.core.tarefas as tarefas_mod
+
+def _rodar_sync(fn, on_ok, on_erro):
+    try:
+        result = fn()
+        on_ok(result)
+    except Exception as exc:
+        on_erro(str(exc))
+
+tarefas_mod.rodar = _rodar_sync
+
 from printgest.core.api import Api
-from printgest.ui.modulos.agendamento import CalendarioMes, PaginaAgendamento
 
 _AGENDAMENTOS: list[dict] = []
 _OS = [
@@ -173,11 +184,12 @@ def _sem_modais(monkeypatch):
     )
 
 
-def _pagina(modo_leitura: bool = False) -> PaginaAgendamento:
+def _pagina(modo_leitura: bool = False) -> "PaginaAgendamento":
+    from printgest.ui.modulos.agendamento import PaginaAgendamento
     return PaginaAgendamento(_api(), modo_leitura=modo_leitura)
 
 
-def _pagina_pronta() -> PaginaAgendamento:
+def _pagina_pronta() -> "PaginaAgendamento":
     """Cria a página e espera as cargas iniciais (OS e período)."""
     pagina = _pagina()
     import time
@@ -191,14 +203,14 @@ def _pagina_pronta() -> PaginaAgendamento:
     return pagina
 
 
-def _celula(calendario: CalendarioMes, dia: QDate):
+def _celula(calendario: "CalendarioMes", dia: QDate):
     for celula in calendario._celulas.values():
         if celula.dia == dia:
             return celula
     return None
 
 
-def _criar(pagina: PaginaAgendamento, **campos) -> None:
+def _criar(pagina: "PaginaAgendamento", **campos) -> None:
     pagina._novo()
     pagina._titulo.definir(campos.get("titulo", "Produção de banner"))
     pagina._tipo.definir(campos.get("tipo", "producao"))
@@ -399,6 +411,7 @@ def test_novo_limpa_form(app, pumpar):
 # ------------------------------------------------------------------- registro
 def test_criar_pagina_mapeia_agendamento(app):
     from printgest.ui.modulos import criar_pagina
+    from printgest.ui.modulos.agendamento import PaginaAgendamento
 
     api = _api()
     assert isinstance(criar_pagina("agendamento", "Agendamento", api, False), PaginaAgendamento)

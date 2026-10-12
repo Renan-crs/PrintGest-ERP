@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
 from printgest.core import catalogos
 from printgest.core.api import Api
 from printgest.core.rbac import pode_abrir
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArquivo,
     CampoCheck,
@@ -160,7 +160,7 @@ class PaginaFicha(QWidget):
 
     def _carregar(self) -> None:
         self._status.setText("Carregando…")
-        rodar(self._buscar, on_ok=self._recebido, on_erro=self._erro_carga)
+        tarefas.rodar(self._buscar, on_ok=self._recebido, on_erro=self._erro_carga)
 
     def _recebido(self, dado: dict) -> None:
         self._preencher(dado or {})
@@ -186,7 +186,7 @@ class PaginaFicha(QWidget):
             return
         self._btn_salvar.setEnabled(False)  # trava contra duplo envio (F10 + clique)
         self._status.setText("Salvando…")
-        rodar(self._executar_salvar, on_ok=self._salvo, on_erro=self._erro_salvar)
+        tarefas.rodar(self._executar_salvar, on_ok=self._salvo, on_erro=self._erro_salvar)
 
     def _salvo(self, dado: dict) -> None:
         self._preencher(dado or {})
@@ -543,7 +543,7 @@ class PaginaReajuste(QWidget):
         self._btn_simular.setEnabled(False)
         self._btn_aplicar.setEnabled(False)
         self._resumo.setText("Simulando…")
-        rodar(
+        tarefas.rodar(
             lambda: self._api.simular_reajuste(self._payload()),
             on_ok=self._previa_recebida,
             on_erro=self._erro,
@@ -580,7 +580,7 @@ class PaginaReajuste(QWidget):
         self._btn_aplicar.setEnabled(False)
         self._resumo.setText("Aplicando…")
         payload = {**self._payload(), "senha": senha}
-        rodar(
+        tarefas.rodar(
             lambda: self._api.aplicar_reajuste(payload),
             on_ok=self._aplicado,
             on_erro=self._erro,
@@ -610,7 +610,7 @@ class PaginaReajuste(QWidget):
     # -------------------------------------------------------------- histórico
 
     def _carregar_historico(self) -> None:
-        rodar(
+        tarefas.rodar(
             lambda: self._api.reajuste_historico(limit=5),
             on_ok=self._historico_recebido,
             on_erro=lambda _msg: self._historico.setText("Não foi possível carregar o histórico."),
