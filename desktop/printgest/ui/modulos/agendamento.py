@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from printgest.core.api import Api
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.busca import CampoBusca
 from printgest.ui.formulario import (
     CampoArea,
@@ -550,7 +550,7 @@ class PaginaAgendamento(QWidget):
 
     def _carregar_periodo(self) -> None:
         inicio, fim = self._janela_mes()
-        rodar(
+        tarefas.rodar(
             lambda: self._api.listar_agendamentos(inicio=inicio, fim=fim),
             on_ok=lambda saida: self._receber_periodo(saida),
             on_erro=self._erro_carga,
@@ -563,7 +563,7 @@ class PaginaAgendamento(QWidget):
 
     def _carregar_lista(self, offset: int = 0) -> None:
         inicio, fim = self._janela_mes()
-        rodar(
+        tarefas.rodar(
             lambda: self._api.listar_agendamentos(
                 inicio=inicio,
                 fim=fim,
@@ -576,7 +576,7 @@ class PaginaAgendamento(QWidget):
         )
 
     def _carregar_os(self) -> None:
-        rodar(
+        tarefas.rodar(
             lambda: self._api.listar_os(tipo="os", limit=200),
             on_ok=lambda saida: self._preencher_os(saida.get("data", [])),
             on_erro=lambda _m: None,
@@ -609,14 +609,14 @@ class PaginaAgendamento(QWidget):
         )
         self._painel_col.addWidget(self._painel_form, 1)
         self._montar_form()
-        painel.setMinimumWidth(340)
+        painel.setMinimumWidth(330)
         return painel
 
     def _montar_form(self) -> None:
         if not hasattr(self, "_campo_os"):
             return  # lista de O.S. ainda não chegou; o painel é montado ao chegar
         conteudo = QWidget()
-        conteudo.setMinimumWidth(340)
+        conteudo.setMinimumWidth(330)
         grade = QVBoxLayout(conteudo)
         grade.setContentsMargins(16, 14, 16, 14)
         grade.setSpacing(10)
@@ -698,7 +698,7 @@ class PaginaAgendamento(QWidget):
     def _abrir_compromisso(self, item_id) -> None:
         if item_id is None:
             return
-        rodar(
+        tarefas.rodar(
             lambda: self._api.obter_agendamento(item_id),
             on_ok=self._receber_compromisso,
             on_erro=self._erro_carga,
@@ -762,13 +762,13 @@ class PaginaAgendamento(QWidget):
         self._btn_salvar.setEnabled(False)
         payload = self._payload()
         if self._editando_id is None:
-            rodar(
+            tarefas.rodar(
                 lambda: self._api.criar_agendamento(payload),
                 on_ok=lambda d: self._salvo(d),
                 on_erro=self._erro_salvar,
             )
         else:
-            rodar(
+            tarefas.rodar(
                 lambda: self._api.atualizar_agendamento(self._editando_id, payload),
                 on_ok=lambda d: self._salvo(d),
                 on_erro=self._erro_salvar,
@@ -787,7 +787,7 @@ class PaginaAgendamento(QWidget):
     def _concluir(self) -> None:
         if self._editando_id is None or self._modo_leitura:
             return
-        rodar(
+        tarefas.rodar(
             lambda: self._api.concluir_agendamento(self._editando_id),
             on_ok=lambda d: self._salvo(d),
             on_erro=self._erro_salvar,
@@ -806,7 +806,7 @@ class PaginaAgendamento(QWidget):
             != QMessageBox.StandardButton.Yes
         ):
             return
-        rodar(
+        tarefas.rodar(
             lambda: self._api.remover_agendamento(self._editando_id),
             on_ok=lambda: self._excluido(),
             on_erro=self._erro_salvar,

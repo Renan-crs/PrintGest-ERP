@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from printgest.core.rbac import tem_acesso
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
@@ -234,7 +234,7 @@ class PaginaCaixa(QWidget):
             self._aplicar_estado()
             self._carregar_extrato()
 
-        rodar(
+        tarefas.rodar(
             lambda: self._api.caixa_atual(),
             on_ok=_receber,
             on_erro=lambda msg: QMessageBox.warning(self, "Caixa", msg),
@@ -284,7 +284,7 @@ class PaginaCaixa(QWidget):
             self._tabela.limpar()
             self._paginador.atualizar(0, 0, LOTE)
             return
-        rodar(
+        tarefas.rodar(
             lambda: self._api.extrato_caixa(caixa_id, limit=LOTE, offset=offset),
             on_ok=lambda saida: self._extrato_recebido(saida, offset),
             on_erro=lambda msg: QMessageBox.warning(self, "Extrato do Caixa", msg),
@@ -314,7 +314,7 @@ class PaginaCaixa(QWidget):
             "observacoes": limpo(self._f_obs_abertura.valor()),
         }
         self._btn_abrir.setEnabled(False)
-        rodar(
+        tarefas.rodar(
             lambda: self._api.abrir_caixa(payload),
             on_ok=lambda _c: self._acao_ok(),
             on_erro=self._erro,
@@ -335,7 +335,7 @@ class PaginaCaixa(QWidget):
         }
         caixa_id = self._caixa["id"]
         self._btn_lancar.setEnabled(False)
-        rodar(
+        tarefas.rodar(
             lambda: self._api.movimento_caixa(caixa_id, payload),
             on_ok=lambda _m: self._acao_ok(),
             on_erro=self._erro,
@@ -366,7 +366,7 @@ class PaginaCaixa(QWidget):
             "observacoes": limpo(self._f_obs_fech.valor()),
         }
         self._btn_fechar.setEnabled(False)
-        rodar(
+        tarefas.rodar(
             lambda: self._api.fechar_caixa(caixa_id, payload),
             on_ok=self._fechado_ok,
             on_erro=self._erro,
@@ -547,7 +547,7 @@ class PaginaContas(PaginaCrud):
             return
         conta_id = dado["id"]
         self._btn_baixa.setEnabled(False)
-        rodar(
+        tarefas.rodar(
             lambda: self._api.baixa_conta(self.TIPO_API, conta_id, payload),
             on_ok=self._baixa_ok,
             on_erro=self._baixa_erro,

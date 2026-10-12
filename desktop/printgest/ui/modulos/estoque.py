@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArea,
     CampoCombo,
@@ -187,7 +187,7 @@ class PaginaEstoqueBase(PaginaCrud):
         dialog.resize(820, 420)
         self._ultimo_dialogo_kardex = dialog
         self._kardex_tabela = tabela
-        rodar(
+        tarefas.rodar(
             lambda: self._api.kardex_estoque(dado["produto_id"], limit=200),
             on_ok=lambda saida: self._kardex_recebidos(saida, tabela),
             on_erro=lambda msg: QMessageBox.warning(dialog, "Kardex", msg),
@@ -252,7 +252,7 @@ class PaginaEstoqueConsulta(PaginaEstoqueBase):
                 f"Abaixo mín.: {dados.get('abaixo_minimo', 0)}"
             )
 
-        rodar(
+        tarefas.rodar(
             lambda: self._api.resumo_estoque(q=q, abaixo_minimo=baixo),
             on_ok=_aplicar,
             on_erro=lambda msg: None,
@@ -403,7 +403,7 @@ class PaginaEstoqueMovimento(PaginaEstoqueBase):
             campo.widget.setFocus()
             return
         self._btn_salvar.setEnabled(False)  # trava contra duplo POST
-        rodar(
+        tarefas.rodar(
             lambda: self._api.movimentar_estoque(self._payload()),
             on_ok=self._movimentado,
             on_erro=lambda msg: self._erro_salvar(msg),

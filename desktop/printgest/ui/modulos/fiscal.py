@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
@@ -294,13 +294,13 @@ class PaginaContingencia(QWidget):
             if seq != self._seq:
                 return
             self._aplicar_resumo(resumo or {})
-            rodar(
+            tarefas.rodar(
                 lambda: self._api.documentos_fiscais(limit=200),
                 on_ok=lambda saida: self._com_lista(saida, seq),
                 on_erro=lambda msg: self._erro(msg, seq),
             )
 
-        rodar(
+        tarefas.rodar(
             lambda: self._api.resumo_fiscal(),
             on_ok=_com_resumo,
             on_erro=lambda msg: self._erro(msg, seq),

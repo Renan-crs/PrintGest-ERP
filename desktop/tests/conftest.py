@@ -13,6 +13,27 @@ from printgest.core import catalogos
 from printgest.ui.theme import aplicar_theme
 
 
+def pytest_sessionstart(session):
+    """Patch `rodar` para executar sincronamente ANTES da execução dos testes."""
+    import printgest.core.tarefas as tarefas_mod
+    import printgest.ui.modulos.agendamento as agendamento_mod
+    import printgest.ui.modulos.configuracao as config_mod
+    import printgest.ui.modulos.os as os_mod
+    import printgest.ui.modulos.financeiro as fin_mod
+    import printgest.ui.modulos.fiscal as fiscal_mod
+    import printgest.ui.modulos.estoque as est_mod
+
+    def _rodar_sync(fn, on_ok, on_erro):
+        try:
+            on_ok(fn())
+        except Exception as exc:
+            on_erro(str(exc))
+
+    for mod in (tarefas_mod, agendamento_mod, config_mod, os_mod, fin_mod, fiscal_mod, est_mod):
+        if hasattr(mod, "rodar"):
+            mod.rodar = _rodar_sync
+
+
 @pytest.fixture(scope="session")
 def app():
     aplicativo = QApplication.instance() or QApplication([])

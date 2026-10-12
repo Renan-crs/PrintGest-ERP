@@ -40,7 +40,7 @@ from printgest.core import catalogos
 from printgest.core.api import Api
 from printgest.core.dominio import FORMAS_PAGAMENTO
 from printgest.core.rbac import pode_abrir
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.busca import CampoBusca
 from printgest.ui.formulario import (
     CampoCheck,
@@ -909,7 +909,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 return
             self._recebidos(saida, offset)
 
-        rodar(
+        tarefas.rodar(
             lambda: self._listar(q, offset, {}),
             on_ok=_receber,
             on_erro=self._erro_carga,
@@ -963,7 +963,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         )
         if resposta != QMessageBox.StandardButton.Yes:
             return
-        rodar(
+        tarefas.rodar(
             lambda: self._api.excluir("vendas", dado["id"]),
             on_ok=lambda _out: self.recarregar(self._busca.texto()),
             on_erro=self._erro_carga,
@@ -1017,7 +1017,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             return
         self._btn_salvar.setEnabled(False)
         emitir_nfce = self._nfce.valor()
-        rodar(
+        tarefas.rodar(
             lambda: self._api.criar("vendas", self._payload()),
             on_ok=lambda dado: self._salvo(dado, emitir_nfce),
             on_erro=self._erro_salvar,

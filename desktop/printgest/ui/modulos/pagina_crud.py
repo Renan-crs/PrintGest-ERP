@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core import catalogos
 from printgest.core.api import Api
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.busca import CampoBusca
 from printgest.ui.formulario import (
     CampoCheck,
@@ -297,7 +297,7 @@ class PaginaCrud(QWidget):
         filtros = {}
         if self.CHAVE_FILTRO and self._filtro and not self.FILTRO_LOCAL:
             filtros[self.CHAVE_FILTRO] = self._filtro
-        rodar(
+        tarefas.rodar(
             lambda: self._listar(q, offset, filtros),
             on_ok=_receber,
             on_erro=lambda msg: self._erro_carga(msg),
@@ -392,14 +392,14 @@ class PaginaCrud(QWidget):
         self._btn_salvar.setEnabled(False)  # trava contra duplo POST (F10 + Enter)
         payload = self._payload()
         if self._editando_id is None:
-            rodar(
+            tarefas.rodar(
                 lambda: self._api.criar(self.ENTIDADE, payload),
                 on_ok=self._salvo,
                 on_erro=lambda msg: self._erro_salvar(msg),
             )
         else:
             item_id = self._editando_id
-            rodar(
+            tarefas.rodar(
                 lambda: self._api.atualizar(self.ENTIDADE, item_id, payload),
                 on_ok=self._salvo,
                 on_erro=lambda msg: self._erro_salvar(msg),
