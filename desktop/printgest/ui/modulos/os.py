@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core import catalogos
 from printgest.core.dominio import FORMAS_PAGAMENTO
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
@@ -232,7 +232,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             return
         item_id = dado["id"]
         self._btn_avancar.setEnabled(False)  # trava contra duplo PATCH
-        rodar(
+        tarefas.rodar(
             lambda: self._api.atualizar_status(item_id, proximo),
             on_ok=self._status_avancado,
             on_erro=self._status_avancado_erro,
@@ -260,7 +260,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         if resposta != QMessageBox.StandardButton.Yes:
             return
         item_id = dado["id"]
-        rodar(
+        tarefas.rodar(
             lambda: self._api.excluir(self.ENTIDADE, item_id),
             on_ok=lambda _out: self.recarregar(self._busca.texto()),
             on_erro=lambda msg: self._erro_salvar(msg),
@@ -315,7 +315,7 @@ class PaginaOrcamento(PaginaOS):
             if resposta != QMessageBox.StandardButton.Yes:
                 return
         item_id = dado["id"]
-        rodar(
+        tarefas.rodar(
             lambda: self._api.acao(
                 "os", item_id, "converter", {"pagamento_confirmado": confirmado}
             ),
@@ -459,7 +459,7 @@ class PaginaProjetos(PaginaOS):
         acumulado: dict[str, list[dict]] = {}
         pendentes = [len(_COLUNAS_QUADRO)]
         for chave, _rotulo, status_etapas in _COLUNAS_QUADRO:
-            rodar(
+            tarefas.rodar(
                 lambda etapas=status_etapas: self._buscar_etapa(q, etapas),
                 on_ok=self._etapa_recebida(seq, chave, acumulado, pendentes),
                 on_erro=self._etapa_falhou(seq, chave, acumulado, pendentes),
@@ -510,7 +510,7 @@ class PaginaProjetos(PaginaOS):
         status_alvo = _STATUS_DESTINO.get(destino_chave)
         if status_alvo is None:
             return
-        rodar(
+        tarefas.rodar(
             lambda: self._api.atualizar_status(item_id, status_alvo),
             on_ok=lambda _dado: self.recarregar(self._busca.texto()),
             on_erro=self._erro_mover,
@@ -532,7 +532,7 @@ class PaginaProjetos(PaginaOS):
                 self._tabela.selectRow(linha)
                 return
         # Registro fora da página atual: busca e mostra direto no formulário.
-        rodar(
+        tarefas.rodar(
             lambda: self._api.obter(self.ENTIDADE, item_id),
             on_ok=self._carregar_no_form,
             on_erro=lambda msg: self._erro_carga(msg),
