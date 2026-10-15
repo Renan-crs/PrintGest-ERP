@@ -477,7 +477,9 @@ QWidget#rodape { background-color: %surface%; border-top: 1px solid %borda%; }
 
 
 def aplicar_theme(app: QApplication) -> QApplication:
-    app.setFont(QFont(FONT_FAMILY, 10))
+    fonte = QFont(FONT_FAMILY, 10)
+    fonte.setStyleHint(QFont.StyleHint.SansSerif)
+    app.setFont(fonte)
     qss = _QSS
     for chave, valor in CORES.items():
         qss = qss.replace(f"%{chave}%", valor)

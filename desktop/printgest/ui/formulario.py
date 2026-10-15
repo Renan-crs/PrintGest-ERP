@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from PySide6.QtCore import QDate, QTime
+from PySide6.QtCore import QDate, QTime, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -446,6 +446,7 @@ class CampoValor(CampoForm):
         super().__init__(rotulo)
         self._prefixo = prefixo
         self._edicao = QLineEdit(valor)
+        self._edicao.setMinimumWidth(80)
         caixa = QWidget()
         linha = QHBoxLayout(caixa)
         linha.setContentsMargins(0, 0, 0, 0)
@@ -453,6 +454,8 @@ class CampoValor(CampoForm):
         if prefixo:
             rot = QLabel(prefixo)
             rot.setObjectName("labelForm")
+            rot.setMinimumWidth(28)
+            rot.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
             linha.addWidget(rot)
         linha.addWidget(self._edicao, 1)
         self._caixa = caixa

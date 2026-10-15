@@ -15,6 +15,7 @@ from printgest.ui.theme import aplicar_theme
 
 def pytest_sessionstart(session):
     """Patch `rodar` para executar sincronamente ANTES da execução dos testes."""
+    print(f"[CONFTEST] pytest_sessionstart called", flush=True)
     import printgest.core.tarefas as tarefas_mod
     import printgest.ui.modulos.agendamento as agendamento_mod
     import printgest.ui.modulos.configuracao as config_mod
@@ -32,6 +33,7 @@ def pytest_sessionstart(session):
     for mod in (tarefas_mod, agendamento_mod, config_mod, os_mod, fin_mod, fiscal_mod, est_mod):
         if hasattr(mod, "rodar"):
             mod.rodar = _rodar_sync
+            print(f"  [CONFTEST] Patched {mod.__name__}.rodar", flush=True)
 
 
 @pytest.fixture(scope="session")

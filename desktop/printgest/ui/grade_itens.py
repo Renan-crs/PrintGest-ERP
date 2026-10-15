@@ -72,53 +72,68 @@ class GradeItens(QWidget):
         if api is not None:
             self.carregar(api)
 
-    # -------------------------------------------------------------- editor
-
     def _barra_editor(self) -> QWidget:
         caixa = QWidget()
         caixa.setObjectName("card")
-        grade = QHBoxLayout(caixa)
-        grade.setContentsMargins(10, 8, 10, 8)
-        grade.setSpacing(8)
+        layout = QVBoxLayout(caixa)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(8)
+
+        # Linha 1: Produto + Descrição
+        linha1 = QHBoxLayout()
+        linha1.setSpacing(8)
 
         self._combo_produto = QComboBox()
         self._combo_produto.setMinimumWidth(220)
         self._combo_produto.currentIndexChanged.connect(self._produto_selecionado)
-        grade.addWidget(self._combo_produto, 2)
+        linha1.addWidget(self._combo_produto, 2)
 
         self._descricao = QLineEdit()
         self._descricao.setPlaceholderText("Descrição avulsa (sem produto)")
-        self._descricao.setFixedWidth(150)
-        grade.addWidget(self._descricao)
+        self._descricao.setMinimumWidth(150)
+        linha1.addWidget(self._descricao, 1)
+        layout.addLayout(linha1)
+
+        # Linha 2: Qtd + Dimensões + Unit. + Desc. + Adicionar
+        linha2 = QHBoxLayout()
+        linha2.setSpacing(8)
 
         self._qtd = QLineEdit("1")
         self._qtd.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self._qtd.setFixedWidth(60)
-        grade.addWidget(self._qtd)
+        self._qtd.setMinimumWidth(60)
+        self._qtd.setMaximumWidth(80)
+        linha2.addWidget(self._qtd)
 
         self._dimensoes = QLineEdit()
         self._dimensoes.setPlaceholderText("Dimensões")
-        self._dimensoes.setFixedWidth(100)
-        grade.addWidget(self._dimensoes)
+        self._dimensoes.setMinimumWidth(100)
+        self._dimensoes.setMaximumWidth(140)
+        linha2.addWidget(self._dimensoes)
 
         self._unit = QLineEdit()
         self._unit.setPlaceholderText("Unit. R$")
-        self._unit.setFixedWidth(90)
-        grade.addWidget(self._unit)
+        self._unit.setMinimumWidth(80)
+        self._unit.setMaximumWidth(110)
+        linha2.addWidget(self._unit)
 
         self._desconto = QLineEdit()
         self._desconto.setPlaceholderText("Desc. R$")
-        self._desconto.setFixedWidth(60)
-        grade.addWidget(self._desconto)
+        self._desconto.setMinimumWidth(60)
+        self._desconto.setMaximumWidth(80)
+        linha2.addWidget(self._desconto)
 
         botao = QPushButton("Adicionar")
         botao.setProperty("role", "primary")
         botao.clicked.connect(self._adicionar)
-        grade.addWidget(botao)
+        botao.setMinimumWidth(100)
+        linha2.addWidget(botao)
 
         remover = QPushButton("Remover Selecionada")
         remover.clicked.connect(self._remover)
-        grade.addWidget(remover)
+        remover.setMinimumWidth(120)
+        linha2.addWidget(remover)
+        linha2.addStretch(1)
+        layout.addLayout(linha2)
         return caixa
 
     # ------------------------------------------------------------ produtos
