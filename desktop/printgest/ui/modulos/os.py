@@ -20,6 +20,15 @@ from PySide6.QtWidgets import (
 
 from printgest.core import catalogos
 from printgest.core.dominio import FORMAS_PAGAMENTO
+from printgest.core.dominio.ordem_servico import (
+    _PROXIMO_STATUS,
+    _rotulo_status,
+    _rotulo_proximo_status,
+    _STATUS_DESTINO,
+    _COLUNAS_QUADRO,
+    rotulo_status,
+    proximo_status,
+)
 import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArea,
@@ -39,32 +48,6 @@ from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.widgets import botao_com_atalho
 
-_PROXIMO_STATUS = {
-    "aberto": "aprovado",
-    "aprovado": "producao",
-    "producao": "pronta",
-    "pronta": "entregue",
-}
-
-# Etapas do quadro de Projetos. "Aguardando" agrupa `aberto` e `aprovado` — o
-# orçamento aprovado ainda não entrou em produção (ver docs/revisao_projetos.md).
-_COLUNAS_QUADRO = [
-    ("aguardando", "Aguardando", ("aberto", "aprovado")),
-    ("producao", "Em produção", ("producao",)),
-    ("pronta", "Prontas", ("pronta",)),
-    ("entregue", "Entregues", ("entregue",)),
-]
-
-# Status aplicado ao soltar um cartão em cada coluna. "Aguardando" agrupa
-# `aberto`/`aprovado`; como não há transição *para trás* até essa etapa (o
-# backend recusa), o alvo é apenas nominal — a mensagem de erro cobre o caso.
-_STATUS_DESTINO = {
-    "aguardando": "aprovado",
-    "producao": "producao",
-    "pronta": "pronta",
-    "entregue": "entregue",
-}
-
 
 class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "os"
@@ -80,10 +63,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     FILTROS = [
         ("", "Todas"),
         ("aberto", "Abertas"),
-        ("aprovado", "Aprovadas"),
         ("producao", "Em Produção"),
         ("pronta", "Prontas"),
         ("entregue", "Entregues"),
+        ("cancelado", "Canceladas"),
     ]
 
     def __init__(self, api, modo_leitura: bool = False) -> None:
@@ -208,7 +191,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     def _acao_extra(self):
         avancar, self._btn_avancar = botao_com_atalho("Avançar Status", "F7")
         self._btn_avancar.clicked.connect(self._avancar_status)
-        cancelar, self._btn_cancelar_os = botao_com_atalho("Cancelar O.S.", "F8")
+        cancelar, self._btn_cancelar_os = botao_com_atalho("Cancelar Projeto", "F8", "danger")
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
         return [avancar, cancelar]
 
@@ -224,12 +207,15 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         )
         if not dado:
             return
-        proximo = _PROXIMO_STATUS.get(dado.get("status"))
+        atual = dado.get("status")
+        proximo = _PROXIMO_STATUS.get(atual)
         if proximo is None:
             QMessageBox.information(
                 self, "O.S.", "Registro sem próxima etapa (entregue/cancelado)."
             )
             return
+        # Atualiza o texto do botão para mostrar o destino
+        self._btn_avancar.setText(f"Avançar para {_rotulo_status(proximo)}")
         item_id = dado["id"]
         self._btn_avancar.setEnabled(False)  # trava contra duplo PATCH
         tarefas.rodar(
@@ -240,10 +226,12 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
 
     def _status_avancado(self, _dado: dict) -> None:
         self._btn_avancar.setEnabled(True)
+        self._btn_avancar.setText("Avançar Status")
         self.recarregar(self._busca.texto())
 
     def _status_avancado_erro(self, msg: str) -> None:
         self._btn_avancar.setEnabled(True)
+        self._btn_avancar.setText("Avançar Status")
         self._erro_salvar(msg)
 
     def _cancelar_os(self) -> None:
@@ -254,8 +242,11 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             return
         resposta = QMessageBox.question(
             self,
-            "Cancelar registro",
-            f"Cancelar o registro Nº {dado.get('numero')}?",
+            "Cancelar Projeto",
+            f"Cancelar permanentemente o projeto Nº {dado.get('numero')}?\n"
+            "Esta ação não pode ser desfeita.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
         if resposta != QMessageBox.StandardButton.Yes:
             return

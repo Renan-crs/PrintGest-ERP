@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import Callable
 
-from printgest.core.tarefas import rodar
+import printgest.core.tarefas as tarefas
 
 _TTL_SEGUNDOS = 300.0
 
@@ -42,7 +42,7 @@ def carregar(
         _cache[chave] = (time.monotonic(), dados)
         on_ok(dados)
 
-    rodar(buscador, on_ok=_recebido, on_erro=on_erro or (lambda _msg: None))
+    tarefas.rodar(buscador, on_ok=_recebido, on_erro=on_erro or (lambda _msg: None))
 
 
 def invalidar(*chaves: str) -> None:
