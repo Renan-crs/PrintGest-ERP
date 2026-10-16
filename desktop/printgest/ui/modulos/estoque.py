@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 import printgest.core.tarefas as tarefas
+from printgest.ui import animacao
 from printgest.ui.formulario import (
     CampoArea,
     CampoCombo,
@@ -192,6 +193,7 @@ class PaginaEstoqueBase(PaginaCrud):
             on_ok=lambda saida: self._kardex_recebidos(saida, tabela),
             on_erro=lambda msg: QMessageBox.warning(dialog, "Kardex", msg),
         )
+        animacao.revelar_janela(dialog)
         dialog.show()
 
     def _kardex_recebidos(self, saida: dict, tabela: TabelaDensa) -> None:

@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from printgest.ui import animacao
 from printgest.ui.widgets import ElideLabel, badge
 
 # Formato usado para carregar o id do cartão durante o arraste.
@@ -122,11 +123,27 @@ class CartaoKanban(QFrame):
         self._preparar_arraste().exec(Qt.DropAction.MoveAction)
 
     def _preparar_arraste(self) -> QDrag:
-        """Monta o `QDrag` com o id do cartão (sem executá-lo — testável)."""
+        """Monta o `QDrag` com o id do cartão (sem executá-lo — testável).
+
+        Quando o movimento está habilitado, o cartão vira um **pixmap elevado**
+        (sombra) sob o cursor e o *hot spot* respeita **onde o usuário pegou**
+        (§2 direct manipulation) — o cartão não "pula" para o centro da mão.
+
+        O menu de contexto "Mover para" (Shift+F10) continua sendo o caminho por
+        teclado; por isso o arraste é apenas o gesto do mouse.
+        """
         arraste = QDrag(self)
         dados = QMimeData()
         dados.setData(MIME_CARTAO, str(self._id).encode("utf-8"))
         arraste.setMimeData(dados)
+        pixmap = animacao.pixmap_com_sombra(self)
+        if pixmap is not None and not pixmap.isNull():
+            arraste.setPixmap(pixmap)
+            if self._inicio is not None:
+                # Preserva o offset do "agarre" (clampado ao cartão).
+                x = min(max(self._inicio.x(), 0), pixmap.width())
+                y = min(max(self._inicio.y(), 0), pixmap.height())
+                arraste.setHotSpot(QPoint(x, y))
         return arraste
 
     def mouseReleaseEvent(self, evento) -> None:  # noqa: N802 (API Qt)

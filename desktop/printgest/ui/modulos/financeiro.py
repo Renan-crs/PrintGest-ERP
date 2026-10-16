@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core.rbac import tem_acesso
 import printgest.core.tarefas as tarefas
+from printgest.ui import animacao
 from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
@@ -429,6 +430,7 @@ def _dialogo_baixa(parent, conta: dict, titulo: str) -> dict | None:
     rodape.addWidget(confirmar)
     col.addLayout(rodape)
 
+    animacao.revelar_janela(dialog)
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return None
     valor = campo_valor.valor()
