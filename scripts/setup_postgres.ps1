@@ -49,14 +49,25 @@ if ($LASTEXITCODE -ne 0) {
     $cmdLine = "`"$pgctl`" start -D `"$dataDir`" -l `"$logFile`" -o `"-p $port -c listen_addresses=127.0.0.1`""
     $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
     if ($result.ReturnValue -ne 0) { throw "Falha ao iniciar o PostgreSQL. Ver $logFile" }
-    Start-Sleep -Seconds 3
 } else {
     Write-Host "PostgreSQL já está rodando."
 }
 
+# Espera o servidor aceitar conexões. O start via WMI não suporta `-w`, e um
+# sleep fixo é frágil: o psql logo abaixo falha com "the database system is
+# starting up" (o consulta do banco volta nula e quebra o `.Trim()`).
+$pgIsReady = Join-Path $binDir "pg_isready.exe"
+$pronto = $false
+for ($i = 0; $i -lt 60; $i++) {
+    & $pgIsReady -h 127.0.0.1 -p $port -U $superUser -q 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) { $pronto = $true; break }
+    Start-Sleep -Milliseconds 500
+}
+if (-not $pronto) { throw "PostgreSQL não respondeu em 127.0.0.1:$port (ver $logFile)" }
+
 $psql = Join-Path $binDir "psql.exe"
 $db   = $(& $psql -h 127.0.0.1 -p $port -d postgres -U $superUser -tAc "SELECT 1 FROM pg_database WHERE datname='printgest'")
-if ($db.Trim() -ne "1") {
+if ("$db".Trim() -ne "1") {
     Write-Host "Criando banco 'printgest'..."
     & $psql -h 127.0.0.1 -p $port -d postgres -U $superUser -c "CREATE DATABASE printgest OWNER $superUser" | Out-Null
 }
