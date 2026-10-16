@@ -1,0 +1,76 @@
+# Changelog
+
+Histórico de versões do **PrintGest ERP**. Formato inspirado em
+[Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e versionamento
+semântico.
+
+As versões correspondem a tags anotadas neste repositório; o commit de destino
+de cada tag está indicado para rastreabilidade.
+
+---
+
+## [0.2.2] — 2026-10-16 · `7b9ed50`
+
+### Adicionado
+
+- Camada de movimento (`desktop/printgest/ui/animacao.py`): *springs* aproximados
+  por curvas de easing, animações interrompíveis (partem do valor atual),
+  materialização por fade e pixmap elevado para arraste. Respeita
+  *reduced-motion* e a plataforma `offscreen` (mantém os testes determinísticos).
+
+### Alterado
+
+- **UI adaptada ao Apple Design:** paleta de sistema (janela clara), tipografia
+  óptica, cantos contínuos, selos em pílula e estilos para controles que antes
+  caíam no visual nativo do Windows (`QMenu`, `QToolTip`, `QCheckBox`,
+  `QRadioButton`, `QDialog`/`QMessageBox`).
+- Barra lateral colapsa com largura animada; páginas materializam com fade curto.
+- Kanban: cartão arrastado vira pixmap com sombra e o *hot spot* respeita onde o
+  usuário agarrou; alvo de soltura em tinta de acento.
+
+### Corrigido
+
+- `test_produtos` travava por ordem de inicialização (`_nomes_cat` era lido antes
+  de existir durante `super().__init__()`).
+- `scripts/setup_postgres.ps1` agora aguarda `pg_isready` antes de consultar o
+  banco, em vez de um `sleep` fixo.
+
+### Notas
+
+- Versão do produto alinhada para `0.2.2` no desktop (`__version__`) e no Local
+  API Service (`config.version`).
+
+---
+
+## [0.2.1] — 2026-10-11 · `4589597`
+
+- Agendamento: visões Calendário/Lista com CRUD síncrono (mockado em testes);
+  `rodar` assíncrono registrado como limitação conhecida (`xfail`).
+
+## [0.2.0] — 2026-10-11 · `6b16140`
+
+- Release 0.2.0: módulos de Projetos (Quadro/Kanban e Lista), Financeiro, Fiscal
+  e Configuração.
+
+## [0.1.0] · `e94ae71`
+
+- Primeira versão: base de cadastros (Clientes, Fornecedores, Produtos/Serviços)
+  e correções 3.1/3.2.
+
+---
+
+## Correções de histórico de tags
+
+- **2026-10-16 — `v0.2.0` reapontada.** A tag `v0.2.0` estava apontando para o
+  commit do refactor de domínio (`e0e7a32`, de 15/10), que é **posterior** ao
+  commit da `v0.2.1` (`4589597`, de 11/10) — a ordem cronológica entre as tags
+  ficava invertida. A `v0.2.0` foi reapontada para o commit de release real
+  (`6b16140`, "Release 0.2.0: Projetos, Financeiro, Fiscal e Configuração") e
+  recriada como tag **anotada** (antes era leve), ficando consistente com as
+  demais.
+
+  Ordem resultante, verificada por ancestralidade:
+  `v0.1.0 < v0.2.0 < v0.2.1 < v0.2.2`.
+
+  > Se você já havia clonado antes desta data, rode
+  > `git fetch --tags --force` para descartar a `v0.2.0` antiga localmente.
