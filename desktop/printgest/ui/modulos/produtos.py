@@ -49,8 +49,11 @@ class PaginaProdutos(PaginaCrud):
     def __init__(
         self, api: Api, modo_leitura: bool = False, nivel: str | None = None
     ) -> None:
-        super().__init__(api, modo_leitura)
+        # Antes do super(): `recarregar()` do `PaginaCrud` formata a coluna
+        # `categoria_nome` já durante a construção (em testes o `rodar` roda de
+        # forma síncrona), então o cache precisa existir antes.
         self._nomes_cat: dict[int, str] = {}
+        super().__init__(api, modo_leitura)
         if nivel == "operador":
             # RBAC: operador consulta o catálogo, mas não altera preços.
             self._preco_custo.habilitar(False)

@@ -1,40 +1,64 @@
-"""Tema do PrintGest — tokens do design system `fluent_print_erp/DESIGN.md`.
+"""Tema do PrintGest — linguagem visual inspirada no Apple Design.
 
-Paleta M3/Fluent (janela clara)+ usada nos mockups e no QSS do PySide6. Os
-componentes usam `setProperty("role", ...)`: `primary`, `ghost`, `danger`,
-`amber` para botões; `label-error` para mensagens; `banner-amber` para o modo
-leitura.
+Adota os fundamentos de *Principles of Great Design* / *The Details of UI
+Typography* (WWDC) para o desktop Qt:
+
+- **Grays** do sistema Apple (janela clara): fundo ``systemGray6``, hairlines
+  ``separator``, texto ``label``/``secondaryLabel`` — separação por fio de cabelo,
+  não por blocos pesados (§12 materiais, §16 craft).
+- **Azul de sistema** ``#0071E3`` como acento; verde/laranja/vermelho nas versões
+  legíveis para texto sobre branco.
+- **Tipografia óptica (§15):** títulos com *tracking* negativo, rótulos pequenos
+  com tracking levemente positivo, hierarquia por peso+tamanho — nunca só por
+  tamanho. ``text-transform`` não existe no QSS; o maiúsculo vem do Python.
+- **Cantos contínuos** aproximados por raios consistentes (controles 6px, cartões
+  e diálogos 12px, pílulas 999px).
+
+Os componentes continuam usando ``setProperty("role", ...)``: ``primary``,
+``ghost``, ``danger``, ``amber`` para botões; ``label-error`` para mensagens;
+``banner-amber`` para o modo leitura. O movimento vive em ``animacao.py``.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 FONT_FAMILY = "Inter"
 
+_ASSETS = Path(__file__).resolve().parent / "assets"
+
 CORES = {
-    "canvas": "#F1F5F9",
-    "surface": "#FFFFFF",
-    "surface-muted": "#F8FAFC",
-    "borda": "#E2E8F0",
-    "borda-forte": "#CBD5E1",
-    "texto": "#0F172A",
-    "texto-muted": "#475569",
-    "primary": "#2563EB",
-    "primary-hover": "#1D4ED8",
-    "primary-active": "#1E40AF",
+    # --- superfícies (janela clara do macOS)
+    "canvas": "#F5F5F7",          # systemGray6 — fundo de janela
+    "surface": "#FFFFFF",         # cartões, barras, campos
+    "surface-muted": "#F5F5F7",   # hovers/repouso de controles
+    # --- traços
+    "borda": "#D8D8DC",           # separador (hairline)
+    "borda-forte": "#C7C7CC",     # systemGray3
+    # --- texto
+    "texto": "#1D1D1F",           # label
+    "texto-muted": "#6E6E73",     # secondaryLabel
+    # --- acento
+    "primary": "#0071E3",         # azul de sistema
+    "primary-hover": "#0077ED",
+    "primary-active": "#0068C8",
+    "primary-container": "#EAF3FF",  # tint de seleção
     "on-primary": "#FFFFFF",
-    "tertiary": "#8B5CF6",
-    "sucesso": "#059669",
-    "sucesso-container": "#ECFDF5",
-    "atencao": "#D97706",
-    "atencao-container": "#FFFBEB",
-    "atencao-borda": "#FDE68A",
-    "erro": "#DC2626",
-    "erro-container": "#FEF2F2",
-    "erro-borda": "#FECACA",
-    "focus": "#2563EB",
+    "tertiary": "#AF52DE",        # roxo de sistema
+    # --- estados
+    "sucesso": "#248A3D",         # verde legível
+    "sucesso-container": "#E9F6EC",
+    "atencao": "#B25000",         # laranja legível
+    "atencao-hover": "#93400A",
+    "atencao-container": "#FFF4E8",
+    "atencao-borda": "#F3C99A",
+    "erro": "#D70015",            # vermelho de sistema
+    "erro-container": "#FCEEEE",
+    "erro-borda": "#F2B8BC",
+    "focus": "#0071E3",
 }
 
 _QSS = """
@@ -51,34 +75,37 @@ QWidget {
 QWidget#botaoKbd, QWidget#cardBaixo { background: transparent; }
 
 QWidget#passo { background-color: %surface-muted%; border: 1px solid %borda%; border-radius: 6px; }
-QWidget#passo[passoAtivo="true"] { background-color: #EFF6FF; border: 1px solid %primary%; }
+QWidget#passo[passoAtivo="true"] { background-color: %primary-container%; border: 1px solid %primary%; }
 
 QPlainTextEdit { background: transparent; border: none; color: %texto-muted%; font-size: 12px; }
 
+/* Selos: pílula cheia, sem contorno pesado (§16 simplicidade). */
 QLabel[badge] {
     font-size: 11px;
-    font-weight: 700;
-    border-radius: 4px;
-    padding: 2px 8px;
-    letter-spacing: 0.02em;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 2px 9px;
+    letter-spacing: 0.01em;
     background-color: %surface-muted%;
     color: %texto-muted%;
-    border: 1px solid %borda-forte%;
+    border: none;
 }
-QLabel[badgeStyle="primary"] { background-color: #DBE1FF; color: #003EA8; border-color: #B4C5FF; }
-QLabel[badgeStyle="success"] { background-color: %sucesso-container%; color: %sucesso%; border-color: #A7F3D0; }
-QLabel[badgeStyle="atencao"] { background-color: %atencao-container%; color: %atencao%; border-color: %atencao-borda%; }
-QLabel[badgeStyle="erro"] { background-color: %erro-container%; color: %erro%; border-color: %erro-borda%; }
+QLabel[badgeStyle="primary"] { background-color: %primary-container%; color: %primary%; }
+QLabel[badgeStyle="success"] { background-color: %sucesso-container%; color: %sucesso%; }
+QLabel[badgeStyle="atencao"] { background-color: %atencao-container%; color: %atencao%; }
+QLabel[badgeStyle="erro"] { background-color: %erro-container%; color: %erro%; }
 
+/* Cartões: material claro com fio de cabelo; nada de sombras duras. */
 QWidget#card {
     background-color: %surface%;
     border: 1px solid %borda%;
-    border-radius: 10px;
+    border-radius: 12px;
 }
 
 QWidget#cardLow {
-    background-color: %surface-muted%;
-    border-radius: 8px;
+    background-color: %surface%;
+    border: 1px solid %borda%;
+    border-radius: 12px;
 }
 
 QLabel { background: transparent; color: %texto%; }
@@ -91,7 +118,7 @@ QLabel[role="atencao"] { color: %atencao%; font-weight: 600; }
 QPushButton[role="success"], QPushButton[role="atencao"], QPushButton[role="error"] {
     border: none;
     background: transparent;
-    font-weight: 700;
+    font-weight: 600;
     padding: 2px 6px;
 }
 QPushButton[role="success"] { color: %sucesso%; }
@@ -99,20 +126,25 @@ QPushButton[role="atencao"] { color: %atencao%; }
 QPushButton[role="error"] { color: %erro%; }
 QPushButton[role="success"]:hover,
 QPushButton[role="atencao"]:hover,
-QPushButton[role="error"]:hover { background-color: %surface-muted%; }
+QPushButton[role="error"]:hover { background-color: %surface-muted%; border-radius: 6px; }
 
-QLabel#titulo { font-size: 20px; font-weight: 700; }
+/* Tipografia óptica: tracking negativo no título, neutro no corpo (§15). */
+QLabel#titulo { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 QLabel#subtitulo { color: %texto-muted%; font-size: 13px; }
-QLabel#labelForm { font-size: 11px; font-weight: 700; color: %texto-muted%; text-transform: uppercase; }
+QLabel#labelForm { font-size: 11px; font-weight: 600; color: %texto-muted%; letter-spacing: 0.02em; }
 
 QLineEdit, QDateEdit, QTimeEdit, QSpinBox, QDoubleSpinBox {
-    background-color: %surface-muted%;
-    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+    border: 1px solid %borda%;
     border-radius: 6px;
     padding: 8px 10px;
     min-height: 22px;
     color: %texto%;
     selection-background-color: %primary%;
+    selection-color: %on-primary%;
+}
+QLineEdit:hover, QDateEdit:hover, QTimeEdit:hover, QSpinBox:hover, QDoubleSpinBox:hover {
+    border-color: %borda-forte%;
 }
 QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
     border: 1px solid %primary%;
@@ -126,68 +158,72 @@ QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0; border: none;
    Windows). A seta fica a nativa: em versionamentos recentes do Qt o truque de
    "triângulo por bordas" em `::down-arrow` vira um bloco preto (G6). */
 QComboBox {
-    background-color: %surface-muted%;
-    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+    border: 1px solid %borda%;
     border-radius: 6px;
     padding: 8px 10px;
     min-height: 22px;
     color: %texto%;
 }
+QComboBox:hover { border-color: %borda-forte%; }
 QComboBox:focus, QComboBox:on { border: 1px solid %primary%; }
 QComboBox QAbstractItemView {
     background-color: %surface%;
-    border: 1px solid %borda-forte%;
-    border-radius: 6px;
+    border: 1px solid %borda%;
+    border-radius: 8px;
+    padding: 4px;
     color: %texto%;
     outline: none;
     selection-background-color: %primary%;
     selection-color: %on-primary%;
 }
 
+/* Botões: contorno fino + preenchimento sutil (padrão do macOS). A resposta ao
+   toque é imediata no `:pressed` (§1); nada de esperar o release. */
 QPushButton {
-    background: transparent;
-    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+    border: 1px solid %borda%;
     border-radius: 6px;
     padding: 8px 14px;
     font-weight: 600;
     color: %texto%;
 }
-QPushButton:hover { background-color: %surface-muted%; border-color: %primary%; }
+QPushButton:hover { background-color: %surface-muted%; border-color: %borda-forte%; }
 QPushButton:pressed { background-color: %borda%; }
 
 QPushButton[role="primary"] {
     background-color: %primary%;
-    border: none;
+    border: 1px solid %primary%;
     color: %on-primary%;
 }
-QPushButton[role="primary"]:hover { background-color: %primary-hover%; }
-QPushButton[role="primary"]:pressed { background-color: %primary-active%; }
-QPushButton[role="primary"]:disabled { background-color: %borda%; color: %texto-muted%; }
+QPushButton[role="primary"]:hover { background-color: %primary-hover%; border-color: %primary-hover%; }
+QPushButton[role="primary"]:pressed { background-color: %primary-active%; border-color: %primary-active%; }
+QPushButton[role="primary"]:disabled { background-color: %surface-muted%; border-color: %borda%; color: %texto-muted%; }
 
 QPushButton[role="danger"] {
-    background: %surface-muted%;
+    background: %surface%;
     border: 1px solid %erro-borda%;
     color: %erro%;
 }
-QPushButton[role="danger"]:hover { background-color: %erro-container%; }
+QPushButton[role="danger"]:hover { background-color: %erro-container%; border-color: %erro%; }
 
 QPushButton[role="amber"] {
     background-color: %atencao%;
-    border: none;
+    border: 1px solid %atencao%;
     color: #FFFFFF;
-    font-weight: 700;
+    font-weight: 600;
 }
-QPushButton[role="amber"]:hover { background-color: #B45309; }
+QPushButton[role="amber"]:hover { background-color: %atencao-hover%; border-color: %atencao-hover%; }
 
 QPushButton[kbd="true"] { padding-right: 6px; }
 
 QLabel[kbdHint="true"] {
     background-color: %surface-muted%;
-    border: 1px solid %borda-forte%;
-    border-radius: 4px;
+    border: 1px solid %borda%;
+    border-radius: 5px;
     color: %texto-muted%;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 2px 5px;
 }
 
@@ -203,12 +239,12 @@ QScrollArea { background: transparent; border: none; }
 /* Scrollbars finas, sem setas — evita o visual clássico do Windows (B1). */
 QScrollBar:vertical {
     background: transparent;
-    width: 10px;
+    width: 8px;
     margin: 0;
 }
 QScrollBar::handle:vertical {
     background-color: %borda-forte%;
-    border-radius: 5px;
+    border-radius: 4px;
     min-height: 30px;
 }
 QScrollBar::handle:vertical:hover { background-color: %texto-muted%; }
@@ -216,44 +252,102 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; border
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
 QScrollBar:horizontal {
     background: transparent;
-    height: 10px;
+    height: 8px;
     margin: 0;
 }
 QScrollBar::handle:horizontal {
     background-color: %borda-forte%;
-    border-radius: 5px;
+    border-radius: 4px;
     min-width: 30px;
 }
 QScrollBar::handle:horizontal:hover { background-color: %texto-muted%; }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; border: none; }
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
 
-QStatusBar { background-color: %surface-muted%; color: %texto-muted%; border-top: 1px solid %borda%; }
+QStatusBar { background-color: %surface%; color: %texto-muted%; border-top: 1px solid %borda%; }
+
+/* --------------------------------------------------- controles nativos (sem
+   isto, QCheckBox/QRadioButton/QMenu/QToolTip caíam no estilo do Windows) */
+
+QCheckBox, QRadioButton { spacing: 8px; }
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+}
+QCheckBox::indicator { border-radius: 5px; }
+QRadioButton::indicator { border-radius: 999px; }
+QCheckBox::indicator:hover, QRadioButton::indicator:hover { border-color: %primary%; }
+QCheckBox::indicator:checked {
+    background-color: %primary%;
+    border-color: %primary%;
+    image: url("%asset_check%");
+}
+QRadioButton::indicator:checked {
+    background-color: %primary%;
+    border-color: %primary%;
+    image: url("%asset_ponto%");
+}
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {
+    background-color: %surface-muted%;
+    border-color: %borda%;
+}
+QCheckBox:disabled, QRadioButton:disabled { color: %texto-muted%; }
+
+QMenu {
+    background-color: %surface%;
+    border: 1px solid %borda%;
+    border-radius: 8px;
+    padding: 4px;
+}
+QMenu::item {
+    background: transparent;
+    border-radius: 6px;
+    padding: 6px 22px 6px 12px;
+}
+QMenu::item:selected { background-color: %primary%; color: %on-primary%; }
+QMenu::item:disabled { color: %texto-muted%; }
+QMenu::separator { height: 1px; background-color: %borda%; margin: 4px 8px; }
+
+QToolTip {
+    background-color: %surface%;
+    color: %texto%;
+    border: 1px solid %borda-forte%;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+QDialog, QMessageBox { background-color: %surface%; }
+QMessageBox QLabel { color: %texto%; }
+QDialogButtonBox QPushButton { min-width: 88px; }
 
 /* ------------------------------------------------------- tela principal */
 
 QWidget#cabecalho { background-color: %surface%; border-bottom: 1px solid %borda%; }
-QLabel#marca { font-size: 16px; font-weight: 800; color: %primary%; }
+QLabel#marca { font-size: 16px; font-weight: 700; color: %primary%; letter-spacing: -0.01em; }
 QLineEdit#buscaGlobal {
-    background-color: %surface-muted%;
-    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+    border: 1px solid %borda%;
     border-radius: 6px;
     color: %texto%;
     padding: 6px 12px;
 }
+QLineEdit#buscaGlobal:hover { border-color: %borda-forte%; }
 QLineEdit#buscaGlobal:focus { border: 1px solid %primary%; }
 QListWidget#sugestoesBusca {
     background-color: %surface%;
-    border: 1px solid %borda-forte%;
-    border-radius: 6px;
+    border: 1px solid %borda%;
+    border-radius: 8px;
     color: %texto%;
     padding: 4px;
 }
-QListWidget#sugestoesBusca::item { padding: 4px 8px; border-radius: 4px; }
+QListWidget#sugestoesBusca::item { padding: 4px 8px; border-radius: 6px; }
 QListWidget#sugestoesBusca::item:selected { background-color: %primary%; color: %on-primary%; }
-QLabel#valorCard { font-size: 18px; font-weight: 800; color: %texto%; }
+QLabel#valorCard { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: %texto%; }
 QProgressBar {
-    border: 1px solid %borda-forte%;
+    border: 1px solid %borda%;
     border-radius: 4px;
     background-color: %surface-muted%;
 }
@@ -263,27 +357,27 @@ QWidget#sidebar { background-color: %surface%; border-right: 1px solid %borda%; 
 QLabel#grupoMenu {
     color: %texto-muted%;
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     /* padding-left 5px + o inset interno do QLabel alinham o rótulo ao texto
        dos itens (QPushButton[nav]) — ver B4. */
     padding: 10px 5px 4px 5px;
 }
 QPushButton[nav="true"] {
     border: none;
-    border-radius: 6px;
+    border-radius: 7px;
     color: %texto-muted%;
     font-weight: 600;
     padding: 7px 10px;
     text-align: left;
 }
 QPushButton[nav="true"]:hover { background-color: %surface-muted%; color: %texto%; }
-QPushButton[nav="true"]:checked { background-color: #EFF6FF; color: %primary%; }
+QPushButton[nav="true"]:checked { background-color: %primary-container%; color: %primary%; }
 
 QLabel#bannerLeitura {
     background-color: %atencao-container%;
     border: 1px solid %atencao-borda%;
-    border-radius: 8px;
+    border-radius: 10px;
     color: %atencao%;
     font-weight: 600;
     padding: 8px 12px;
@@ -292,7 +386,7 @@ QLabel#bannerLeitura {
 QLabel#bannerErro {
     background-color: %erro-container%;
     border: 1px solid %erro-borda%;
-    border-radius: 8px;
+    border-radius: 10px;
     color: %erro%;
     font-weight: 600;
     padding: 8px 12px;
@@ -300,19 +394,19 @@ QLabel#bannerErro {
 
 QToolButton#menuUsuario {
     background-color: %surface%;
-    border: 1px solid %borda-forte%;
-    border-radius: 16px;
+    border: 1px solid %borda%;
+    border-radius: 999px;
     color: %texto%;
     font-weight: 600;
     padding: 4px 10px;
 }
-QToolButton#menuUsuario:hover { border-color: %primary%; background-color: %surface-muted%; }
+QToolButton#menuUsuario:hover { border-color: %borda-forte%; background-color: %surface-muted%; }
 QToolButton#menuUsuario::menu-indicator { image: none; width: 0; }
 
 QPushButton[icone="true"] {
     border: none;
     background: transparent;
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 4px 8px;
     font-size: 15px;
     color: %texto-muted%;
@@ -330,83 +424,85 @@ QPushButton[link="true"] {
 QPushButton[link="true"]:hover { color: %primary-hover%; }
 
 QPushButton[chave="true"] {
-    background-color: %surface-muted%;
-    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+    border: 1px solid %borda%;
     border-radius: 999px;
     color: %texto-muted%;
     font-size: 12px;
     font-weight: 600;
     padding: 4px 12px;
 }
-QPushButton[chave="true"]:hover { border-color: %primary%; color: %texto%; }
+QPushButton[chave="true"]:hover { border-color: %borda-forte%; color: %texto%; }
 QPushButton[chave="true"]:checked { background-color: %primary%; border-color: %primary%; color: #FFFFFF; }
 
 /* Controle segmentado (visões/filtros) — mesmo visual, por objectName. */
 QPushButton#chaveRapida {
-    background-color: %surface-muted%;
-    border: 1px solid %borda-forte%;
+    background-color: %surface%;
+    border: 1px solid %borda%;
     border-radius: 999px;
     color: %texto-muted%;
     font-size: 12px;
     font-weight: 600;
     padding: 5px 14px;
 }
-QPushButton#chaveRapida:hover { border-color: %primary%; color: %texto%; }
+QPushButton#chaveRapida:hover { border-color: %borda-forte%; color: %texto%; }
 QPushButton#chaveRapida:checked { background-color: %primary%; border-color: %primary%; color: #FFFFFF; }
 
 /* Quadro Kanban (Projetos) — uma coluna por etapa, cartões sem corte. */
 QScrollArea#areaQuadro { background: transparent; border: none; }
 QFrame#colunaKanban {
-    background-color: %surface-muted%;
-    border: 1px solid %borda%;
-    border-radius: 10px;
-}
-QFrame#colunaKanban[alvoDrop="true"] {
     background-color: %surface%;
-    border: 2px dashed %primary%;
+    border: 1px solid %borda%;
+    border-radius: 12px;
+}
+/* Alvo de soltura: tinta de acento — "sugere a direção do gesto" (§8) sem o
+   tracejado chamativo do primeiro rascunho. */
+QFrame#colunaKanban[alvoDrop="true"] {
+    background-color: %primary-container%;
+    border: 1px solid %primary%;
 }
 QLabel#tituloColunaKanban {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     color: %texto-muted%;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
 }
 QLabel#contagemKanban {
-    background-color: %surface%;
-    border: 1px solid %borda-forte%;
+    background-color: %surface-muted%;
+    border: none;
     border-radius: 999px;
     color: %texto-muted%;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 1px 8px;
 }
 QFrame#cartaoKanban {
     background-color: %surface%;
     border: 1px solid %borda%;
-    border-radius: 8px;
+    border-radius: 10px;
 }
-QFrame#cartaoKanban:hover { border-color: %primary%; }
+QFrame#cartaoKanban:hover { border-color: %borda-forte%; }
 QFrame#cartaoKanban:focus { border: 2px solid %primary%; }
-QLabel#tituloCartao { font-weight: 700; }
+QLabel#tituloCartao { font-weight: 600; }
 
 /* Calendário mensal (Agendamento) — grade de 6 semanas, sem rolagem lateral. */
 QWidget[role="painelDia"] {
-    background-color: %surface-muted%;
+    background-color: %surface%;
     border: 1px solid %borda%;
-    border-radius: 8px;
+    border-radius: 10px;
 }
 QPushButton[navCalendario="true"] { padding: 4px 12px; }
 QPushButton[chipEvento="true"] {
-    border-radius: 5px;
+    border-radius: 6px;
     padding: 2px 6px;
     font-size: 11px;
     text-align: left;
 }
 QPushButton[chipEvento="true"][chipTipo="primary"] { background-color: %primary%; color: %on-primary%; }
-QPushButton[chipEvento="true"][chipTipo="success"] { background-color: %sucesso-container%; color: %sucesso%; border: 1px solid %sucesso%; }
-QWidget[celulaDia="true"] { background-color: %surface%; border: 1px solid %borda%; border-radius: 6px; }
+QPushButton[chipEvento="true"][chipTipo="success"] { background-color: %sucesso-container%; color: %sucesso%; }
+QWidget[celulaDia="true"] { background-color: %surface%; border: 1px solid %borda%; border-radius: 8px; }
 QWidget[celulaDia="true"][foraDoMes="true"] { background-color: %surface-muted%; }
-QWidget[celulaDia="true"]:hover { border-color: %primary%; }
+QWidget[celulaDia="true"]:hover { border-color: %borda-forte%; }
 QWidget[celulaDia="true"][selecionada="true"] { border: 2px solid %primary%; }
 QWidget[celulaDia="true"][hoje="true"] { border: 2px solid %sucesso%; }
 
@@ -414,14 +510,14 @@ QWidget[celulaDia="true"][hoje="true"] { border: 2px solid %sucesso%; }
 QPushButton#acaoLinha {
     padding: 3px 10px;
     font-size: 12px;
-    border-radius: 5px;
+    border-radius: 6px;
 }
 
 QLabel#secaoForm {
     color: %primary%;
     font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
+    font-weight: 600;
+    letter-spacing: 0.03em;
     padding-top: 8px;
 }
 
@@ -430,26 +526,27 @@ QTableWidget {
     border: none;
     gridline-color: transparent;
     font-size: 13px;
-    selection-background-color: #EFF6FF;
+    selection-background-color: %primary-container%;
     selection-color: %texto%;
 }
+/* Seleção = tinta de acento na linha inteira; a barra lateral de 3px saiu (§16
+   simplicidade: nada de elementos decorativos sem função). */
 QTableWidget::item {
     border-bottom: 1px solid %borda%;
-    padding: 6px 8px;
-    border-left: 3px solid transparent;
+    padding: 7px 8px;
 }
-QTableWidget::item:selected { border-left: 3px solid %primary%; }
+QTableWidget::item:selected { background-color: %primary-container%; color: %texto%; }
 QTableWidget::item:hover { background-color: %surface-muted%; }
 QHeaderView::section {
-    background-color: %surface-muted%;
+    background-color: transparent;
     border: none;
-    border-bottom: 1px solid %borda-forte%;
+    border-bottom: 1px solid %borda%;
     color: %texto-muted%;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 6px 8px;
 }
-QTableCornerButton::section { background-color: %surface-muted%; border: none; }
+QTableCornerButton::section { background-color: transparent; border: none; }
 
 QLabel#vazioTabela {
     background: transparent;
@@ -459,14 +556,14 @@ QLabel#vazioTabela {
 }
 
 QPushButton#pagBotao {
-    border: 1px solid %borda-forte%;
-    background-color: %surface-muted%;
-    border-radius: 5px;
+    border: 1px solid %borda%;
+    background-color: %surface%;
+    border-radius: 6px;
     color: %texto%;
-    font-weight: 700;
+    font-weight: 600;
     padding: 0;
 }
-QPushButton#pagBotao:hover { border-color: %primary%; color: %primary%; }
+QPushButton#pagBotao:hover { border-color: %borda-forte%; background-color: %surface-muted%; }
 QPushButton#pagBotao:disabled { color: %borda-forte%; border-color: %borda%; }
 
 QPushButton[role="ghost"] { border: none; color: %texto-muted%; }
@@ -483,5 +580,8 @@ def aplicar_theme(app: QApplication) -> QApplication:
     qss = _QSS
     for chave, valor in CORES.items():
         qss = qss.replace(f"%{chave}%", valor)
+    # Ícones dos controles nativos vêm de SVG embutido (ver contra-ícone acima).
+    qss = qss.replace("%asset_check%", (_ASSETS / "check.svg").as_posix())
+    qss = qss.replace("%asset_ponto%", (_ASSETS / "ponto.svg").as_posix())
     app.setStyleSheet(qss)
     return app

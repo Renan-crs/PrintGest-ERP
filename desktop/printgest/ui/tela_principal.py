@@ -50,6 +50,7 @@ from printgest.core.rbac import (
     tem_acesso,
 )
 from printgest.core.tarefas import rodar
+from printgest.ui import animacao
 from printgest.ui.busca_global import BuscaGlobal
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
@@ -781,14 +782,39 @@ class TelaPrincipal(QMainWindow):
         return lateral
 
     def _alternar_colapso(self) -> None:
+        """Colapsa/expande a barra lateral com largura animada (§4, §5).
+
+        A largura parte do valor **atual** em tela (interrompível: clicar de novo
+        no meio reverte sem salto). Sem movimento habilitado — SO pedindo menos
+        movimento ou plataforma offscreen — aplica o estado final de imediato.
+        """
         self._colapsada = not self._colapsada
-        largura = 64 if self._colapsada else 224
-        self._sidebar.setFixedWidth(largura)
+        largura_final = 64 if self._colapsada else 224
         self._btn_colapso.setText("»" if self._colapsada else "«")
-        for widget in self._itens_lateral:
-            widget.setVisible(not self._colapsada)
-        self._btn_menu[ITEM_INICIO].setVisible(True)
-        aplicar_estilo(self._sidebar)
+
+        if not animacao.animacoes_habilitadas():
+            self._sidebar.setFixedWidth(largura_final)
+            for widget in self._itens_lateral:
+                widget.setVisible(not self._colapsada)
+            self._btn_menu[ITEM_INICIO].setVisible(True)
+            aplicar_estilo(self._sidebar)
+            return
+
+        if not self._colapsada:
+            # Expandir: revela os rótulos antes para a barra "crescer e mostrar".
+            for widget in self._itens_lateral:
+                widget.setVisible(True)
+
+        def _ao_terminar() -> None:
+            if self._colapsada:
+                for widget in self._itens_lateral:
+                    widget.setVisible(False)
+                self._btn_menu[ITEM_INICIO].setVisible(True)
+            aplicar_estilo(self._sidebar)
+
+        animacao.animar_largura(
+            self._sidebar, self._sidebar.width(), largura_final, ao_fim=_ao_terminar
+        )
 
     def _botao_menu(self, texto: str, checkavel: bool = True) -> QPushButton:
         botao = QPushButton(texto)
@@ -908,6 +934,9 @@ class TelaPrincipal(QMainWindow):
                 pagina.navegar.connect(self._navegar)
         self._marcar(item_id)
         self._stack_paginas.setCurrentWidget(pagina)
+        # A página "materializa" com um fade curto (§12): responder na hora,
+        # nunca bloquear o input (§1). O fade parte da opacidade atual.
+        animacao.aparecer(pagina)
         self.navegado.emit(item_id)
 
     def _marcar(self, item_id: str) -> None:
