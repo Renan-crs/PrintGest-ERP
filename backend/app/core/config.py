@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
-    version: str = "0.2.0"
+    version: str = "0.2.2"
     env: str = "dev"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
