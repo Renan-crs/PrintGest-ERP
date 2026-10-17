@@ -92,16 +92,17 @@ def test_navegar_para_clientes_carrega_grade(app, pumpar):
     assert principal._stack_paginas.currentWidget() is principal._paginas["cliente"]
 
 
-def test_navegar_para_projetos_abre_listagem_de_os(app):
-    # usa handler que responde 200 para /v1/os (a página de O.S. recarrega no
-    # construtor; um 404 abriria QMessageBox modal e travaria o próximo pump).
+def test_navegar_para_projetos_abre_o_quadro(app):
+    # usa handler que responde 200 para qualquer rota (a nova tela carrega o
+    # quadro e os cartões no construtor; um 404 abriria QMessageBox modal e
+    # travaria o próximo pump).
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_vazio_handler))
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "operador"}})
     principal = TelaPrincipal(
         api, usuario=api.usuario, modo_leitura=False, base_url="127.0.0.1:8000"
     )
     principal._navegar("projetos")
-    from printgest.ui.modulos.os import PaginaProjetos
+    from printgest.ui.modulos.projetos import PaginaProjetos
 
     assert isinstance(principal._stack_paginas.currentWidget(), PaginaProjetos)
 
@@ -137,7 +138,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.ui.modulos.financeiro import PaginaFinanceiro
     from printgest.ui.modulos.fiscal import PaginaFiscal
     from printgest.ui.modulos.fornecedores import PaginaFornecedores
-    from printgest.ui.modulos.os import PaginaProjetos
+    from printgest.ui.modulos.projetos import PaginaProjetos
     from printgest.ui.modulos.produtos import PaginaProdutos, PaginaServicos
     from printgest.ui.modulos.venda_balcao import PaginaVendaBalcao
 

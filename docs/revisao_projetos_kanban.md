@@ -1,14 +1,15 @@
-# Projetos (Quadro Kanban) — Fase 1 (Núcleo), backend
+# Projetos (Quadro Kanban) — Fase 1 (Núcleo): backend + tela
 
 Documento de entrega da **Fase 1** do módulo **Projetos** descrito no
 `PRD — Módulo Projetos (Quadro Kanban)` (v1.0.0, 17/10/2026), que substitui o
 modelo "1 projeto = 1 O.S." do PRD v2.1.
 
-> **Escopo desta entrega.** Backend da Fase 1 (Núcleo): modelo de dados,
-> migração, API do quadro/listas/cartões e as regras de visibilidade. **A tela
-> do desktop ainda não consome a nova API** — o módulo Projetos que existe hoje
-> (Kanban sobre `/v1/os`, ver `docs/revisao_projetos.md`) segue **intacto e em
-> uso**. A troca de fonte da tela é a última fatia da Fase 1.
+> **Escopo desta entrega.** Backend da Fase 1 (Núcleo) — modelo de dados,
+> migração, API do quadro/listas/cartões e as regras de visibilidade — **e a
+> tela do desktop** (`ui/modulos/projetos.py`), que passou a consumir
+> `/v1/projetos`. O antigo quadro sobre `/v1/os` (ver
+> `docs/revisao_projetos.md`) foi substituído; `PaginaOS`/`PaginaOrcamento`
+> seguem intactas. Etiquetas, checklists, comentários e anexos são a Fase 2.
 
 ---
 
@@ -120,17 +121,42 @@ cliente e devolve **409** se outro usuário gravou antes.
 
 ## 5. Testes
 
-`backend/tests/test_projetos.py` — **19 testes**, cobrindo: semente das listas,
+`backend/tests/test_projetos.py` — **20 testes**, cobrindo: semente das listas,
 CRUD de listas com dono/contagem, criar/editar/arquivar/restaurar cartão,
 movimentação atômica, **rebalanceamento** (forçado por posições vizinhas no
-limite da precisão), 409 por versão obsoleta, PV1/PV2 (404 para não membro e
-some da busca), PV3 (entra/sai da lista pessoal), PV4 (atribuidor acompanhante),
-PV5 (contagem), membros manuais, RBAC (Caixa 403; estrutura só gestor; exclusão
-só admin), exclusão de lista com cartões, e **não-regressão** (`GET /v1/os`
-segue respondendo).
+limite da precisão), 409 por versão obsoleta, limpeza de campos com `null`
+(PATCH parcial), PV1/PV2 (404 para não membro e some da busca), PV3 (entra/sai da
+lista pessoal), PV4 (atribuidor acompanhante), PV5 (contagem), membros manuais,
+RBAC (Caixa 403; estrutura só gestor; exclusão só admin), exclusão de lista com
+cartões, e **não-regressão** (`GET /v1/os` segue respondendo).
 
-Suíte do backend: **141 testes** verdes (122 anteriores + 19 novos). A suíte do
-desktop (**254**) não foi tocada por esta entrega.
+Suíte do backend: **142 testes** verdes (122 anteriores + 20 novos).
+
+### 5.1 Tela do desktop (Fase 1 UI)
+
+`desktop/printgest/ui/modulos/projetos.py` substitui a antiga `PaginaProjetos`
+(que ficava em `ui/modulos/os.py`) e consome `/v1/projetos`:
+
+- **Quadro dinâmico** — `QuadroKanban.definir_colunas()` reconstrói as colunas a
+  partir de `GET /quadro`; os cartões vêm de `GET /cartoes` (uma consulta) e são
+  agrupados por `lista_id`, respeitando a visibilidade calculada no servidor;
+- **Arrastar-e-soltar / menu "Mover para"** — o soltar informa o **índice**
+  (novo 3º argumento de `movido`, pela metade do cartão); a página converte para
+  a semântica do servidor (mesma lista desconta o próprio cartão; menu anexa ao
+  final) e grava via `PATCH /cartoes/{id}/mover` com a `versao` lida (409 em
+  conflito recarrega o quadro);
+- **Ficha do cartão** (`DialogoCartao`) — título, descrição, datas, lembrete,
+  responsável (atribuição), concluído, arquivar/restaurar e **membros** (add/remover;
+  restringem a visibilidade);
+- **Gestão de listas** (`DialogoListas`) — criar, renomear, arquivar e (só Admin)
+  excluir. Botão visível apenas para Admin/Gerente; o backend reforça (403);
+- **Modo leitura** — nada é arrastável nem gravável.
+
+`desktop/tests/test_projetos.py` — **25 testes** (quadro, colunas do servidor,
+busca, atraso, movimentação com índice/versão, reordenação interna, modo leitura,
+RBAC de estrutura e os diálogos de cartão e de listas).
+
+Suíte do desktop: **240 testes** verdes.
 
 ---
 
@@ -153,6 +179,15 @@ desktop (**254**) não foi tocada por esta entrega.
 5. **Vínculo com a O.S. (RN2) fica na Fase 5.** As colunas `ordem_servico_id`
    (única) e `status_os` já existem para recebê-lo; mover um cartão **ainda não**
    sincroniza o status da O.S.
+6. **`null` explícito limpa o campo (`PATCH /cartoes/{id}`).** Como o router usa
+   `exclude_unset=True`, campo **ausente** = "não mexer" e campo presente com
+   `null` = "limpar". Isso permite remover prazo/descrição/lembrete pela ficha do
+   cartão (`titulo` continua obrigatório no schema). `atribuir_cartao` não tem
+   "desatribuir": remover o acesso é feito removendo os membros.
+7. **Índice no sinal `movido` do Kanban.** O componente genérico passou a emitir
+   `(id, chave_destino, indice)` (antes `(id, chave)`); o menu de contexto envia
+   `-1` (anexar ao final). Mudança interna — o `QuadroKanban` só é usado por esta
+   tela.
 
 ---
 
@@ -167,9 +202,8 @@ desktop (**254**) não foi tocada por esta entrega.
 - **Sincronização entre estações (≤ 5 s).** A Fase 1 prevê o mecanismo: a
   visibilidade e as mutações já são server-side; falta o *polling*/SSE na tela.
   A `versao` otimista já evita sobrescrita em concorrência.
-- **UI:** trocar o módulo Projetos para consumir `/v1/projetos` (listas
-  configuráveis, cartão modal, arraste) e descontinuar, com calma, o quadro
-  sobre `/v1/os`.
+- **UI da Fase 2/3:** calendário e visão de **arquivados**, compartilhamento e
+  "Gerar O.S.", além das etiquetas/checklists/comentários/anexos da Fase 2.
 
 ---
 

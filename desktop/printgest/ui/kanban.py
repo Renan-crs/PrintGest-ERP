@@ -9,9 +9,15 @@ fluxo por etapas amanhã.
 **Movimentação.** Os cartões podem ser arrastados entre colunas (gesto do
 mouse) e, para acesso por teclado, o menu de contexto do cartão (tecla
 Aplicativo / Shift+F10) oferece "Mover para → <etapa>". O quadro apenas
-*anuncia* o movimento pelo sinal `movido(id, chave_destino)`; quem decide se ele
-é válido (regra de transição de status) e persiste é o dono da tela — por isso o
-componente continua sem tocar a rede.
+*anuncia* o movimento pelo sinal `movido(id, chave_destino, indice)`; quem
+decide se ele é válido e persiste é o dono da tela — por isso o componente
+continua sem tocar a rede. O `indice` é a posição (0-based) de destino dentro
+da coluna, calculada pela metade vertical de cada cartão; o menu de contexto
+envia `indice = -1` (anexar ao final), pois ali não há posição do ponteiro.
+
+**Colunas dinâmicas.** `definir_colunas(...)` reconstrói as colunas — usado
+quando a estrutura do quadro chega do servidor (ex.: listas criadas/renomeadas
+pelo gestor).
 
 Sem rolagem por coluna: o quadro inteiro tem **uma** barra vertical (as colunas
 crescem juntas) e a barra horizontal só aparece se as colunas não couberem.
@@ -50,7 +56,7 @@ class CartaoKanban(QFrame):
     """
 
     selecionado = Signal(int)
-    mover_solicitado = Signal(int, str)
+    mover_solicitado = Signal(int, str, int)
 
     def __init__(
         self,
@@ -171,7 +177,7 @@ class CartaoKanban(QFrame):
             acao = menu.addAction(f"Mover para {rotulo}")
             acao.triggered.connect(
                 lambda _marcado=False, destino=chave: self.mover_solicitado.emit(
-                    self._id, destino
+                    self._id, destino, -1
                 )
             )
         menu.exec(evento.globalPos())
@@ -193,7 +199,7 @@ class ColunaKanban(QFrame):
     alvo de soltura (arrastar-e-soltar entre colunas)."""
 
     selecionado = Signal(int)
-    recebido = Signal(int, str)
+    recebido = Signal(int, str, int)
 
     def __init__(self, chave: str, rotulo: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -291,7 +297,21 @@ class ColunaKanban(QFrame):
         except (TypeError, ValueError):
             return
         evento.acceptProposedAction()
-        self.recebido.emit(item_id, self.chave)
+        self.recebido.emit(item_id, self.chave, self.indice_para_posicao(evento.position().toPoint()))
+
+    def indice_para_posicao(self, pos: QPoint) -> int:
+        """Índice (0-based) de inserção para uma soltura no ponto `pos` da coluna.
+
+        Compara o Y da soltura com a metade vertical de cada cartão: solto acima
+        do centro do cartão *i* → entra na posição *i*; abaixo de todos → vai para
+        o final (`len(cartoes)`). É a metade, e não a borda, que dá a sensação
+        de "inserir onde soltei" do Trello.
+        """
+        for indice, cartao in enumerate(self.cartoes()):
+            meio = cartao.mapTo(self, QPoint(0, cartao.height() // 2)).y()
+            if pos.y() < meio:
+                return indice
+        return len(self.cartoes())
 
     def _destacar(self, ligado: bool) -> None:
         if bool(self.property("alvoDrop")) == ligado:
@@ -307,7 +327,7 @@ class QuadroKanban(QWidget):
     """Painel horizontal de colunas (`ColunaKanban`), uma por etapa."""
 
     selecionado = Signal(int)
-    movido = Signal(int, str)
+    movido = Signal(int, str, int)
 
     def __init__(
         self,
@@ -317,7 +337,7 @@ class QuadroKanban(QWidget):
     ) -> None:
         super().__init__(parent)
         self._fabrica = fabrica
-        self._rotulos = list(colunas)
+        self._rotulos: list[tuple[str, str]] = []
         self._colunas: dict[str, ColunaKanban] = {}
         self._permite_movimento = True
 
@@ -329,6 +349,16 @@ class QuadroKanban(QWidget):
         )
         self._area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
+        fora = QVBoxLayout(self)
+        fora.setContentsMargins(0, 0, 0, 0)
+        fora.addWidget(self._area)
+
+        self.definir_colunas(colunas)
+
+    def definir_colunas(self, colunas: list[tuple[str, str]]) -> None:
+        """Reconstrói as colunas (o quadro serve listas que vêm do servidor)."""
+        self._rotulos = list(colunas)
+        self._colunas = {}
         interno = QWidget()
         interno.setObjectName("interiorQuadro")
         linha = QHBoxLayout(interno)
@@ -340,11 +370,10 @@ class QuadroKanban(QWidget):
             coluna.recebido.connect(self.movido)
             linha.addWidget(coluna, 1)
             self._colunas[chave] = coluna
+        antigo = self._area.takeWidget()
+        if antigo is not None:
+            antigo.deleteLater()
         self._area.setWidget(interno)
-
-        fora = QVBoxLayout(self)
-        fora.setContentsMargins(0, 0, 0, 0)
-        fora.addWidget(self._area)
 
     def preencher(self, por_coluna: dict[str, list[dict]]) -> None:
         for chave, coluna in self._colunas.items():
@@ -365,10 +394,21 @@ class QuadroKanban(QWidget):
         cartao.coluna_origem = chave
         cartao.arrastavel = self._permite_movimento
         cartao.destinos = list(self._rotulos) if self._permite_movimento else []
-        cartao.mover_solicitado.connect(self.movido)
+        # Conecta uma única vez (permitir_movimento + preencher podem se repetir).
+        if not getattr(cartao, "_movido_ligado", False):
+            cartao.mover_solicitado.connect(self.movido)
+            cartao._movido_ligado = True
 
     def coluna(self, chave: str) -> ColunaKanban:
         return self._colunas[chave]
+
+    def tem_coluna(self, chave: str) -> bool:
+        return chave in self._colunas
+
+    @property
+    def rotulos(self) -> list[tuple[str, str]]:
+        """Cópia das `(chave, rótulo)` atuais, na ordem do quadro."""
+        return list(self._rotulos)
 
     def contagem(self, chave: str) -> int:
         return len(self._colunas[chave].cartoes())

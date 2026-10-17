@@ -141,6 +141,96 @@ class Api:
         )
         return self._tratar(resp)
 
+    # ----------------------------------------------------------- projetos
+    # Módulo Quadro Kanban (PRD Módulo Projetos). Namespace `/v1/projetos`,
+    # independente de `/v1/os`: o cartão é a unidade (não mais "1 projeto = 1
+    # O.S."). A ordenação é um **índice** 0-based (`posicao` no corpo) e a
+    # edição usa controle otimista via `versao` (enviar a versão lida).
+
+    def obter_quadro(self) -> dict:
+        """Quadro da filial com as listas ativas: `GET /v1/projetos/quadro`."""
+        return self._get("/v1/projetos/quadro", self._token)
+
+    def listar_cartoes(
+        self,
+        q: str = "",
+        lista_id: int | None = None,
+        arquivado: bool = False,
+        sou_membro: bool | None = None,
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> dict:
+        """Cartões visíveis ao usuário: `GET /v1/projetos/cartoes`."""
+        return self.listar_com_filtros(
+            "projetos/cartoes",
+            q=q,
+            lista_id=lista_id,
+            arquivado=arquivado,
+            sou_membro=sou_membro,
+            limit=limit,
+            offset=offset,
+        )
+
+    def criar_cartao(self, payload: dict) -> dict:
+        return self._post("/v1/projetos/cartoes", payload, self._token)
+
+    def obter_cartao(self, cartao_id: int) -> dict:
+        return self._get(f"/v1/projetos/cartoes/{cartao_id}", self._token)
+
+    def atualizar_cartao(self, cartao_id: int, payload: dict) -> dict:
+        return self._patch(f"/v1/projetos/cartoes/{cartao_id}", payload, self._token)
+
+    def mover_cartao(self, cartao_id: int, payload: dict) -> dict:
+        """Move para `lista_id`/`posicao` (índice) com `versao` (§10)."""
+        return self._patch(
+            f"/v1/projetos/cartoes/{cartao_id}/mover", payload, self._token
+        )
+
+    def arquivar_cartao(self, cartao_id: int, versao: int) -> dict:
+        return self._patch(
+            f"/v1/projetos/cartoes/{cartao_id}/arquivar", {"versao": versao}, self._token
+        )
+
+    def restaurar_cartao(self, cartao_id: int, versao: int) -> dict:
+        return self._patch(
+            f"/v1/projetos/cartoes/{cartao_id}/restaurar", {"versao": versao}, self._token
+        )
+
+    def atribuir_cartao(self, cartao_id: int, versao: int, usuario_id: int) -> dict:
+        return self._patch(
+            f"/v1/projetos/cartoes/{cartao_id}/atribuir",
+            {"versao": versao, "usuario_id": usuario_id},
+            self._token,
+        )
+
+    def adicionar_membro(self, cartao_id: int, usuario_id: int) -> dict:
+        return self._post(
+            f"/v1/projetos/cartoes/{cartao_id}/membros",
+            {"usuario_id": usuario_id},
+            self._token,
+        )
+
+    def remover_membro(self, cartao_id: int, membro_id: int) -> dict:
+        return self._delete_data(
+            f"/v1/projetos/cartoes/{cartao_id}/membros/{membro_id}", self._token
+        )
+
+    def criar_lista(self, payload: dict) -> dict:
+        return self._post("/v1/projetos/quadro/listas", payload, self._token)
+
+    def atualizar_lista(self, lista_id: int, payload: dict) -> dict:
+        return self._patch(
+            f"/v1/projetos/quadro/listas/{lista_id}", payload, self._token
+        )
+
+    def arquivar_lista(self, lista_id: int) -> dict:
+        return self._patch(
+            f"/v1/projetos/quadro/listas/{lista_id}/arquivar", {}, self._token
+        )
+
+    def excluir_lista(self, lista_id: int) -> None:
+        self._delete(f"/v1/projetos/quadro/listas/{lista_id}", self._token)
+
     # --------------------------------------------------------- agendamento
 
     def listar_agendamentos(
@@ -403,6 +493,11 @@ class Api:
         resp = self._cliente.delete(path, headers=self._headers(token))
         if resp.status_code >= 400:
             raise ApiError(_detalhe(resp))
+
+    def _delete_data(self, path: str, token: str | None = None) -> dict:
+        """DELETE que devolve o corpo `data` (ex.: remover membro de um cartão)."""
+        resp = self._cliente.delete(path, headers=self._headers(token))
+        return self._tratar(resp)
 
     @staticmethod
     def _headers(token: str | None) -> dict[str, str]:
