@@ -15,12 +15,14 @@ from app.models.enums import (
     ModeloFiscal,
     NivelAcesso,
     OrigemMov,
+    OrigemMembro,
     StatusCaixa,
     StatusConta,
     StatusFiscal,
     StatusOs,
     StatusPedido,
     StatusVenda,
+    TipoLista,
     TipoMovEstoque,
     TipoOs,
     TipoPessoa,
@@ -39,6 +41,7 @@ from app.models.movimento import (
     VendaBalcao,
     VendaBalcaoItem,
 )
+from app.models.projetos import Cartao, CartaoMembro, Quadro, QuadroLista
 
 __all__ = [
     "Base",
@@ -68,4 +71,10 @@ __all__ = [
     "PedidoCompraItem",
     "VendaBalcao",
     "VendaBalcaoItem",
+    "Cartao",
+    "CartaoMembro",
+    "Quadro",
+    "QuadroLista",
+    "OrigemMembro",
+    "TipoLista",
 ]
