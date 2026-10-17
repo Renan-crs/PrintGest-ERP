@@ -9,6 +9,31 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [Não lançado]
+
+### Adicionado
+
+- **Módulo Projetos (Quadro Kanban) — Fase 1 (Núcleo), backend.** Namespace novo
+  `/v1/projetos`, **aditivo**: `/v1/os` e o quadro atual de Projetos seguem
+  intactos. Quadro por filial com listas configuráveis e cartões, membros,
+  movimentação **atômica** com ordenação fracionária (com rebalanceamento) e
+  controle **otimista** de versão (409).
+- Visibilidade **PV1–PV5 no servidor**: cartão sem membros é da equipe; com
+  membros, restringe a membros + Admin/Gerente (cartão invisível → 404);
+  contagens por lista respeitam a visibilidade do consultante.
+- Migração `e7c1d4a2b9f6` (reversível): cria `quadro`, `quadro_lista`, `cartao`,
+  `cartao_membro` e os enums `tipo_lista`/`origem_membro`.
+- 19 testes novos em `backend/tests/test_projetos.py` (semente, CRUD de listas,
+  cartões, mover/rebalancear, 409, PV1–PV5, RBAC, não-regressão). Backend: **141
+  testes** verdes.
+
+### Documentação
+
+- `docs/revisao_projetos_kanban.md`: escopo da Fase 1, decisões tomadas e
+  pendências (Fases 2–4).
+
+---
+
 ## [0.2.2] — 2026-10-16 · `7b9ed50`
 
 ### Adicionado
