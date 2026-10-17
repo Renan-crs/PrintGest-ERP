@@ -87,6 +87,31 @@ class TipoAgenda(StrEnum):
     ENTREGA = "entrega"
 
 
+class TipoLista(StrEnum):
+    """Tipos de lista do quadro de Projetos (PRD Módulo Projetos §4.1).
+
+    O `tipo` define o papel da lista no fluxo e, quando acompanhado de
+    `status_os`, sincroniza o cartão vinculado com a O.S. (RN2). `livre` não
+    altera a O.S.; `usuario` é a lista pessoal de um membro (PV3).
+    """
+
+    ORCAMENTO = "orcamento"
+    USUARIO = "usuario"
+    APROVACAO = "aprovacao"
+    PRODUCAO = "producao"
+    TERCEIRO = "terceiro"
+    FINAL = "final"
+    LIVRE = "livre"
+
+
+class OrigemMembro(StrEnum):
+    """Por que um usuário virou membro do cartão (PRD Módulo Projetos §9/PV3)."""
+
+    MANUAL = "manual"
+    LISTA = "lista"
+    ATRIBUIDOR = "atribuidor"
+
+
 class TipoPlanoConta(StrEnum):
     RECEITA = "receita"
     DESPESA = "despesa"
