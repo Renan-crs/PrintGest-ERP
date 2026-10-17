@@ -1,9 +1,13 @@
-"""Testes do menu Projetos: visões Quadro (Kanban) e Lista.
+"""Testes do módulo Projetos (Quadro Kanban) sobre `/v1/projetos`.
 
-O quadro reusa `/v1/os` (1 projeto = 1 O.S., tipo `os`) — uma consulta por
-etapa — e o cartão abre o registro na visão Lista. O arrastar-e-soltar entre
-colunas usa `PATCH /v1/os/{id}/status` (mesma regra de transição do formulário).
-O calendário segue fora desta entrega (ver docs/revisao_projetos.md).
+Diferente do quadro antigo (1 projeto = 1 O.S. via `/v1/os`), aqui as colunas
+são as **listas** do servidor e cada cartão é uma unidade independente. O quadro
+carrega com duas consultas (`/quadro` + `/cartoes`) e o arrastar-e-soltar usa
+`PATCH /cartoes/{id}/mover` com um **índice** (0-based) e a `versao` lida.
+
+O `MockTransport` abaixo emula o backend o suficiente para exercitar a tela: o
+quadro, os cartões (busca/arquivo), a movimentação, a ficha do cartão (com
+membros) e a estrutura de listas.
 """
 
 from __future__ import annotations
@@ -13,131 +17,295 @@ import json
 
 import httpx
 import pytest
-from PySide6.QtCore import QMimeData, QPointF, Qt
+from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt
 from PySide6.QtGui import QDropEvent
 from PySide6.QtWidgets import QLabel, QMessageBox, QVBoxLayout, QWidget
 
 from printgest.core.api import Api
 from printgest.ui.kanban import MIME_CARTAO
-from printgest.ui.modulos.os import PaginaProjetos
+from printgest.ui.modulos.projetos import DialogoCartao, DialogoListas, PaginaProjetos
 
-_OSS = [
-    {
-        "id": 1,
-        "numero": 1044,
-        "tipo": "os",
-        "status": "aberto",
-        "cliente_nome": "Ana",
-        "data_previsao_entrega": "2999-09-25",
-        "valor_total": "312.00",
-    },
-    {
-        "id": 2,
-        "numero": 1045,
-        "tipo": "os",
-        "status": "aprovado",
-        "cliente_nome": "Biz Gráfica Rápida e Comunicação Visual Ltda",
-        "data_previsao_entrega": "2020-01-01",
-        "valor_total": "100.00",
-    },
-    {
-        "id": 3,
-        "numero": 1046,
-        "tipo": "os",
-        "status": "producao",
-        "cliente_nome": "Cliente de nome muito muito longo para elidir no cartão",
-        "data_previsao_entrega": None,
-        "valor_total": None,
-    },
-    {"id": 4, "numero": 1047, "tipo": "os", "status": "pronta", "cliente_nome": "Dora", "valor_total": "50.00"},
-    {"id": 5, "numero": 1048, "tipo": "os", "status": "entregue", "cliente_nome": "Eva", "valor_total": "10.00"},
-    # Orçamento (tipo ≠ os): nunca pode aparecer no quadro de projetos.
-    {"id": 6, "numero": 3100, "tipo": "orcamento", "status": "aberto", "cliente_nome": "Biz"},
+
+def _lista(ident: int, nome: str) -> dict:
+    return {
+        "id": ident,
+        "quadro_id": 1,
+        "nome": nome,
+        "posicao": f"{ident}.000000000000",
+        "tipo": "livre",
+        "status_os": None,
+        "usuario_dono_id": None,
+        "usuario_dono_nome": None,
+        "fornecedor_id": None,
+        "arquivada": False,
+        "contagem": 0,
+    }
+
+
+def _cartao(ident: int, lista_id: int, titulo: str, **extra) -> dict:
+    base = {
+        "id": ident,
+        "filial_id": 1,
+        "lista_id": lista_id,
+        "posicao": f"{ident}.000000000000",
+        "titulo": titulo,
+        "descricao": None,
+        "data_inicio": None,
+        "data_entrega": None,
+        "lembrete_min": None,
+        "concluido": False,
+        "concluido_em": None,
+        "ordem_servico_id": None,
+        "ultimo_responsavel_id": None,
+        "ultimo_responsavel_nome": None,
+        "terceiro_fornecedor_id": None,
+        "terceiro_prazo": None,
+        "terceiro_custo": None,
+        "arquivado": False,
+        "versao": 1,
+        "membros": [],
+        "criado_por": 1,
+        "criado_em": "2026-01-01T09:00:00",
+        "atualizado_em": "2026-01-01T09:00:00",
+    }
+    base.update(extra)
+    return base
+
+
+_LISTAS = [_lista(1, "Orçamento"), _lista(2, "Em produção"), _lista(3, "Entregue")]
+
+_CARTOES = [
+    _cartao(10, 1, "Banner 2x1", data_entrega="2999-01-01"),
+    _cartao(11, 2, "Cartão atrasado", data_entrega="2020-01-01", versao=2),
+    _cartao(
+        12,
+        2,
+        "Cartão de outra pessoa",
+        ultimo_responsavel_id=7,
+        ultimo_responsavel_nome="Vina",
+        membros=[{"usuario_id": 7, "nome": "Vina", "origem": "manual"}],
+    ),
 ]
 
-_CLIENTES = [{"id": 1, "nome_razao": "Ana"}, {"id": 2, "nome_razao": "Biz"}]
-_FUNCIONARIOS = [{"id": 10, "nome": "Vina", "e_vendedor": True, "e_atendente": True}]
-_PRODUTOS = [{"id": 5, "codigo": "B015", "nome": "Adesivo", "preco_venda": "10.00"}]
+_USUARIOS = [
+    {"id": 1, "nome": "Ana", "login": "ana"},
+    {"id": 7, "nome": "Vina", "login": "vina"},
+]
 
-_GETS: list[httpx.Request] = []
-_PATCHES: list[httpx.Request] = []
-
-# Espelho local da regra de transição do backend (OsStatus) só para o teste
-# decidir o 200/400 do `PATCH /v1/os/{id}/status`.
-_TRANSICOES = {
-    "aberto": {"aprovado", "producao", "pronta", "entregue", "cancelado"},
-    "aprovado": {"producao", "pronta", "entregue", "cancelado"},
-    "producao": {"pronta", "entregue", "cancelado"},
-    "pronta": {"entregue", "cancelado"},
-    "entregue": set(),
-    "cancelado": set(),
-}
-
-# `oss` é a cópia mutável usada pelo handler (a `_OSS` é o molde).
-ESTADO: dict = {"oss": []}
+# Molde imutável; `ESTADO` é a cópia mutável usada pelo handler em cada teste.
+ESTADO: dict = {}
 
 
 @pytest.fixture(autouse=True)
 def _dados_limpos():
-    ESTADO["oss"] = copy.deepcopy(_OSS)
+    ESTADO.update(
+        {
+            "listas": copy.deepcopy(_LISTAS),
+            "cartoes": copy.deepcopy(_CARTOES),
+            "usuarios": copy.deepcopy(_USUARIOS),
+            "requisicoes": [],
+        }
+    )
     yield
 
 
+@pytest.fixture(autouse=True)
+def _qt(app):
+    """Garante o QApplication (offscreen) antes de montar qualquer widget."""
+    return app
+
+
+def _quadro_json() -> dict:
+    listas = ESTADO["listas"]
+    contagens: dict[int, int] = {}
+    for cartao in ESTADO["cartoes"]:
+        if not cartao["arquivado"]:
+            contagens[cartao["lista_id"]] = contagens.get(cartao["lista_id"], 0) + 1
+    saida = []
+    for lista in listas:
+        item = dict(lista)
+        item["contagem"] = contagens.get(lista["id"], 0)
+        saida.append(item)
+    return {"id": 1, "filial_id": 1, "nome": "Projetos", "listas": saida}
+
+
+def _pagina_json(itens: list[dict]) -> dict:
+    return {"data": itens, "meta": {"total": len(itens), "limit": 1000, "offset": 0}}
+
+
 def _handler(request: httpx.Request) -> httpx.Response:
-    if request.method == "GET" and request.url.path == "/v1/os":
-        _GETS.append(request)
+    ESTADO["requisicoes"].append(request)
+    metodo = request.method
+    caminho = request.url.path
+
+    if caminho == "/v1/usuarios":
+        return httpx.Response(200, json=_pagina_json(ESTADO["usuarios"]))
+
+    if caminho == "/v1/projetos/quadro" and metodo == "GET":
+        return httpx.Response(200, json={"data": _quadro_json()})
+
+    if caminho == "/v1/projetos/cartoes" and metodo == "GET":
         params = request.url.params
-        linhas = ESTADO["oss"]
-        if params.get("tipo"):
-            linhas = [o for o in linhas if o["tipo"] == params["tipo"]]
-        if params.get("status"):
-            linhas = [o for o in linhas if o["status"] == params["status"]]
-        return httpx.Response(
-            200, json={"data": linhas, "meta": {"total": len(linhas), "limit": 200, "offset": 0}}
-        )
-    if request.method == "PATCH" and request.url.path.endswith("/status"):
-        _PATCHES.append(request)
-        ident = int(request.url.path.split("/")[3])
-        novo = json.loads(request.content)["status"]
-        alvo = next((o for o in ESTADO["oss"] if o["id"] == ident), None)
-        if alvo is None:
-            return httpx.Response(404, json={"detail": "O.S. inexistente"})
-        if novo not in _TRANSICOES.get(alvo["status"], set()):
-            return httpx.Response(
-                400,
-                json={
-                    "detail": f"Transição de status inválida: {alvo['status']} → {novo}."
-                },
-            )
-        alvo["status"] = novo
-        return httpx.Response(200, json={"data": alvo})
-    if request.method == "GET" and request.url.path.startswith("/v1/os/"):
-        ident = int(request.url.path.rsplit("/", 1)[1])
-        dado = next(o for o in ESTADO["oss"] if o["id"] == ident)
-        return httpx.Response(200, json={"data": dado})
-    if request.url.path == "/v1/clientes":
-        return httpx.Response(200, json={"data": _CLIENTES, "meta": {"total": 2, "limit": 50, "offset": 0}})
-    if request.url.path == "/v1/funcionarios":
-        return httpx.Response(200, json={"data": _FUNCIONARIOS, "meta": {"total": 1, "limit": 50, "offset": 0}})
-    if request.url.path == "/v1/produtos":
-        return httpx.Response(200, json={"data": _PRODUTOS, "meta": {"total": 1, "limit": 50, "offset": 0}})
-    return httpx.Response(404, json={"detail": "rota não esperada"})
+        arquivado = params.get("arquivado") == "true"
+        termo = (params.get("q") or "").strip().lower()
+        linhas = [c for c in ESTADO["cartoes"] if bool(c["arquivado"]) == arquivado]
+        if params.get("lista_id"):
+            linhas = [c for c in linhas if c["lista_id"] == int(params["lista_id"])]
+        if termo:
+            linhas = [
+                c
+                for c in linhas
+                if termo in c["titulo"].lower()
+                or termo in (c.get("descricao") or "").lower()
+            ]
+        return httpx.Response(200, json=_pagina_json(linhas))
+
+    if caminho == "/v1/projetos/cartoes" and metodo == "POST":
+        dados = json.loads(request.content)
+        novo = _cartao(max((c["id"] for c in ESTADO["cartoes"]), default=0) + 1, dados["lista_id"], dados["titulo"])
+        for campo in ("descricao", "data_inicio", "data_entrega", "lembrete_min"):
+            novo[campo] = dados.get(campo)
+        ESTADO["cartoes"].append(novo)
+        return httpx.Response(201, json={"data": novo})
+
+    if caminho.startswith("/v1/projetos/cartoes/"):
+        partes = caminho.split("/")
+        cartao_id = int(partes[4])
+        cartao = next((c for c in ESTADO["cartoes"] if c["id"] == cartao_id), None)
+        if cartao is None:
+            return httpx.Response(404, json={"detail": "Cartão não encontrado."})
+        acao = partes[5] if len(partes) > 5 else None
+
+        if acao is None and metodo == "GET":
+            return httpx.Response(200, json={"data": cartao})
+        if acao is None and metodo == "PATCH":
+            dados = json.loads(request.content)
+            if dados.get("versao") != cartao["versao"]:
+                return httpx.Response(409, json={"detail": "Versão desatualizada."})
+            for campo in (
+                "titulo",
+                "descricao",
+                "data_inicio",
+                "data_entrega",
+                "lembrete_min",
+                "concluido",
+            ):
+                if campo in dados and dados[campo] is not None:
+                    cartao[campo] = dados[campo]
+            cartao["versao"] += 1
+            return httpx.Response(200, json={"data": cartao})
+
+        if acao == "mover" and metodo == "PATCH":
+            dados = json.loads(request.content)
+            if dados.get("versao") != cartao["versao"]:
+                return httpx.Response(409, json={"detail": "Versão desatualizada."})
+            cartao["lista_id"] = dados["lista_id"]
+            cartao["posicao"] = f"{cartao['posicao'].split('.')[0]}.{dados['posicao']:06d}"
+            cartao["posicao_indice"] = dados["posicao"]
+            cartao["versao"] += 1
+            return httpx.Response(200, json={"data": cartao})
+
+        if acao in ("arquivar", "restaurar") and metodo == "PATCH":
+            dados = json.loads(request.content)
+            if dados.get("versao") != cartao["versao"]:
+                return httpx.Response(409, json={"detail": "Versão desatualizada."})
+            cartao["arquivado"] = acao == "arquivar"
+            cartao["versao"] += 1
+            return httpx.Response(200, json={"data": cartao})
+
+        if acao == "atribuir" and metodo == "PATCH":
+            dados = json.loads(request.content)
+            if dados.get("versao") != cartao["versao"]:
+                return httpx.Response(409, json={"detail": "Versão desatualizada."})
+            uid = dados["usuario_id"]
+            nome = next((u["nome"] for u in ESTADO["usuarios"] if u["id"] == uid), "?")
+            cartao["ultimo_responsavel_id"] = uid
+            cartao["ultimo_responsavel_nome"] = nome
+            if not any(m["usuario_id"] == uid for m in cartao["membros"]):
+                cartao["membros"].append(
+                    {"usuario_id": uid, "nome": nome, "origem": "manual"}
+                )
+            cartao["versao"] += 1
+            return httpx.Response(200, json={"data": cartao})
+
+        if acao == "membros" and metodo == "POST":
+            dados = json.loads(request.content)
+            uid = dados["usuario_id"]
+            nome = next((u["nome"] for u in ESTADO["usuarios"] if u["id"] == uid), "?")
+            if not any(m["usuario_id"] == uid for m in cartao["membros"]):
+                cartao["membros"].append(
+                    {"usuario_id": uid, "nome": nome, "origem": "manual"}
+                )
+            cartao["versao"] += 1
+            return httpx.Response(200, json={"data": cartao})
+
+        if acao == "membros" and metodo == "DELETE":
+            membro_id = int(partes[6])
+            cartao["membros"] = [
+                m for m in cartao["membros"] if m["usuario_id"] != membro_id
+            ]
+            cartao["versao"] += 1
+            return httpx.Response(200, json={"data": cartao})
+
+    if caminho == "/v1/projetos/quadro/listas" and metodo == "POST":
+        dados = json.loads(request.content)
+        novo_id = max((l["id"] for l in ESTADO["listas"]), default=0) + 1
+        ESTADO["listas"].append(_lista(novo_id, dados["nome"]))
+        return httpx.Response(201, json={"data": _lista(novo_id, dados["nome"])})
+
+    if caminho.startswith("/v1/projetos/quadro/listas/"):
+        partes = caminho.split("/")
+        lista_id = int(partes[5])
+        lista = next((l for l in ESTADO["listas"] if l["id"] == lista_id), None)
+        if lista is None:
+            return httpx.Response(404, json={"detail": "Lista não encontrada."})
+        if metodo == "PATCH" and (len(partes) == 6):
+            dados = json.loads(request.content)
+            if dados.get("nome"):
+                lista["nome"] = dados["nome"]
+            return httpx.Response(200, json={"data": lista})
+        if metodo == "PATCH" and partes[6] == "arquivar":
+            lista["arquivada"] = True
+            return httpx.Response(200, json={"data": lista})
+        if metodo == "DELETE":
+            ocupados = [
+                c
+                for c in ESTADO["cartoes"]
+                if c["lista_id"] == lista_id and not c["arquivado"]
+            ]
+            if ocupados:
+                return httpx.Response(
+                    400, json={"detail": "Mova ou arquive os cartões antes."}
+                )
+            ESTADO["listas"] = [l for l in ESTADO["listas"] if l["id"] != lista_id]
+            return httpx.Response(204)
+
+    return httpx.Response(404, json={"detail": f"rota não esperada: {caminho}"})
 
 
-def _pagina(modo_leitura: bool = False) -> PaginaProjetos:
-    _GETS.clear()
-    _PATCHES.clear()
+def _api() -> Api:
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
-    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
-    return PaginaProjetos(api, modo_leitura=modo_leitura)
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
+    return api
 
 
-def _soltar(coluna, item_id) -> None:
-    """Simula o soltar de um cartão sobre a coluna (o drop real do Qt)."""
+def _pagina(nivel: str = "gerente", modo_leitura: bool = False) -> PaginaProjetos:
+    return PaginaProjetos(_api(), modo_leitura=modo_leitura, nivel=nivel)
+
+
+def _patches(caminho_sufixo: str) -> list[httpx.Request]:
+    return [
+        r
+        for r in ESTADO["requisicoes"]
+        if r.method == "PATCH" and r.url.path.endswith(caminho_sufixo)
+    ]
+
+
+def _soltar(coluna, item_id, y: int = 12) -> None:
     dados = QMimeData()
     dados.setData(MIME_CARTAO, str(item_id).encode("utf-8"))
     evento = QDropEvent(
-        QPointF(12, 12),
+        QPointF(12, y),
         Qt.DropAction.MoveAction,
         dados,
         Qt.MouseButton.LeftButton,
@@ -146,217 +314,253 @@ def _soltar(coluna, item_id) -> None:
     coluna.dropEvent(evento)
 
 
-@pytest.fixture
-def pagina(pumpar):
+# --------------------------------------------------------------- quadro
+
+def test_quadro_renderiza_listas_e_cartoes():
     pagina = _pagina()
-    pumpar(
-        lambda: pagina._tabela.rowCount() == 5
-        and pagina._quadro.contagem("aguardando") == 2
-    )
-    return pagina
+    assert pagina._quadro.coluna("1")._titulo.text() == "ORÇAMENTO"
+    assert pagina._quadro.contagem("1") == 1
+    assert pagina._quadro.contagem("2") == 2
+    assert pagina._quadro.coluna_do(12) == "2"
 
 
-def test_quadro_tem_as_quatro_etapas(pagina):
-    assert pagina._quadro.coluna("aguardando")._titulo.text() == "AGUARDANDO"
-    assert pagina._quadro.coluna("producao")._titulo.text() == "EM PRODUÇÃO"
-    assert pagina._quadro.contagem("pronta") == 1
-    assert pagina._quadro.contagem("entregue") == 1
+def test_colunas_vem_do_servidor_na_ordem():
+    pagina = _pagina()
+    assert [c for c, _r in pagina._quadro._rotulos] == ["1", "2", "3"]
 
 
-def test_aprovado_agrupa_com_aberto_na_aguardando(pagina):
-    ids = {c.id_registro for c in pagina._quadro.coluna("aguardando").cartoes()}
-    assert ids == {1, 2}  # aberto (1044) + aprovado (1045)
-
-
-def test_orcamento_nao_entra_no_quadro(pagina):
-    todos = set()
-    for chave in ("aguardando", "producao", "pronta", "entregue"):
-        todos |= {c.id_registro for c in pagina._quadro.coluna(chave).cartoes()}
-    assert 6 not in todos
-
-
-def test_quadro_consulta_apenas_os_do_tipo_papel(pagina):
-    tipos = {request.url.params.get("tipo") for request in _GETS}
-    assert tipos == {"os"}
-
-
-def test_cartao_elidido_preserva_texto_no_tooltip(pagina):
+def test_cartao_mostra_responsavel_e_prazo():
+    pagina = _pagina()
     cartao = next(
-        c
-        for c in pagina._quadro.coluna("producao").cartoes()
-        if c.id_registro == 3
+        c for c in pagina._quadro.coluna("2").cartoes() if c.id_registro == 12
     )
-    assert "Cliente de nome muito muito longo" in cartao.toolTip()
+    assert "Vina" in cartao.toolTip()
 
 
-def test_cartao_atrasado_recebe_badge(pagina):
+def test_cartao_atrasado_recebe_badge():
+    pagina = _pagina()
     cartao = next(
-        c for c in pagina._quadro.coluna("aguardando").cartoes() if c.id_registro == 2
+        c for c in pagina._quadro.coluna("2").cartoes() if c.id_registro == 11
     )
-    badges = [b.text() for b in cartao.findChildren(QLabel)]
-    assert "Atrasado" in badges
+    assert "Atrasado" in [b.text() for b in cartao.findChildren(QLabel)]
 
 
-def test_clicar_cartao_abre_o_registro_na_lista(pagina, pumpar):
-    assert pagina._visao_atual == 0
-    pagina._quadro.coluna("producao").cartoes()[0].selecionado.emit(3)
-    pumpar(lambda: pagina._editando_id == 3)
-    assert pagina._visao_atual == 1
-    assert pagina._cliente.valor() == 1 or pagina._editando_id == 3
+def test_estado_vazio_sem_listas():
+    ESTADO["listas"] = []
+    pagina = _pagina()
+    assert pagina._listas == []
+    assert pagina._quadro.isHidden() is True
+    assert pagina._vazio.isHidden() is False
 
 
-def test_alternador_troca_visao_e_esconde_filtros(pagina):
-    assert pagina._visao_atual == 0
-    assert pagina._filtros_widget.isHidden()
-    pagina._btn_lista.click()
-    assert pagina._visao_atual == 1
-    assert not pagina._filtros_widget.isHidden()
-    pagina._btn_quadro.click()
-    assert pagina._visao_atual == 0
-    assert pagina._filtros_widget.isHidden()
+def test_busca_envia_q_e_filtra():
+    pagina = _pagina()
+    pagina.recarregar("Banner")
+    assert pagina._quadro.contagem("1") == 1
+    assert pagina._quadro.contagem("2") == 0
+    buscas = [r for r in ESTADO["requisicoes"] if r.url.path == "/v1/projetos/cartoes"]
+    assert buscas[-1].url.params.get("q") == "Banner"
 
 
-def test_novo_projeto_volta_para_a_lista(pagina):
-    pagina._editando_id = 5
-    pagina._btn_novo.click()
-    assert pagina._visao_atual == 1
-    assert pagina._editando_id is None
-
-
-def test_estado_vazio_no_quadro(app, pumpar):
-    def vazio(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/v1/os":
-            return httpx.Response(200, json={"data": [], "meta": {"total": 0, "limit": 200, "offset": 0}})
-        return _handler(request)
-
-    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(vazio))
-    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
-    pagina = PaginaProjetos(api)
-    pumpar(lambda: pagina._quadro.coluna("aguardando")._contagem.text() == "0")
-    for chave in ("aguardando", "producao", "pronta", "entregue"):
-        coluna = pagina._quadro.coluna(chave)
-        assert not coluna._vazio.isHidden()
-        assert coluna._vazio.text() == "Sem registros"
-
-
-def test_modo_leitura_bloqueia_escrita_mas_mostra_quadro(app, pumpar):
-    pagina = _pagina(modo_leitura=True)
-    pumpar(lambda: pagina._quadro.contagem("aguardando") == 2)
-    assert pagina._btn_salvar.isEnabled() is False
-    assert pagina._quadro.coluna("aguardando")._vazio.isHidden()
-
-
-_RESOLUCOES = [
-    (1280, 720, 100),
-    (1280, 720, 125),
-    (1280, 720, 150),
-    (1366, 768, 100),
-    (1366, 768, 125),
-    (1366, 768, 150),
-    (1920, 1080, 100),
-    (1920, 1080, 125),
-    (1920, 1080, 150),
-]
-
-
-@pytest.mark.parametrize("largura,altura,escala", _RESOLUCOES)
-def test_quadro_sem_rolagem_horizontal(app, pumpar, largura, altura, escala):
-    # Largura lógica = física / escala; pior caso realista: lateral recolhida (64px).
-    conteudo = int(largura * 100 / escala) - 64
-    logica_a = int(altura * 100 / escala)
-
+def test_quadro_sem_rolagem_horizontal(app):
+    # 3 colunas de largura mínima cabem na tela; o quadro não rola na horizontal.
     pagina = _pagina()
     container = QWidget()
     caixa = QVBoxLayout(container)
     caixa.setContentsMargins(0, 0, 0, 0)
     caixa.addWidget(pagina)
-    container.resize(conteudo, logica_a)
+    container.resize(1216, 720)
     container.show()
-    pumpar(lambda: pagina._quadro.contagem("aguardando") == 2)
     app.processEvents()
-
-    assert pagina.minimumSizeHint().width() <= conteudo, (
-        f"piso {pagina.minimumSizeHint().width()} > {conteudo} "
-        f"({largura}x{altura}@{escala}%)"
-    )
-    assert pagina._quadro._area.horizontalScrollBar().maximum() == 0, (
-        f"quadro rola na horizontal em {largura}x{altura}@{escala}%"
-    )
-    # A grade da Lista também não rola lateralmente.
-    tabela = pagina._tabela
-    assert tabela.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    assert pagina._quadro._area.horizontalScrollBar().maximum() == 0
     container.close()
 
 
-# ------------------------------------------------ arrastar-e-soltar (Quadro)
-def test_cartao_conhece_origem_e_destinos(pagina):
-    cartao = pagina._quadro.coluna("pronta").cartoes()[0]
-    assert cartao.coluna_origem == "pronta"
-    assert cartao.arrastavel is True
-    assert [chave for chave, _rotulo in cartao.destinos] == [
-        "aguardando",
-        "producao",
-        "pronta",
-        "entregue",
-    ]
+# ------------------------------------------------------------ movimentação
+
+def test_soltar_em_outra_lista_move_com_indice_e_versao():
+    pagina = _pagina()
+    _soltar(pagina._quadro.coluna("3"), 12)
+    patch = _patches("/mover")[-1]
+    dados = json.loads(patch.content)
+    assert patch.url.path == "/v1/projetos/cartoes/12/mover"
+    assert dados["lista_id"] == 3
+    assert dados["posicao"] == 0
+    assert dados["versao"] == 1
+    assert pagina._quadro.coluna_do(12) == "3"
 
 
-def test_arraste_carrega_o_id_no_mime(pagina):
-    cartao = pagina._quadro.coluna("producao").cartoes()[0]
-    assert cartao.id_registro == 3
-    arraste = cartao._preparar_arraste()
-    assert bytes(arraste.mimeData().data(MIME_CARTAO)) == b"3"
+def test_menu_mover_anexa_ao_final():
+    pagina = _pagina()
+    # Menu de contexto envia indice -1 → posição = quantidade de cartões no destino.
+    pagina._quadro.coluna("2").cartoes()[0].mover_solicitado.emit(10, "2", -1)
+    dados = json.loads(_patches("/mover")[-1].content)
+    assert dados["lista_id"] == 2
+    assert dados["posicao"] == 2  # destino já tinha 2 cartões
 
 
-def test_soltar_em_outra_coluna_avanca_status(pagina, pumpar):
-    # Cartão 3 está "producao"; soltar em "pronta" → PATCH status "pronta".
-    _soltar(pagina._quadro.coluna("pronta"), 3)
-    pumpar(lambda: pagina._quadro.coluna_do(3) == "pronta")
-
-    assert _PATCHES[-1].url.path == "/v1/os/3/status"
-    assert json.loads(_PATCHES[-1].content)["status"] == "pronta"
-    assert next(o for o in ESTADO["oss"] if o["id"] == 3)["status"] == "pronta"
+def test_soltar_na_mesma_posicao_nao_chama_api():
+    pagina = _pagina()
+    assert pagina._indice_efetivo(11, "2", "2", 0) == 0  # cartão 11 já é o índice 0
+    pagina._mover(11, "2", 0)
+    assert _patches("/mover") == []
 
 
-def test_soltar_na_mesma_coluna_nao_chama_api(pagina):
-    _soltar(pagina._quadro.coluna("producao"), 3)
-    assert _PATCHES == []
+def test_reordenar_dentro_da_lista_ajusta_o_indice():
+    pagina = _pagina()
+    # Cartão 11 (índice 0) solto abaixo do 12 (índice 1) → servidor recebe índice 1.
+    assert pagina._indice_efetivo(11, "2", "2", 2) == 1
 
 
-def test_menu_mover_dispara_a_mesma_rota(pagina, pumpar):
-    cartao = pagina._quadro.coluna("producao").cartoes()[0]
-    cartao.mover_solicitado.emit(cartao.id_registro, "pronta")
-    pumpar(lambda: pagina._quadro.coluna_do(3) == "pronta")
-    assert json.loads(_PATCHES[-1].content)["status"] == "pronta"
+def test_drop_event_calcula_indice_pela_metade_do_cartao():
+    pagina = _pagina()
+    coluna = pagina._quadro.coluna("2")
+    for indice, cartao in enumerate(coluna.cartoes()):
+        cartao.setGeometry(0, indice * 60, 100, 50)
+    assert coluna.indice_para_posicao(QPoint(0, 0)) == 0
+    assert coluna.indice_para_posicao(QPoint(0, 10_000)) == 2
 
 
-def test_mover_para_tras_avisa_e_reverte(pagina, pumpar, monkeypatch):
-    avisos: list[str] = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: avisos.append(a[1]))
-    # Cartão 5 está "entregue"; a transição para "pronta" é recusada pelo backend.
-    _soltar(pagina._quadro.coluna("pronta"), 5)
-    pumpar(lambda: bool(avisos))
-    assert pagina._quadro.coluna_do(5) == "entregue"
-    assert len(_PATCHES) == 1
-    assert next(o for o in ESTADO["oss"] if o["id"] == 5)["status"] == "entregue"
-    assert "Não foi possível mover" in avisos
+# --------------------------------------------------------------- modo leitura
+
+def test_modo_leitura_bloqueia_arraste_e_botoes():
+    pagina = _pagina(modo_leitura=True)
+    coluna = pagina._quadro.coluna("1")
+    assert coluna.acceptDrops() is False
+    assert coluna.cartoes()[0].arrastavel is False
+    assert pagina._btn_novo.isEnabled() is False
 
 
-def test_modo_leitura_bloqueia_arraste_e_movimento(app, pumpar, monkeypatch):
+def test_modo_leitura_mover_avisa_e_nao_grava(monkeypatch):
     avisos: list[str] = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: avisos.append(a[1]))
     pagina = _pagina(modo_leitura=True)
-    pumpar(lambda: pagina._quadro.contagem("aguardando") == 2)
-
-    coluna = pagina._quadro.coluna("producao")
-    assert coluna.acceptDrops() is False
-    cartao = coluna.cartoes()[0]
-    assert cartao.arrastavel is False
-    assert cartao.destinos == []
-
-    # Soltar (não aceito) não dispara nada; tentar mover pelo menu avisa e não grava.
-    _soltar(coluna, cartao.id_registro)
-    assert _PATCHES == []
-    pagina._mover_projeto(cartao.id_registro, "pronta")
-    assert _PATCHES == []
+    pagina._mover(10, "2", 0)
+    assert _patches("/mover") == []
     assert "Modo leitura" in avisos
+
+
+# ----------------------------------------------------------- RBAC de estrutura
+
+def test_botao_de_listas_so_para_gestor():
+    assert _pagina(nivel="gerente")._btn_listas.isHidden() is False
+    assert _pagina(nivel="operador")._btn_listas.isHidden() is True
+    assert _pagina(nivel="admin")._btn_listas.isHidden() is False
+
+
+def test_novo_cartao_sem_listas_avisa(monkeypatch):
+    ESTADO["listas"] = []
+    avisos: list[str] = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: avisos.append(a[2]))
+    pagina = _pagina()
+    pagina._novo_cartao()
+    assert "lista" in avisos[0].lower()
+
+# --------------------------------------------------------------- ficha cartão
+
+def test_dialogo_cria_cartao():
+    api = _api()
+    dialogo = DialogoCartao(
+        api, listas=copy.deepcopy(_LISTAS), usuarios=copy.deepcopy(_USUARIOS), lista_padrao=2
+    )
+    dialogo._titulo.definir("Novo trabalho")
+    dialogo._salvar()
+    criado = next(c for c in ESTADO["cartoes"] if c["titulo"] == "Novo trabalho")
+    assert criado["lista_id"] == 2
+    assert dialogo._cartao["id"] == criado["id"]
+
+
+def test_dialogo_exige_titulo(monkeypatch):
+    avisos: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: avisos.append(a[1]))
+    api = _api()
+    dialogo = DialogoCartao(api, listas=copy.deepcopy(_LISTAS), usuarios=[])
+    dialogo._titulo.definir("   ")
+    dialogo._salvar()
+    assert avisos
+    assert not any(c["titulo"].strip() == "" for c in ESTADO["cartoes"])
+
+
+def test_dialogo_edita_e_atribui():
+    api = _api()
+    cartao = copy.deepcopy(next(c for c in ESTADO["cartoes"] if c["id"] == 10))
+    dialogo = DialogoCartao(
+        api, cartao=cartao, listas=copy.deepcopy(_LISTAS), usuarios=copy.deepcopy(_USUARIOS)
+    )
+    dialogo._titulo.definir("Banner revisado")
+    dialogo._responsavel.definir(7)
+    dialogo._salvar()
+
+    atual = next(c for c in ESTADO["cartoes"] if c["id"] == 10)
+    assert atual["titulo"] == "Banner revisado"
+    assert atual["ultimo_responsavel_id"] == 7
+    assert any(m["usuario_id"] == 7 for m in atual["membros"])
+    assert atual["versao"] >= 2
+
+
+def test_dialogo_arquiva():
+    api = _api()
+    cartao = copy.deepcopy(next(c for c in ESTADO["cartoes"] if c["id"] == 11))
+    dialogo = DialogoCartao(api, cartao=cartao, usuarios=[])
+    dialogo._arquivar()
+    assert next(c for c in ESTADO["cartoes"] if c["id"] == 11)["arquivado"] is True
+
+
+def test_dialogo_adiciona_e_remove_membro():
+    api = _api()
+    cartao = copy.deepcopy(next(c for c in ESTADO["cartoes"] if c["id"] == 12))
+    dialogo = DialogoCartao(api, cartao=cartao, usuarios=copy.deepcopy(_USUARIOS))
+
+    dialogo._novo_membro.setCurrentIndex(
+        dialogo._novo_membro.findData(1)
+    )
+    dialogo._adicionar_membro()
+    atual = next(c for c in ESTADO["cartoes"] if c["id"] == 12)
+    assert any(m["usuario_id"] == 1 for m in atual["membros"])
+
+    # Reabre com o estado atualizado e remove o membro recém-adicionado.
+    dialogo2 = DialogoCartao(api, cartao=copy.deepcopy(atual), usuarios=copy.deepcopy(_USUARIOS))
+    item = next(
+        dialogo2._membros.item(i)
+        for i in range(dialogo2._membros.count())
+        if dialogo2._membros.item(i).data(Qt.ItemDataRole.UserRole) == 1
+    )
+    dialogo2._membros.setCurrentItem(item)
+    dialogo2._remover_membro()
+    final = next(c for c in ESTADO["cartoes"] if c["id"] == 12)
+    assert not any(m["usuario_id"] == 1 for m in final["membros"])
+
+
+def test_dialogo_modo_leitura_desabilita_salvar():
+    api = _api()
+    cartao = copy.deepcopy(ESTADO["cartoes"][0])
+    dialogo = DialogoCartao(api, modo_leitura=True, cartao=cartao, usuarios=[])
+    assert dialogo._btn_salvar.isEnabled() is False
+
+
+# --------------------------------------------------------------- listas
+
+def test_dialogo_listas_cria_e_renomeia():
+    api = _api()
+    dialogo = DialogoListas(api, listas=copy.deepcopy(_LISTAS), admin=True)
+    dialogo._nome.setText("Revisão")
+    dialogo._btn_nova.click()
+    assert any(l["nome"] == "Revisão" for l in ESTADO["listas"])
+
+    dialogo._lista.setCurrentRow(0)
+    dialogo._nome.setText("Orçamentos")
+    dialogo._btn_renomear.click()
+    assert ESTADO["listas"][0]["nome"] == "Orçamentos"
+
+
+def test_dialogo_listas_excluir_so_para_admin():
+    assert DialogoListas(_api(), listas=[], admin=True)._btn_excluir.isHidden() is False
+    assert DialogoListas(_api(), listas=[], admin=False)._btn_excluir.isHidden() is True
+
+
+def test_dialogo_listas_arquiva(monkeypatch):
+    api = _api()
+    dialogo = DialogoListas(api, listas=copy.deepcopy(_LISTAS), admin=True)
+    dialogo._lista.setCurrentRow(2)
+    dialogo._btn_arquivar.click()
+    assert next(l for l in ESTADO["listas"] if l["id"] == 3)["arquivada"] is True

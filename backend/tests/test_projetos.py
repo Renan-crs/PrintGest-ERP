@@ -206,7 +206,49 @@ def test_atualizar_cartao_incrementa_versao(client, admin_token):
         headers=header,
         json={"versao": cartao["versao"], "titulo": "Ainda outro"},
     )
+    # versão obsoleta => 409
+    conflito = client.patch(
+        f"/v1/projetos/cartoes/{cartao['id']}",
+        headers=header,
+        json={"versao": cartao["versao"], "titulo": "Ainda outro"},
+    )
     assert conflito.status_code == 409
+
+
+def test_atualizar_cartao_limpa_campos_com_null(client, admin_token):
+    """`null` explícito limpa o campo; campo omitido não é tocado (PATCH parcial)."""
+    header = auth(client, admin_token)
+    lista_id = _criar_lista(client, header, f"Limpeza {_u()}")["id"]
+    criado = client.post(
+        "/v1/projetos/cartoes",
+        headers=header,
+        json={
+            "lista_id": lista_id,
+            "titulo": f"Com prazo {_u()}",
+            "descricao": "algo a apagar",
+            "data_entrega": "2999-12-31",
+            "lembrete_min": 60,
+        },
+    ).json()["data"]
+
+    resp = client.patch(
+        f"/v1/projetos/cartoes/{criado['id']}",
+        headers=header,
+        json={
+            "versao": criado["versao"],
+            "descricao": None,
+            "data_entrega": None,
+            "lembrete_min": None,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    atualizado = resp.json()["data"]
+    assert atualizado["descricao"] is None
+    assert atualizado["data_entrega"] is None
+    assert atualizado["lembrete_min"] is None
+    # Omitir o título não o apaga nem o altera.
+    assert atualizado["titulo"] == criado["titulo"]
+    assert atualizado["versao"] == criado["versao"] + 1
 
 
 def test_arquivar_e_restaurar_cartao(client, admin_token):

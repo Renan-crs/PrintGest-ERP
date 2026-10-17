@@ -474,8 +474,11 @@ def atualizar_cartao(
 ) -> dict:
     cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
     _verificar_versao(cartao, dados["versao"])
+    # `exclude_unset` no router: campo ausente = não mexer; campo presente com
+    # `null` = limpar (permite remover título nulo? não; limpa datas/descrição e
+    # lembrete — edição parcial de verdade). `titulo` é não-nulo no schema.
     for campo in ("titulo", "descricao", "data_inicio", "data_entrega", "lembrete_min"):
-        if campo in dados and dados[campo] is not None:
+        if campo in dados and not (campo == "titulo" and dados[campo] is None):
             setattr(cartao, campo, dados[campo])
     if dados.get("concluido") is not None:  # RN4: marca e desmarca sem bloquear
         cartao.concluido = bool(dados["concluido"])

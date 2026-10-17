@@ -23,9 +23,34 @@ de cada tag está indicado para rastreabilidade.
   contagens por lista respeitam a visibilidade do consultante.
 - Migração `e7c1d4a2b9f6` (reversível): cria `quadro`, `quadro_lista`, `cartao`,
   `cartao_membro` e os enums `tipo_lista`/`origem_membro`.
-- 19 testes novos em `backend/tests/test_projetos.py` (semente, CRUD de listas,
-  cartões, mover/rebalancear, 409, PV1–PV5, RBAC, não-regressão). Backend: **141
-  testes** verdes.
+- 20 testes novos em `backend/tests/test_projetos.py` (semente, CRUD de listas,
+  cartões, mover/rebalancear, 409, PV1–PV5, RBAC, limpeza de campos com `null`,
+  não-regressão). Backend: **142 testes** verdes.
+- **Módulo Projetos — Fase 1 (Núcleo), tela do desktop.** A página *Projetos*
+  passa a consumir `/v1/projetos`: colunas são as listas do servidor, cartões são
+  a unidade (não mais "1 projeto = 1 O.S."), arrastar-e-soltar e menu "Mover para"
+  gravam via `PATCH /cartoes/{id}/mover` (índice + versão), ficha do cartão
+  (título, descrição, datas, lembrete, responsável, concluído, arquivar/restaurar
+  e membros) e gestão de listas para gestores (Admin/Gerente; exclusão só Admin).
+- `QuadroKanban.definir_colunas()` reconstrói as colunas a partir do servidor e o
+  soltar passa a informar o **índice** de inserção (novo 3º argumento de `movido`,
+  calculado pela metade do cartão), habilitando reordenação dentro da lista.
+- 25 testes em `desktop/tests/test_projetos.py` cobrindo o quadro, a busca, a
+  movimentação (índice/versão), o modo leitura, o RBAC de estrutura e os diálogos
+  de cartão e de listas. Desktop: **240 testes** verdes.
+
+### Corrigido
+
+- `PATCH /v1/projetos/cartoes/{id}`: enviar `null` explicitamente agora **limpa** o
+  campo (datas, descrição, lembrete) — antes o `null` era ignorado e não havia
+  como remover um prazo pela interface.
+
+### Alterado
+
+- A antiga `PaginaProjetos` (quadro sobre `/v1/os`, em
+  `ui/modulos/os.py`) foi substituída pela nova `ui/modulos/projetos.py`. A
+  `PaginaOS`/`PaginaOrcamento` permanecem intactas para os itens internos
+  `os`/`orcamento`.
 
 ### Documentação
 

@@ -8,26 +8,13 @@ O avanço de status usa `PATCH /{id}/status` e o cancelamento `DELETE /{id}`.
 
 from __future__ import annotations
 
-from datetime import date
-
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QMessageBox,
-    QPushButton,
-    QWidget,
-)
+from PySide6.QtWidgets import QMessageBox
 
 from printgest.core import catalogos
 from printgest.core.dominio import FORMAS_PAGAMENTO
 from printgest.core.dominio.ordem_servico import (
     _PROXIMO_STATUS,
     _rotulo_status,
-    _rotulo_proximo_status,
-    _STATUS_DESTINO,
-    _COLUNAS_QUADRO,
-    rotulo_status,
-    proximo_status,
 )
 import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
@@ -42,7 +29,6 @@ from printgest.ui.formulario import (
     limpo,
 )
 from printgest.ui.grade_itens import GradeItens
-from printgest.ui.kanban import CartaoKanban, QuadroKanban
 from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
@@ -320,211 +306,4 @@ class PaginaOrcamento(PaginaOS):
             self,
             "Ordem de Serviço gerada",
             f"Orçamento convertido na O.S. Nº {dados.get('numero')}.",
-        )
-
-
-class PaginaProjetos(PaginaOS):
-    """Menu "Projetos" (v2.1 §1): 1 projeto = 1 O.S. (tipo `os`).
-
-    Duas visões sobre o mesmo cadastro de O.S.:
-
-    - **Quadro** (Kanban): colunas por etapa, cartões clicáveis e arrastáveis.
-      Clicar num cartão abre o registro na visão Lista (o formulário é o mesmo
-      de O.S.); **arrastar** um cartão para outra coluna avança o status pelo
-      endpoint existente `PATCH /v1/os/{id}/status` (mesma regra de transição do
-      formulário — nada é contornado). O menu de contexto do cartão oferece
-      "Mover para" como alternativa por teclado.
-    - **Lista**: grade densa + formulário lateral, como no restante do sistema.
-
-    O calendário continua para a fase 3 do roadmap (ver
-    `docs/revisao_projetos.md`).
-    """
-
-    ROTULO_PAGINA = "Projetos"
-    ROTULO_NOVO = "Novo Projeto"
-    GRUPO_LISTA = "PROJETOS (1 PROJETO = 1 O.S.)"
-    LUGAR_BUSCA = "Buscar por Nº do projeto ou nome do cliente..."
-    CHAVES = ["numero", "cliente_nome", "status", "data_previsao_entrega", "valor_total"]
-    COLUNAS = ["Nº", "Cliente", "Status", "Prazo", "Total"]
-
-    _seq_quadro = 0
-
-    def __init__(self, api, modo_leitura: bool = False) -> None:
-        super().__init__(api, modo_leitura)
-        self._montar_quadro()
-
-    # --------------------------------------------------------------- visões
-
-    def _badges_barra(self) -> list:
-        """Alternador Quadro/Lista, anexado à barra de título."""
-        self._visao = QWidget()
-        linha = QHBoxLayout(self._visao)
-        linha.setContentsMargins(0, 0, 0, 0)
-        linha.setSpacing(6)
-        self._btn_quadro = QPushButton("Quadro")
-        self._btn_lista = QPushButton("Lista")
-        for botao in (self._btn_quadro, self._btn_lista):
-            botao.setObjectName("chaveRapida")
-            botao.setCheckable(True)
-            linha.addWidget(botao)
-        self._btn_quadro.setChecked(True)
-        self._btn_quadro.clicked.connect(lambda: self._trocar_visao(0))
-        self._btn_lista.clicked.connect(lambda: self._trocar_visao(1))
-        return [self._visao]
-
-    def _montar_quadro(self) -> None:
-        self._quadro = QuadroKanban(
-            [(chave, rotulo) for chave, rotulo, _s in _COLUNAS_QUADRO],
-            fabrica=self._cartao,
-        )
-        self._quadro.selecionado.connect(self._abrir_registro)
-        self._quadro.movido.connect(self._mover_projeto)
-        self._quadro.permitir_movimento(not self._modo_leitura)
-
-        raiz = self.layout()
-        # Troca a "lista + formulário" pelo quadro e vice-versa. Um
-        # `QStackedWidget` inflaria o piso da tela com a página oculta; trocar o
-        # widget central mantém o piso apenas do que está visível.
-        self._divisor = raiz.itemAt(2).widget()  # [0] título, [1] busca, [2] main
-        raiz.removeWidget(self._divisor)
-        self._divisor.hide()
-        self._main_atual = self._divisor
-        self._visao_atual = 1
-        self._trocar_visao(0)
-
-    def _trocar_visao(self, indice: int) -> None:
-        alvo = self._quadro if indice == 0 else self._divisor
-        if alvo is not self._main_atual:
-            raiz = self.layout()
-            raiz.removeWidget(self._main_atual)
-            self._main_atual.hide()
-            raiz.addWidget(alvo, 1)
-            alvo.show()
-            self._main_atual = alvo
-        self._visao_atual = indice
-        self._btn_quadro.setChecked(indice == 0)
-        self._btn_lista.setChecked(indice == 1)
-        # Os filtros de status são da Lista; no Quadro as colunas já são os status.
-        if self._filtros_widget is not None:
-            self._filtros_widget.setVisible(indice == 1)
-        if indice == 0:
-            self._atualizar_quadro(self._busca.texto())
-
-    def _novo(self) -> None:
-        # O formulário vive na visão Lista; criar exige vê-lo.
-        self._trocar_visao(1)
-        super()._novo()
-
-    def recarregar(self, q: str = "", offset: int | None = None) -> None:
-        super().recarregar(q, offset)
-        if getattr(self, "_quadro", None) is not None:
-            self._atualizar_quadro(q or "")
-
-    # ----------------------------------------------------------------- quadro
-
-    def _cartao(self, dado: dict) -> CartaoKanban:
-        prazo = formatar_data_iso(dado.get("data_previsao_entrega")) or "Sem prazo"
-        total = formatar_moeda(dado.get("valor_total")) or "R$ 0,00"
-        return CartaoKanban(
-            dado.get("id"),
-            f"Projeto Nº {dado.get('numero')}",
-            dado.get("cliente_nome") or "Consumidor final",
-            f"{prazo} · {total}",
-            atrasado=self._atrasado(dado),
-        )
-
-    def _atrasado(self, dado: dict) -> bool:
-        if dado.get("status") in ("entregue", "cancelado"):
-            return False
-        prazo = dado.get("data_previsao_entrega")
-        if not prazo:
-            return False
-        try:
-            return date.fromisoformat(str(prazo)[:10]) < date.today()
-        except ValueError:
-            return False
-
-    def _atualizar_quadro(self, q: str = "") -> None:
-        self._seq_quadro += 1
-        seq = self._seq_quadro
-        acumulado: dict[str, list[dict]] = {}
-        pendentes = [len(_COLUNAS_QUADRO)]
-        for chave, _rotulo, status_etapas in _COLUNAS_QUADRO:
-            tarefas.rodar(
-                lambda etapas=status_etapas: self._buscar_etapa(q, etapas),
-                on_ok=self._etapa_recebida(seq, chave, acumulado, pendentes),
-                on_erro=self._etapa_falhou(seq, chave, acumulado, pendentes),
-            )
-
-    def _buscar_etapa(self, q: str, status_etapas: tuple) -> list[dict]:
-        itens: list[dict] = []
-        for status in status_etapas:
-            saida = self._api.listar_os(q=q, status=status, tipo=self.TIPO, limit=200)
-            itens.extend(saida.get("data", []))
-        itens.sort(key=lambda o: o.get("numero") or 0, reverse=True)
-        return itens
-
-    def _etapa_recebida(self, seq: int, chave: str, acumulado: dict, pendentes: list):
-        def _aplicar(itens: list[dict]) -> None:
-            if seq != self._seq_quadro:
-                return
-            acumulado[chave] = itens
-            pendentes[0] -= 1
-            if pendentes[0] == 0:
-                self._quadro.preencher(acumulado)
-
-        return _aplicar
-
-    def _etapa_falhou(self, seq: int, chave: str, acumulado: dict, pendentes: list):
-        def _aplicar(_msg: str) -> None:
-            # Falha de uma coluna não derruba o quadro: ela fica vazia e as
-            # demais seguem na tela.
-            self._etapa_recebida(seq, chave, acumulado, pendentes)([])
-
-        return _aplicar
-
-    # -------------------------------------------------------- mover cartão
-
-    def _mover_projeto(self, item_id, destino_chave: str) -> None:
-        """Solta um cartão em outra etapa: avança o status pela mesma rota do form."""
-        if self._modo_leitura:
-            QMessageBox.warning(
-                self,
-                "Modo leitura",
-                "A licença está em modo leitura; não é possível alterar o status.",
-            )
-            self._atualizar_quadro(self._busca.texto())
-            return
-        origem = self._quadro.coluna_do(item_id)
-        if origem is None or origem == destino_chave:
-            return  # solto na própria coluna (ou cartão já atualizado): nada a fazer
-        status_alvo = _STATUS_DESTINO.get(destino_chave)
-        if status_alvo is None:
-            return
-        tarefas.rodar(
-            lambda: self._api.atualizar_status(item_id, status_alvo),
-            on_ok=lambda _dado: self.recarregar(self._busca.texto()),
-            on_erro=self._erro_mover,
-        )
-
-    def _erro_mover(self, msg: str) -> None:
-        # Transição recusada (ex.: "entregue" → etapa anterior) ou falha de rede:
-        # avisa e recarrega para o cartão voltar à coluna de origem.
-        QMessageBox.warning(self, "Não foi possível mover", msg)
-        self._atualizar_quadro(self._busca.texto())
-
-    # ----------------------------------------------------------- abrir cartão
-
-    def _abrir_registro(self, item_id) -> None:
-        self._trocar_visao(1)
-        for linha in range(self._tabela.rowCount()):
-            item = self._tabela.item(linha, 0)
-            if item is not None and item.data(Qt.ItemDataRole.UserRole + 1) == item_id:
-                self._tabela.selectRow(linha)
-                return
-        # Registro fora da página atual: busca e mostra direto no formulário.
-        tarefas.rodar(
-            lambda: self._api.obter(self.ENTIDADE, item_id),
-            on_ok=self._carregar_no_form,
-            on_erro=lambda msg: self._erro_carga(msg),
         )
