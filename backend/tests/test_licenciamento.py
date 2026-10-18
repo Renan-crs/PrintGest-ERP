@@ -4,6 +4,8 @@ O RedGest é simulado com `httpx.MockTransport` (suíte herméticas, sem process
 externo), imitando o contrato congelado em `scripts/redgest_stub.py`.
 """
 
+import datetime as dt
+
 import httpx
 import pytest
 
@@ -221,3 +223,180 @@ def test_renovar_sem_ativacao_400(client):
 
     resp = client.post("/v1/licenca/renovar")
     assert resp.status_code == 400
+
+
+# --------------------------------------------- resiliência de rede (E1 do plano)
+
+
+def _mock_transporte(monkeypatch, handle):
+    """Injeta um transporte httpx arbitrário no `_cliente` do serviço."""
+    transporte = httpx.MockTransport(handle)
+    monkeypatch.setattr(
+        licensa_service,
+        "_cliente",
+        lambda: httpx.Client(base_url="http://redgest.local", transport=transporte),
+    )
+
+
+def test_ativacao_sem_rede_devolve_503(client, monkeypatch):
+    """RedGest inacessível na ativação: 503 com mensagem clara, nunca 500 cru."""
+
+    def handle(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("sem rota para o RedGest")
+
+    _mock_transporte(monkeypatch, handle)
+
+    resp = _ativar(client)
+    assert resp.status_code == 503, resp.text
+    assert "não foi possível falar com o servidor de licenças" in resp.json()[
+        "detail"
+    ].lower()
+
+
+def test_timeout_na_renovacao_nao_revoga(client, monkeypatch):
+    """Cold start/timeout do RedGest: 503, sem revogação e sem modo leitura."""
+    respostas = _respostas_ok()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/validar"):
+            raise httpx.ReadTimeout("cold start do plano gratuito")
+        return respostas.get(
+            request.url.path, httpx.Response(404, json={"detail": "não mapeada"})
+        )
+
+    _mock_transporte(monkeypatch, handle)
+
+    assert _ativar(client).status_code == 200  # ativação não toca em /validar
+
+    resp = client.post("/v1/licenca/renovar")
+    assert resp.status_code == 503, resp.text
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["status"] == "ativa"  # indisponibilidade ≠ revogação
+    assert data["modo_leitura"] is False
+
+
+def test_backoff_crescente_e_saturado():
+    """1/5/15 min após falhas; volta ao intervalo normal com zero falhas."""
+    from app.core.config import settings
+
+    assert (
+        licensa_service._atraso_proximo_ciclo(0)
+        == settings.licenca_refresh_intervalo_segundos
+    )
+    assert licensa_service._atraso_proximo_ciclo(1) == 60
+    assert licensa_service._atraso_proximo_ciclo(2) == 300
+    assert licensa_service._atraso_proximo_ciclo(3) == 900
+    assert licensa_service._atraso_proximo_ciclo(9) == 900  # satura no último passo
+
+
+# ------------------------------- estados e tolerância offline (E2 do plano)
+
+
+def _ajustar_licenca(**campos):
+    """Manipula a linha local da licença (simula passagem do tempo/falha)."""
+    from app.db import SessionLocal
+    from app.models.licenca import Licenca
+
+    sessao = SessionLocal()
+    try:
+        lic = sessao.query(Licenca).first()
+        assert lic is not None, "ative a licença antes de ajustar"
+        for chave, valor in campos.items():
+            setattr(lic, chave, valor)
+        sessao.commit()
+    finally:
+        sessao.close()
+
+
+def _parse(valor: str) -> dt.datetime:
+    return dt.datetime.fromisoformat(valor)
+
+
+def test_ativacao_define_janela_de_tolerancia(client, monkeypatch):
+    """A tolerância começa na expiração do token e dura `licenca_tolerancia_horas`."""
+    from app.core.config import settings
+
+    _mock_stub(monkeypatch, _respostas_ok())
+    resp = _ativar(client)
+    assert resp.status_code == 200, resp.text
+
+    data = resp.json()["data"]
+    assert data["estado"] == "ativa"
+    assert data["motivo"]
+    janela = _parse(data["tolerancia_expira_em"]) - _parse(data["token_expira_em"])
+    assert janela.total_seconds() == settings.licenca_tolerancia_horas * 3600
+
+
+def test_token_vencido_dentro_da_tolerancia_opera_normal(
+    client, admin_token, monkeypatch
+):
+    """Queda do RedGest não bloqueia no instante da expiração (tolerância ativa)."""
+    _mock_stub(monkeypatch, _respostas_ok())
+    assert _ativar(client).status_code == 200
+
+    agora = licensa_service._agora()
+    _ajustar_licenca(
+        token_expira_em=agora - dt.timedelta(hours=1),
+        tolerancia_expira_em=agora + dt.timedelta(hours=71),
+    )
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "tolerancia"
+    assert data["modo_leitura"] is False
+
+    resp = client.post(
+        "/v1/clientes",
+        headers=auth(client, admin_token),
+        json={"nome_razao": "Gravado na tolerância", "tipo_pessoa": "pf"},
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_tolerancia_esgotada_entra_em_modo_leitura(client, monkeypatch):
+    _mock_stub(monkeypatch, _respostas_ok())
+    assert _ativar(client).status_code == 200
+
+    agora = licensa_service._agora()
+    _ajustar_licenca(
+        token_expira_em=agora - dt.timedelta(hours=100),
+        tolerancia_expira_em=agora - dt.timedelta(hours=28),
+    )
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "leitura"
+    assert data["modo_leitura"] is True
+
+
+def test_base_legada_deriva_tolerancia_do_token(client, monkeypatch):
+    """Licença ativada antes de E2 (coluna nula) ainda ganha tolerância."""
+    _mock_stub(monkeypatch, _respostas_ok())
+    assert _ativar(client).status_code == 200
+
+    agora = licensa_service._agora()
+    _ajustar_licenca(
+        token_expira_em=agora - dt.timedelta(hours=1),
+        tolerancia_expira_em=None,
+    )
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "tolerancia"
+    assert data["modo_leitura"] is False
+    assert data["tolerancia_expira_em"] is not None  # derivada do token atual
+
+
+def test_falha_de_renovacao_registra_diagnostico(client, monkeypatch):
+    """Falha de rede grava `ultima_tentativa_em`/`ultimo_erro` para a UI."""
+    _mock_stub(monkeypatch, _respostas_ok())
+    assert _ativar(client).status_code == 200
+
+    def handle(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("RedGest fora do ar")
+
+    _mock_transporte(monkeypatch, handle)
+    assert client.post("/v1/licenca/renovar").status_code == 503
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["ultima_tentativa_em"] is not None
+    assert "inacessível" in (data["ultimo_erro"] or "")
+    assert data["estado"] == "ativa"  # o token local ainda é válido

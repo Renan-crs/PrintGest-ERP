@@ -11,6 +11,11 @@ O RedGest emite JWT RS256 de curta duração para a licença por CNPJ. Este serv
   com token vencido/revogado, `ESTADO["modo_leitura"]` fica `True` e o middleware
   bloqueia escritas (HTTP 423). Tratado no background pelo loop do lifespan.
 
+Resiliência (`docs/plano_resiliencia_licenca.md`): o timeout para o RedGest é
+configurável (padrão 90 s, para absorver *cold start* de plano gratuito) e as
+falhas de transporte viram `503` com mensagem clara — nunca revogação. O loop
+aplica backoff crescente (1/5/15 min) entre tentativas que falham.
+
 Credenciais e endpoints seguem o contrato congelado no `scripts/redgest_stub.py`
 (POSTs sem barra final, para o `httpx` não depender de redirect 307).
 """
@@ -50,7 +55,26 @@ def _normalizar_cnpj(cnpj: str) -> str:
 
 
 def _cliente() -> httpx.Client:
-    return httpx.Client(base_url=settings.redgest_url, timeout=10.0)
+    return httpx.Client(
+        base_url=settings.redgest_url, timeout=settings.licenca_timeout_segundos
+    )
+
+
+def _indisponivel(contexto: str, exc: Exception) -> HTTPException:
+    """Traduz falha de transporte (timeout/DNS/conexão) em 503 com mensagem clara.
+
+    Distingue "RedGest inacessível" de "licença revogada": só a resposta
+    explícita de revogação (401/403) leva ao modo de leitura; indisponibilidade
+    de rede não.
+    """
+    logger.warning("RedGest inacessível (%s): %s", contexto, exc)
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "Não foi possível falar com o servidor de licenças "
+            f"({contexto}). Verifique a conexão e tente novamente."
+        ),
+    )
 
 
 def _garantir_resposta(cliente: httpx.Client, resp: httpx.Response, contexto: str) -> dict:
@@ -95,19 +119,70 @@ def _licenca_local(db: Session) -> Licenca | None:
     return db.query(Licenca).order_by(Licenca.id).first()
 
 
+ESTADO_ATIVA = "ativa"
+ESTADO_TOLERANCIA = "tolerancia"
+ESTADO_LEITURA = "leitura"
+ESTADO_REVOGADA = "revogada"
+ESTADO_NAO_ATIVADA = "nao_ativada"
+
+
+def _janela_tolerancia(token_expira_em: dt.datetime) -> dt.datetime:
+    return token_expira_em + dt.timedelta(hours=settings.licenca_tolerancia_horas)
+
+
+def _tolerancia_expira_em(lic: Licenca) -> dt.datetime | None:
+    """Tolerância efetiva: a coluna, ou derivada do token (bases anteriores a E2).
+
+    Licenças ativadas antes da migração `c9e4f1a7b2d8` não têm a coluna; derivar
+    aqui evita que essas bases percam a tolerância até a próxima renovação.
+    """
+    if lic.tolerancia_expira_em is not None:
+        return lic.tolerancia_expira_em
+    if lic.token_expira_em is None:
+        return None
+    return _janela_tolerancia(lic.token_expira_em)
+
+
+def _estado(lic: Licenca | None) -> str:
+    """Estado derivado (plano E2): ativa | tolerancia | leitura | revogada | nao_ativada."""
+    if lic is None:
+        return ESTADO_NAO_ATIVADA
+    if lic.status == STATUS_REVOGADA:
+        return ESTADO_REVOGADA
+    if lic.status != STATUS_ATIVA or lic.token_expira_em is None:
+        return ESTADO_LEITURA
+    agora = _agora()
+    if lic.token_expira_em > agora:
+        return ESTADO_ATIVA
+    tolerancia = _tolerancia_expira_em(lic)
+    if tolerancia is not None and tolerancia > agora:
+        return ESTADO_TOLERANCIA
+    return ESTADO_LEITURA
+
+
+def _modo_leitura(estado: str) -> bool:
+    return estado in (ESTADO_LEITURA, ESTADO_REVOGADA, ESTADO_NAO_ATIVADA)
+
+
+def _motivo(estado: str) -> str:
+    return {
+        ESTADO_ATIVA: "Licença ativa.",
+        ESTADO_TOLERANCIA: (
+            "Sem contato com o RedGest; operando normalmente em tolerância."
+        ),
+        ESTADO_REVOGADA: "Licença revogada pelo RedGest.",
+        ESTADO_NAO_ATIVADA: "Licença ainda não ativada.",
+    }.get(estado, "Tolerância esgotada ou licença inválida.")
+
+
 def _recalcular_estado(lic: Licenca | None) -> None:
-    valida = (
-        lic is not None
-        and lic.status == STATUS_ATIVA
-        and lic.token_expira_em is not None
-        and lic.token_expira_em > _agora()
-    )
-    ESTADO["modo_leitura"] = not valida
+    ESTADO["modo_leitura"] = _modo_leitura(_estado(lic))
 
 
 def situacao(db: Session) -> dict:
     lic = _licenca_local(db)
-    _recalcular_estado(lic)
+    estado = _estado(lic)
+    ESTADO["modo_leitura"] = _modo_leitura(estado)
     if _desabilitada():
         ESTADO["modo_leitura"] = False
     if lic is None:
@@ -115,11 +190,16 @@ def situacao(db: Session) -> dict:
             "sistema": settings.redgest_sistema,
             "cnpj": None,
             "plano": None,
-            "status": "nao_ativada",
+            "status": ESTADO_NAO_ATIVADA,
+            "estado": estado,
+            "motivo": _motivo(estado),
             "modo_leitura": ESTADO["modo_leitura"],
             "max_estacoes": None,
             "modulos_habilitados": [],
             "token_expira_em": None,
+            "tolerancia_expira_em": None,
+            "ultima_tentativa_em": None,
+            "ultimo_erro": None,
         }
     ent = lic.entitlements or {}
     return {
@@ -127,10 +207,15 @@ def situacao(db: Session) -> dict:
         "cnpj": lic.cnpj,
         "plano": lic.plano,
         "status": lic.status,
+        "estado": estado,
+        "motivo": _motivo(estado),
         "modo_leitura": ESTADO["modo_leitura"],
         "max_estacoes": ent.get("max_estacoes"),
         "modulos_habilitados": ent.get("modulos_habilitados") or [],
         "token_expira_em": lic.token_expira_em,
+        "tolerancia_expira_em": _tolerancia_expira_em(lic),
+        "ultima_tentativa_em": lic.ultima_tentativa_em,
+        "ultimo_erro": lic.ultimo_erro,
     }
 
 
@@ -168,7 +253,10 @@ def _persistir_ativa(
     lic.entitlements = entitlements
     lic.token_jwt = token
     lic.token_expira_em = agora + dt.timedelta(seconds=expires_in)
+    lic.tolerancia_expira_em = _janela_tolerancia(lic.token_expira_em)
     lic.ultima_validacao = agora
+    lic.ultima_tentativa_em = agora
+    lic.ultimo_erro = None
     db.commit()
     db.refresh(lic)
     _recalcular_estado(lic)
@@ -181,23 +269,26 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
             detail="Licenciamento desabilitado nesta build de desenvolvimento.",
         )
     cnpj_limpo = _normalizar_cnpj(cnpj)
-    with _cliente() as cliente:
-        resp = cliente.post(
-            "/api/v1/licencas",
-            json={"sistema": settings.redgest_sistema, "cnpj": cnpj_limpo, "codigo_licenca": codigo_licenca},
-        )
-        dados = _garantir_resposta(cliente, resp, "Falha ao registrar a licença")
-        licenca_redgest_id = _campo(dados, "licenca_id", "registro")
+    try:
+        with _cliente() as cliente:
+            resp = cliente.post(
+                "/api/v1/licencas",
+                json={"sistema": settings.redgest_sistema, "cnpj": cnpj_limpo, "codigo_licenca": codigo_licenca},
+            )
+            dados = _garantir_resposta(cliente, resp, "Falha ao registrar a licença")
+            licenca_redgest_id = _campo(dados, "licenca_id", "registro")
 
-        resp = cliente.post(f"/api/v1/licencas/{licenca_redgest_id}/ativar")
-        dados = _garantir_resposta(cliente, resp, "Falha na ativação da licença")
-        client_id = _campo(dados, "client_id", "ativação")
-        client_secret = _campo(dados, "client_secret", "ativação")
-        token = _campo(dados, "access_token", "ativação")
-        expires_in = int(_campo(dados, "expires_in", "ativação"))
+            resp = cliente.post(f"/api/v1/licencas/{licenca_redgest_id}/ativar")
+            dados = _garantir_resposta(cliente, resp, "Falha na ativação da licença")
+            client_id = _campo(dados, "client_id", "ativação")
+            client_secret = _campo(dados, "client_secret", "ativação")
+            token = _campo(dados, "access_token", "ativação")
+            expires_in = int(_campo(dados, "expires_in", "ativação"))
 
-        resp = cliente.get(f"/api/v1/licencas/{licenca_redgest_id}")
-        dados = _garantir_resposta(cliente, resp, "Falha ao consultar a licença")
+            resp = cliente.get(f"/api/v1/licencas/{licenca_redgest_id}")
+            dados = _garantir_resposta(cliente, resp, "Falha ao consultar a licença")
+    except httpx.HTTPError as exc:
+        raise _indisponivel("ativação", exc) from exc
 
     entitlements = {
         "cnpj_vinculado": dados.get("cnpj"),
@@ -232,12 +323,20 @@ def renovar(db: Session) -> dict:
             detail="Licença ainda não ativada.",
         )
     with _cliente() as cliente:
-        resp = cliente.post(
-            f"/api/v1/licencas/{lic.licenca_redgest_id}/validar",
-            json={"client_id": lic.client_id, "client_secret": lic.client_secret},
-        )
+        try:
+            resp = cliente.post(
+                f"/api/v1/licencas/{lic.licenca_redgest_id}/validar",
+                json={"client_id": lic.client_id, "client_secret": lic.client_secret},
+            )
+        except httpx.HTTPError as exc:
+            lic.ultima_tentativa_em = _agora()
+            lic.ultimo_erro = f"RedGest inacessível ({type(exc).__name__})"
+            db.commit()
+            raise _indisponivel("renovação", exc) from exc
         if resp.status_code in (401, 403):
             lic.status = STATUS_REVOGADA
+            lic.ultima_tentativa_em = _agora()
+            lic.ultimo_erro = "revogada pelo RedGest"
             db.commit()
             _recalcular_estado(lic)
             raise HTTPException(
@@ -255,7 +354,10 @@ def renovar(db: Session) -> dict:
     lic.token_expira_em = agora + dt.timedelta(
         seconds=int(_campo(dados, "expires_in", "renovação"))
     )
+    lic.tolerancia_expira_em = _janela_tolerancia(lic.token_expira_em)
     lic.ultima_validacao = agora
+    lic.ultima_tentativa_em = agora
+    lic.ultimo_erro = None
     lic.entitlements = {
         "cnpj_vinculado": dados.get("cnpj_vinculado"),
         "max_estacoes": dados.get("max_estacoes"),
@@ -267,30 +369,54 @@ def renovar(db: Session) -> dict:
     return situacao(db)
 
 
-def _tentativa_renovacao() -> None:
+def _atraso_proximo_ciclo(falhas: int) -> int:
+    """Espera até o próximo ciclo: normal sem falhas; backoff crescente com falhas.
+
+    Backoff (1/5/15 min por padrão) evita bater no RedGest a cada ciclo quando
+    ele está fora, mas volta ao intervalo normal assim que uma renovação dá
+    certo.
+    """
+    if falhas <= 0:
+        return settings.licenca_refresh_intervalo_segundos
+    backoff = settings.licenca_backoff
+    indice = min(falhas - 1, len(backoff) - 1)
+    return backoff[indice]
+
+
+def _tentativa_renovacao() -> bool:
+    """Uma passada do loop. Devolve `True` quando houve falha de renovação.
+
+    Falha de rede agora vira `HTTPException(503)` dentro de `renovar`, então
+    cai no mesmo `except HTTPException` — sem marcar revogação.
+    """
     db = SessionLocal()
     try:
         lic = _licenca_local(db)
         if lic is None or lic.status != STATUS_ATIVA or lic.token_expira_em is None:
             _recalcular_estado(lic)
-            return
+            return False
         faltando = (lic.token_expira_em - _agora()).total_seconds()
         _recalcular_estado(lic)
         if faltando > settings.licenca_renova_antes_segundos:
-            return
+            return False
         try:
             renovar(db)
+            return False
         except HTTPException:
             _recalcular_estado(lic)
+            return True
     finally:
         db.close()
 
 
 async def loop_renovacao() -> None:
+    falhas = 0
     while True:
         if not _desabilitada():
             try:
-                await asyncio.to_thread(_tentativa_renovacao)
+                falhou = await asyncio.to_thread(_tentativa_renovacao)
             except Exception:  # noqa: BLE001 — falha externa não derruba o loop
                 logger.exception("Falha inesperada na renovação automática da licença.")
-        await asyncio.sleep(settings.licenca_refresh_intervalo_segundos)
+                falhou = True
+            falhas = falhas + 1 if falhou else 0
+        await asyncio.sleep(_atraso_proximo_ciclo(falhas))

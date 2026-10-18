@@ -1,0 +1,217 @@
+# Plano — Resiliência da licença do PrintGest (RedGest indisponível)
+
+Plano de implementação derivado do documento
+`Disponibilidade do PrintGest com o RedGest em planos gratuitos.md`
+(18/10/2026). Cobre **apenas o lado PrintGest** — o que o ERP precisa fazer para
+sobreviver ao RedGest fora do ar. O que é responsabilidade do RedGest (§3 e §4
+daquele documento) está listado em *Fora de escopo*.
+
+Referências de linha do código de hoje estão em
+`backend/app/services/licensa_service.py`, `backend/app/core/config.py`,
+`backend/app/models/licenca.py`, `desktop/printgest/main.py`,
+`desktop/printgest/ui/modoleitura.py` e `desktop/printgest/ui/tela_principal.py`.
+
+---
+
+## 0. Objetivo e critério de sucesso
+
+**Objetivo.** Fazer o PrintGest continuar operando (inclusive escrevendo e
+emitindo fiscal) enquanto o RedGest estiver inacessível, distinguindo
+*indisponibilidade* de *revogação*, e avisando o usuário com a mensagem correta.
+
+**Critério de sucesso (testes de aceite §5 do documento):**
+
+1. RedGest frio (resposta em ~60 s): a renovação conclui sem erro visível.
+2. RedGest inacessível por até ~72 h após o token expirar: opera normalmente.
+3. Queda de ~5 dias (72 h de token + 72 h de tolerância): nenhum cliente perde
+   acesso.
+4. Resposta explícita de revogação: modo leitura dentro da janela de renovação.
+5. Em qualquer caso, a mensagem ao usuário diz *qual* é o motivo.
+
+---
+
+## 1. Linha de base (o que existe hoje)
+
+| Ponto | Hoje | Arquivo |
+| --- | --- | --- |
+| Renovação em background | Existe (`loop_renovacao` no lifespan, em thread) | `licensa_service.py:289`; `main.py:83` |
+| Timeout para o RedGest | **10 s** | `licensa_service.py:53` |
+| Cadência | Loop a cada 300 s; renova quando falta ≤ 3600 s; retry fixo, sem backoff | `config.py:24-25`; `licensa_service.py:279` |
+| Revogação | Só 401/403 marca `revogada` | `licensa_service.py:239-249` |
+| Tolerância pós-expiração | **Não existe** — vira modo leitura na hora | `licensa_service.py:98-105` |
+| Validação local do JWT | Não existe (confia só em `token_expira_em`) | `licenca.py` (sem verificação) |
+| Extensão de emergência | Não existe | — |
+| Estados expostos | Só `modo_leitura` (bool) | `licensa_service.py:108-134` |
+| Erro de rede na renovação manual | Vira **HTTP 500** cru | `licensa_service.py:234-250` |
+| Ritmo da UI | Status lido **uma vez** no login (timer single-shot) | `tela_principal.py:571-575` |
+
+---
+
+## 2. Decisões (defaults a implementar; revisar depois)
+
+| # | Decisão | Default proposto | Observação |
+| --- | --- | --- | --- |
+| D1 | Duração da tolerância pós-expiração | **72 h** | É o número já anunciado na UI (`ativacao.py:224`). |
+| D2 | Backoff de tentativas | **1 / 5 / 15 min**, repetindo 15 min; zera no sucesso | §2 item 1 do documento. |
+| D3 | Validação local do token (assinatura RS256) | **Fazer** | Adiciona `cryptography` ao runtime. Reverte decisão do PRD v2.0 §3.3 — **marcar**. |
+| D4 | Extensão de emergência (licença assinada offline) | **Fazer** | Reverte decisão do PRD v2.0 §3.3 — **marcar**. |
+| D5 | Cadência de renovação quando o token é longo | Manter checagem a cada 5 min, renovando só na janela (`renova_antes`) | O "a cada 6 h" do documento é propriedade do TTL do RedGest. |
+
+> D3 e D4 **reabrem** itens removidos de propósito no `docs/prd_2.0.md` §3.3
+> (ativação offline assistida, cache/HMAC). Se forem adiante, o PRD precisa ser
+> atualizado explicitamente para não ficar contraditório.
+
+---
+
+## 3. Etapas
+
+### E0 — Configuração central ✅
+- [x] `core/config.py`: `licenca_timeout_segundos: int = 90`.
+- [x] `core/config.py`: `licenca_tolerancia_horas: int = 72`.
+- [x] `core/config.py`: backoff — `licenca_backoff_segundos: str = "60,300,900"`
+      (string + propriedade `settings.licenca_backoff -> list[int]`;
+      pydantic-settings não parseia `list[int]` de env de forma confiável).
+- [x] `backend/.env.example`: documentar as três novas variáveis.
+- [ ] Revisar `licenca_renova_antes_segundos` (hoje 1 h) para a nova realidade.
+      *Mantido em 3600 s (D5): é a cadência de checagem (5 min) que controla.*
+
+**Aceite:** `settings` carrega os defaults; testes existentes seguem verdes.
+
+### E1 — Resiliência de rede ✅
+- [x] `_cliente()` usa `settings.licenca_timeout_segundos` no lugar de `10.0`.
+- [x] `ativar()` e `renovar()`: encapsular a chamada HTTP em `try/except
+      httpx.HTTPError` e traduzir para `HTTPException(503, "Não foi possível
+      falar com o servidor de licenças …")` (`_indisponivel`). Nunca sobe 500 cru.
+- [x] `loop_renovacao`/`_tentativa_renovacao`: contador de falhas consecutivas
+      com backoff (D2: 1/5/15 min, saturando no último); zera no sucesso; nunca
+      marca `revogada` por timeout/5xx/DNS.
+- [x] Registrar em log a causa da falha. *(Sem `request_id`: o logger do daemon
+      já inclui contexto; adicionar se a observabilidade pedir.)*
+
+**Aceite:** transporte simulado que demora > 90 s ou estoura timeout → a
+tentativa falha sem marcar revogação e sem derrubar o loop; a próxima tentativa
+respeita o backoff.
+
+### E2 — Máquina de estados e tolerância ✅
+- [x] `models/licenca.py`: `tolerancia_expira_em`, `ultima_tentativa_em`,
+      `ultimo_erro` (nullable) + `ultimo_erro` preenchido em falha/revogação.
+- [x] Migração Alembic **reversível** (aditiva), novo head `c9e4f1a7b2d8`
+      (up/down/up validados no Postgres).
+- [x] `licensa_service`: estados `ativa` / `tolerancia` / `leitura` /
+      `revogada` (`nao_ativada` quando não há linha local):
+  - `ativa` — `status=ativa` e `token_expira_em > agora`;
+  - `tolerancia` — `status=ativa` e `token_expira_em <= agora <=
+    tolerancia_expira_em`;
+  - `leitura` — tolerância esgotada;
+  - `revogada` — `status=revogada` (leitura imediata, sem tolerância).
+- [x] `_recalcular_estado`: `modo_leitura = estado in {leitura, revogada}` (e
+      `nao_ativada`).
+- [x] Em `renovar()` bem-sucedido: `tolerancia_expira_em = token_expira_em +
+      tolerancia`. Idem em `ativar()`.
+- [x] `situacao()`: devolver `estado`, `motivo`, `tolerancia_expira_em`,
+      `ultima_tentativa_em`, `ultimo_erro`, além do que já devolve.
+
+
+**Aceite:** token expirado dentro da tolerância → `modo_leitura=False`,
+`estado="tolerancia"`, escritas liberadas (sem 423); após a tolerância →
+`estado="leitura"` e 423 nas escritas.
+
+### E3 — Validação local do token (D3)
+- [ ] Adicionar `cryptography` ao `backend/requirements.txt` (justificativa:
+      verificar a assinatura RS256 offline).
+- [ ] Chave pública do RedGest configurável (`PRINTGEST_REDGEST_PUBKEY` ou
+      arquivo); validar assinatura + `exp` do JWT contra o relógio local.
+- [ ] Política: assinatura inválida → `estado="leitura"` com
+      `motivo="licença inválida"` (tamper), distinta de indisponibilidade.
+- [ ] Documentar a limitação de relógio local (rollback estende uso) — herdar a
+      decisão do PRD v2.0 §3.3 ou assumir o risco explicitamente.
+
+**Aceite:** JWT adulterado → leitura; JWT válido sem rede → `ativa`/`tolerancia`.
+
+### E4 — Extensão de emergência (D4)
+- [ ] Formato: JSON `{cnpj, emitido_em, valido_ate}` + assinatura RSA
+      (destacada), assinado por chave privada mantida **offline** pelo dono.
+- [ ] Serviço para importar/validar o arquivo com a chave pública embutida;
+      estende `tolerancia_expira_em` até `valido_ate` (nunca reduz).
+- [ ] Tela de importação (admin) no desktop.
+- [ ] Registrar a extensão em log/atividade.
+
+**Aceite:** arquivo válido estende a tolerância; arquivo inválido/CNPJ diferente
+é recusado com mensagem clara.
+
+### E5 — UI (desktop) — parcial
+- [x] `modoleitura.py`: mensagem honesta por estado — revogação (sem tolerância)
+      × tolerância expirada; inclui "Última tentativa: <data/hora>" e
+      "Último erro: …" no diagnóstico (`situacao` passado por `main.py`).
+- [x] `tela_principal.py`: `QTimer` repetitivo (5 min) repintando o indicador;
+      `_texto_licenca`/`_estilo_licenca`/`_detalhe_texto` por `estado`
+      (tolerância = alerta, não erro).
+- [x] `main.py`: passa a `situacao` completa para a tela de modo leitura.
+- [x] `ativacao.py`: já anunciava "Tolerância Offline: 72 Horas" — alinhado.
+- [ ] Banner **progressivo** em `estado="tolerancia"` (tempo restante). *Backlog.*
+
+**Aceite:** um teste de UI mostra a mensagem de revogação (✅) e o diagnóstico
+de tolerância (✅); o banner progressivo fica para o backlog.
+
+### E6 — Testes — parcial
+- [x] `backend/tests/test_licenciamento.py` (via `httpx.MockTransport`): timeout
+      na ativação/renovação (503, sem revogação), janela de tolerância,
+      tolerância esgotada → leitura, diagnóstico da falha, backoff (1/5/15).
+- [x] `desktop/tests/test_modoleitura.py` e `test_tela_principal.py`: mensagem
+      por estado (revogada × tolerância) e texto/estilo do indicador.
+- [ ] Cold start com *delay* real (o MockTransport não simula atraso de 60 s);
+      coberto por timeout simulado. Rollover completo de token → backlog.
+- [ ] Mapear cada teste de aceite da §5 a um teste nomeado. *Parcial: aceites
+      1–5 cobertos por `test_timeout_na_renovacao_nao_revoga`,
+      `test_token_vencido_dentro_da_tolerancia_opera_normal`,
+      `test_tolerancia_esgotada_entra_em_modo_leitura` e
+      `test_revogada_mostra_mensagem_de_revogacao`.*
+
+---
+
+## 4. Fora de escopo (é do RedGest)
+
+- Endpoint `/health` que consulta o Supabase e o pinger externo (UptimeRobot /
+  cron-job.org / GitHub Actions).
+- Limite de 750 h/mês do Render e alertas de indisponibilidade.
+- Backup agendado (`pg_dump`) do banco de licenças.
+- Migração para planos pagos (§4: Render Starter + Supabase Pro). **Entrada para
+  o preço da licença.**
+
+---
+
+## 5. Impacto em documentos
+
+- [x] `docs/prd_2.0.md` §3.2: tolerância 72 h (`licenca_tolerancia_horas`),
+      timeout 90 s com backoff 60/300/900 s e a regra de que indisponibilidade
+      **não** revoga (item novo, nº 8).
+- [ ] `docs/prd_2.0.md` §3: token 72 h / renovação 6 h e a nota sobre D3/D4
+      (reversões de §3.3) — **junto com E3/E4**, ainda não feitas.
+- [ ] `licenciamento_online_first.md`: substituir os valores de 4 h e 24–72 h
+      pelos novos. **Esse arquivo não existe no repositório** — localizar
+      (documento externo?) ou criar.
+- [x] `CHANGELOG.md` (`## [Não lançado]`).
+
+---
+
+## 6. Riscos
+
+| Risco | Mitigação |
+| --- | --- |
+| Timeout de 90 s prende o worker thread | O loop já roda em `asyncio.to_thread`; manter timeout só na chamada ao RedGest, nunca nas rotas locais. |
+| Rollback de relógio local estende uso | Assumido conforme PRD v2.0 §3.3 (ou tratar em D3). |
+| `cryptography` no runtime | Dependência pesada, porém padrão; alternativa é validar só `exp` no início. **Decidir.** |
+| D4 reintroduz fluxo offline | Manter a chave privada offline e a importação auditável. |
+| Confusão com o PRD | Atualizar o PRD na mesma entrega que reverter §3.3. |
+
+---
+
+## 7. Ordem recomendada
+
+1. **E0 + E1 + E2** — resolve o cenário que o documento quer cobrir (o "mínimo
+   vendável" da resiliência). Entregável já utilizável.
+2. **E5 + E6** — UI e testes, junto com as etapas acima.
+- [ ] E3 e E4 depois, como decisões (D3/D4) explícitas.
+- E0..E2 destravam os testes de aceite 1–4; o aceite 5 depende de E5.
+
+**Sugestão de versão:** `0.3.0` (junto com o restante do `Não lançado`).

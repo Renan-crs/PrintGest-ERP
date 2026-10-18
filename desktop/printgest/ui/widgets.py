@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
@@ -55,6 +57,17 @@ def badge(texto: str, estilo: str = "") -> QLabel:
     if estilo:
         lbl.setProperty("badgeStyle", estilo)
     return lbl
+
+
+def formatar_datahora(valor: object) -> str:
+    """ISO-8601 (com ou sem fuso) do daemon → `dd/mm/aaaa hh:mm` (vazia se nulo)."""
+    if not valor:
+        return ""
+    try:
+        momento = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    except ValueError:
+        return str(valor)
+    return momento.strftime("%d/%m/%Y %H:%M")
 
 
 class ElideLabel(QLabel):

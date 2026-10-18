@@ -54,7 +54,13 @@ from printgest.ui import animacao
 from printgest.ui.busca_global import BuscaGlobal
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
-from printgest.ui.widgets import ElideLabel, FlowLayout, aplicar_estilo, badge
+from printgest.ui.widgets import (
+    ElideLabel,
+    FlowLayout,
+    aplicar_estilo,
+    badge,
+    formatar_datahora,
+)
 
 ITEM_INICIO = "inicio"
 _COR_ATRASO = QColor("#dc2626")
@@ -574,6 +580,13 @@ class TelaPrincipal(QMainWindow):
             self._timer_licenca.timeout.connect(self._carregar_licenca)
             self._timer_licenca.start()
 
+        # Repinta o indicador a cada 5 min: o estado pode mudar em background
+        # (ativa → tolerância → leitura) sem o usuário reabrir a tela.
+        self._timer_licenca_refresh = QTimer(self)
+        self._timer_licenca_refresh.setInterval(5 * 60 * 1000)
+        self._timer_licenca_refresh.timeout.connect(self._carregar_licenca)
+        self._timer_licenca_refresh.start()
+
     # -------------------------------------------------------------- topo
 
     def _cabecalho(self) -> QWidget:
@@ -702,32 +715,68 @@ class TelaPrincipal(QMainWindow):
         self._pintar_licenca({})
 
     def _pintar_licenca(self, sit: dict) -> None:
-        self._detalhe_licenca = self._texto_licenca(sit, self._modo_leitura)
+        self._detalhe_licenca = self._detalhe_texto(sit, self._modo_leitura)
         self._lbl_licenca.setText("● Licença")
         self._lbl_licenca.setProperty(
             "role", self._estilo_licenca(sit, self._modo_leitura)
         )
-        self._lbl_licenca.setToolTip(self._detalhe_licenca)
+        self._lbl_licenca.setToolTip(self._texto_licenca(sit, self._modo_leitura))
         aplicar_estilo(self._lbl_licenca)
 
     @staticmethod
     def _texto_licenca(sit: dict, modo_leitura: bool) -> str:
-        if modo_leitura:
+        estado = sit.get("estado")
+        if estado == "tolerancia":
+            return "Licença em tolerância"
+        if estado == "revogada":
+            return "Licença revogada"
+        if estado == "leitura" or modo_leitura:
             return "Modo Leitura"
-        status = sit.get("status")
-        if status == "ativa":
+        if estado == "ativa" or sit.get("status") == "ativa":
             return "Licença Ativa"
-        if status:
+        if sit.get("status"):
             return "Licença pendente"
         return "Verificando licença..."
 
     @staticmethod
     def _estilo_licenca(sit: dict, modo_leitura: bool) -> str:
-        if modo_leitura or sit.get("modo_leitura"):
+        estado = sit.get("estado")
+        if modo_leitura or sit.get("modo_leitura") or estado in ("leitura", "revogada"):
             return "erro"
-        if sit.get("status") == "ativa":
+        if estado == "tolerancia":
+            # Sem contato com o RedGest, mas dentro da janela: alerta, não bloqueio.
+            return "atencao"
+        if estado == "ativa" or sit.get("status") == "ativa":
             return "success"
         return "atencao"
+
+    @staticmethod
+    def _detalhe_texto(sit: dict, modo_leitura: bool) -> str:
+        """Mensagem completa (P21): estado + motivo + prazos + último erro."""
+        linhas = [f"{TelaPrincipal._texto_licenca(sit, modo_leitura)}."]
+        if sit.get("motivo"):
+            linhas.append(str(sit["motivo"]))
+        if sit.get("plano"):
+            linhas.append(f"Plano: {sit['plano']}")
+        if sit.get("cnpj"):
+            linhas.append(f"CNPJ: {sit['cnpj']}")
+        if sit.get("max_estacoes"):
+            linhas.append(f"Estações autorizadas: {sit['max_estacoes']}")
+        if formatar_datahora(sit.get("token_expira_em")):
+            linhas.append(
+                f"Token válido até: {formatar_datahora(sit['token_expira_em'])}"
+            )
+        if sit.get("estado") == "tolerancia":
+            linhas.append(
+                f"Tolerância até: {formatar_datahora(sit.get('tolerancia_expira_em'))}"
+            )
+        if formatar_datahora(sit.get("ultima_tentativa_em")):
+            linhas.append(
+                f"Última verificação: {formatar_datahora(sit['ultima_tentativa_em'])}"
+            )
+        if sit.get("ultimo_erro"):
+            linhas.append(f"Último erro: {sit['ultimo_erro']}")
+        return "\n".join(linhas)
 
     def _banner_modo_leitura(self) -> QWidget:
         banner = QWidget()

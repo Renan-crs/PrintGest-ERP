@@ -69,3 +69,38 @@ def test_suporte_canais_sem_numero_ficticio(app):
     texto = janela._mensagem.text()
     assert "Canais de atendimento RedGest" in texto
     assert "98765-4321" not in texto
+
+
+# ------------------------------------- mensagem por estado (E5 do plano)
+
+
+def _janela_situacao(situacao: dict | None) -> ModoLeituraWindow:
+    api = Api(
+        base_url="http://daemon.test",
+        transport=httpx.MockTransport(lambda r: httpx.Response(404)),
+    )
+    return ModoLeituraWindow(api, token="tok", situacao=situacao)
+
+
+def test_revogada_mostra_mensagem_de_revogacao(app):
+    janela = _janela_situacao({"estado": "revogada", "ultimo_erro": "revogada pelo RedGest"})
+    assert "revogada" in janela._mensagem.text().lower()
+    assert "revogação" in janela._diag_texto.toPlainText().lower()
+
+
+def test_tolerancia_esgotada_mostra_diagnostico(app):
+    janela = _janela_situacao(
+        {
+            "estado": "leitura",
+            "ultimo_erro": "RedGest inacessível (ConnectError)",
+            "ultima_tentativa_em": "2026-10-18T10:00:00+00:00",
+        }
+    )
+    texto = janela._diag_texto.toPlainText()
+    assert "RedGest inacessível" in texto
+    assert "18/10/2026 10:00" in texto
+
+
+def test_sem_situacao_mantem_mensagem_padrao(app):
+    janela = _janela_situacao(None)
+    assert "tolerância offline" in janela._mensagem.text().lower()
