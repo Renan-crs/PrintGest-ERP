@@ -163,6 +163,209 @@ class CartaoOut(ORMModel):
     arquivado: bool
     versao: int
     membros: list[MembroOut] = []
+    # Fase 2 (Cartão rico): etiquetas aplicadas e selos de progresso (RF4).
+    etiquetas: list["EtiquetaOut"] = []
+    checklist_total: int = 0
+    checklist_concluidos: int = 0
+    comentarios_total: int = 0
     criado_por: int | None = None
     criado_em: datetime
     atualizado_em: datetime
+
+
+# ---------------------------------------------------------- Fase 2: etiquetas
+
+
+class EtiquetaCreate(BaseModel):
+    nome: str | None = None
+    cor: str
+
+    @field_validator("nome")
+    @classmethod
+    def _nome(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        return valor.strip() or None
+
+    @field_validator("cor")
+    @classmethod
+    def _cor(cls, valor: str) -> str:
+        return _validar_cor(valor)
+
+
+class EtiquetaUpdate(BaseModel):
+    nome: str | None = None
+    cor: str | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def _nome(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        return valor.strip() or None
+
+    @field_validator("cor")
+    @classmethod
+    def _cor(cls, valor: str | None) -> str | None:
+        return None if valor is None else _validar_cor(valor)
+
+
+class EtiquetaOut(ORMModel):
+    id: int
+    filial_id: int
+    nome: str | None = None
+    cor: str
+
+
+class EtiquetaAplicarIn(BaseModel):
+    etiqueta_id: int
+
+
+# --------------------------------------------------------- Fase 2: checklist
+
+
+class ChecklistCreate(BaseModel):
+    titulo: str
+
+    @field_validator("titulo")
+    @classmethod
+    def _titulo(cls, valor: str) -> str:
+        valor = (valor or "").strip()
+        if not valor:
+            raise ValueError("Informe o título do checklist.")
+        return valor
+
+
+class ChecklistUpdate(BaseModel):
+    titulo: str | None = None
+    posicao: int | None = None  # índice (0-based) de reordenação
+
+    @field_validator("titulo")
+    @classmethod
+    def _titulo(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("Informe o título do checklist.")
+        return valor
+
+
+class ChecklistItemCreate(BaseModel):
+    texto: str
+    responsavel_id: int | None = None
+    data_entrega: date | None = None
+
+    @field_validator("texto")
+    @classmethod
+    def _texto(cls, valor: str) -> str:
+        valor = (valor or "").strip()
+        if not valor:
+            raise ValueError("Informe o texto do item.")
+        return valor
+
+
+class ChecklistItemUpdate(BaseModel):
+    texto: str | None = None
+    concluido: bool | None = None
+    responsavel_id: int | None = None
+    data_entrega: date | None = None
+    posicao: int | None = None  # índice (0-based) de reordenação
+
+    @field_validator("texto")
+    @classmethod
+    def _texto(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("Informe o texto do item.")
+        return valor
+
+
+class ChecklistItemOut(ORMModel):
+    id: int
+    checklist_id: int
+    texto: str
+    concluido: bool
+    responsavel_id: int | None = None
+    responsavel_nome: str | None = None
+    data_entrega: date | None = None
+    posicao: Decimal
+
+
+class ChecklistOut(ORMModel):
+    id: int
+    cartao_id: int
+    titulo: str
+    posicao: Decimal
+    total: int = 0
+    concluidos: int = 0
+    itens: list[ChecklistItemOut] = []
+
+
+# -------------------------------------------------------- Fase 2: comentários
+
+
+class ComentarioCreate(BaseModel):
+    texto: str
+    resposta_a_id: int | None = None
+
+    @field_validator("texto")
+    @classmethod
+    def _texto(cls, valor: str) -> str:
+        valor = (valor or "").strip()
+        if not valor:
+            raise ValueError("Escreva um comentário.")
+        return valor
+
+
+class ComentarioUpdate(BaseModel):
+    texto: str
+
+    @field_validator("texto")
+    @classmethod
+    def _texto(cls, valor: str) -> str:
+        valor = (valor or "").strip()
+        if not valor:
+            raise ValueError("Escreva um comentário.")
+        return valor
+
+
+class ComentarioOut(ORMModel):
+    id: int
+    cartao_id: int
+    usuario_id: int
+    usuario_nome: str | None = None
+    texto: str | None = None
+    resposta_a_id: int | None = None
+    excluido: bool
+    criado_em: datetime
+    editado_em: datetime | None = None
+
+
+# --------------------------------------------------------- Fase 2: atividade
+
+
+class AtividadeOut(ORMModel):
+    id: int
+    cartao_id: int
+    usuario_id: int | None = None
+    usuario_nome: str | None = None
+    tipo: str
+    dados: dict | None = None
+    criado_em: datetime
+
+
+def _validar_cor(valor: str) -> str:
+    """Aceita `#RRGGBB` ou `#AARRGGBB` (preferência de daltonismo usa alfa)."""
+    texto = (valor or "").strip().upper()
+    if not texto.startswith("#"):
+        texto = f"#{texto}"
+    hexa = texto[1:]
+    if len(hexa) not in (6, 8) or any(c not in "0123456789ABCDEF" for c in hexa):
+        raise ValueError("Cor inválida; use #RRGGBB.")
+    return texto
+
+
+CartaoOut.model_rebuild()

@@ -13,8 +13,16 @@ O quadro deixa de ser uma visão sobre `/v1/os` e ganha entidade própria:
   visibilidade **nunca** é armazenada em `cartao`; ela é sempre recalculada a
   partir desta tabela.
 
-As demais tabelas do PRD (etiqueta, checklist, anexo, comentário, atividade)
-entram nas fases 2 e 3 — por isso `capa_anexo_id` ainda não existe aqui.
+A **Fase 2** (Cartão rico) acrescenta:
+
+- `etiqueta` (+ `cartao_etiqueta`) — rótulos coloridos por filial (RF10);
+- `cartao_checklist` (+ `cartao_checklist_item`) — vários por cartão, com
+  responsável e data por item (RF11);
+- `cartao_comentario` — comentários com resposta em 1 nível e soft-delete (RF14);
+- `cartao_atividade` — log **append-only** (criado, movido, membro, etiqueta,
+  data, checklist, concluído, arquivado…) com `dados` em JSONB (RF14/§12).
+
+`cartao_anexo` e `capa_anexo_id` ficam para a **Fase 3** (Anexos e fluxo).
 """
 
 from datetime import date, datetime
@@ -34,6 +42,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -176,6 +185,12 @@ class Cartao(Base):
         cascade="all, delete-orphan",
         foreign_keys="CartaoMembro.cartao_id",
     )
+    etiquetas: Mapped[list["Etiqueta"]] = relationship(
+        secondary="cartao_etiqueta", order_by="Etiqueta.nome"
+    )
+    checklists: Mapped[list["CartaoChecklist"]] = relationship(
+        cascade="all, delete-orphan", order_by="CartaoChecklist.posicao"
+    )
 
 
 class CartaoMembro(Base):
@@ -207,3 +222,147 @@ class CartaoMembro(Base):
 
     cartao: Mapped[Cartao] = relationship(back_populates="membros")
     usuario: Mapped[Usuario | None] = relationship(foreign_keys=[usuario_id])
+
+
+# -------------------------------------------------------- Fase 2: cartão rico
+
+
+class Etiqueta(Base):
+    """Rótulo colorido por filial (PRD Módulo Projetos RF10).
+
+    `nome` é opcional (etiqueta só de cor, como no Trello). As cores são
+    validadas no serviço contra a paleta de ≥ 20 tons.
+    """
+
+    __tablename__ = "etiqueta"
+    __table_args__ = (Index("idx_etiqueta_filial", "filial_id", "nome"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    filial_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    nome: Mapped[str | None] = mapped_column(String(60))
+    cor: Mapped[str] = mapped_column(String(9), nullable=False)  # #RRGGBB ou #AARRGGBB
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class CartaoEtiqueta(Base):
+    """Vínculo N:N cartão ↔ etiqueta (aplicar/remover em RF10)."""
+
+    __tablename__ = "cartao_etiqueta"
+
+    cartao_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("cartao.id", ondelete="CASCADE"), primary_key=True
+    )
+    etiqueta_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("etiqueta.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class CartaoChecklist(Base):
+    """Checklist de um cartão (RF11): vários por cartão, ordenáveis."""
+
+    __tablename__ = "cartao_checklist"
+    __table_args__ = (Index("idx_cartao_checklist_cartao", "cartao_id", "posicao"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cartao_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("cartao.id", ondelete="CASCADE"), nullable=False
+    )
+    titulo: Mapped[str] = mapped_column(String(120), nullable=False)
+    posicao: Mapped[Decimal] = mapped_column(Numeric(24, 12), nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    itens: Mapped[list["CartaoChecklistItem"]] = relationship(
+        back_populates="checklist",
+        cascade="all, delete-orphan",
+        order_by="CartaoChecklistItem.posicao",
+    )
+
+
+class CartaoChecklistItem(Base):
+    """Item de checklist (RF11): checkbox, texto, responsável e data."""
+
+    __tablename__ = "cartao_checklist_item"
+    __table_args__ = (
+        Index("idx_cartao_checklist_item_checklist", "checklist_id", "posicao"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    checklist_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("cartao_checklist.id", ondelete="CASCADE"), nullable=False
+    )
+    texto: Mapped[str] = mapped_column(String(500), nullable=False)
+    concluido: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    responsavel_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("usuario.id")
+    )
+    data_entrega: Mapped[date | None] = mapped_column(Date)
+    posicao: Mapped[Decimal] = mapped_column(Numeric(24, 12), nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    checklist: Mapped[CartaoChecklist] = relationship(back_populates="itens")
+
+
+class CartaoComentario(Base):
+    """Comentário do cartão (RF14): resposta em 1 nível e soft-delete.
+
+    `resposta_a_id` aponta para o comentário-raiz (o serviço recusa aninhar mais
+    de um nível). `excluido=True` mantém a linha para não quebrar as respostas.
+    """
+
+    __tablename__ = "cartao_comentario"
+    __table_args__ = (Index("idx_cartao_comentario_cartao", "cartao_id", "criado_em"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cartao_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("cartao.id", ondelete="CASCADE"), nullable=False
+    )
+    usuario_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("usuario.id"), nullable=False
+    )
+    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    resposta_a_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("cartao_comentario.id")
+    )
+    excluido: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    editado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CartaoAtividade(Base):
+    """Log append-only do cartão (RF14/§12): quem fez o quê, quando.
+
+    `dados` (JSONB) guarda o contexto do evento (ex.: lista de origem/destino,
+    campo alterado, nome do membro). Nunca é atualizado nem apagado.
+    """
+
+    __tablename__ = "cartao_atividade"
+    __table_args__ = (
+        Index("idx_cartao_atividade_cartao", "cartao_id", "criado_em"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cartao_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("cartao.id", ondelete="CASCADE"), nullable=False
+    )
+    usuario_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("usuario.id")
+    )
+    tipo: Mapped[str] = mapped_column(String(40), nullable=False)
+    dados: Mapped[dict | None] = mapped_column(JSONB)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
