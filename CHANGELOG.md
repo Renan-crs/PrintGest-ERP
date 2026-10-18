@@ -38,6 +38,23 @@ de cada tag está indicado para rastreabilidade.
 - 25 testes em `desktop/tests/test_projetos.py` cobrindo o quadro, a busca, a
   movimentação (índice/versão), o modo leitura, o RBAC de estrutura e os diálogos
   de cartão e de listas. Desktop: **240 testes** verdes.
+- **Módulo Projetos — Fase 2 (cartão rico), modelo de dados.** Migração
+  `f2a3b4c5d6e7` (reversível) cria `etiqueta`, `cartao_etiqueta`,
+  `cartao_checklist`, `cartao_checklist_item`, `cartao_comentario` e
+  `cartao_atividade`. Aditivo: nenhuma tabela existente muda (etiquetas por
+  filial, checklists com itens, comentários em 1 nível e log append-only).
+- **Licença resiliente à indisponibilidade do RedGest.** Erro de rede na
+  ativação/renovação agora vira `503` (antes `500`); timeout de contato
+  configurável (`licenca_timeout_segundos`, 90 s) e backoff progressivo no loop
+  (`licenca_backoff_segundos`, 60/300/900 s). A licença ganha estados derivados
+  (`ativa`/`tolerancia`/`leitura`/`revogada`/`nao_ativada`) e janela de tolerância
+  offline de 72 h (`licenca_tolerancia_horas`), contada da expiração do token:
+  enquanto o RedGest estiver fora, o sistema **continua escrevendo**.
+- Migração `c9e4f1a7b2d8` (aditiva e reversível) guarda a tolerância e o
+  diagnóstico (`ultima_tentativa_em`/`ultimo_erro`), exposto em `GET /v1/licenca`.
+- 5 testes novos de resiliência em `backend/tests/test_licenciamento.py` (timeout
+  → 503 sem revogar, janela de tolerância, transição para leitura, diagnóstico e
+  base legada), 15 no arquivo. Backend: **150 testes** verdes.
 
 ### Corrigido
 
@@ -51,11 +68,19 @@ de cada tag está indicado para rastreabilidade.
   `ui/modulos/os.py`) foi substituída pela nova `ui/modulos/projetos.py`. A
   `PaginaOS`/`PaginaOrcamento` permanecem intactas para os itens internos
   `os`/`orcamento`.
+- Indicador de licença na tela principal passa a refletir o `estado` (tolerância =
+  alerta; revogação/leitura = erro) e se atualiza a cada 5 min; a tela de **Modo
+  Leitura** distingue *revogação* de *tolerância esgotada* e mostra a última
+  tentativa/erro. Desktop: **245 testes** verdes.
 
 ### Documentação
 
 - `docs/revisao_projetos_kanban.md`: escopo da Fase 1, decisões tomadas e
   pendências (Fases 2–4).
+- `docs/plano_resiliencia_licenca.md`: plano das etapas E0–E6 da resiliência da
+  licença (E0–E2/E5 concluídas; E3/E4 e o banner progressivo em aberto).
+- `docs/prd_2.0.md` §3.2: tolerância de 72 h, timeout de 90 s com backoff e a
+  regra de que a indisponibilidade **não** revoga a licença.
 
 ---
 

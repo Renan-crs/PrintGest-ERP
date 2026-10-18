@@ -116,10 +116,11 @@ A licença é emitida e controlada pelo RedGest, vinculada ao **CNPJ da gráfica
 1. **Ativação**: no primeiro uso, o operador informa CNPJ + código de licença (recebido na contratação). O Local API Service troca isso por credenciais (`client_id`/`client_secret`) junto ao RedGest — fluxo 100% online, sem ativação assistida manual.
 2. **Token**: RedGest emite um JWT RS256 de curta duração (ex.: 4 horas) contendo entitlements (`max_estacoes`, módulos habilitados, plano).
 3. **Renovação automática**: o Local API Service renova o token periodicamente (ex.: a cada 3h) antes de expirar. Processo silencioso, sem intervenção do usuário.
-4. **Falha de renovação (internet fora do ar)**: sistema continua operando normalmente com o último token válido até ele expirar. Ao expirar sem renovação, entra em **modo leitura** (bloqueia escrita e emissão fiscal) até a conexão voltar.
-5. **Janela de tolerância offline**: 24–72h, não 7 dias — adequado a "internet cai, depois volta", não a "gráfica opera sem internet por design".
+4. **Falha de renovação (internet fora do ar)**: o RedGest inacessível vira `503` para o chamador e **nunca** revoga a licença (revogação só vem de `401/403`). O sistema continua operando com o token local; ao expirar, entra na tolerância (item 5) — e não em modo leitura imediato.
+5. **Janela de tolerância offline** (`licenca_tolerancia_horas`, **72h** por padrão): contada a partir da expiração do token. Esgotada sem renovação, o sistema entra em **modo leitura** (bloqueia escrita e emissão fiscal) até a conexão voltar.
 6. **Revogação** (inadimplência/cancelamento): refletida na próxima tentativa de renovação; sistema entra em modo leitura em poucas horas.
 7. **Troca da máquina-servidor**: reinstala o Local API Service na nova máquina e reativa com o mesmo CNPJ — sem fluxo de rebind com limite de tentativas.
+8. **Contato com o RedGest**: timeout de 90 s por padrão (`licenca_timeout_segundos`) e recuo progressivo após falhas consecutivas (`licenca_backoff_segundos`, 60/300/900 s), zerado na primeira renovação bem-sucedida.
 
 ### 3.3 O que foi removido do desenho original (v1.2) e por quê
 

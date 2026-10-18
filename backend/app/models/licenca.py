@@ -36,6 +36,17 @@ class Licenca(Base):
     entitlements: Mapped[dict | None] = mapped_column(JSONB)
     token_jwt: Mapped[str | None] = mapped_column(Text)
     token_expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Tolerância offline (plano E2): enquanto `agora <= tolerancia_expira_em` o
+    # sistema opera normalmente mesmo com o token vencido (RedGest inacessível).
+    tolerancia_expira_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    # Diagnóstico (mensagem correta na UI): quando foi a última tentativa e qual
+    # foi o último erro observado.
+    ultima_tentativa_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    ultimo_erro: Mapped[str | None] = mapped_column(Text)
     ultima_validacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

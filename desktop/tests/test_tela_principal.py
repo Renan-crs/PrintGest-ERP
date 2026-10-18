@@ -184,3 +184,37 @@ def test_configuracoes_apenas_admin(app):
     assert "Configurações" not in botoes
     gerente._navegar("configuracoes")
     assert gerente._stack_paginas.currentWidget() is gerente._pagina_inicio
+
+
+# ------------------------------- indicador de licença por estado (E5 do plano)
+
+
+def test_texto_e_estilo_licenca_por_estado():
+    assert TelaPrincipal._texto_licenca({"estado": "tolerancia"}, False) == (
+        "Licença em tolerância"
+    )
+    assert TelaPrincipal._estilo_licenca({"estado": "tolerancia"}, False) == "atencao"
+    assert TelaPrincipal._estilo_licenca({"estado": "revogada"}, False) == "erro"
+    assert TelaPrincipal._estilo_licenca({"estado": "leitura"}, False) == "erro"
+    assert TelaPrincipal._estilo_licenca({"estado": "ativa"}, False) == "success"
+    # retrocompatível com payload antigo (sem o campo `estado`)
+    assert TelaPrincipal._texto_licenca({"status": "ativa"}, False) == "Licença Ativa"
+    assert TelaPrincipal._estilo_licenca({"status": "ativa"}, False) == "success"
+
+
+def test_detalhe_licenca_inclui_motivo_e_diagnostico():
+    detalhe = TelaPrincipal._detalhe_texto(
+        {
+            "estado": "tolerancia",
+            "motivo": "Sem contato com o RedGest; operando normalmente em tolerância.",
+            "token_expira_em": "2026-10-18T09:00:00+00:00",
+            "tolerancia_expira_em": "2026-10-21T09:00:00+00:00",
+            "ultima_tentativa_em": "2026-10-18T10:00:00+00:00",
+            "ultimo_erro": "RedGest inacessível (ConnectError)",
+        },
+        False,
+    )
+    assert "tolerância." in detalhe
+    assert "Tolerância até: 21/10/2026 09:00" in detalhe
+    assert "Última verificação: 18/10/2026 10:00" in detalhe
+    assert "Último erro: RedGest inacessível (ConnectError)" in detalhe

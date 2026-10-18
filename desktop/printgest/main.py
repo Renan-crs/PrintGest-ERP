@@ -131,7 +131,7 @@ class _Roteador:
 
     def _abrir_modo_leitura(self, sit: dict) -> None:
         janela = ModoLeituraWindow(
-            self._api, token=self._token, cnpj=sit.get("cnpj")
+            self._api, token=self._token, cnpj=sit.get("cnpj"), situacao=sit
         )
         janela.renovada.connect(lambda: self._abrir_dashboard(False))
         janela.consulta.connect(lambda: self._abrir_dashboard(True))

@@ -20,7 +20,12 @@ from PySide6.QtWidgets import (
 
 from printgest.core.api import Api
 from printgest.core.tarefas import rodar
-from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
+from printgest.ui.widgets import (
+    aplicar_estilo,
+    badge,
+    botao_com_atalho,
+    formatar_datahora,
+)
 
 _PODERES = [
     ("Visualizar histórico de Ordens de Serviço existentes",
@@ -53,11 +58,18 @@ class ModoLeituraWindow(QMainWindow):
     saida = Signal()
 
     def __init__(
-        self, api: Api, token: str | None = None, cnpj: str | None = None
+        self,
+        api: Api,
+        token: str | None = None,
+        cnpj: str | None = None,
+        situacao: dict | None = None,
     ) -> None:
         super().__init__()
         self._api = api
         self._token = token
+        # Situação reportada pelo daemon: permite distinguir revogação (sem
+        # tolerância) de tolerância esgotada — mensagem honesta (P21).
+        self._situacao = situacao or {}
         self.setWindowTitle("PrintGest ERP — Sistema em Modo Leitura")
         self.setMinimumSize(1020, 720)
 
@@ -83,6 +95,10 @@ class ModoLeituraWindow(QMainWindow):
 
     # ------------------------------------------------------------------ helpers
 
+    @property
+    def _revogada(self) -> bool:
+        return self._situacao.get("estado") == "revogada"
+
     def _banner(self) -> QWidget:
         banner = QWidget()
         banner.setObjectName("bannerAmber")
@@ -93,7 +109,11 @@ class ModoLeituraWindow(QMainWindow):
         titulo = QLabel("SISTEMA EM MODO LEITURA")
         titulo.setStyleSheet("font-weight: 700; font-size: 15px;")
         linha.addWidget(titulo)
-        linha.addWidget(badge("Tolerância Offline Expirada", "atencao"))
+        linha.addWidget(
+            badge("Licença revogada", "erro")
+            if self._revogada
+            else badge("Tolerância Offline Expirada", "atencao")
+        )
         linha.addStretch(1)
 
         btn_revalidar = botao_com_atalho("Revalidar", "F5", "amber")
@@ -109,23 +129,40 @@ class ModoLeituraWindow(QMainWindow):
 
         topo = QHBoxLayout()
         topo.setSpacing(10)
-        titulo = QLabel("Modo Leitura Ativado — Renovação Pendente")
+        titulo = QLabel(
+            "Licença Revogada — Modo Leitura"
+            if self._revogada
+            else "Modo Leitura Ativado — Renovação Pendente"
+        )
         titulo.setObjectName("titulo")
         topo.addWidget(titulo)
-        topo.addWidget(badge("Offline > 72h", "erro"))
+        topo.addWidget(
+            badge("Revogada pelo RedGest", "erro")
+            if self._revogada
+            else badge("Tolerância offline esgotada", "erro")
+        )
         topo.addStretch(1)
         linha.addLayout(topo)
 
-        self._mensagem = QLabel(
-            "A licença RedGest está ativa, porém o token não foi renovado dentro da "
-            "tolerância offline. As operações de escrita e emissão fiscal estão "
-            "suspensas até a próxima sincronização bem-sucedida."
-        )
+        self._mensagem = QLabel(self._mensagem_inicial())
         self._mensagem.setObjectName("subtitulo")
         self._mensagem.setWordWrap(True)
         linha.addWidget(self._mensagem)
 
         return caixa
+
+    def _mensagem_inicial(self) -> str:
+        if self._revogada:
+            return (
+                "A licença foi revogada pelo RedGest. As operações de escrita e "
+                "emissão fiscal permanecem suspensas até a regularização com o "
+                "fornecedor; o modo de consulta segue disponível."
+            )
+        return (
+            "A licença RedGest está ativa, porém o token não foi renovado dentro da "
+            "tolerância offline. As operações de escrita e emissão fiscal estão "
+            "suspensas até a próxima sincronização bem-sucedida."
+        )
 
     def _colunas(self) -> QHBoxLayout:
         colunas = QHBoxLayout()
@@ -192,12 +229,7 @@ class ModoLeituraWindow(QMainWindow):
         titulo.setObjectName("labelForm")
         diag.addWidget(titulo)
         self._diag_texto = QPlainTextEdit()
-        self._diag_texto.setPlainText(
-            "Status da Internet na máquina servidora: a renovação automática não "
-            "obteve resposta do RedGest na última tentativa. Clique em \"Verificar "
-            "Rede Local\" para conferir a conectividade do daemon; quando a "
-            "internet/serviço voltar, o sistema retoma o funcionamento normal."
-        )
+        self._diag_texto.setPlainText(self._diagnostico_inicial())
         self._diag_texto.setReadOnly(True)
         self._diag_texto.setMaximumHeight(84)
         diag.addWidget(self._diag_texto)
@@ -207,6 +239,29 @@ class ModoLeituraWindow(QMainWindow):
         btn_rede[1].clicked.connect(self._verificar_rede)
         linha.addWidget(btn_rede[0], 0)
         return linha
+
+    def _diagnostico_inicial(self) -> str:
+        if self._revogada:
+            return (
+                "A última verificação no RedGest retornou revogação da licença. "
+                "Reative o contrato com o fornecedor; a renovação automática será "
+                "retomada quando o RedGest voltar a autorizar esta estação."
+            )
+        partes = [
+            "Status da Internet na máquina servidora: a renovação automática não "
+            "obteve resposta do RedGest na última tentativa."
+        ]
+        if self._situacao.get("ultimo_erro"):
+            partes.append(f"Último erro: {self._situacao['ultimo_erro']}.")
+        quando = formatar_datahora(self._situacao.get("ultima_tentativa_em"))
+        if quando:
+            partes.append(f"Última tentativa: {quando}.")
+        partes.append(
+            'Clique em "Verificar Rede Local" para conferir a conectividade do '
+            "daemon; quando a internet/serviço voltar, o sistema retoma o "
+            "funcionamento normal."
+        )
+        return " ".join(partes)
 
     def _acoes(self) -> QHBoxLayout:
         linha = QHBoxLayout()
