@@ -10,7 +10,10 @@ assinatura no serviço quebra o teste.
 import datetime as dt
 import hashlib
 import hmac
+import http.server
 import json
+import threading
+import time
 
 import httpx
 import pytest
@@ -92,6 +95,61 @@ def _mock_sem_rede(monkeypatch, erro: Exception | None = None):
         raise erro or httpx.ConnectError("sem rota para o RedGest")
 
     return _mock(monkeypatch, handle)
+
+
+class _RedGestReal:
+    """Servidor HTTP local (socket real) que responde com atraso configurável.
+
+    O `MockTransport` do httpx **não** aplica timeout ao handler — ele devolve a
+    resposta na hora, então um `time.sleep` no mock nunca estoura o timeout do
+    cliente. Para exercitar o *cold start* de verdade (a requisição estourar
+    `licenca_timeout_segundos`) é preciso um transporte real; este servidor
+    dorme antes de responder e ainda permite trocar o atraso entre chamadas.
+    """
+
+    def __init__(self, *, atraso: float = 0.0) -> None:
+        self.atraso = atraso
+        self.requisicoes: list[dict] = []
+        dono = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):  # noqa: N802 (nome fixado pelo stdlib)
+                tamanho = int(self.headers.get("Content-Length") or 0)
+                corpo = self.rfile.read(tamanho)
+                dono.requisicoes.append(
+                    {
+                        "caminho": self.path,
+                        "corpo": corpo,
+                        "headers": dict(self.headers),
+                    }
+                )
+                time.sleep(dono.atraso)
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    payload = _resposta_ok().content
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+                except (BrokenPipeError, ConnectionError):
+                    # O cliente já desistiu (timeout): é exatamente o que o
+                    # teste de cold start quer medir.
+                    pass
+
+            def log_message(self, *args):  # silencia o log do stdlib
+                pass
+
+        self.servidor = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.servidor.server_address[1]}"
+        self.thread = threading.Thread(target=self.servidor.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_exc):
+        self.servidor.shutdown()
+        self.servidor.server_close()
 
 
 def _ativar(client, chave: str = CHAVE):
@@ -622,6 +680,102 @@ def test_tolerancia_derivada_quando_coluna_nula(client, monkeypatch):
     assert data["estado"] == "tolerancia"
     assert data["modo_leitura"] is False
     assert data["tolerancia_expira_em"] is not None  # derivada da vigência
+
+
+# ----------------------- cold start real + rollover (E6 do plano)
+def test_cold_start_lento_conclui_sem_erro_visivel(client, monkeypatch):
+    """Aceite 1: RedGest "frio" responde devagar, mas dentro do timeout -> 200.
+
+    O `MockTransport` do httpx nao aplica timeout ao handler; aqui um socket real
+    dorme antes de responder, provando que `licenca_timeout_segundos` e de fato
+    aplicado a requisicao e que a lentidao nao vira erro nem revogacao.
+    """
+    with _RedGestReal(atraso=0.4) as redgest:
+        monkeypatch.setattr(settings, "redgest_url", redgest.url)
+        monkeypatch.setattr(settings, "licenca_timeout_segundos", 10)
+        resp = _ativar(client)
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["estado"] == "ativa"
+    assert data["ultimo_erro"] is None
+    assert len(redgest.requisicoes) == 1
+    assert redgest.requisicoes[0]["caminho"] == CAMINHO
+
+
+def test_cold_start_estoura_timeout_real_e_recupera(client, monkeypatch):
+    """Aceite 1/2: atraso real acima do timeout -> 503, sem revogar; depois volta.
+
+    Prova o par: (a) o timeout configurado e o que interrompe a chamada (erro de
+    transporte real, nao um mock) e (b) quando o RedGest responde dentro do
+    prazo, a revalidacao volta a `ativa` e limpa o diagnostico.
+    """
+    with _RedGestReal(atraso=0.0) as redgest:
+        monkeypatch.setattr(settings, "redgest_url", redgest.url)
+        monkeypatch.setattr(settings, "licenca_timeout_segundos", 10)
+        assert _ativar(client).status_code == 200
+
+        redgest.atraso = 1.5  # RedGest "frio": 1,5 s com timeout de 0,2 s
+        monkeypatch.setattr(settings, "licenca_timeout_segundos", 0.2)
+        assert client.post("/v1/licenca/renovar").status_code == 503
+
+        data = client.get("/v1/licenca").json()["data"]
+        assert data["estado"] == "ativa"  # indisponibilidade nunca revoga
+        assert data["modo_leitura"] is False
+        assert "Timeout" in (data["ultimo_erro"] or "")
+
+        redgest.atraso = 0.0  # respondeu dentro do prazo: recupera sozinho
+        monkeypatch.setattr(settings, "licenca_timeout_segundos", 10)
+        assert client.post("/v1/licenca/renovar").status_code == 200
+
+        data = client.get("/v1/licenca").json()["data"]
+        assert data["estado"] == "ativa"
+        assert data["ultimo_erro"] is None
+
+
+def test_revalidacao_renova_a_vigencia_e_reativa(client, monkeypatch):
+    """Rollover da vigencia (o Contrato C nao tem token para renovar).
+
+    Em tolerancia, uma revalidacao que traz `expira_em` novo substitui o local
+    (o RedGest e a fonte da verdade): a instalacao volta a `ativa` e a janela de
+    tolerancia e recalculada a partir da nova vigencia.
+    """
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    agora = licensa_service._agora()
+    _ajustar_licenca(
+        expira_em=agora - dt.timedelta(hours=1),
+        tolerancia_expira_em=agora + dt.timedelta(hours=71),
+    )
+    assert client.get("/v1/licenca").json()["data"]["estado"] == "tolerancia"
+
+    nova = agora + dt.timedelta(days=365)
+    _mock(monkeypatch, _resposta_ok(expira_em=_iso(nova), primeira_ativacao=False))
+    assert client.post("/v1/licenca/renovar").status_code == 200
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "ativa"
+    assert data["modo_leitura"] is False
+    assert _parse(data["expira_em"]) == nova
+    assert _parse(data["tolerancia_expira_em"]) == nova + dt.timedelta(
+        hours=settings.licenca_tolerancia_horas
+    )
+
+
+def test_revalidacao_de_licenca_vitalicia_continua_vitalicia(client, monkeypatch):
+    """`expira_em: null` (vitalicia) atravessa a revalidacao sem criar tolerancia."""
+    _mock(monkeypatch, _resposta_ok(expira_em=None))
+    assert _ativar(client).status_code == 200
+
+    _mock(monkeypatch, _resposta_ok(expira_em=None, primeira_ativacao=False))
+    assert client.post("/v1/licenca/renovar").status_code == 200
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["expira_em"] is None
+    assert data["tolerancia_expira_em"] is None
+    assert data["estado"] == "ativa"
+    assert data["modo_leitura"] is False
 
 
 def test_falha_de_revalidacao_registra_diagnostico(client, monkeypatch):
