@@ -20,7 +20,13 @@ configurável (padrão 90 s, para absorver *cold start* de plano gratuito) e as
 falhas de transporte viram `503` com mensagem clara — **nunca** revogação. A
 licença vale até `expira_em` e, depois do vencimento, a instalação opera em
 tolerância (`licenca_tolerancia_horas`, 72 h) antes de entrar em modo de leitura.
-O loop aplica backoff crescente (1/5/15/60 min) entre tentativas que falham.
+O loop aplica backoff crescente (1/5/15/60 min) com jitter entre tentativas que
+falham (doc §9.2).
+
+A **chave de ativação** fica no cofre do SO (DPAPI em escopo de máquina — doc
+§9.4); `_chave_em_claro` a abre para revalidar e para mascarar na resposta. O
+serial é normalizado por `_parse_chave`: a doc §4.2 manda aceitar com ou sem
+hífens e validar o formato **antes** de chamar a API.
 
 O `maquina_fingerprint` segue a doc de integração do RedGest §7: identificadores
 estáveis de hardware (BIOS UUID, CPU ID, serial da placa-mãe e do disco), JSON
@@ -41,6 +47,8 @@ import json
 import logging
 import os
 import platform
+import random
+import re
 import subprocess
 from typing import Any
 
@@ -48,6 +56,7 @@ import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core import cofre
 from app.core.config import settings
 from app.db import SessionLocal
 from app.models.licenca import Licenca
@@ -319,13 +328,41 @@ def _erro_do_corpo(resp: httpx.Response) -> tuple[str | None, str]:
     return codigo, detalhe
 
 
+_CHAVE_RE = re.compile(r"^[0-9A-F]{4}(-[0-9A-F]{4}){3}$")
+
+
 def _parse_chave(chave: str) -> str:
-    return (chave or "").strip().upper()
+    """Normaliza o serial digitado e valida o formato **antes** de chamar a API.
+
+    A doc de integração §4.2 exige aceitar o serial com ou sem hífens (com
+    espaços, colado de e-mail etc.). Limpamos tudo que não é hexadecimal,
+    subimos para maiúsculas e reagrupamos em `XXXX-XXXX-XXXX-XXXX`. Devolve
+    `""` quando não há exatamente 16 caracteres hexadecimais — o chamador
+    responde 400 sem tocar na rede.
+    """
+    digitos = re.sub(r"[^0-9A-F]", "", (chave or "").upper())
+    if len(digitos) != 16:
+        return ""
+    formatada = "-".join(digitos[i : i + 4] for i in range(0, 16, 4))
+    return formatada if _CHAVE_RE.match(formatada) else ""
 
 
 # -------------------------------------------------------------------- estado
 def _licenca_local(db: Session) -> Licenca | None:
     return db.query(Licenca).order_by(Licenca.id).first()
+
+
+@functools.lru_cache(maxsize=8)
+def _abrir_chave(guardada: str) -> str:
+    """Abre a chave no cofre do SO (cacheado por valor guardado)."""
+    return cofre.revelar(guardada)
+
+
+def _chave_em_claro(lic: Licenca | None) -> str:
+    """Chave de ativação legível; `""` se não ativada ou ilegível nesta máquina."""
+    if lic is None or not lic.chave_ativacao:
+        return ""
+    return _abrir_chave(lic.chave_ativacao)
 
 
 def _janela_tolerancia(expira_em: dt.datetime) -> dt.datetime:
@@ -343,7 +380,9 @@ def _tolerancia_expira_em(lic: Licenca) -> dt.datetime | None:
 
 def _estado(lic: Licenca | None) -> str:
     """Estado derivado: ativa | tolerancia | leitura | revogada | nao_ativada."""
-    if lic is None or not lic.chave_ativacao:
+    if not _chave_em_claro(lic):
+        # Sem chave guardada ou cofre ilegível (banco de outra máquina): a
+        # instalação precisa ser reativada.
         return ESTADO_NAO_ATIVADA
     if lic.status == STATUS_REVOGADA:
         return ESTADO_REVOGADA
@@ -400,7 +439,7 @@ def situacao(db: Session) -> dict:
         ESTADO["modo_leitura"] = False
     return {
         "sistema": settings.redgest_sistema,
-        "chave": _mascarar(lic.chave_ativacao) if lic else None,
+        "chave": _mascarar(_chave_em_claro(lic)) or None,
         "plano": lic.plano if lic else None,
         "status": lic.status if lic else ESTADO_NAO_ATIVADA,
         "estado": estado,
@@ -424,9 +463,10 @@ def _persistir_ok(
     agora = _agora()
     expira = _parse_dt(dados.get("expira_em"))
     if lic is None:
-        lic = Licenca(chave_ativacao=chave)
+        lic = Licenca()
         db.add(lic)
-    lic.chave_ativacao = chave
+    # Doc §9.4: a chave de ativação vai para o cofre do SO, nunca em texto puro.
+    lic.chave_ativacao = cofre.proteger(chave)
     lic.maquina_fingerprint = fingerprint
     lic.sistema = settings.redgest_sistema
     lic.status = STATUS_ATIVA
@@ -583,9 +623,14 @@ def ativar(db: Session, *, chave_ativacao: str) -> dict:
         )
     chave = _parse_chave(chave_ativacao)
     if not chave:
+        # Formato avaliado localmente (doc §4.2): não gasta uma requisição (nem
+        # uma tentativa da cota) para descobrir que a chave está truncada.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Informe a chave de ativação (XXXX-XXXX-XXXX-XXXX).",
+            detail=(
+                "Chave de ativação inválida. Informe os 16 caracteres de "
+                "XXXX-XXXX-XXXX-XXXX (pode digitar/colar com ou sem hífens)."
+            ),
         )
     return _validar_online(db, chave)
 
@@ -602,7 +647,16 @@ def renovar(db: Session) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licença ainda não ativada.",
         )
-    return _validar_online(db, lic.chave_ativacao)
+    chave = _chave_em_claro(lic)
+    if not chave:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Não foi possível ler a chave de ativação guardada no cofre desta "
+                "máquina (banco restaurado de outro computador?). Reative a licença."
+            ),
+        )
+    return _validar_online(db, chave)
 
 
 # ---------------------------------------------------------------------- loop
@@ -611,12 +665,19 @@ def _atraso_proximo_ciclo(falhas: int) -> int:
 
     Backoff (1/5/15/60 min por padrão) evita bater no RedGest a cada ciclo quando
     ele está fora, mas volta ao intervalo normal assim que a validação dá certo.
+    A doc §9.2 pede jitter: `licenca_backoff_jitter_percentual` (±20% por padrão)
+    espalha as instalações que caíram juntas, evitando reconexão em manada.
     """
     if falhas <= 0:
         return settings.licenca_refresh_intervalo_segundos
     backoff = settings.licenca_backoff
     indice = min(falhas - 1, len(backoff) - 1)
-    return backoff[indice]
+    base = backoff[indice]
+    jitter = settings.licenca_backoff_jitter_percentual
+    if jitter <= 0:
+        return base
+    fator = random.uniform(1 - jitter / 100, 1 + jitter / 100)
+    return max(1, round(base * fator))
 
 
 def _precisa_revalidar(lic: Licenca) -> bool:
@@ -639,7 +700,7 @@ def _tentativa_renovacao() -> bool:
     db = SessionLocal()
     try:
         lic = _licenca_local(db)
-        if lic is None or not lic.chave_ativacao:
+        if not _chave_em_claro(lic):
             _recalcular_estado(lic)
             return False
         _recalcular_estado(lic)

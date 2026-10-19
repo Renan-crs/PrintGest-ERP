@@ -67,7 +67,7 @@ emitindo fiscal) enquanto o RedGest estiver inacessível, distinguindo
 | # | Decisão | Default proposto | Observação |
 | --- | --- | --- | --- |
 | D1 | Duração da tolerância pós-expiração | **72 h** | É o número já anunciado na UI (`ativacao.py:224`). |
-| D2 | Backoff de tentativas | **1 / 5 / 15 min**, repetindo 15 min; zera no sucesso | §2 item 1 do documento. |
+| D2 | Backoff de tentativas | **1 / 5 / 15 / 60 min** com **jitter ±20 %**, saturando no último passo; zera no sucesso | Doc de integração §9.2: `licenca_backoff_segundos` + `licenca_backoff_jitter_percentual`. O `±` espalha as instalações que caíram juntas (manada). |
 | D3 | Validação local do token (assinatura RS256) | **Descartado** (Contrato C: sem JWT) | Não reverte mais §3.3 do PRD; ver revisão 2.1.0. |
 | D4 | Extensão de emergência assinada | **Descartado** (Contrato C) | A tolerância de 72 h cobre a indisponibilidade; ver revisão 2.1.0. |
 | D5 | Cadência de renovação quando o token é longo | Manter checagem a cada 5 min, renovando só na janela (`renova_antes`) | O "a cada 6 h" do documento é propriedade do TTL do RedGest. |
@@ -86,7 +86,10 @@ emitindo fiscal) enquanto o RedGest estiver inacessível, distinguindo
 - [x] `core/config.py`: backoff — `licenca_backoff_segundos: str = "60,300,900,3600"`
       (string + propriedade `settings.licenca_backoff -> list[int]`;
       pydantic-settings não parseia `list[int]` de env de forma confiável).
-- [x] `backend/.env.example`: documentar as três novas variáveis.
+- [x] `core/config.py`: jitter do backoff —
+      `licenca_backoff_jitter_percentual: int = 20` (doc §9.2).
+- [x] `core/config.py`: cofre do SO — `cofre: str = "dpapi"` (doc §9.4).
+- [x] `backend/.env.example`: documentar as novas variáveis.
 - [ ] Revisar `licenca_renova_antes_segundos` (hoje 1 h) para a nova realidade.
       *Mantido em 3600 s (D5): é a cadência de checagem (5 min) que controla.*
 

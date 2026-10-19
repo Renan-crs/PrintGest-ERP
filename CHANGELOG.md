@@ -98,6 +98,27 @@ de cada tag está indicado para rastreabilidade.
   ausentes/genéricos são omitidos e há fallback estável e override por
   `PRINTGEST_MAQUINA_FINGERPRINT`. Mapa completo de conformidade em
   `docs/licenciamento_online_first.md` §6/§7.
+- **Conformidade com o documento de integração do RedGest — rodada 2
+  (§4.2/§9.2/§9.4).** Três lacunas fechadas: (a) o serial passa a ser aceito
+  **com ou sem hífens** (e com espaços) e **validado localmente** antes de
+  qualquer chamada de rede; (b) o backoff de revalidação ganha **jitter** de
+  ±20 %; (c) a `chave_ativacao` deixa de ficar em texto puro no banco e passa a
+  ser gravada no **cofre do SO** (DPAPI de escopo de máquina) — novo
+  `backend/app/core/cofre.py`, coluna `Text` e migração `b2c3d4e5f6a7`.
+- **Cofre do SO para a chave de ativação** (doc §9.4). `PRINTGEST_COFRE=dpapi`
+  (default) cifra o serial com `CRYPTPROTECT_LOCAL_MACHINE` no formato
+  `dpapi:v1:<base64>`: protege o arquivo do banco (backup/dump) sem amarrar o
+  segredo ao usuário que ativou (o Local API Service pode rodar como serviço).
+  `PRINTGEST_COFRE=nenhum` desliga (dev/diagnóstico) e fora do Windows o módulo
+  degrada para texto puro com aviso no log. Linhas antigas (texto puro) seguem
+  legíveis; blob ilegível (banco restaurado em outra máquina) vira `nao_ativada`
+  e a UI pede a reativação, em vez de mandar lixo ao RedGest. Nada de sensível
+  (`chave_ativacao`, `api_key`, `nonce`, assinatura) vai para o log.
+- 12 testes novos: formato do serial (com/sem hífens, espaços, inválido sem
+  tocar na rede, `_parse_chave`), jitter dentro da faixa, chave cifrada no banco
+  e revalidação com a chave em claro, cofre (`backend/tests/test_cofre.py`:
+  roundtrip, texto puro legado, blob corrompido, cofre desligado). Backend:
+  **195 testes** verdes.
 
 ### Corrigido
 
@@ -111,11 +132,18 @@ de cada tag está indicado para rastreabilidade.
   no manual de integração §8.2) passa a ser tratada — revogação/bloqueio/
   expiração → `423`, chave não reconhecida → `400`, limite → `409` — em vez de
   ser aceita como ativação bem-sucedida.
+- Licença: serial digitado sem hífens (ou com espaços/caixa baixa) ia cru para o
+  RedGest e voltava `400` de chave inválida, gastando tentativa da cota; agora é
+  normalizado para `XXXX-XXXX-XXXX-XXXX` antes do envio e o formato é validado
+  **localmente** (`_parse_chave`) — chave truncada responde `400` sem nenhuma
+  requisição.
 
 ### Alterado
 
 - Licença: o backoff de revalidação passa a 1/5/15/60 min
-  (`licenca_backoff_segundos=60,300,900,3600`), saturando no último passo.
+  (`licenca_backoff_segundos=60,300,900,3600`), saturando no último passo e
+  recebendo **jitter** de ±20 % (`licenca_backoff_jitter_percentual`, doc §9.2;
+  `0` desliga).
 
 ### Alterado
 
@@ -143,8 +171,10 @@ de cada tag está indicado para rastreabilidade.
   progressivo segue em aberto).
 - `docs/licenciamento_online_first.md`: decisões do licenciamento online-first
   vigente (chave de produto, tolerância de 72 h, cadências e estados), o
-  algoritmo do `maquina_fingerprint` (§6) e o mapa de conformidade com o
-  documento de integração do RedGest (§7).
+  algoritmo do `maquina_fingerprint` (§6), o mapa de conformidade com o
+  documento de integração do RedGest (§7) e o cofre do SO para a chave (§8).
+- `backend/.env.example`: `PRINTGEST_COFRE` e
+  `PRINTGEST_LICENCA_BACKOFF_JITTER_PERCENTUAL`.
 - `docs/prd_2.0.md` §3: reescrito para o Contrato C (chave de produto validada
   online); tolerância de 72 h, timeout de 90 s com backoff e a regra de que a
   indisponibilidade **não** revoga a licença.

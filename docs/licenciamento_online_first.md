@@ -20,6 +20,12 @@ valores do desenho anterior `online_periodic` (JWT de 4 h, tolerância de
 - **Fingerprint da máquina** (`maquina_fingerprint`, SHA-256) identifica a
   instalação; reativar a mesma máquina não consome o `limite_ativacoes`. É
   calculado a partir de identificadores **estáveis** de hardware (ver §6).
+- **Serial tolerante à digitação**: aceito com ou sem hífens (e com espaços) e
+  normalizado para `XXXX-XXXX-XXXX-XXXX` **antes** de qualquer chamada; formato
+  inválido local não gasta tentativa da cota (doc §4.2).
+- **Chave em cofre do SO** (doc §9.4): a tabela `licenca` guarda o serial
+  cifrado com **DPAPI em escopo de máquina** (`dpapi:v1:<base64>`), não em texto
+  puro — ver §8.
 
 Só o Local API Service fala com o RedGest; as estações-cliente nunca o fazem.
 
@@ -32,6 +38,7 @@ Só o Local API Service fala com o RedGest; as estações-cliente nunca o fazem.
 | `licenca_timeout_segundos` | 90 s | Timeout da chamada (Render frio responde em 30–60 s). |
 | `licenca_tolerancia_horas` | 72 h | Operação normal após `expira_em` vencer, sem contato com o RedGest. |
 | `licenca_backoff_segundos` | 60/300/900/3600 s | Recuo progressivo após falhas (1/5/15/60 min); satura no último passo e zera no sucesso. |
+| `licenca_backoff_jitter_percentual` | 20 % | Jitter (±) sobre o recuo, para as instalações não reconectarem em manada (doc §9.2). `0` desliga. |
 
 ## 3. Estados derivados (nunca persistidos como verdade)
 
@@ -91,6 +98,7 @@ Referência: *"Documento de Integração — chave de ativação (serial)"* v1.0
 | Item da doc | Situação |
 |---|---|
 | §4 endpoint `POST /api/v1/licencas-software/validar/` | ✅ `CAMINHO_VALIDAR` |
+| §4.2 serial com ou sem hífens + validar formato antes da chamada | ✅ `_parse_chave` (limpa/espaça, uppercase, reagrupa em 4; inválido → 400 sem rede) |
 | §5.1 `X-RedGest-Nonce` (Base64 de 32 bytes, único por requisição) | ✅ `os.urandom(32)` → base64 |
 | §5.1 `X-RedGest-Timestamp` (`YYYY-MM-DDTHH:MM:SSZ`, UTC) | ✅ `strftime` com `Z` |
 | §5.2 `sha256=` + HMAC-SHA256(segredo, utf8(nonce+timestamp)+corpo) | ✅ `_assinatura` (corpo = bytes exatos enviados) |
@@ -102,15 +110,33 @@ Referência: *"Documento de Integração — chave de ativação (serial)"* v1.0
 | §8.2 recusa em `200 {valido: false}` | ✅ tratada (`_tratar_recusa`) |
 | §8.3 429 | ✅ 503 + backoff, sem revogar |
 | §9.1 timeout 90 s; renovação a cada 6 h; tolerância 72 h; rede não revoga | ✅ |
-| §9.2 backoff 1/5/15/60 min | ✅ `licenca_backoff_segundos` |
+| §9.2 backoff 1/5/15/60 min **com jitter** | ✅ `licenca_backoff_segundos` + `licenca_backoff_jitter_percentual` |
+| §9.3 tolerância de 72 h não-bloqueante | ✅ estado `tolerancia` (escreve) + indicador na tela principal |
+| §9.4 chave de ativação em cofre do SO; segredos fora dos logs | ✅ DPAPI (escopo de máquina) — ver §8 |
 
 Divergências assumidas:
 
-- **§9.2 jitter**: o backoff não adiciona jitter (é uma instalação por cliente,
-  não há *thundering herd* contra o RedGest).
-- **§9.4 cofre do SO**: a chave fica na tabela local `licenca` (Postgres do Local
-  API Service), não em DPAPI/Keychain. O Local API Service é a fronteira de
-  confiança e precisa da chave para revalidar; cifrar em repouso exigiria uma
-  segunda credencial local, sem ganho real de segurança no modelo atual.
 - **§10 migração v4.x**: o `/licencas-software/` é depreciado (sunset
-  01/03/2027) — ver §5.
+  01/03/2027) — ver §5. Não há o que migrar antes dessa data.
+
+## 8. Cofre do SO para a chave de ativação (doc §9.4)
+
+`app/core/cofre.py` grava o serial cifrado com **DPAPI em escopo de máquina**
+(`CRYPTPROTECT_LOCAL_MACHINE`), no formato `dpapi:v1:<base64>`:
+
+- **Escopo de máquina** (e não de usuário) porque o Local API Service pode rodar
+  como serviço, com outra conta — um blob amarrado ao perfil do usuário que
+  ativou quebraria a instalação.
+- O que se protege é o **arquivo do banco** (backup/dump): o blob não abre em
+  outro computador. Dentro da máquina, qualquer processo do serviço lê a chave —
+  que é justamente quem precisa dela para revalidar.
+- `PRINTGEST_COFRE=nenhum` desliga o cofre (texto puro; só dev/diagnóstico).
+  Fora do Windows não há DPAPI: o módulo degrada para texto puro com aviso no
+  log (o Local API Service só roda em Windows em produção).
+- Linhas gravadas **antes** do cofre (texto puro) continuam legíveis: o serviço
+  reconhece valores sem o prefixo. Blob ilegível (banco restaurado em outra
+  máquina) vira `nao_ativada` e a UI pede a reativação, em vez de enviar lixo ao
+  RedGest.
+
+Nada de sensível vai para o log: nem `chave_ativacao`, nem `api_key`, nem
+`nonce`/assinatura — só contexto e mensagens de erro.
