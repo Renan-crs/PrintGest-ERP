@@ -11,12 +11,14 @@
   atalhos globais (F2 clientes, F3 produtos, F5 PDV) + versão.
 - Em modo leitura, exibe banner amber e repassa o estado às páginas (a API
   também reforça com 423).
+- Em tolerância, exibe banner **não bloqueante** com o prazo final e o tempo
+  restante recomposto a cada minuto (doc de integração §9.3 / E5).
 """
 
 from __future__ import annotations
 
 import socket
-from datetime import datetime
+from datetime import datetime, timezone
 
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
@@ -78,6 +80,78 @@ def _eh_gerente_ou_mais(nivel: str) -> bool:
 
 def _eh_operador_ou_mais(nivel: str) -> bool:
     return tem_acesso(nivel, "operador")
+
+
+def _momento(valor: object) -> datetime | None:
+    """ISO-8601 (com ou sem fuso) vindo do daemon → `datetime` com fuso (UTC se ausente)."""
+    if not valor:
+        return None
+    try:
+        momento = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=timezone.utc)
+    return momento
+
+
+def _agora_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def tempo_restante(valor: object, agora: datetime | None = None) -> str:
+    """Tempo restante em texto curto: `2 dias e 21 h`, `3 h e 12 min`, `8 min`.
+
+    Vazio quando o prazo não é legível; `menos de 1 min` quando já passou.
+    """
+    fim = _momento(valor)
+    if fim is None:
+        return ""
+    agora = agora or _agora_utc()
+    if agora.tzinfo is None:
+        agora = agora.replace(tzinfo=timezone.utc)
+    segundos = int((fim - agora).total_seconds())
+    if segundos <= 0:
+        return "menos de 1 min"
+    dias, resto = divmod(segundos, 86400)
+    horas, resto = divmod(resto, 3600)
+    minutos = resto // 60
+    if dias:
+        return f"{dias} dia{'s' if dias > 1 else ''} e {horas} h"
+    if horas:
+        return f"{horas} h e {minutos} min"
+    return f"{max(minutos, 1)} min"
+
+
+def fracao_tolerancia(sit: dict, agora: datetime | None = None) -> float | None:
+    """Fração (0..1) da janela de tolerância ainda disponível.
+
+    `None` quando não há janela (licença vitalícia ou payload sem `expira_em`)
+    — nesse caso o banner esconde a barra de progresso.
+    """
+    fim = _momento(sit.get("tolerancia_expira_em"))
+    inicio = _momento(sit.get("expira_em"))
+    if fim is None or inicio is None or fim <= inicio:
+        return None
+    agora = agora or _agora_utc()
+    if agora.tzinfo is None:
+        agora = agora.replace(tzinfo=timezone.utc)
+    total = (fim - inicio).total_seconds()
+    return min(1.0, max(0.0, (fim - agora).total_seconds() / total))
+
+
+def mensagem_tolerancia(sit: dict) -> str:
+    """Mensagem do banner não bloqueante (doc de integração RedGest §9.3)."""
+    prazo = formatar_datahora(sit.get("tolerancia_expira_em"))
+    if prazo:
+        return (
+            "Sem conexão com o servidor de licenças. O PrintGest continuará "
+            f"funcionando normalmente até {prazo}."
+        )
+    return (
+        "Sem conexão com o servidor de licenças. O PrintGest continuará "
+        "funcionando normalmente durante a tolerância."
+    )
 
 
 class PaginaInicial(QWidget):
@@ -556,6 +630,11 @@ class TelaPrincipal(QMainWindow):
         if modo_leitura:
             coluna.addWidget(self._banner_modo_leitura())
 
+        # Banner não bloqueante do estado `tolerancia` (doc de integração §9.3):
+        # fica oculto por padrão e o layout ignora widget oculto.
+        self._banner_tol = self._banner_tolerancia()
+        coluna.addWidget(self._banner_tol)
+
         coluna.addWidget(self._cabecalho())
 
         corpo = QWidget()
@@ -570,6 +649,17 @@ class TelaPrincipal(QMainWindow):
 
         self.setCentralWidget(raiz)
         self._instalar_atalhos()
+
+        # Última situação conhecida da licença (o banner de tolerância e o
+        # indicador vivem dela mesmo quando o daemon local não responde).
+        self._situacao_licenca: dict = {}
+
+        # Countdown do banner: recompõe o texto/dia a cada minuto, sem rede — a
+        # situação é reconsultada pelo `_timer_licenca_refresh` (5 min).
+        self._timer_tolerancia = QTimer(self)
+        self._timer_tolerancia.setInterval(60 * 1000)
+        self._timer_tolerancia.timeout.connect(self._atualizar_tolerancia)
+
         if situacao_licenca is not None:
             # Licença já consultada no login (token de sessão): evita o 2º GET.
             self._licenca(situacao_licenca)
@@ -715,6 +805,10 @@ class TelaPrincipal(QMainWindow):
         self._pintar_licenca({})
 
     def _pintar_licenca(self, sit: dict) -> None:
+        if sit:
+            # Guarda a última situação conhecida: se o daemon local não responder,
+            # o indicador e o banner de tolerância não "somem" da tela.
+            self._situacao_licenca = sit
         self._detalhe_licenca = self._detalhe_texto(sit, self._modo_leitura)
         self._lbl_licenca.setText("● Licença")
         self._lbl_licenca.setProperty(
@@ -722,6 +816,36 @@ class TelaPrincipal(QMainWindow):
         )
         self._lbl_licenca.setToolTip(self._texto_licenca(sit, self._modo_leitura))
         aplicar_estilo(self._lbl_licenca)
+        self._atualizar_tolerancia()
+
+    def _atualizar_tolerancia(self) -> None:
+        """Mostra/atualiza o banner de tolerância a partir da situação conhecida.
+
+        Não chama a rede: é o callback do `QTimer` de 1 min (countdown) e também
+        roda a cada repintura do indicador (5 min), com a situação recém-consultada.
+        """
+        sit = self._situacao_licenca
+        visivel = not self._modo_leitura and sit.get("estado") == "tolerancia"
+        self._banner_tol.setVisible(visivel)
+        if not visivel:
+            self._timer_tolerancia.stop()
+            return
+
+        self._lbl_tol.setText(mensagem_tolerancia(sit))
+        restante = tempo_restante(sit.get("tolerancia_expira_em"))
+        self._lbl_tol_restante.setText(
+            f"Restam {restante}" if restante else "Tolerância ativa"
+        )
+        self._lbl_tol_restante.setToolTip(
+            "O sistema opera normalmente enquanto o servidor de licenças estiver "
+            "inacessível; ao fim do prazo, entra em modo leitura."
+        )
+        fracao = fracao_tolerancia(sit)
+        self._barra_tol.setVisible(fracao is not None)
+        if fracao is not None:
+            self._barra_tol.setValue(int(round(fracao * 1000)))
+        if not self._timer_tolerancia.isActive():
+            self._timer_tolerancia.start()
 
     @staticmethod
     def _texto_licenca(sit: dict, modo_leitura: bool) -> str:
@@ -790,6 +914,39 @@ class TelaPrincipal(QMainWindow):
         linha.addWidget(titulo)
         linha.addWidget(badge("Escritas bloqueadas", "atencao"))
         linha.addStretch(1)
+        return banner
+
+    def _banner_tolerancia(self) -> QWidget:
+        """Banner **não bloqueante** do estado `tolerancia` (doc de integração §9.3).
+
+        Informa em quanto tempo a licença deixa de valer (tolerância de 72 h da
+        vigência) sem travar nada: as escritas seguem liberadas. O texto e a
+        barra são recompostos por `_atualizar_tolerancia`.
+        """
+        banner = QWidget()
+        banner.setObjectName("bannerAmber")
+        linha = QHBoxLayout(banner)
+        linha.setContentsMargins(24, 8, 24, 8)
+        linha.setSpacing(10)
+
+        self._lbl_tol = QLabel("")
+        self._lbl_tol.setStyleSheet("font-weight: 600; font-size: 13px;")
+        linha.addWidget(self._lbl_tol)
+
+        self._lbl_tol_restante = QLabel("")
+        self._lbl_tol_restante.setProperty("role", "atencao")
+        linha.addWidget(self._lbl_tol_restante)
+
+        self._barra_tol = QProgressBar()
+        self._barra_tol.setObjectName("barraTolerancia")
+        self._barra_tol.setTextVisible(False)
+        self._barra_tol.setRange(0, 1000)
+        self._barra_tol.setFixedWidth(160)
+        self._barra_tol.setFixedHeight(6)
+        linha.addWidget(self._barra_tol)
+
+        linha.addStretch(1)
+        banner.setVisible(False)
         return banner
 
     def _barra_lateral(self) -> QWidget:

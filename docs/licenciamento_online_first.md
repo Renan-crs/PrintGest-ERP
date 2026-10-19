@@ -111,7 +111,7 @@ Referência: *"Documento de Integração — chave de ativação (serial)"* v1.0
 | §8.3 429 | ✅ 503 + backoff, sem revogar |
 | §9.1 timeout 90 s; renovação a cada 6 h; tolerância 72 h; rede não revoga | ✅ |
 | §9.2 backoff 1/5/15/60 min **com jitter** | ✅ `licenca_backoff_segundos` + `licenca_backoff_jitter_percentual` |
-| §9.3 tolerância de 72 h não-bloqueante | ✅ estado `tolerancia` (escreve) + indicador na tela principal |
+| §9.3 tolerância de 72 h não-bloqueante + banner | ✅ estado `tolerancia` (escreve), indicador na tela principal e banner progressivo com prazo/restante (`tela_principal.py`) |
 | §9.4 chave de ativação em cofre do SO; segredos fora dos logs | ✅ DPAPI (escopo de máquina) — ver §8 |
 
 Divergências assumidas:
