@@ -20,7 +20,12 @@ configurável (padrão 90 s, para absorver *cold start* de plano gratuito) e as
 falhas de transporte viram `503` com mensagem clara — **nunca** revogação. A
 licença vale até `expira_em` e, depois do vencimento, a instalação opera em
 tolerância (`licenca_tolerancia_horas`, 72 h) antes de entrar em modo de leitura.
-O loop aplica backoff crescente (1/5/15 min) entre tentativas que falham.
+O loop aplica backoff crescente (1/5/15/60 min) entre tentativas que falham.
+
+O `maquina_fingerprint` segue a doc de integração do RedGest §7: identificadores
+estáveis de hardware (BIOS UUID, CPU ID, serial da placa-mãe e do disco), JSON
+canônico com chaves ordenadas e SHA-256 hex. Sem eles, usa um fallback estável
+(nunca hostname/MAC, que a doc manda evitar).
 
 A assinatura segue o contrato congelado no RedGest
 (`apps/liberacao/infrastructure/web/licenca_software_auth.py`):
@@ -29,14 +34,14 @@ A assinatura segue o contrato congelado no RedGest
 
 import base64
 import datetime as dt
+import functools
 import hashlib
 import hmac
 import json
 import logging
 import os
 import platform
-import socket
-import uuid
+import subprocess
 from typing import Any
 
 import httpx
@@ -72,6 +77,16 @@ _ERROS_DE_LICENCA = {
     ),
     "LICENCA_EXPIRADA": (STATUS_EXPIRADA, "Licença expirada no RedGest."),
 }
+
+_MSG_LIMITE = (
+    "Limite de ativações desta chave atingido. Solicite a reemissão da chave ou "
+    "o aumento do limite ao fornecedor."
+)
+_MSG_CHAVE_DESCONHECIDA = (
+    "Chave de ativação não reconhecida pelo servidor de licenças. Confira a "
+    "chave digitada; se estiver correta, o produto precisa estar configurado com "
+    "credencial de integração no RedGest."
+)
 
 ESTADO: dict[str, bool] = {"modo_leitura": not settings.licenca_desabilitada}
 
@@ -118,22 +133,113 @@ def _exigir_credencial() -> None:
 
 
 # --------------------------------------------------------------- fingerprint
-def _fingerprint() -> str:
-    """Fingerprint determinístico da estação (estável entre reinicializações).
+# Doc de integração RedGest §7: usar componentes estáveis (BIOS UUID, CPU ID,
+# serial da placa-mãe/disco) e **evitar** hostname, usuário, IP, MAC, volume de
+# disco e data de instalação.
+_FINGERPRINT_VAZIOS = {
+    "",
+    "0",
+    "none",
+    "null",
+    "unknown",
+    "not specified",
+    "default string",
+    "system serial number",
+    "to be filled by o.e.m.",
+    "to be filled by oem",
+}
 
-    Combina hostname, SO, arquitetura e o MAC (`uuid.getnode`) e devolve o
-    SHA-256 do conjunto. O RedGest guarda esse valor para a cota de ativações —
-    reenviar o mesmo fingerprint não consome cota nova.
-    """
-    partes = "|".join(
-        [
-            socket.gethostname(),
-            platform.system(),
-            platform.machine(),
-            str(uuid.getnode()),
-        ]
+_SCRIPT_HARDWARE = (
+    "$out = [ordered]@{};"
+    "$cs = Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue;"
+    "if ($cs.UUID) { $out['bios_uuid'] = $cs.UUID };"
+    "$bb = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue;"
+    "if ($bb.SerialNumber) { $out['placa_mae_serial'] = $bb.SerialNumber };"
+    "$pr = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue |"
+    " Select-Object -First 1;"
+    "if ($pr.ProcessorId) { $out['cpu_id'] = $pr.ProcessorId };"
+    "$dd = Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue |"
+    " Sort-Object Index | Select-Object -First 1;"
+    "if ($dd.SerialNumber) { $out['disco_serial'] = $dd.SerialNumber };"
+    "$out | ConvertTo-Json -Compress"
+)
+
+
+def _valor_util(valor: Any) -> str:
+    """Normaliza e descarta identificadores genéricos (doc §7.2: nunca `null`)."""
+    texto = str(valor or "").strip()
+    if texto.lower() in _FINGERPRINT_VAZIOS:
+        return ""
+    # Preenchimentos só de zeros (ex.: 00000000-0000-0000-0000-000000000000 ou
+    # "0000000000") são placeholder de SMBIOS/placa, não identificador.
+    if texto and set(texto) <= set("0-"):
+        return ""
+    return texto
+
+
+def _consultar_hardware() -> dict[str, str]:
+    """Identificadores estáveis de hardware do Windows (CIM); `{}` se falhar."""
+    if platform.system() != "Windows":
+        return {}
+    try:
+        saida = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                _SCRIPT_HARDWARE,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        dados = json.loads(saida.stdout or "{}")
+    except (OSError, subprocess.SubprocessError, ValueError):
+        logger.warning("Não foi possível ler os identificadores de hardware.")
+        return {}
+    if not isinstance(dados, dict):
+        return {}
+    limpos = {chave: _valor_util(valor) for chave, valor in dados.items()}
+    return {chave: valor for chave, valor in limpos.items() if valor}
+
+
+@functools.lru_cache(maxsize=1)
+def _fingerprint_do_hardware() -> str:
+    """SHA-256 do JSON canônico (chaves ordenadas) do hardware — cacheado."""
+    campos = _consultar_hardware()
+    if not campos:
+        # Fallback estável: menos campos é melhor que campos voláteis (doc §7.2),
+        # mas a requisição exige um valor — e nunca hostname/MAC.
+        campos = {
+            chave: valor
+            for chave, valor in {
+                "arquitetura": platform.machine(),
+                "processador": platform.processor(),
+            }.items()
+            if valor
+        }
+    canonico = json.dumps(
+        campos, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
-    return hashlib.sha256(partes.encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
+
+
+def _fingerprint() -> str:
+    """Fingerprint determinístico da estação (estável entre reinstalações).
+
+    Segue a doc de integração do RedGest §7: identificadores estáveis de
+    hardware, JSON canônico com chaves ordenadas e SHA-256 em hex minúsculo.
+    O RedGest guarda esse valor para a cota de ativações — reenviar o mesmo
+    fingerprint não consome cota nova; trocar o hardware, sim.
+    """
+    fixo = (settings.maquina_fingerprint or "").strip()
+    if fixo:
+        return fixo.lower()
+    return _fingerprint_do_hardware()
 
 
 # --------------------------------------------------------------- assinatura
@@ -381,10 +487,31 @@ def _validar_online(db: Session, chave: str) -> dict:
         raise _indisponivel("validação da chave", exc) from exc
 
     if resp.status_code == status.HTTP_200_OK:
-        _persistir_ok(db, chave=chave, fingerprint=fingerprint, dados=_corpo_json(resp))
+        dados = _corpo_json(resp)
+        if dados.get("valido") is False:
+            # A doc de integração §8.2 prevê a recusa dentro de um 200; o
+            # servidor real devolve 403/409, mas tratamos os dois formatos.
+            _tratar_recusa(db, dados)
+        _persistir_ok(db, chave=chave, fingerprint=fingerprint, dados=dados)
         return situacao(db)
 
     _tratar_erro(db, resp)
+
+
+def _tratar_recusa(db: Session, dados: dict) -> None:
+    """Traduz um `200 {valido: false}` do RedGest (doc §8.2) em erro local."""
+    motivo = str(dados.get("motivo") or dados.get("codigo") or "").strip().upper()
+    if motivo in _ERROS_DE_LICENCA:
+        novo_status, mensagem = _ERROS_DE_LICENCA[motivo]
+        _marcar_status(db, novo_status, mensagem)
+        raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=mensagem)
+    if motivo == "LIMITE_ATIVACOES_EXCEDIDO":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=_MSG_LIMITE
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, detail=_MSG_CHAVE_DESCONHECIDA
+    )
 
 
 def _tratar_erro(db: Session, resp: httpx.Response) -> None:
@@ -410,12 +537,7 @@ def _tratar_erro(db: Session, resp: httpx.Response) -> None:
         # assinar). Para o usuário isso é "chave não reconhecida"; a segunda
         # frase cobre o caso raro de produto sem `api_key` configurada.
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Chave de ativação não reconhecida pelo servidor de licenças. "
-                "Confira a chave digitada; se estiver correta, o produto precisa "
-                "estar configurado com credencial de integração no RedGest."
-            ),
+            status_code=status.HTTP_400_BAD_REQUEST, detail=_MSG_CHAVE_DESCONHECIDA
         )
     if resp.status_code == status.HTTP_403_FORBIDDEN:
         raise HTTPException(
@@ -425,14 +547,23 @@ def _tratar_erro(db: Session, resp: httpx.Response) -> None:
     if resp.status_code == status.HTTP_409_CONFLICT:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Limite de ativações desta chave atingido. Solicite a reemissão "
-                "da chave ou o aumento do limite ao fornecedor."
-            ),
+            detail=_MSG_LIMITE,
         )
     if resp.status_code == status.HTTP_400_BAD_REQUEST:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detalhe)
+    if resp.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        # Doc de integração §8.3/§9.2: 429 é transitório — respeita o backoff e
+        # nunca revoga a licença.
+        _registrar_falha(db, "RedGest limitou a taxa de requisições (429)")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "O servidor de licenças está limitando as requisições. "
+                "Tente novamente em instantes."
+            ),
+        )
     if resp.status_code >= 500:
+        _registrar_falha(db, f"RedGest indisponível ({resp.status_code})")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="O servidor de licenças está indisponível. Tente novamente em instantes.",
@@ -478,7 +609,7 @@ def renovar(db: Session) -> dict:
 def _atraso_proximo_ciclo(falhas: int) -> int:
     """Espera até o próximo ciclo: normal sem falhas; backoff crescente com falhas.
 
-    Backoff (1/5/15 min por padrão) evita bater no RedGest a cada ciclo quando
+    Backoff (1/5/15/60 min por padrão) evita bater no RedGest a cada ciclo quando
     ele está fora, mas volta ao intervalo normal assim que a validação dá certo.
     """
     if falhas <= 0:

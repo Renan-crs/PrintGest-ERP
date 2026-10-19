@@ -88,13 +88,34 @@ de cada tag está indicado para rastreabilidade.
   assinatura HMAC, nonce, timestamp e bytes do corpo; ativação, revogação,
   bloqueio, limite, vitalícia, tolerância e diagnóstico). `scripts/redgest_stub.py`
   ganha o endpoint do Contrato C e o desktop passa a pedir apenas a chave de
-  produto. Backend: **173 testes** verdes.
+  produto. Backend: **183 testes** verdes.
+- **Conformidade com o documento de integração do RedGest (v1.0, 18/10/2026).**
+  O `maquina_fingerprint` passa a ser o SHA-256 do JSON canônico (chaves
+  ordenadas) de identificadores **estáveis** de hardware — `bios_uuid`,
+  `placa_mae_serial`, `cpu_id` e `disco_serial` via CIM/PowerShell — em vez de
+  hostname + MAC. Assim o fingerprint não muda ao renomear a máquina ou
+  reinstalar o PrintGest (sem consumir `limite_ativacoes` à toa); campos
+  ausentes/genéricos são omitidos e há fallback estável e override por
+  `PRINTGEST_MAQUINA_FINGERPRINT`. Mapa completo de conformidade em
+  `docs/licenciamento_online_first.md` §6/§7.
 
 ### Corrigido
 
 - `PATCH /v1/projetos/cartoes/{id}`: enviar `null` explicitamente agora **limpa** o
   campo (datas, descrição, lembrete) — antes o `null` era ignorado e não havia
   como remover um prazo pela interface.
+- Licença: `429` e `5xx` do RedGest deixam de cair em `502 "Resposta inesperada"`
+  e passam a ser tratados como indisponibilidade transitória (`503` com backoff,
+  `ultimo_erro` registrado) — sem revogar a licença.
+- Licença: a recusa reportada dentro de um `200 {valido: false}` (formato previsto
+  no manual de integração §8.2) passa a ser tratada — revogação/bloqueio/
+  expiração → `423`, chave não reconhecida → `400`, limite → `409` — em vez de
+  ser aceita como ativação bem-sucedida.
+
+### Alterado
+
+- Licença: o backoff de revalidação passa a 1/5/15/60 min
+  (`licenca_backoff_segundos=60,300,900,3600`), saturando no último passo.
 
 ### Alterado
 
@@ -121,7 +142,9 @@ de cada tag está indicado para rastreabilidade.
   licença (E0–E2/E5 concluídas; E3/E4 canceladas pelo Contrato C; o banner
   progressivo segue em aberto).
 - `docs/licenciamento_online_first.md`: decisões do licenciamento online-first
-  vigente (chave de produto, tolerância de 72 h, cadências e estados).
+  vigente (chave de produto, tolerância de 72 h, cadências e estados), o
+  algoritmo do `maquina_fingerprint` (§6) e o mapa de conformidade com o
+  documento de integração do RedGest (§7).
 - `docs/prd_2.0.md` §3: reescrito para o Contrato C (chave de produto validada
   online); tolerância de 72 h, timeout de 90 s com backoff e a regra de que a
   indisponibilidade **não** revoga a licença.

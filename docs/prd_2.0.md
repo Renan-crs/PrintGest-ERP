@@ -115,7 +115,7 @@ A licença é emitida e controlada pelo RedGest e entregue como uma **chave de p
 ### 3.2 Fluxo
 
 1. **Ativação**: no primeiro uso, o operador informa a chave de produto recebida na contratação; o Local API Service a valida online em `POST /api/v1/licencas-software/validar/`, autenticando por HMAC-SHA256 do `Sistema.api_key`. A resposta traz `valido`, `expira_em`, `primeira_ativacao`, `ativacoes_realizadas` e `limite_ativacoes`.
-2. **Vínculo por máquina**: cada ativação registra um `maquina_fingerprint` (SHA-256 estável da instalação). Reativar a mesma máquina não consome o `limite_ativacoes`; uma máquina nova consome.
+2. **Vínculo por máquina**: cada ativação registra um `maquina_fingerprint` — o SHA-256 do JSON canônico de identificadores estáveis de hardware (BIOS UUID, serial da placa-mãe, CPU ID e serial do disco). Reativar a mesma máquina não consome o `limite_ativacoes`; uma máquina nova consome. Hostname, MAC e IP **não** entram (mudam com frequência).
 3. **Vigência**: a licença vale até `expira_em` (`null` = vitalícia). Não há JWT nem token de curta duração.
 4. **Revalidação automática**: o Local API Service reconsulta o RedGest a cada `licenca_revalidar_a_cada_segundos` (default 6 h). É essa revalidação que detecta revogação, bloqueio ou expiração.
 5. **Falha de revalidação (internet fora do ar)**: o RedGest inacessível vira `503` para o chamador e **nunca** revoga a licença (revogação só vem de `403`). O sistema segue operando dentro da vigência; ao vencê-la, entra na tolerância (item 6) — e não em modo leitura imediato.
@@ -123,7 +123,7 @@ A licença é emitida e controlada pelo RedGest e entregue como uma **chave de p
 7. **Revogação/bloqueio** (inadimplência/cancelamento): refletido na próxima revalidação; `LICENCA_REVOGADA` é terminal e leva a modo leitura imediato (a regularização reativa o `BLOQUEADA`).
 8. **Troca da máquina-servidor**: reinstala o Local API Service na nova máquina e reativa com a mesma chave de produto — sem fluxo de rebind com limite de tentativas.
 9. **Limite de ativações**: ativar em mais máquinas do que o `limite_ativacoes` responde `409` com mensagem clara ao usuário.
-10. **Contato com o RedGest**: timeout de 90 s por padrão (`licenca_timeout_segundos`) e recuo progressivo após falhas consecutivas (`licenca_backoff_segundos`, 60/300/900 s), zerado na primeira revalidação bem-sucedida.
+10. **Contato com o RedGest**: timeout de 90 s por padrão (`licenca_timeout_segundos`) e recuo progressivo após falhas consecutivas (`licenca_backoff_segundos`, 60/300/900/3600 s — 1/5/15/60 min), zerado na primeira revalidação bem-sucedida. `429` e `5xx` são tratados como indisponibilidade (`503`), nunca como revogação. A recusa também é aceita no formato `200 {valido: false}` (§8.2 do manual de integração).
 
 ### 3.3 O que foi removido do desenho original (v1.2) e por quê
 

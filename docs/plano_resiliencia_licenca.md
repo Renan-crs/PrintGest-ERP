@@ -83,7 +83,7 @@ emitindo fiscal) enquanto o RedGest estiver inacessível, distinguindo
 ### E0 — Configuração central ✅
 - [x] `core/config.py`: `licenca_timeout_segundos: int = 90`.
 - [x] `core/config.py`: `licenca_tolerancia_horas: int = 72`.
-- [x] `core/config.py`: backoff — `licenca_backoff_segundos: str = "60,300,900"`
+- [x] `core/config.py`: backoff — `licenca_backoff_segundos: str = "60,300,900,3600"`
       (string + propriedade `settings.licenca_backoff -> list[int]`;
       pydantic-settings não parseia `list[int]` de env de forma confiável).
 - [x] `backend/.env.example`: documentar as três novas variáveis.
@@ -98,8 +98,8 @@ emitindo fiscal) enquanto o RedGest estiver inacessível, distinguindo
       httpx.HTTPError` e traduzir para `HTTPException(503, "Não foi possível
       falar com o servidor de licenças …")` (`_indisponivel`). Nunca sobe 500 cru.
 - [x] `loop_renovacao`/`_tentativa_renovacao`: contador de falhas consecutivas
-      com backoff (D2: 1/5/15 min, saturando no último); zera no sucesso; nunca
-      marca `revogada` por timeout/5xx/DNS.
+      com backoff (D2: 1/5/15/60 min, saturando no último); zera no sucesso; nunca
+      marca `revogada` por timeout/5xx/429/DNS.
 - [x] Registrar em log a causa da falha. *(Sem `request_id`: o logger do daemon
       já inclui contexto; adicionar se a observabilidade pedir.)*
 
@@ -171,7 +171,8 @@ de tolerância (✅); o banner progressivo fica para o backlog.
 ### E6 — Testes — parcial
 - [x] `backend/tests/test_licenciamento.py` (via `httpx.MockTransport`): timeout
       na ativação/renovação (503, sem revogação), janela de tolerância,
-      tolerância esgotada → leitura, diagnóstico da falha, backoff (1/5/15).
+      tolerância esgotada → leitura, diagnóstico da falha, backoff (1/5/15/60),
+      `429`/`5xx` → 503, recusa em `200 {valido: false}` e fingerprint canônico.
 - [x] `desktop/tests/test_modoleitura.py` e `test_tela_principal.py`: mensagem
       por estado (revogada × tolerância) e texto/estilo do indicador.
 - [ ] Cold start com *delay* real (o MockTransport não simula atraso de 60 s);
@@ -198,7 +199,7 @@ de tolerância (✅); o banner progressivo fica para o backlog.
 ## 5. Impacto em documentos
 
 - [x] `docs/prd_2.0.md` §3.2: tolerância 72 h (`licenca_tolerancia_horas`),
-      timeout 90 s com backoff 60/300/900 s e a regra de que indisponibilidade
+      timeout 90 s com backoff 60/300/900/3600 s e a regra de que indisponibilidade
       **não** revoga (item novo, nº 8).
 - [x] `docs/prd_2.0.md` §3: reescrito para o Contrato C (chave de produto +
       validação online), com a nota de que D3/D4 não se aplicam.
