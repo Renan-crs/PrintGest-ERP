@@ -119,6 +119,17 @@ de cada tag está indicado para rastreabilidade.
   e revalidação com a chave em claro, cofre (`backend/tests/test_cofre.py`:
   roundtrip, texto puro legado, blob corrompido, cofre desligado). Backend:
   **195 testes** verdes.
+- **Banner progressivo de tolerância (doc de integração §9.3 / etapa E5).** Em
+  `estado="tolerancia"`, a Tela Principal mostra um banner **não bloqueante**
+  (âmbar, acima do cabeçalho) com a mensagem "Sem conexão com o servidor de
+  licenças. O PrintGest continuará funcionando normalmente até DD/MM/AAAA HH:MM",
+  o **tempo restante** ("Restam 2 dias e 21 h") e uma barra com a fração da
+  tolerância ainda disponível. O countdown é recomposto a cada minuto por um
+  `QTimer` **sem chamada de rede** (a situação é reconsultada pelos 5 min já
+  existentes) e o banner sai de cena sozinho quando a revalidação volta a
+  `ativa` — nenhuma escrita é bloqueada. Se o daemon local parar de responder, o
+  aviso **permanece** (desconhecimento não é licença nova). Desktop: **256
+  testes** verdes.
 
 ### Corrigido
 
@@ -167,8 +178,7 @@ de cada tag está indicado para rastreabilidade.
 - `docs/revisao_projetos_fase2.md`: escopo e decisões da Fase 2 (cartão rico:
   etiquetas, checklists, comentários e atividade).
 - `docs/plano_resiliencia_licenca.md`: plano das etapas E0–E6 da resiliência da
-  licença (E0–E2/E5 concluídas; E3/E4 canceladas pelo Contrato C; o banner
-  progressivo segue em aberto).
+  licença (E0–E2/E5 **concluídas**; E3/E4 canceladas pelo Contrato C; E6 parcial).
 - `docs/licenciamento_online_first.md`: decisões do licenciamento online-first
   vigente (chave de produto, tolerância de 72 h, cadências e estados), o
   algoritmo do `maquina_fingerprint` (§6), o mapa de conformidade com o

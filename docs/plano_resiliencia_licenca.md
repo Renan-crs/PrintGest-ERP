@@ -157,7 +157,7 @@ respeita o backoff.
 **Aceite:** arquivo válido estende a tolerância; arquivo inválido/CNPJ diferente
 é recusado com mensagem clara.
 
-### E5 — UI (desktop) — parcial
+### E5 — UI (desktop) — concluído
 - [x] `modoleitura.py`: mensagem honesta por estado — revogação (sem tolerância)
       × tolerância expirada; inclui "Última tentativa: <data/hora>" e
       "Último erro: …" no diagnóstico (`situacao` passado por `main.py`).
@@ -166,10 +166,17 @@ respeita o backoff.
       (tolerância = alerta, não erro).
 - [x] `main.py`: passa a `situacao` completa para a tela de modo leitura.
 - [x] `ativacao.py`: já anunciava "Tolerância Offline: 72 Horas" — alinhado.
-- [ ] Banner **progressivo** em `estado="tolerancia"` (tempo restante). *Backlog.*
+- [x] Banner **progressivo** em `estado="tolerancia"` (doc de integração §9.3):
+      mensagem "Sem conexão com o servidor de licenças. O PrintGest continuará
+      funcionando normalmente até DD/MM/AAAA HH:MM", tempo restante recomposto a
+      cada minuto (`QTimer`, sem rede) e barra com a fração da tolerância ainda
+      disponível (`fracao_tolerancia`). Não bloqueia escrita alguma e sai de cena
+      sozinho quando a revalidação volta a `ativa`.
 
-**Aceite:** um teste de UI mostra a mensagem de revogação (✅) e o diagnóstico
-de tolerância (✅); o banner progressivo fica para o backlog.
+**Aceite:** testes de UI mostram a mensagem de revogação (✅), o diagnóstico de
+tolerância (✅) e o banner progressivo com prazo + tempo restante + barra, além
+de a mudança de estado (`tolerancia` → `ativa`) retirar o banner sem reabrir a
+tela (✅).
 
 ### E6 — Testes — parcial
 - [x] `backend/tests/test_licenciamento.py` (via `httpx.MockTransport`): timeout
@@ -228,7 +235,8 @@ de tolerância (✅); o banner progressivo fica para o backlog.
 
 1. **E0 + E1 + E2** — resolve o cenário que o documento quer cobrir (o "mínimo
    vendável" da resiliência). Entregável já utilizável.
-2. **E5 + E6** — UI e testes, junto com as etapas acima.
+2. **E5 + E6** — UI e testes. **E5 concluído**; o E6 segue parcial (itens em
+   aberto acima: cold start/rollover e o mapa nomeado dos aceites).
 - ~~E3 e E4~~ cancelados: o Contrato C não emite JWT (ver revisão 2.1.0).
 - E0..E2 destravam os testes de aceite 1–4; o aceite 5 depende de E5.
 

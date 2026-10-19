@@ -16,7 +16,8 @@ Typography* (WWDC) para o desktop Qt:
 
 Os componentes continuam usando ``setProperty("role", ...)``: ``primary``,
 ``ghost``, ``danger``, ``amber`` para botões; ``label-error`` para mensagens;
-``banner-amber`` para o modo leitura. O movimento vive em ``animacao.py``.
+``banner-amber`` para o modo leitura e o banner de tolerância. O movimento vive
+em ``animacao.py``.
 """
 
 from __future__ import annotations
@@ -352,6 +353,9 @@ QProgressBar {
     background-color: %surface-muted%;
 }
 QProgressBar::chunk { background-color: %primary%; border-radius: 4px; }
+/* Barra do banner de tolerância (E5, doc §9.3): mesma família âmbar do banner. */
+QProgressBar#barraTolerancia { border: 1px solid %atencao-borda%; background-color: %surface%; }
+QProgressBar#barraTolerancia::chunk { background-color: %atencao%; }
 
 QWidget#sidebar { background-color: %surface%; border-right: 1px solid %borda%; }
 QLabel#grupoMenu {
