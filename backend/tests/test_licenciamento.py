@@ -23,6 +23,8 @@ CHAVE = "A1B2-C3D4-E5F6-7890"
 CHAVE_INVALIDA = "0000-0000-0000-0000"
 API_KEY = "chave-api-do-sistema-teste"
 CAMINHO = "/api/v1/licencas-software/validar/"
+# SHA-256 fixo de 64 hex — usado como `maquina_fingerprint` nos testes.
+FINGERPRINT_FIXO = "a" * 64
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +35,9 @@ def _licenca_isolada(client, monkeypatch):
 
     monkeypatch.setattr(settings, "redgest_api_key", API_KEY)
     monkeypatch.setattr(settings, "licenca_desabilitada", False)
+    # Fingerprint fixo: a suíte não pode depender do hardware da máquina nem
+    # disparar o PowerShell (doc de integração §7).
+    monkeypatch.setattr(settings, "maquina_fingerprint", FINGERPRINT_FIXO)
 
     sessao = SessionLocal()
     try:
@@ -42,6 +47,7 @@ def _licenca_isolada(client, monkeypatch):
         sessao.close()
 
     licensa_service.ESTADO["modo_leitura"] = True
+    licensa_service._fingerprint_do_hardware.cache_clear()
     yield
 
 
@@ -315,16 +321,135 @@ def test_timeout_na_revalidacao_nao_revoga(client, monkeypatch):
     assert data["modo_leitura"] is False
 
 
-def test_backoff_crescente_e_saturado():
-    """1/5/15 min após falhas; volta ao intervalo normal com zero falhas."""
+def test_backoff_crescente_e_saturado(monkeypatch):
+    """1/5/15/60 min por falha consecutiva (doc §9.2); satura no último passo."""
+    monkeypatch.setattr(settings, "licenca_backoff_segundos", "60,300,900,3600")
     assert (
         licensa_service._atraso_proximo_ciclo(0)
         == settings.licenca_refresh_intervalo_segundos
     )
-    assert licensa_service._atraso_proximo_ciclo(1) == 60
-    assert licensa_service._atraso_proximo_ciclo(2) == 300
-    assert licensa_service._atraso_proximo_ciclo(3) == 900
-    assert licensa_service._atraso_proximo_ciclo(9) == 900  # satura no último passo
+    for falhas, segundos in ((1, 60), (2, 300), (3, 900), (4, 3600), (9, 3600)):
+        assert licensa_service._atraso_proximo_ciclo(falhas) == segundos
+
+
+def test_backoff_com_config_invalida_usa_padrao(monkeypatch):
+    monkeypatch.setattr(settings, "licenca_backoff_segundos", "abc,,x")
+    assert settings.licenca_backoff == [60, 300, 900, 3600]
+
+
+# ------------------------------------------------ limitação de taxa (429/5xx)
+def test_429_vira_503_e_nao_revoga(client, monkeypatch):
+    """Doc §8.3/§9.2: 429 é transitório, respeita o backoff e não revoga."""
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    _mock(monkeypatch, httpx.Response(429, text="too many requests"))
+    resp = client.post("/v1/licenca/renovar")
+    assert resp.status_code == 503, resp.text
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "ativa"  # nunca revoga por 429
+    assert "429" in (data["ultimo_erro"] or "")
+
+
+def test_erro_5xx_vira_503_e_registra_diagnostico(client, monkeypatch):
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    _mock(monkeypatch, httpx.Response(502, text="bad gateway"))
+    assert client.post("/v1/licenca/renovar").status_code == 503
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "ativa"
+    assert "indisponível" in (data["ultimo_erro"] or "").lower()
+
+
+# -------------------------------- recusa dentro de um 200 (`valido: false`)
+def test_recusa_200_revogada_entra_modo_leitura(client, monkeypatch):
+    """Doc §8.2: a recusa também pode chegar em 200 com `valido: false`."""
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    _mock(
+        monkeypatch,
+        httpx.Response(200, json={"valido": False, "motivo": "licenca_revogada"}),
+    )
+    assert client.post("/v1/licenca/renovar").status_code == 423
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["status"] == "revogada"
+    assert data["modo_leitura"] is True
+
+
+def test_recusa_200_chave_invalida_devolve_400(client, monkeypatch):
+    _mock(
+        monkeypatch,
+        httpx.Response(200, json={"valido": False, "motivo": "chave_invalida"}),
+    )
+    resp = _ativar(client, CHAVE_INVALIDA)
+    assert resp.status_code == 400, resp.text
+    assert client.get("/v1/licenca").json()["data"]["status"] == "nao_ativada"
+
+
+def test_recusa_200_limite_devolve_409(client, monkeypatch):
+    _mock(
+        monkeypatch,
+        httpx.Response(
+            200, json={"valido": False, "motivo": "limite_ativacoes_excedido"}
+        ),
+    )
+    resp = _ativar(client)
+    assert resp.status_code == 409, resp.text
+
+
+# ---------------------------------------------------- fingerprint (doc §7)
+def test_fingerprint_do_hardware_e_canonico(monkeypatch):
+    """JSON canônico (chaves ordenadas) + SHA-256 hex minúsculo, estável."""
+    monkeypatch.setattr(settings, "maquina_fingerprint", "")
+    monkeypatch.setattr(
+        licensa_service,
+        "_consultar_hardware",
+        lambda: {"placa_mae_serial": "B", "bios_uuid": "A"},
+    )
+    licensa_service._fingerprint_do_hardware.cache_clear()
+    try:
+        esperado = hashlib.sha256(
+            b'{"bios_uuid":"A","placa_mae_serial":"B"}'
+        ).hexdigest()
+        obtido = licensa_service._fingerprint()
+        assert obtido == esperado
+        assert len(obtido) == 64
+        assert obtido == licensa_service._fingerprint()  # determinístico
+    finally:
+        licensa_service._fingerprint_do_hardware.cache_clear()
+
+
+def test_fingerprint_descarta_identificadores_genericos():
+    """Placa/SMBIOS sem serial ('None', tudo zeros) não entra no fingerprint."""
+    assert licensa_service._valor_util("None") == ""
+    assert licensa_service._valor_util("  To Be Filled By O.E.M. ") == ""
+    assert licensa_service._valor_util("00000000-0000-0000-0000-000000000000") == ""
+    assert licensa_service._valor_util("  ") == ""
+    assert licensa_service._valor_util("ABC-123") == "ABC-123"
+
+
+def test_fingerprint_override_por_configuracao(monkeypatch):
+    monkeypatch.setattr(settings, "maquina_fingerprint", "ABC123")
+    assert licensa_service._fingerprint() == "abc123"
+
+
+def test_fingerprint_sem_hardware_usa_fallback_estavel(monkeypatch):
+    """Sem hardware disponível, cai num fallback estável (sem hostname/MAC)."""
+    monkeypatch.setattr(settings, "maquina_fingerprint", "")
+    monkeypatch.setattr(licensa_service, "_consultar_hardware", lambda: {})
+    monkeypatch.setattr("platform.machine", lambda: "AMD64")
+    monkeypatch.setattr("platform.processor", lambda: "")
+    licensa_service._fingerprint_do_hardware.cache_clear()
+    try:
+        esperado = hashlib.sha256(b'{"arquitetura":"AMD64"}').hexdigest()
+        assert licensa_service._fingerprint() == esperado
+    finally:
+        licensa_service._fingerprint_do_hardware.cache_clear()
 
 
 # ------------------------------- estados e tolerância offline (plano E2)

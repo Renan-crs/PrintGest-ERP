@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # segredo compartilhado que assina (HMAC-SHA256) cada validação da chave de
     # produto. Sem ele a ativação online não é possível.
     redgest_api_key: str = ""
+    # Fingerprint da máquina enviado ao RedGest (doc de integração §7). Vazio =
+    # calcula pelo hardware (BIOS UUID / CPU ID / serial da placa-mãe / do disco).
+    # Defina para fixar um valor (VMs com SMBIOS ausente, testes ou suporte).
+    maquina_fingerprint: str = ""
     licenca_refresh_intervalo_segundos: int = 300
     # Cadência de revalidação online da chave de produto (default 6 h). A licença
     # em si vale até `expira_em`; isso só controla de quanto em quanto tempo o
@@ -38,9 +42,9 @@ class Settings(BaseSettings):
     # Sem isso o sistema caía em modo leitura no instante do vencimento.
     licenca_tolerancia_horas: int = 72
     # Backoff entre tentativas de renovação após falhas, em CSV de segundos
-    # (1, 5 e 15 min). pydantic-settings não parseia `list[int]` de env de forma
-    # confiável — exposto por `licenca_backoff`.
-    licenca_backoff_segundos: str = "60,300,900"
+    # (1, 5, 15 e 60 min — doc de integração §9.2). pydantic-settings não parseia
+    # `list[int]` de env de forma confiável — exposto por `licenca_backoff`.
+    licenca_backoff_segundos: str = "60,300,900,3600"
     licenca_desabilitada: bool = False
 
     model_config = {"env_prefix": "PRINTGEST_", "env_file": ".env", "extra": "ignore"}
@@ -49,14 +53,15 @@ class Settings(BaseSettings):
     def licenca_backoff(self) -> list[int]:
         """Backoff (segundos) entre tentativas após falhas consecutivas.
 
-        Ignora entradas inválidas; se nada sobrar, devolve o padrão (1/5/15 min).
+        Ignora entradas inválidas; se nada sobrar, devolve o padrão
+        (1/5/15/60 min — doc de integração §9.2).
         """
         valores = [
             int(parte.strip())
             for parte in (self.licenca_backoff_segundos or "").split(",")
             if parte.strip().isdigit()
         ]
-        return valores or [60, 300, 900]
+        return valores or [60, 300, 900, 3600]
 
     def validar_producao(self) -> None:
         """P17: recusa defaults inseguros fora de dev/local/test.
