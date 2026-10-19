@@ -1,35 +1,36 @@
 #!/usr/bin/env python
-"""RedGest Stub — servidor local de licenciamento para o modelo `online_periodic`.
+"""RedGest Stub — servidor local de licenciamento para o PrintGest.
 
-Espelha o contrato genérico do RedGest (plano de generalização aprovado) que o
-PrintGest deverá consumir em produção. Endpoints por licença:
+Contrato vigente (Contrato C, §8 do manual do RedGest): **chave de produto**
+validada online, autenticada por HMAC do `Sistema.api_key`.
+
+  POST /api/v1/licencas-software/validar/   valida a chave + fingerprint (HMAC)
+
+Contrato legado (`online_periodic` por CNPJ + código), mantido só para
+desenvolvimento do fluxo antigo:
 
   POST /api/v1/sistemas/                    registra/atualiza um sistema (dev)
   GET  /api/v1/sistemas/{codigo}            consulta o sistema + chave pública
-  POST /api/v1/licencas/                    cria licença (idempotente) -> licenca_id
-  POST /api/v1/licencas/{id}/ativar         ativação inicial (CNPJ + código) -> credenciais + JWT
-  POST /api/v1/licencas/{id}/validar        validação periódica (pull) -> novo JWT
-  POST /api/v1/licencas/{id}/revogar        revoga (simula inadimplência/cancelamento)
-  GET  /api/v1/licencas/{id}                status da licença (dev)
-  GET  /api/v1/licencas/{id}/eventos        trilha append-only (webhook pré-evento)
+  POST /api/v1/licencas/                    cria licença (idempotente)
+  POST /api/v1/licencas/{id}/ativar         ativação inicial (CNPJ + código)
+  POST /api/v1/licencas/{id}/validar        validação periódica (pull)
+  POST /api/v1/licencas/{id}/revogar        revoga (simula inadimplência)
   GET  /api/v1/health                       status do stub
 
-Características:
-- `tipo_licenciamento: online_periodic`: licença por CNPJ (sem hardware ID); o
-  JWT é de curta duração (default 4h), renovado com TTL configurável via env
-  `REDGEST_STUB_TOKEN_TTL` (em segundos) para acelerar testes de modo leitura.
-- JWT assinado em RS256 com par de chaves gerado uma vez e persistido em
-  `.dev/redgest_stub_jwt/` (a chave pública é exposta em /sistemas/{codigo}).
-- Licenças válidas (dev): ver SEED_CNPJ / SEED_CODIGO_LICENCA. Para simular
-  revogação, remova o código do seed ou altere o client_secret derivado.
-- Estados: `aguardando` -> `ativa` -> `revogada`. Webhooks do plano (§4) não são
-  entregues (rede local não recebe push); ficam registrados como eventos e o
-  cliente deve usar polling em `/validar` — modelo já previsto no PRD §3.2.6.
+Chaves de produto de teste (Contrato C):
+- válida:    `REDGEST_STUB_CHAVE` (default `A3F1-9C2B-77DE-1045`)
+- revogada:  `0000-0000-0000-0000`
+- bloqueada: `1111-1111-1111-1111`
+- expirada:  `2222-2222-2222-2222`
+
+O segredo HMAC é `REDGEST_STUB_API_KEY` (default `chave-api-printgest-dev`) e
+precisa casar com `PRINTGEST_REDGEST_API_KEY` no PrintGest.
 
 Uso:
   <backend venv>/python -m uvicorn scripts.redgest_stub:app --host 127.0.0.1 --port 9100
 """
 import base64
+import datetime as dt
 import hashlib
 import hmac
 import json
@@ -42,7 +43,8 @@ from typing import Any
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 SISTEMA = "grafica_erp"
@@ -356,6 +358,148 @@ def status_licenca(licenca_id: str) -> dict[str, Any]:
 def eventos_licenca(licenca_id: str) -> dict[str, Any]:
     _licenca_por_id(licenca_id)
     return {"data": EVENTOS.get(licenca_id, [])}
+
+
+# --- Contrato C: chave de produto (`/licencas-software/validar/`) -----------------
+SISTEMA_CHAVE = "printgest"
+API_KEY_CHAVE = os.environ.get("REDGEST_STUB_API_KEY", "chave-api-printgest-dev")
+TOLERANCIA_ASSINATURA_SEGUNDOS = 300
+
+SEED_CHAVE_ATIVACAO = os.environ.get("REDGEST_STUB_CHAVE", "A3F1-9C2B-77DE-1045")
+SEED_LIMITE_ATIVACOES = 5
+_SEED_EXPIRA = time.time() + 365 * 24 * 3600
+
+# Chave -> licença fake. `expira_em=None` = vitalícia.
+LICENCAS_SOFTWARE: dict[str, dict[str, Any]] = {
+    SEED_CHAVE_ATIVACAO: {
+        "status": "ATIVA",
+        "plano": "ANUAL",
+        "limite_ativacoes": SEED_LIMITE_ATIVACOES,
+        "fingerprints": [],
+        "expira_em": _SEED_EXPIRA,
+    },
+    "3333-3333-3333-3333": {  # vitalícia
+        "status": "ATIVA",
+        "plano": "VITALICIA",
+        "limite_ativacoes": 1,
+        "fingerprints": [],
+        "expira_em": None,
+    },
+    "0000-0000-0000-0000": {
+        "status": "REVOGADA",
+        "plano": "ANUAL",
+        "limite_ativacoes": 1,
+        "fingerprints": [],
+        "expira_em": _SEED_EXPIRA,
+    },
+    "1111-1111-1111-1111": {
+        "status": "BLOQUEADA",
+        "plano": "ANUAL",
+        "limite_ativacoes": 1,
+        "fingerprints": [],
+        "expira_em": _SEED_EXPIRA,
+    },
+    "2222-2222-2222-2222": {
+        "status": "EXPIRADA",
+        "plano": "MENSAL",
+        "limite_ativacoes": 1,
+        "fingerprints": [],
+        "expira_em": time.time() - 24 * 3600,
+    },
+}
+
+
+def _assinatura_redgest(segredo: str, nonce: str, timestamp: str, body: bytes) -> str:
+    material = f"{nonce}{timestamp}".encode("utf-8") + body
+    digest = hmac.new(segredo.encode("utf-8"), material, hashlib.sha256).hexdigest()
+    return f"sha256={digest}"
+
+
+def _erro_chave(status_code: int, detail: str, codigo: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code, content={"detail": detail, "codigo": codigo}
+    )
+
+
+@app.post("/api/v1/licencas-software/validar/")
+async def validar_licenca_software(request: Request) -> JSONResponse:
+    """Espelha `ValidarLicencaSoftwareView` (RedGest v3.6 §8.4)."""
+    # Corpo bruto lido ANTES de qualquer parse: a assinatura cobre estes bytes.
+    corpo = await request.body()
+    try:
+        dados = json.loads(corpo.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, ValueError):
+        return _erro_chave(400, "JSON inválido.", "CORPO_INVALIDO")
+
+    chave = (dados.get("chave_ativacao") or "").strip().upper()
+    fingerprint = (dados.get("maquina_fingerprint") or "").strip()
+    licenca = LICENCAS_SOFTWARE.get(chave)
+    if licenca is None:
+        # O RedGest resolve o segredo *pela* chave: chave desconhecida cai aqui.
+        return _erro_chave(
+            403,
+            "Sistema sem credencial de integração configurada.",
+            "SISTEMA_SEM_CREDENCIAL",
+        )
+
+    nonce = request.headers.get("X-RedGest-Nonce")
+    timestamp = request.headers.get("X-RedGest-Timestamp")
+    assinatura = request.headers.get("X-RedGest-Signature")
+    if not (nonce and timestamp and assinatura):
+        return _erro_chave(
+            401, "Assinatura HMAC obrigatória.", "ASSINATURA_OBRIGATORIA"
+        )
+    if not hmac.compare_digest(
+        _assinatura_redgest(API_KEY_CHAVE, nonce, timestamp, corpo), assinatura
+    ):
+        return _erro_chave(401, "Assinatura inválida.", "ASSINATURA_INVALIDA")
+    try:
+        momento = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return _erro_chave(401, "Timestamp inválido.", "ASSINATURA_INVALIDA")
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=dt.timezone.utc)
+    desvio = abs((dt.datetime.now(dt.timezone.utc) - momento).total_seconds())
+    if desvio > TOLERANCIA_ASSINATURA_SEGUNDOS:
+        return _erro_chave(401, "Timestamp fora da janela.", "ASSINATURA_INVALIDA")
+    if not fingerprint:
+        return _erro_chave(
+            400, "Fingerprint da máquina obrigatório.", "FINGERPRINT_OBRIGATORIO"
+        )
+
+    if licenca["status"] == "REVOGADA":
+        return _erro_chave(403, "Licença revogada.", "LICENCA_REVOGADA")
+    if licenca["status"] == "BLOQUEADA":
+        return _erro_chave(403, "Licença bloqueada.", "LICENCA_BLOQUEADA")
+    if licenca["status"] == "EXPIRADA" or (
+        licenca["expira_em"] is not None and licenca["expira_em"] <= time.time()
+    ):
+        licenca["status"] = "EXPIRADA"
+        return _erro_chave(403, "Licença expirada.", "LICENCA_EXPIRADA")
+
+    ja_registrada = fingerprint in licenca["fingerprints"]
+    if not ja_registrada and len(licenca["fingerprints"]) >= licenca["limite_ativacoes"]:
+        return _erro_chave(
+            409, "Limite de ativações atingido.", "LIMITE_ATIVACOES_EXCEDIDO"
+        )
+    primeira = not licenca["fingerprints"]
+    if not ja_registrada:
+        licenca["fingerprints"].append(fingerprint)
+
+    expira = licenca["expira_em"]
+    return JSONResponse(
+        content={
+            "valido": True,
+            "expira_em": (
+                dt.datetime.fromtimestamp(expira, dt.timezone.utc).isoformat()
+                if expira
+                else None
+            ),
+            "primeira_ativacao": primeira,
+            "ativacoes_realizadas": len(licenca["fingerprints"]),
+            "limite_ativacoes": licenca["limite_ativacoes"],
+        }
+    )
 
 
 @app.get("/api/v1/health")

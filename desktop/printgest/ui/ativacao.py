@@ -1,11 +1,14 @@
 """Tela 1.2 — Ativação de Licença do Sistema (PrintGest ERP).
 
-Troca CNPJ + código de licença RedGest por uma licença ativa (`online_periodic`).
-Em caso de sucesso, o on-premise cria a licença local e o token passa a ser
-renovado automaticamente em segundo plano.
+O usuário digita a **chave de produto** (`XXXX-XXXX-XXXX-XXXX`) entregue na
+contratação. O on-premise valida a chave online no RedGest (Contrato C,
+`/api/v1/licencas-software/validar/`) e guarda a licença local; a partir daí a
+revalidação acontece em segundo plano.
 """
 
 from __future__ import annotations
+
+import re
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -25,9 +28,11 @@ from printgest.core.api import Api
 from printgest.core.tarefas import rodar
 from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
 
+_FORMATO_CHAVE = re.compile(r"^[0-9A-F]{4}(-[0-9A-F]{4}){3}$")
+
 _PASSOS = [
-    ("Empresa & Chave", "Identificação fiscal"),
-    ("Validação RedGest", "Handshake & Token"),
+    ("Chave de Produto", "4 blocos hexadecimais"),
+    ("Validação Online", "Confirmação no servidor"),
     ("Sistema Liberado", "Sincronização balcão"),
 ]
 
@@ -38,11 +43,10 @@ class AtivacaoWindow(QMainWindow):
     ativada = Signal()
     saida = Signal()
 
-    def __init__(self, api: Api, token: str | None = None, cnpj_atual: str | None = None) -> None:
+    def __init__(self, api: Api, token: str | None = None) -> None:
         super().__init__()
         self._api = api
         self._token = token
-        self._cnpj_atual = cnpj_atual
         self.setWindowTitle("PrintGest ERP — Ativação de Licença do Sistema")
         self.setMinimumSize(960, 640)
 
@@ -67,7 +71,7 @@ class AtivacaoWindow(QMainWindow):
         cabeçalho.addWidget(titulo)
 
         subtitulo = QLabel(
-            "Informe os dados de licenciamento contratados junto ao RedGest para "
+            "Digite a chave de produto entregue na contratação do PrintGest para "
             "liberar o acesso a todas as estações de trabalho da gráfica."
         )
         subtitulo.setObjectName("subtitulo")
@@ -86,7 +90,7 @@ class AtivacaoWindow(QMainWindow):
         self.setCentralWidget(base)
         QShortcut(QKeySequence(Qt.Key.Key_F10), self, self._ativar)
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.saida.emit)
-        self._campo_codigo.setFocus()
+        self._campo_chave.setFocus()
 
     # ------------------------------------------------------------------ helpers
 
@@ -137,22 +141,17 @@ class AtivacaoWindow(QMainWindow):
         form.setContentsMargins(24, 20, 24, 20)
         form.setSpacing(10)
 
-        form.addWidget(self._rotulo("CNPJ"))
-        self._campo_cnpj = QLineEdit()
-        self._campo_cnpj.setInputMask("99.999.999/9999-99;_")
-        if self._cnpj_atual:
-            self._campo_cnpj.setText(self._cnpj_atual)
-        self._campo_cnpj.setPlaceholderText("00.000.000/0000-00")
-        form.addWidget(self._campo_cnpj)
-
-        form.addWidget(self._rotulo("Código de Licença"))
-        self._campo_codigo = QLineEdit()
-        self._campo_codigo.setMaxLength(25)
-        self._campo_codigo.setProperty("mono", "true")
-        self._campo_codigo.setPlaceholderText("PGST-XXXX-XXXX-XXXX-XXXX")
-        self._campo_codigo.textChanged.connect(self._manter_codigo_maiusculo)
-        form.addWidget(self._campo_codigo)
-        formato = QLabel("Formato padrão: PGST-XXXX-XXXX-XXXX-XXXX (25 caracteres alfanuméricos)")
+        form.addWidget(self._rotulo("Chave de Produto"))
+        self._campo_chave = QLineEdit()
+        self._campo_chave.setMaxLength(19)
+        self._campo_chave.setProperty("mono", "true")
+        self._campo_chave.setPlaceholderText("XXXX-XXXX-XXXX-XXXX")
+        self._campo_chave.textChanged.connect(self._manter_chave_formatada)
+        form.addWidget(self._campo_chave)
+        formato = QLabel(
+            "A chave tem 16 caracteres hexadecimais (4 blocos de 4, separados por "
+            "hífen) e é validada online no servidor de licenças."
+        )
         formato.setObjectName("subtitulo")
         formato.setWordWrap(True)
         form.addWidget(formato)
@@ -216,7 +215,7 @@ class AtivacaoWindow(QMainWindow):
         modelo_l.setContentsMargins(16, 14, 16, 14)
         modelo_l.setSpacing(8)
         cab_m = QHBoxLayout()
-        titulo_m = QLabel("Como funciona o Modelo de Licenciamento Híbrido RedGest")
+        titulo_m = QLabel("Como funciona o Licenciamento por Chave de Produto")
         titulo_m.setStyleSheet("font-weight: 700;")
         cab_m.addWidget(titulo_m)
         cab_m.addStretch(1)
@@ -225,11 +224,11 @@ class AtivacaoWindow(QMainWindow):
         texto_m = QPlainTextEdit()
         texto_m.setProperty("role", "muted")
         texto_m.setPlainText(
-            "A ativação é 100% online vinculada ao CNPJ da sua gráfica. O Local API "
-            "Service renova o token automaticamente em segundo plano. Em caso de "
-            "oscilação ou queda temporária de internet, o sistema opera normalmente "
-            "por até 72 horas em tolerância offline contínua, sem travar vendas no "
-            "balcão ou emissão de cupons."
+            "A ativação é 100% online: o Local API Service confirma a chave no "
+            "servidor de licenças e guarda a licença nesta máquina. A revalidação "
+            "roda em segundo plano. Em caso de oscilação ou queda temporária de "
+            "internet, o sistema opera normalmente por até 72 horas em tolerância "
+            "offline, sem travar vendas no balcão ou emissão de cupons."
         )
         texto_m.setReadOnly(True)
         texto_m.setMaximumHeight(132)
@@ -257,17 +256,25 @@ class AtivacaoWindow(QMainWindow):
         label.setObjectName("labelForm")
         return label
 
-    def _manter_codigo_maiusculo(self, texto: str) -> None:
-        """Código de licença é case-insensitive — normaliza para maiúsculas sem
-        mover o cursor para o fim (P5: não roubar o foco do usuário).
-        """
-        if texto == texto.upper():
+    @staticmethod
+    def _formatar_chave(texto: str) -> str:
+        """Normaliza para hexadecimais maiúsculos com hífens a cada 4 caracteres."""
+        bruto = "".join(c for c in texto.upper() if c in "0123456789ABCDEF")[:16]
+        return "-".join(bruto[i : i + 4] for i in range(0, len(bruto), 4))
+
+    def _manter_chave_formatada(self, texto: str) -> None:
+        """Mantém a chave em XXXX-XXXX-XXXX-XXXX sem roubar o cursor (P5)."""
+        formatado = self._formatar_chave(texto)
+        if formatado == texto:
             return
-        posicao = self._campo_codigo.cursorPosition()
-        self._campo_codigo.blockSignals(True)
-        self._campo_codigo.setText(texto.upper())
-        self._campo_codigo.blockSignals(False)
-        self._campo_codigo.setCursorPosition(posicao)
+        posicao = self._campo_chave.cursorPosition()
+        deslocamento = formatado.count("-") - texto.count("-")
+        self._campo_chave.blockSignals(True)
+        self._campo_chave.setText(formatado)
+        self._campo_chave.blockSignals(False)
+        self._campo_chave.setCursorPosition(
+            max(0, min(len(formatado), posicao + deslocamento))
+        )
 
     # --------------------------------------------------------------- ações
 
@@ -294,18 +301,20 @@ class AtivacaoWindow(QMainWindow):
         rodar(self._api.testar_comunicacao, ok, erro)
 
     def _ativar(self) -> None:
-        cnpj = self._campo_cnpj.text().strip()
-        codigo = self._campo_codigo.text().strip()
-        if sum(c.isdigit() for c in cnpj) != 14 or len(codigo) < 8:
-            self._erro.setText("Informe o CNPJ completo (14 dígitos) e o código de licença.")
+        chave = self._campo_chave.text().strip().upper()
+        if not _FORMATO_CHAVE.match(chave):
+            self._erro.setText(
+                "Informe a chave de produto completa (XXXX-XXXX-XXXX-XXXX)."
+            )
             return
 
         self._erro.setText("")
+        self._marcar_passo(1)
         self._botao_ativar.setEnabled(False)
-        self._botao_ativar.setText("Validando com RedGest…")
+        self._botao_ativar.setText("Validando online…")
 
         def chamada():
-            return self._api.ativar_licenca(self._token, cnpj, codigo)
+            return self._api.ativar_licenca(self._token, chave)
 
         def ok(_) -> None:
             self._botao_ativar.setEnabled(True)
@@ -319,7 +328,7 @@ class AtivacaoWindow(QMainWindow):
         def erro(msg: str) -> None:
             self._botao_ativar.setEnabled(True)
             self._botao_ativar.setText("Validar e Ativar Licença Online")
-            self._marcar_passo(1)
+            self._marcar_passo(0)
             self._erro.setProperty("role", "error")
             self._erro.setText(msg)
             aplicar_estilo(self._erro)

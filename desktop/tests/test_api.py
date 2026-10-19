@@ -44,10 +44,12 @@ def test_situacao_licenca_parse():
         assert request.url.path == "/v1/licenca"
         return _resposta(
             {
-                "sistema": "grafica_erp",
+                "sistema": "printgest",
+                "chave": "************1045",
                 "status": "ativa",
+                "estado": "ativa",
                 "modo_leitura": False,
-                "token_expira_em": "2026-09-21T12:00:00",
+                "expira_em": "2027-09-21T12:00:00",
             }
         )
 
@@ -56,17 +58,15 @@ def test_situacao_licenca_parse():
     assert dados["modo_leitura"] is False
 
 
-def test_ativar_licenca_payload():
+def test_ativar_licenca_envia_chave_de_produto():
     def handler(request: httpx.Request) -> httpx.Response:
-        corpo = request.read().decode()
-        assert "12.345.678/0001-90" in corpo
-        assert "PGST-ABCD-EFGH-IJKL-MNOP" in corpo
+        assert request.url.path == "/v1/licenca/ativar"
         assert request.headers["authorization"] == "Bearer tok"
-        return _resposta({"status": "ativa", "modo_leitura": False})
+        corpo = request.read().decode()
+        assert '"chave_ativacao": "A3F1-9C2B-77DE-1045"' in corpo
+        return _resposta({"status": "ativa", "estado": "ativa", "modo_leitura": False})
 
-    dados = _api(handler).ativar_licenca(
-        "tok", "12.345.678/0001-90", "PGST-ABCD-EFGH-IJKL-MNOP"
-    )
+    dados = _api(handler).ativar_licenca("tok", "A3F1-9C2B-77DE-1045")
     assert dados["status"] == "ativa"
 
 

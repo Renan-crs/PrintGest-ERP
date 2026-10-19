@@ -1,4 +1,4 @@
-"""Schemas de licenciamento — ativação e situação (`online_periodic`)."""
+"""Schemas de licenciamento - chave de produto validada online (RedGest)."""
 
 from datetime import datetime
 
@@ -6,22 +6,28 @@ from pydantic import BaseModel, Field
 
 
 class LicencaAtivarIn(BaseModel):
-    cnpj: str = Field(min_length=1, description="CNPJ da gráfica (aceita máscara).")
-    codigo_licenca: str = Field(min_length=1, max_length=40)
+    chave_ativacao: str = Field(
+        min_length=1,
+        max_length=19,
+        description=(
+            "Chave de produto entregue na contratação (formato XXXX-XXXX-XXXX-XXXX)."
+        ),
+    )
 
 
 class LicencaSituacaoOut(BaseModel):
     sistema: str
-    cnpj: str | None = None
+    chave: str | None = None
     plano: str | None = None
     status: str
-    # Estado derivado (plano E2): ativa | tolerancia | leitura | revogada | nao_ativada.
+    # Estado derivado: ativa | tolerancia | leitura | revogada | nao_ativada.
     estado: str
     motivo: str
     modo_leitura: bool
-    max_estacoes: int | None = None
-    modulos_habilitados: list[str] = []
-    token_expira_em: datetime | None = None
+    expira_em: datetime | None = None
     tolerancia_expira_em: datetime | None = None
+    limite_ativacoes: int | None = None
+    ativacoes_realizadas: int | None = None
+    ultima_validacao: datetime | None = None
     ultima_tentativa_em: datetime | None = None
     ultimo_erro: str | None = None

@@ -1,29 +1,42 @@
-"""Serviço de licenciamento `online_periodic` (PRD v2.0 §3) — cliente do RedGest.
+"""Serviço de licenciamento por chave de produto (RedGest `/licencas-software/`).
 
-O RedGest emite JWT RS256 de curta duração para a licença por CNPJ. Este serviço:
+O RedGest emite uma **chave de ativação** (`XXXX-XXXX-XXXX-XXXX`, Contrato C do
+manual de integração) que o usuário digita na primeira execução. Este serviço:
 
-- **ativa**: troca CNPJ + código de licença por credenciais + primeiro token
-  (POST `/api/v1/licencas` e `/api/v1/licencas/{id}/ativar`) e guarda tudo na
-  tabela local `licenca`;
-- **renova**: polling em `/api/v1/licencas/{id}/validar` (PRD §3.2.6 — máquina
-  local não recebe webhook), reemitindo o token antes da expiração;
-- **modo de leitura**: com token válido o sistema opera completo; sem ativação ou
-  com token vencido/revogado, `ESTADO["modo_leitura"]` fica `True` e o middleware
-  bloqueia escritas (HTTP 423). Tratado no background pelo loop do lifespan.
+- **ativa**: valida a chave online em
+  `POST /api/v1/licencas-software/validar/`, enviando
+  `{chave_ativacao, maquina_fingerprint}` assinado por HMAC-SHA256 com a
+  `api_key` do Sistema no RedGest (cabeçalhos `X-RedGest-Signature`,
+  `X-RedGest-Nonce`, `X-RedGest-Timestamp`), e guarda o resultado na tabela
+  local `licenca`;
+- **revalida**: consulta o RedGest periodicamente (default a cada 6 h) para
+  detectar revogação/bloqueio/expiração;
+- **modo de leitura**: sem ativação, com a licença revogada/bloqueada/expirada
+  ou com tolerância esgotada, `ESTADO["modo_leitura"]` fica `True` e o
+  middleware bloqueia escritas (HTTP 423).
 
 Resiliência (`docs/plano_resiliencia_licenca.md`): o timeout para o RedGest é
 configurável (padrão 90 s, para absorver *cold start* de plano gratuito) e as
-falhas de transporte viram `503` com mensagem clara — nunca revogação. O loop
-aplica backoff crescente (1/5/15 min) entre tentativas que falham.
+falhas de transporte viram `503` com mensagem clara — **nunca** revogação. A
+licença vale até `expira_em` e, depois do vencimento, a instalação opera em
+tolerância (`licenca_tolerancia_horas`, 72 h) antes de entrar em modo de leitura.
+O loop aplica backoff crescente (1/5/15 min) entre tentativas que falham.
 
-Credenciais e endpoints seguem o contrato congelado no `scripts/redgest_stub.py`
-(POSTs sem barra final, para o `httpx` não depender de redirect 307).
+A assinatura segue o contrato congelado no RedGest
+(`apps/liberacao/infrastructure/web/licenca_software_auth.py`):
+`sha256=` + hex(HMAC_SHA256(segredo, nonce + timestamp + corpo_bruto)).
 """
 
-import asyncio
+import base64
 import datetime as dt
+import hashlib
+import hmac
+import json
 import logging
-import re
+import os
+import platform
+import socket
+import uuid
 from typing import Any
 
 import httpx
@@ -37,7 +50,28 @@ from app.models.licenca import Licenca
 logger = logging.getLogger(__name__)
 
 STATUS_ATIVA = "ativa"
+STATUS_BLOQUEADA = "bloqueada"
 STATUS_REVOGADA = "revogada"
+STATUS_EXPIRADA = "expirada"
+
+ESTADO_ATIVA = "ativa"
+ESTADO_TOLERANCIA = "tolerancia"
+ESTADO_LEITURA = "leitura"
+ESTADO_REVOGADA = "revogada"
+ESTADO_NAO_ATIVADA = "nao_ativada"
+
+CAMINHO_VALIDAR = "/api/v1/licencas-software/validar/"
+PREFIXO_ASSINATURA = "sha256="
+
+# Erros de licença que chegam como 403 + `codigo` e viram estado local.
+_ERROS_DE_LICENCA = {
+    "LICENCA_REVOGADA": (STATUS_REVOGADA, "Licença revogada pelo RedGest."),
+    "LICENCA_BLOQUEADA": (
+        STATUS_BLOQUEADA,
+        "Licença bloqueada pelo RedGest — regularize o contrato/pagamento.",
+    ),
+    "LICENCA_EXPIRADA": (STATUS_EXPIRADA, "Licença expirada no RedGest."),
+}
 
 ESTADO: dict[str, bool] = {"modo_leitura": not settings.licenca_desabilitada}
 
@@ -50,10 +84,6 @@ def _agora() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
-def _normalizar_cnpj(cnpj: str) -> str:
-    return re.sub(r"\D", "", cnpj)
-
-
 def _cliente() -> httpx.Client:
     return httpx.Client(
         base_url=settings.redgest_url, timeout=settings.licenca_timeout_segundos
@@ -64,8 +94,7 @@ def _indisponivel(contexto: str, exc: Exception) -> HTTPException:
     """Traduz falha de transporte (timeout/DNS/conexão) em 503 com mensagem clara.
 
     Distingue "RedGest inacessível" de "licença revogada": só a resposta
-    explícita de revogação (401/403) leva ao modo de leitura; indisponibilidade
-    de rede não.
+    explícita do RedGest leva ao modo de leitura; indisponibilidade de rede não.
     """
     logger.warning("RedGest inacessível (%s): %s", contexto, exc)
     return HTTPException(
@@ -77,82 +106,145 @@ def _indisponivel(contexto: str, exc: Exception) -> HTTPException:
     )
 
 
-def _garantir_resposta(cliente: httpx.Client, resp: httpx.Response, contexto: str) -> dict:
-    if resp.status_code >= 400:
-        detalhe = "Erro de comunicação registrado."
-        try:
-            corpo = resp.json()
-            detalhe = corpo.get("detail") or corpo.get("data", {}).get("detail") or detalhe
-        except ValueError:
-            pass
-        codigo = status.HTTP_423_LOCKED if resp.status_code == 403 else status.HTTP_400_BAD_REQUEST
-        raise HTTPException(status_code=codigo, detail=f"{contexto}: {detalhe}")
+def _exigir_credencial() -> None:
+    if not settings.redgest_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Integração com o servidor de licenças sem credencial configurada "
+                "(defina PRINTGEST_REDGEST_API_KEY)."
+            ),
+        )
+
+
+# --------------------------------------------------------------- fingerprint
+def _fingerprint() -> str:
+    """Fingerprint determinístico da estação (estável entre reinicializações).
+
+    Combina hostname, SO, arquitetura e o MAC (`uuid.getnode`) e devolve o
+    SHA-256 do conjunto. O RedGest guarda esse valor para a cota de ativações —
+    reenviar o mesmo fingerprint não consome cota nova.
+    """
+    partes = "|".join(
+        [
+            socket.gethostname(),
+            platform.system(),
+            platform.machine(),
+            str(uuid.getnode()),
+        ]
+    )
+    return hashlib.sha256(partes.encode("utf-8")).hexdigest()
+
+
+# --------------------------------------------------------------- assinatura
+def _corpo(chave: str, fingerprint: str) -> bytes:
+    """Corpo exato (bytes) que será assinado e enviado — sem espaços."""
+    return json.dumps(
+        {"chave_ativacao": chave, "maquina_fingerprint": fingerprint},
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _assinatura(segredo: str, nonce: str, timestamp: str, corpo: bytes) -> str:
+    material = f"{nonce}{timestamp}".encode("utf-8") + corpo
+    digest = hmac.new(segredo.encode("utf-8"), material, hashlib.sha256).hexdigest()
+    return f"{PREFIXO_ASSINATURA}{digest}"
+
+
+def _agora_em_texto() -> str:
+    return _agora().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _cabecalhos(corpo: bytes) -> dict:
+    nonce = base64.b64encode(os.urandom(32)).decode("ascii")
+    timestamp = _agora_em_texto()
+    return {
+        "Content-Type": "application/json",
+        "X-RedGest-Signature": _assinatura(
+            settings.redgest_api_key, nonce, timestamp, corpo
+        ),
+        "X-RedGest-Nonce": nonce,
+        "X-RedGest-Timestamp": timestamp,
+    }
+
+
+# ------------------------------------------------------------------- parsing
+def _parse_dt(valor: Any) -> dt.datetime | None:
+    if valor in (None, ""):
+        return None
+    if isinstance(valor, dt.datetime):
+        momento = valor
+    else:
+        momento = dt.datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=dt.timezone.utc)
+    return momento
+
+
+def _corpo_json(resp: httpx.Response) -> dict:
     try:
         corpo = resp.json()
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"{contexto}: resposta não-JSON do servidor de licenças.",
+            detail="Resposta não-JSON do servidor de licenças.",
         ) from exc
-    return corpo.get("data", {})
-
-
-def _campo(dados: dict, chave: str, contexto: str) -> Any:
-    """Extrai campo obrigatório do payload do RedGest com erro claro (P4).
-
-    Evita `KeyError` → HTTP 500 quando o servidor externo responde 2xx com
-    payload incompleto; converte em 502 (Bad Gateway) com mensagem acionável.
-    """
-    valor = dados.get(chave)
-    if valor is None or valor == "":
+    if not isinstance(corpo, dict):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                "Resposta inválida do servidor de licenças "
-                f"({contexto}: campo '{chave}' ausente)."
-            ),
+            detail="Resposta inesperada do servidor de licenças.",
         )
-    return valor
+    # O contrato do RedGest devolve o objeto direto; aceitamos `data` por
+    # compatibilidade com servidores que embrulham a resposta.
+    return corpo.get("data") or corpo
 
 
+def _erro_do_corpo(resp: httpx.Response) -> tuple[str | None, str]:
+    codigo: str | None = None
+    detalhe = "Erro relatado pelo servidor de licenças."
+    try:
+        corpo = resp.json()
+        if isinstance(corpo, dict):
+            codigo = corpo.get("codigo")
+            if corpo.get("detail"):
+                detalhe = str(corpo["detail"])
+    except ValueError:
+        pass
+    return codigo, detalhe
+
+
+def _parse_chave(chave: str) -> str:
+    return (chave or "").strip().upper()
+
+
+# -------------------------------------------------------------------- estado
 def _licenca_local(db: Session) -> Licenca | None:
     return db.query(Licenca).order_by(Licenca.id).first()
 
 
-ESTADO_ATIVA = "ativa"
-ESTADO_TOLERANCIA = "tolerancia"
-ESTADO_LEITURA = "leitura"
-ESTADO_REVOGADA = "revogada"
-ESTADO_NAO_ATIVADA = "nao_ativada"
-
-
-def _janela_tolerancia(token_expira_em: dt.datetime) -> dt.datetime:
-    return token_expira_em + dt.timedelta(hours=settings.licenca_tolerancia_horas)
+def _janela_tolerancia(expira_em: dt.datetime) -> dt.datetime:
+    return expira_em + dt.timedelta(hours=settings.licenca_tolerancia_horas)
 
 
 def _tolerancia_expira_em(lic: Licenca) -> dt.datetime | None:
-    """Tolerância efetiva: a coluna, ou derivada do token (bases anteriores a E2).
-
-    Licenças ativadas antes da migração `c9e4f1a7b2d8` não têm a coluna; derivar
-    aqui evita que essas bases percam a tolerância até a próxima renovação.
-    """
+    """Tolerância efetiva: a coluna, ou derivada da vigência (bases anteriores)."""
     if lic.tolerancia_expira_em is not None:
         return lic.tolerancia_expira_em
-    if lic.token_expira_em is None:
+    if lic.expira_em is None:
         return None
-    return _janela_tolerancia(lic.token_expira_em)
+    return _janela_tolerancia(lic.expira_em)
 
 
 def _estado(lic: Licenca | None) -> str:
-    """Estado derivado (plano E2): ativa | tolerancia | leitura | revogada | nao_ativada."""
-    if lic is None:
+    """Estado derivado: ativa | tolerancia | leitura | revogada | nao_ativada."""
+    if lic is None or not lic.chave_ativacao:
         return ESTADO_NAO_ATIVADA
     if lic.status == STATUS_REVOGADA:
         return ESTADO_REVOGADA
-    if lic.status != STATUS_ATIVA or lic.token_expira_em is None:
+    if lic.status in (STATUS_BLOQUEADA, STATUS_EXPIRADA):
         return ESTADO_LEITURA
     agora = _agora()
-    if lic.token_expira_em > agora:
+    if lic.expira_em is None or lic.expira_em > agora:
         return ESTADO_ATIVA
     tolerancia = _tolerancia_expira_em(lic)
     if tolerancia is not None and tolerancia > agora:
@@ -164,19 +256,34 @@ def _modo_leitura(estado: str) -> bool:
     return estado in (ESTADO_LEITURA, ESTADO_REVOGADA, ESTADO_NAO_ATIVADA)
 
 
-def _motivo(estado: str) -> str:
+def _motivo(lic: Licenca | None, estado: str) -> str:
+    if lic is not None and lic.status == STATUS_BLOQUEADA:
+        return "Licença bloqueada pelo RedGest — regularize o contrato/pagamento."
+    if lic is not None and lic.status == STATUS_EXPIRADA:
+        return "Licença expirada. Renove o contrato para reativar."
     return {
         ESTADO_ATIVA: "Licença ativa.",
         ESTADO_TOLERANCIA: (
-            "Sem contato com o RedGest; operando normalmente em tolerância."
+            "Vigência vencida e sem contato com o RedGest; operando em tolerância."
         ),
         ESTADO_REVOGADA: "Licença revogada pelo RedGest.",
         ESTADO_NAO_ATIVADA: "Licença ainda não ativada.",
-    }.get(estado, "Tolerância esgotada ou licença inválida.")
+    }.get(
+        estado,
+        "Tolerância esgotada: informe a chave de ativação novamente ou contate o fornecedor.",
+    )
 
 
 def _recalcular_estado(lic: Licenca | None) -> None:
     ESTADO["modo_leitura"] = _modo_leitura(_estado(lic))
+
+
+def _mascarar(chave: str | None) -> str | None:
+    if not chave:
+        return None
+    if len(chave) <= 4:
+        return "*" * len(chave)
+    return f"{'*' * (len(chave) - 4)}{chave[-4:]}"
 
 
 def situacao(db: Session) -> dict:
@@ -185,129 +292,171 @@ def situacao(db: Session) -> dict:
     ESTADO["modo_leitura"] = _modo_leitura(estado)
     if _desabilitada():
         ESTADO["modo_leitura"] = False
-    if lic is None:
-        return {
-            "sistema": settings.redgest_sistema,
-            "cnpj": None,
-            "plano": None,
-            "status": ESTADO_NAO_ATIVADA,
-            "estado": estado,
-            "motivo": _motivo(estado),
-            "modo_leitura": ESTADO["modo_leitura"],
-            "max_estacoes": None,
-            "modulos_habilitados": [],
-            "token_expira_em": None,
-            "tolerancia_expira_em": None,
-            "ultima_tentativa_em": None,
-            "ultimo_erro": None,
-        }
-    ent = lic.entitlements or {}
     return {
-        "sistema": lic.sistema,
-        "cnpj": lic.cnpj,
-        "plano": lic.plano,
-        "status": lic.status,
+        "sistema": settings.redgest_sistema,
+        "chave": _mascarar(lic.chave_ativacao) if lic else None,
+        "plano": lic.plano if lic else None,
+        "status": lic.status if lic else ESTADO_NAO_ATIVADA,
         "estado": estado,
-        "motivo": _motivo(estado),
+        "motivo": _motivo(lic, estado),
         "modo_leitura": ESTADO["modo_leitura"],
-        "max_estacoes": ent.get("max_estacoes"),
-        "modulos_habilitados": ent.get("modulos_habilitados") or [],
-        "token_expira_em": lic.token_expira_em,
-        "tolerancia_expira_em": _tolerancia_expira_em(lic),
-        "ultima_tentativa_em": lic.ultima_tentativa_em,
-        "ultimo_erro": lic.ultimo_erro,
+        "expira_em": lic.expira_em if lic else None,
+        "tolerancia_expira_em": _tolerancia_expira_em(lic) if lic else None,
+        "limite_ativacoes": lic.limite_ativacoes if lic else None,
+        "ativacoes_realizadas": lic.ativacoes_realizadas if lic else None,
+        "ultima_validacao": lic.ultima_validacao if lic else None,
+        "ultima_tentativa_em": lic.ultima_tentativa_em if lic else None,
+        "ultimo_erro": lic.ultimo_erro if lic else None,
     }
 
 
-def _persistir_ativa(
-    db: Session,
-    *,
-    licenca_redgest_id: str,
-    cnpj: str,
-    codigo_licenca: str,
-    plano: str | None,
-    client_id: str,
-    client_secret: str,
-    entitlements: dict,
-    token: str,
-    expires_in: int,
+# ---------------------------------------------------------------- persistência
+def _persistir_ok(
+    db: Session, *, chave: str, fingerprint: str, dados: dict
 ) -> None:
     lic = _licenca_local(db)
     agora = _agora()
+    expira = _parse_dt(dados.get("expira_em"))
     if lic is None:
-        lic = Licenca(
-            licenca_redgest_id=licenca_redgest_id,
-            sistema=settings.redgest_sistema,
-            cnpj=cnpj,
-            codigo_licenca=codigo_licenca,
-        )
+        lic = Licenca(chave_ativacao=chave)
         db.add(lic)
-    lic.licenca_redgest_id = licenca_redgest_id
+    lic.chave_ativacao = chave
+    lic.maquina_fingerprint = fingerprint
     lic.sistema = settings.redgest_sistema
-    lic.cnpj = cnpj
-    lic.codigo_licenca = codigo_licenca
-    lic.plano = plano
     lic.status = STATUS_ATIVA
-    lic.client_id = client_id
-    lic.client_secret = client_secret
-    lic.entitlements = entitlements
-    lic.token_jwt = token
-    lic.token_expira_em = agora + dt.timedelta(seconds=expires_in)
-    lic.tolerancia_expira_em = _janela_tolerancia(lic.token_expira_em)
-    lic.ultima_validacao = agora
-    lic.ultima_tentativa_em = agora
+    lic.expira_em = expira
+    lic.tolerancia_expira_em = (
+        _janela_tolerancia(expira) if expira is not None else None
+    )
+    limite = dados.get("limite_ativacoes")
+    lic.limite_ativacoes = int(limite) if limite is not None else None
+    realizadas = dados.get("ativacoes_realizadas")
+    lic.ativacoes_realizadas = int(realizadas) if realizadas is not None else None
+    lic.entitlements = {
+        "primeira_ativacao": bool(dados.get("primeira_ativacao")),
+        "limite_ativacoes": lic.limite_ativacoes,
+        "ativacoes_realizadas": lic.ativacoes_realizadas,
+    }
+    lic.ultima_validacao = _agora()
+    lic.ultima_tentativa_em = _agora()
     lic.ultimo_erro = None
     db.commit()
     db.refresh(lic)
     _recalcular_estado(lic)
 
 
-def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
+def _marcar_status(db: Session, novo_status: str, motivo: str) -> None:
+    lic = _licenca_local(db)
+    if lic is None:
+        return
+    lic.status = novo_status
+    lic.ultima_tentativa_em = _agora()
+    lic.ultimo_erro = motivo
+    db.commit()
+    _recalcular_estado(lic)
+
+
+def _registrar_falha(db: Session, motivo: str) -> None:
+    lic = _licenca_local(db)
+    if lic is None:
+        return
+    lic.ultima_tentativa_em = _agora()
+    lic.ultimo_erro = motivo
+    db.commit()
+    _recalcular_estado(lic)
+
+
+# ------------------------------------------------------------------- chamada
+def _validar_online(db: Session, chave: str) -> dict:
+    """Chama o RedGest, atualiza a licença local e devolve a situação."""
+    _exigir_credencial()
+    fingerprint = _fingerprint()
+    corpo = _corpo(chave, fingerprint)
+    headers = _cabecalhos(corpo)
+    try:
+        with _cliente() as cliente:
+            resp = cliente.post(CAMINHO_VALIDAR, content=corpo, headers=headers)
+    except httpx.HTTPError as exc:
+        _registrar_falha(db, f"RedGest inacessível ({type(exc).__name__})")
+        raise _indisponivel("validação da chave", exc) from exc
+
+    if resp.status_code == status.HTTP_200_OK:
+        _persistir_ok(db, chave=chave, fingerprint=fingerprint, dados=_corpo_json(resp))
+        return situacao(db)
+
+    _tratar_erro(db, resp)
+
+
+def _tratar_erro(db: Session, resp: httpx.Response) -> None:
+    codigo, detalhe = _erro_do_corpo(resp)
+    if resp.status_code == status.HTTP_401_UNAUTHORIZED:
+        # Assinatura HMAC recusada: bug de integração (credencial/timestamp), não
+        # é problema do usuário e não deve entrar em laço de tentativas.
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"O servidor de licenças recusou a assinatura da requisição. {detalhe}",
+        )
+    if resp.status_code == status.HTTP_403_FORBIDDEN and codigo in _ERROS_DE_LICENCA:
+        novo_status, motivo = _ERROS_DE_LICENCA[codigo]
+        _marcar_status(db, novo_status, motivo)
+        raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=motivo)
+    if resp.status_code == status.HTTP_403_FORBIDDEN and codigo in (
+        "CHAVE_NAO_ENCONTRADA",
+        "CHAVE_INVALIDA",
+        "SISTEMA_SEM_CREDENCIAL",
+    ):
+        # O RedGest resolve o segredo *pela* chave enviada; quando a chave não
+        # existe, a resposta é `SISTEMA_SEM_CREDENCIAL` (não há sistema para
+        # assinar). Para o usuário isso é "chave não reconhecida"; a segunda
+        # frase cobre o caso raro de produto sem `api_key` configurada.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Chave de ativação não reconhecida pelo servidor de licenças. "
+                "Confira a chave digitada; se estiver correta, o produto precisa "
+                "estar configurado com credencial de integração no RedGest."
+            ),
+        )
+    if resp.status_code == status.HTTP_403_FORBIDDEN:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"O servidor de licenças recusou a validação: {detalhe}",
+        )
+    if resp.status_code == status.HTTP_409_CONFLICT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Limite de ativações desta chave atingido. Solicite a reemissão "
+                "da chave ou o aumento do limite ao fornecedor."
+            ),
+        )
+    if resp.status_code == status.HTTP_400_BAD_REQUEST:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detalhe)
+    if resp.status_code >= 500:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="O servidor de licenças está indisponível. Tente novamente em instantes.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Resposta inesperada do servidor de licenças ({resp.status_code}).",
+    )
+
+
+# ---------------------------------------------------------------- operações
+def ativar(db: Session, *, chave_ativacao: str) -> dict:
     if _desabilitada():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licenciamento desabilitado nesta build de desenvolvimento.",
         )
-    cnpj_limpo = _normalizar_cnpj(cnpj)
-    try:
-        with _cliente() as cliente:
-            resp = cliente.post(
-                "/api/v1/licencas",
-                json={"sistema": settings.redgest_sistema, "cnpj": cnpj_limpo, "codigo_licenca": codigo_licenca},
-            )
-            dados = _garantir_resposta(cliente, resp, "Falha ao registrar a licença")
-            licenca_redgest_id = _campo(dados, "licenca_id", "registro")
-
-            resp = cliente.post(f"/api/v1/licencas/{licenca_redgest_id}/ativar")
-            dados = _garantir_resposta(cliente, resp, "Falha na ativação da licença")
-            client_id = _campo(dados, "client_id", "ativação")
-            client_secret = _campo(dados, "client_secret", "ativação")
-            token = _campo(dados, "access_token", "ativação")
-            expires_in = int(_campo(dados, "expires_in", "ativação"))
-
-            resp = cliente.get(f"/api/v1/licencas/{licenca_redgest_id}")
-            dados = _garantir_resposta(cliente, resp, "Falha ao consultar a licença")
-    except httpx.HTTPError as exc:
-        raise _indisponivel("ativação", exc) from exc
-
-    entitlements = {
-        "cnpj_vinculado": dados.get("cnpj"),
-        "max_estacoes": dados.get("max_estacoes"),
-        "modulos_habilitados": dados.get("modulos_habilitados") or [],
-    }
-    _persistir_ativa(
-        db,
-        licenca_redgest_id=licenca_redgest_id,
-        cnpj=cnpj_limpo,
-        codigo_licenca=codigo_licenca,
-        plano=dados.get("plano"),
-        client_id=client_id,
-        client_secret=client_secret,
-        entitlements=entitlements,
-        token=token,
-        expires_in=expires_in,
-    )
-    return situacao(db)
+    chave = _parse_chave(chave_ativacao)
+    if not chave:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe a chave de ativação (XXXX-XXXX-XXXX-XXXX).",
+        )
+    return _validar_online(db, chave)
 
 
 def renovar(db: Session) -> dict:
@@ -317,64 +466,20 @@ def renovar(db: Session) -> dict:
             detail="Licenciamento desabilitado nesta build de desenvolvimento.",
         )
     lic = _licenca_local(db)
-    if lic is None or not lic.client_id or not lic.client_secret:
+    if lic is None or not lic.chave_ativacao:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licença ainda não ativada.",
         )
-    with _cliente() as cliente:
-        try:
-            resp = cliente.post(
-                f"/api/v1/licencas/{lic.licenca_redgest_id}/validar",
-                json={"client_id": lic.client_id, "client_secret": lic.client_secret},
-            )
-        except httpx.HTTPError as exc:
-            lic.ultima_tentativa_em = _agora()
-            lic.ultimo_erro = f"RedGest inacessível ({type(exc).__name__})"
-            db.commit()
-            raise _indisponivel("renovação", exc) from exc
-        if resp.status_code in (401, 403):
-            lic.status = STATUS_REVOGADA
-            lic.ultima_tentativa_em = _agora()
-            lic.ultimo_erro = "revogada pelo RedGest"
-            db.commit()
-            _recalcular_estado(lic)
-            raise HTTPException(
-                status_code=status.HTTP_423_LOCKED,
-                detail=(
-                    "Licença revogada pelo RedGest. O sistema opera em modo de "
-                    "leitura — contate o fornecedor para regularizar."
-                ),
-            )
-        dados = _garantir_resposta(cliente, resp, "Falha na renovação da licença")
-
-    agora = _agora()
-    lic.status = STATUS_ATIVA
-    lic.token_jwt = _campo(dados, "access_token", "renovação")
-    lic.token_expira_em = agora + dt.timedelta(
-        seconds=int(_campo(dados, "expires_in", "renovação"))
-    )
-    lic.tolerancia_expira_em = _janela_tolerancia(lic.token_expira_em)
-    lic.ultima_validacao = agora
-    lic.ultima_tentativa_em = agora
-    lic.ultimo_erro = None
-    lic.entitlements = {
-        "cnpj_vinculado": dados.get("cnpj_vinculado"),
-        "max_estacoes": dados.get("max_estacoes"),
-        "modulos_habilitados": dados.get("modulos_habilitados") or [],
-    }
-    db.commit()
-    db.refresh(lic)
-    _recalcular_estado(lic)
-    return situacao(db)
+    return _validar_online(db, lic.chave_ativacao)
 
 
+# ---------------------------------------------------------------------- loop
 def _atraso_proximo_ciclo(falhas: int) -> int:
     """Espera até o próximo ciclo: normal sem falhas; backoff crescente com falhas.
 
     Backoff (1/5/15 min por padrão) evita bater no RedGest a cada ciclo quando
-    ele está fora, mas volta ao intervalo normal assim que uma renovação dá
-    certo.
+    ele está fora, mas volta ao intervalo normal assim que a validação dá certo.
     """
     if falhas <= 0:
         return settings.licenca_refresh_intervalo_segundos
@@ -383,21 +488,31 @@ def _atraso_proximo_ciclo(falhas: int) -> int:
     return backoff[indice]
 
 
-def _tentativa_renovacao() -> bool:
-    """Uma passada do loop. Devolve `True` quando houve falha de renovação.
+def _precisa_revalidar(lic: Licenca) -> bool:
+    if lic.ultima_validacao is None:
+        return True
+    agora = _agora()
+    intervalo = settings.licenca_revalidar_a_cada_segundos
+    if _estado(lic) == ESTADO_TOLERANCIA:
+        # Já vencida: tenta mais cedo para recuperar (ou confirmar) o estado.
+        intervalo = settings.licenca_backoff[-1]
+    return (agora - lic.ultima_validacao).total_seconds() >= intervalo
 
-    Falha de rede agora vira `HTTPException(503)` dentro de `renovar`, então
+
+def _tentativa_renovacao() -> bool:
+    """Uma passada do loop. Devolve `True` quando houve falha de revalidação.
+
+    Falha de rede vira `HTTPException(503)` dentro de `_validar_online`, então
     cai no mesmo `except HTTPException` — sem marcar revogação.
     """
     db = SessionLocal()
     try:
         lic = _licenca_local(db)
-        if lic is None or lic.status != STATUS_ATIVA or lic.token_expira_em is None:
+        if lic is None or not lic.chave_ativacao:
             _recalcular_estado(lic)
             return False
-        faltando = (lic.token_expira_em - _agora()).total_seconds()
         _recalcular_estado(lic)
-        if faltando > settings.licenca_renova_antes_segundos:
+        if not _precisa_revalidar(lic):
             return False
         try:
             renovar(db)
@@ -410,13 +525,15 @@ def _tentativa_renovacao() -> bool:
 
 
 async def loop_renovacao() -> None:
+    import asyncio
+
     falhas = 0
     while True:
         if not _desabilitada():
             try:
                 falhou = await asyncio.to_thread(_tentativa_renovacao)
             except Exception:  # noqa: BLE001 — falha externa não derruba o loop
-                logger.exception("Falha inesperada na renovação automática da licença.")
+                logger.exception("Falha inesperada na revalidação automática da licença.")
                 falhou = True
             falhas = falhas + 1 if falhou else 0
         await asyncio.sleep(_atraso_proximo_ciclo(falhas))

@@ -122,17 +122,13 @@ class _Roteador:
     # ---------------------------------------------------------------- telas
 
     def _abrir_ativacao(self, sit: dict) -> None:
-        janela = AtivacaoWindow(
-            self._api, token=self._token, cnpj_atual=sit.get("cnpj")
-        )
+        janela = AtivacaoWindow(self._api, token=self._token)
         janela.ativada.connect(lambda: self._abrir_dashboard(False))
         janela.saida.connect(QApplication.instance().quit)
         self._abrir(janela)
 
     def _abrir_modo_leitura(self, sit: dict) -> None:
-        janela = ModoLeituraWindow(
-            self._api, token=self._token, cnpj=sit.get("cnpj"), situacao=sit
-        )
+        janela = ModoLeituraWindow(self._api, token=self._token, situacao=sit)
         janela.renovada.connect(lambda: self._abrir_dashboard(False))
         janela.consulta.connect(lambda: self._abrir_dashboard(True))
         janela.saida.connect(QApplication.instance().quit)

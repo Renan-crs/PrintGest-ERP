@@ -1,10 +1,11 @@
 """main — Local API Service PrintGest.
 
-Fase 4 (licenciamento `online_periodic`): o lifespan inicia o loop de renovação
-(dentro de `licensa_service`) e um middleware transversal bloqueia escritas
-(POST/PUT/PATCH/DELETE) com HTTP 423 enquanto a licença estiver sem ativação,
-revogada ou com token vencido (modo de leitura). Rotas de licença, autenticação
-e documentação ficam sempre liberadas para permitir a tela de ativação.
+Licenciamento por **chave de produto** (RedGest Contrato C): o lifespan inicia o
+loop de revalidação online (dentro de `licensa_service`) e um middleware
+transversal bloqueia escritas (POST/PUT/PATCH/DELETE) com HTTP 423 enquanto a
+licença estiver sem ativação, revogada/bloqueada/expirada ou com a tolerância
+esgotada (modo de leitura). Rotas de licença, autenticação e documentação ficam
+sempre liberadas para permitir a tela de ativação.
 """
 
 import asyncio

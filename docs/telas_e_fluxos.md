@@ -8,7 +8,7 @@ Baseado no PRD v2.0 (escopo MVP: 5 estações, 1 filial, licenciamento online-fi
 
 ### 1.1 Acesso e Licenciamento
 - Tela de Login (usuário/senha)
-- Tela de Ativação de Licença (1ª execução: CNPJ + código de licença)
+- Tela de Ativação de Licença (1ª execução: chave de produto `XXXX-XXXX-XXXX-XXXX`)
 - Banner/Modal de Aviso de Modo Leitura (licença sem renovação)
 
 ### 1.2 Cadastros
@@ -104,15 +104,16 @@ Baseado no PRD v2.0 (escopo MVP: 5 estações, 1 filial, licenciamento online-fi
 5. Sistema confere valor esperado (soma dos lançamentos) vs valor informado na conferência física
 6. Divergência, se houver, é registrada
 
-### 2.5 Fluxo: Licenciamento (online-first)
+### 2.5 Fluxo: Licenciamento (chave de produto, validação online)
 
-1. Na 1ª execução, sistema solicita CNPJ + código de licença
-2. Local API Service envia para o RedGest → recebe token de curta duração
+1. Na 1ª execução, o sistema solicita a chave de produto (`XXXX-XXXX-XXXX-XXXX`)
+2. Local API Service valida a chave online no RedGest (Contrato C) e registra o fingerprint da máquina
 3. Sistema libera o uso normal
-4. Local API Service renova o token automaticamente em background, a cada poucas horas
-5. Se a renovação falhar (sem internet): sistema segue funcionando até o token expirar
-6. Se expirar sem renovar: modo leitura — bloqueia criação/edição e emissão fiscal, mantém consulta
-7. Conexão volta → renovação automática assim que possível → sistema volta ao normal sem ação do usuário
+4. Local API Service revalida a chave em background a cada ~6 h (detecta revogação/bloqueio/expiração)
+5. Se a revalidação falhar (sem internet): sistema segue funcionando dentro da vigência
+6. Vencida a vigência sem reconexão, abre-se a tolerância offline de 72 h (ainda escreve, com aviso)
+7. Esgotada a tolerância: modo leitura — bloqueia criação/edição e emissão fiscal, mantém consulta
+8. Conexão volta → revalidação automática → sistema volta ao normal sem ação do usuário
 
 ### 2.6 Fluxo: Reajuste de Preços em Bloco
 

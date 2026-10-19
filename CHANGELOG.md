@@ -61,18 +61,34 @@ de cada tag está indicado para rastreabilidade.
   isolamento, comentários em 1 nível, autoria, soft-delete e moderação, log de
   atividade, RBAC do Caixa e bloqueio de escrita no modo leitura). Backend:
   **167 testes** verdes.
-- **Licença resiliente à indisponibilidade do RedGest.** Erro de rede na
-  ativação/renovação agora vira `503` (antes `500`); timeout de contato
-  configurável (`licenca_timeout_segundos`, 90 s) e backoff progressivo no loop
+- **Licença por chave de produto (RedGest Contrato C).** A ativação deixa de
+  trocar CNPJ + código por um JWT e passa a validar **online** a **chave de
+  produto** (`XXXX-XXXX-XXXX-XXXX`) em `POST /api/v1/licencas-software/validar/`,
+  autenticando por HMAC-SHA256 do `Sistema.api_key` (`X-RedGest-Signature` /
+  `-Nonce`/`-Timestamp`). A licença local guarda `chave_ativacao`,
+  `maquina_fingerprint` (SHA-256), `expira_em`, `limite_ativacoes` e
+  `ativacoes_realizadas`; `expira_em` nulo = vitalícia. Não há mais JWT nem
+  renovação antecipada: o RedGest é reconsultado a cada
+  `licenca_revalidar_a_cada_segundos` (default 6 h) e é essa revalidação que
+  detecta revogação, bloqueio e expiração.
+- **Resiliência à indisponibilidade do RedGest.** Erro de rede na ativação/
+  revalidação vira `503` (antes `500`); timeout de contato configurável
+  (`licenca_timeout_segundos`, 90 s) e backoff progressivo no loop
   (`licenca_backoff_segundos`, 60/300/900 s). A licença ganha estados derivados
   (`ativa`/`tolerancia`/`leitura`/`revogada`/`nao_ativada`) e janela de tolerância
-  offline de 72 h (`licenca_tolerancia_horas`), contada da expiração do token:
-  enquanto o RedGest estiver fora, o sistema **continua escrevendo**.
-- Migração `c9e4f1a7b2d8` (aditiva e reversível) guarda a tolerância e o
-  diagnóstico (`ultima_tentativa_em`/`ultimo_erro`), exposto em `GET /v1/licenca`.
-- 5 testes novos de resiliência em `backend/tests/test_licenciamento.py` (timeout
-  → 503 sem revogar, janela de tolerância, transição para leitura, diagnóstico e
-  base legada), 15 no arquivo. Backend: **150 testes** verdes.
+  offline de 72 h (`licenca_tolerancia_horas`), contada da vigência (`expira_em`):
+  enquanto o RedGest estiver fora, o sistema **continua escrevendo**. Sem
+  `PRINTGEST_REDGEST_API_KEY` a ativação responde `502` antes de qualquer chamada
+  de rede.
+- Migração `a1b2c3d4e5f6` (aditiva e reversível) acrescenta as colunas da chave de
+  produto (`chave_ativacao`, `maquina_fingerprint`, `expira_em`,
+  `limite_ativacoes`, `ativacoes_realizadas`) e afrouxa `cnpj`/`codigo_licenca`,
+  além de manter `tolerancia_expira_em`/`ultima_tentativa_em`/`ultimo_erro`.
+- Testes reescritos em `backend/tests/test_licenciamento.py` (o mock confere
+  assinatura HMAC, nonce, timestamp e bytes do corpo; ativação, revogação,
+  bloqueio, limite, vitalícia, tolerância e diagnóstico). `scripts/redgest_stub.py`
+  ganha o endpoint do Contrato C e o desktop passa a pedir apenas a chave de
+  produto. Backend: **173 testes** verdes.
 
 ### Corrigido
 
@@ -86,21 +102,29 @@ de cada tag está indicado para rastreabilidade.
   `ui/modulos/os.py`) foi substituída pela nova `ui/modulos/projetos.py`. A
   `PaginaOS`/`PaginaOrcamento` permanecem intactas para os itens internos
   `os`/`orcamento`.
+- Tela de **Ativação** deixa de pedir CNPJ + código e passa a pedir apenas a
+  **chave de produto** (formatação automática `XXXX-XXXX-XXXX-XXXX`); o diálogo de
+  situação mostra chave, plano, estações (limite/em uso) e vigência em vez de
+  CNPJ/`token_expira_em`.
 - Indicador de licença na tela principal passa a refletir o `estado` (tolerância =
   alerta; revogação/leitura = erro) e se atualiza a cada 5 min; a tela de **Modo
   Leitura** distingue *revogação* de *tolerância esgotada* e mostra a última
-  tentativa/erro. Desktop: **245 testes** verdes.
+  tentativa/erro. Desktop: **247 testes** verdes (+4 xfail, 8 xpass).
 
 ### Documentação
 
-- `docs/revisao_projetos_fase2.md`: escopo e decisões da Fase 2 (cartão rico:
-  etiquetas, checklists, comentários e atividade).
 - `docs/revisao_projetos_kanban.md`: escopo da Fase 1, decisões tomadas e
   pendências (Fases 2–4).
+- `docs/revisao_projetos_fase2.md`: escopo e decisões da Fase 2 (cartão rico:
+  etiquetas, checklists, comentários e atividade).
 - `docs/plano_resiliencia_licenca.md`: plano das etapas E0–E6 da resiliência da
-  licença (E0–E2/E5 concluídas; E3/E4 e o banner progressivo em aberto).
-- `docs/prd_2.0.md` §3.2: tolerância de 72 h, timeout de 90 s com backoff e a
-  regra de que a indisponibilidade **não** revoga a licença.
+  licença (E0–E2/E5 concluídas; E3/E4 canceladas pelo Contrato C; o banner
+  progressivo segue em aberto).
+- `docs/licenciamento_online_first.md`: decisões do licenciamento online-first
+  vigente (chave de produto, tolerância de 72 h, cadências e estados).
+- `docs/prd_2.0.md` §3: reescrito para o Contrato C (chave de produto validada
+  online); tolerância de 72 h, timeout de 90 s com backoff e a regra de que a
+  indisponibilidade **não** revoga a licença.
 
 ---
 

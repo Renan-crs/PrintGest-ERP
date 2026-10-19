@@ -758,14 +758,15 @@ class TelaPrincipal(QMainWindow):
             linhas.append(str(sit["motivo"]))
         if sit.get("plano"):
             linhas.append(f"Plano: {sit['plano']}")
-        if sit.get("cnpj"):
-            linhas.append(f"CNPJ: {sit['cnpj']}")
-        if sit.get("max_estacoes"):
-            linhas.append(f"Estações autorizadas: {sit['max_estacoes']}")
-        if formatar_datahora(sit.get("token_expira_em")):
+        if sit.get("chave"):
+            linhas.append(f"Chave: {sit['chave']}")
+        if sit.get("limite_ativacoes"):
             linhas.append(
-                f"Token válido até: {formatar_datahora(sit['token_expira_em'])}"
+                f"Estações autorizadas: {sit['limite_ativacoes']} "
+                f"(em uso: {sit.get('ativacoes_realizadas') or 0})"
             )
+        if formatar_datahora(sit.get("expira_em")):
+            linhas.append(f"Válida até: {formatar_datahora(sit['expira_em'])}")
         if sit.get("estado") == "tolerancia":
             linhas.append(
                 f"Tolerância até: {formatar_datahora(sit.get('tolerancia_expira_em'))}"

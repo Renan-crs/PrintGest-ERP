@@ -448,12 +448,8 @@ class Api:
     def situacao_licenca(self, token: str | None = None) -> dict:
         return self._get("/v1/licenca", token)
 
-    def ativar_licenca(self, token: str | None, cnpj: str, codigo: str) -> dict:
-        return self._post(
-            "/v1/licenca/ativar",
-            {"cnpj": cnpj, "codigo_licenca": codigo},
-            token,
-        )
+    def ativar_licenca(self, token: str | None, chave: str) -> dict:
+        return self._post("/v1/licenca/ativar", {"chave_ativacao": chave}, token)
 
     def renovar_licenca(self, token: str | None) -> dict:
         return self._post("/v1/licenca/renovar", {}, token)
