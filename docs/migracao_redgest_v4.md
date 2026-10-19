@@ -10,6 +10,9 @@ Plano de migração do PrintGest do **Contrato C** (chave de produto, v3.6,
   deve estar concluída antes de **01/03/2027**.
 - **Estado:** planejado — **bloqueado por pré-requisitos do RedGest** (§3). Nada
   do contrato em produção muda enquanto o adapter existir.
+- **Decisão (19/10/2026):** permanecer na fase **M0** — o adaptador do Contrato B
+  só começa depois que o RedGest provisionar o modelo v4 do `printgest` (§3).
+  Nesse intervalo o foco é validar o Contrato C atual em produção.
 - **Referência:** `manual-integracao-sistemas-licenciados.md` §7, §11.4, §12 e
   §14.1; `CHANGELOG-1.0.md` (P2).
 
