@@ -43,6 +43,24 @@ de cada tag está indicado para rastreabilidade.
   `cartao_checklist`, `cartao_checklist_item`, `cartao_comentario` e
   `cartao_atividade`. Aditivo: nenhuma tabela existente muda (etiquetas por
   filial, checklists com itens, comentários em 1 nível e log append-only).
+- **Módulo Projetos — Fase 2 (cartão rico), backend.** Sob `/v1/projetos`:
+  catálogo de etiquetas por filial (RBAC de estrutura — Admin/Gerente criam,
+  editam e excluem; Operador lê) e aplicar/remover na ficha do cartão
+  (idempotente); checklists com itens (checkbox, responsável, data e ordenação
+  fracionária) e progresso exposto no cartão (`checklist_total`/
+  `checklist_concluidos`); comentários com resposta em **1 nível** (a segunda
+  camada é recusada), edição pelo autor e **soft-delete** (autor ou gestor, a
+  linha fica para não quebrar as respostas); e log de atividade **append-only**
+  alimentado por todas as escritas (`criado`, `atualizado`, `movido`,
+  `arquivado`, `membro_add`, `etiqueta_add`, `checklist_criado`,
+  `item_concluido`, `comentario`, ...), consultável em
+  `GET /cartoes/{id}/atividade`. Nenhuma dessas escritas incrementa `versao` —
+  a versão otimista guarda título/descrição/datas, mover, arquivar e atribuir.
+- 17 testes novos em `backend/tests/test_projetos_fase2.py` (RBAC de etiquetas,
+  etiquetas no cartão, checklists/itens/progresso, reordenação, 404 de
+  isolamento, comentários em 1 nível, autoria, soft-delete e moderação, log de
+  atividade, RBAC do Caixa e bloqueio de escrita no modo leitura). Backend:
+  **167 testes** verdes.
 - **Licença resiliente à indisponibilidade do RedGest.** Erro de rede na
   ativação/renovação agora vira `503` (antes `500`); timeout de contato
   configurável (`licenca_timeout_segundos`, 90 s) e backoff progressivo no loop
@@ -75,6 +93,8 @@ de cada tag está indicado para rastreabilidade.
 
 ### Documentação
 
+- `docs/revisao_projetos_fase2.md`: escopo e decisões da Fase 2 (cartão rico:
+  etiquetas, checklists, comentários e atividade).
 - `docs/revisao_projetos_kanban.md`: escopo da Fase 1, decisões tomadas e
   pendências (Fases 2–4).
 - `docs/plano_resiliencia_licenca.md`: plano das etapas E0–E6 da resiliência da
