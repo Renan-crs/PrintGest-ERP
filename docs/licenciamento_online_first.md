@@ -64,9 +64,18 @@ Só o Local API Service fala com o RedGest; as estações-cliente nunca o fazem.
 
 ## 5. Depreciação
 
-O manual do RedGest marca `/licencas-software/` (v3.6) como depreciado em favor
-de `/api/v1/licencas/` (v4.x, assertion/JWK), com *sunset* em **01/03/2027**.
-O PrintGest deverá migrar antes dessa data.
+O RedGest marca `LicencaSoftware` v3.6 (`/licencas-software/`) como depreciado:
+as respostas passam a trazer `Deprecation: true`,
+`Sunset: Mon, 01 Mar 2027` e `Link: .../licencas/; rel="successor-version"`. O
+endpoint **permanece como adapter** até essa data; o PrintGest deve migrar antes
+de **01/03/2027**.
+
+A migração **não** é uma troca de endpoint: `/licencas/` é outro contrato
+(Contrato B v4.0, model `Licenca`, ativação por `cnpj` + `codigo_licenca`,
+credencial `client_id`/`client_secret`, resposta com JWT e `grace_deadline`). O
+alvo do PrintGest é a estratégia **`hardware_bound`** (desktop identificado por
+equipamento, 72 h de grace, rebind). Plano, pré-requisitos do RedGest e fases de
+corte em **`docs/migracao_redgest_v4.md`**.
 
 ## 6. Fingerprint da máquina (doc de integração RedGest §7)
 
@@ -117,7 +126,13 @@ Referência: *"Documento de Integração — chave de ativação (serial)"* v1.0
 Divergências assumidas:
 
 - **§10 migração v4.x**: o `/licencas-software/` é depreciado (sunset
-  01/03/2027) — ver §5. Não há o que migrar antes dessa data.
+  01/03/2027) — ver §5. O sucessor para o PrintGest é o Contrato B v4.0 na
+  estratégia `hardware_bound`; a migração está planejada e **bloqueada por
+  pré-requisitos do RedGest** (`docs/migracao_redgest_v4.md`). Nada do contrato
+  atual muda enquanto o adapter existir.
+- **§9.3 tolerância de 72 h** também é o grace do `hardware_bound` (§11.4/§12),
+  então o comportamento visível ao usuário (banner + escrita liberada) se
+  mantém na migração.
 
 ## 8. Cofre do SO para a chave de ativação (doc §9.4)
 
