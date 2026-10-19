@@ -130,6 +130,31 @@ de cada tag está indicado para rastreabilidade.
   `ativa` — nenhuma escrita é bloqueada. Se o daemon local parar de responder, o
   aviso **permanece** (desconhecimento não é licença nova). Desktop: **256
   testes** verdes.
+- **Suíte de aceite da resiliência (etapa E6).** O "cold start" passa a ser
+  exercitado com atraso **real** (`_RedGestReal`: um socket local que dorme antes
+  de responder), provando que `licenca_timeout_segundos` está de fato ligado à
+  requisição: lento mas dentro do timeout → `200` sem erro visível
+  (`test_cold_start_lento_conclui_sem_erro_visivel`); acima do timeout → `503`,
+  sem revogar a licença e com recuperação automática quando o RedGest volta
+  (`test_cold_start_estoura_timeout_real_e_recupera`). O "rollover de token" do
+  plano vira rollover de **vigência** — o Contrato C não tem token:
+  `test_revalidacao_renova_a_vigencia_e_reativa` (a revalidação com `expira_em`
+  novo tira a instalação de `tolerancia` e volta para `ativa`, recalculando a
+  janela) e a licença vitalícia permanece vitalícia. Os 5 aceites da §0 de
+  `docs/plano_resiliencia_licenca.md` ganham mapa para testes nomeados e o E6
+  fica marcado como **concluído**. Backend: **200 testes** verdes.
+- **Plano de migração para o RedGest v4.x (`/api/v1/licencas/`).** Novo
+  `docs/migracao_redgest_v4.md`: o `/licencas-software/` (Contrato C) é
+  depreciado — passa a responder `Deprecation: true`,
+  `Sunset: Mon, 01 Mar 2027` e `Link: .../licencas/; rel="successor-version"` —
+  e o sucessor do PrintGest é o **Contrato B v4.0** na estratégia
+  `hardware_bound` (ativação por `cnpj` + `codigo_licenca`, credencial
+  `client_id`/`client_secret`, JWT RS256 com verificação local e
+  `grace_deadline` de 72 h). O documento detalha o que muda em relação ao
+  contrato atual, os pré-requisitos do lado RedGest (que **bloqueiam** a
+  migração), o trabalho previsto no PrintGest, as fases de corte (M0–M4) e os
+  riscos. `docs/licenciamento_online_first.md` §5/§7 apontam para o plano; nada
+  do contrato atual muda enquanto o adapter existir.
 
 ### Corrigido
 
