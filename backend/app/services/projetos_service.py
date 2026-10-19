@@ -13,6 +13,13 @@ Camada de regra de negócio do quadro. Três eixos:
   membro de origem `lista`; atribuir a outro usuário restringe o cartão e, para
   quem não é gestor, o atribuidor vira acompanhante.
 
+A **Fase 2** (cartão rico) acrescenta, no fim do arquivo: etiquetas aplicadas ao
+cartão (RF10), checklists com itens ordenáveis por fração (RF11), comentários
+com resposta em 1 nível e soft-delete (RF14) e o log de atividade append-only
+(§12). Todas as sub-rotinas passam pelo `_buscar_cartao` (logo, por PV1–PV5) e
+**nenhuma** incrementa `versao` — a versão otimista guarda texto/datas, mover,
+arquivar e atribuir.
+
 A sincronização com o status da O.S. (RN2) fica na **fase 5** (vínculo com OS);
 as colunas `ordem_servico_id` e `status_os` já existem para recebê-la.
 """
@@ -31,7 +38,13 @@ from app.models.enums import NivelAcesso, OrigemMembro, StatusOs, TipoLista
 from app.models.projetos import (
     PASSO_FRACIONARIO,
     Cartao,
+    CartaoAtividade,
+    CartaoChecklist,
+    CartaoChecklistItem,
+    CartaoComentario,
+    CartaoEtiqueta,
     CartaoMembro,
+    Etiqueta,
     Quadro,
     QuadroLista,
 )
@@ -344,6 +357,14 @@ def _para_cartao(db: Session, cartao: Cartao) -> dict:
     donos = _nomes_usuarios(db, [cartao.ultimo_responsavel_id])
     dados["ultimo_responsavel_nome"] = donos.get(cartao.ultimo_responsavel_id)
     dados["membros"] = _membros_out(db, cartao.id)
+    # Fase 2 (RF4): etiquetas aplicadas e selos de progresso do cartão. Como o
+    # `_membros_out` já faz isso, são consultas por cartão — a Fase 1 otimizou
+    # a leitura em bloco só para listas/contagens; o resto é previsível no MVP.
+    dados["etiquetas"] = _etiquetas_do_cartao(db, cartao.id)
+    dados["checklist_total"], dados["checklist_concluidos"] = _progresso_checklists(
+        db, cartao.id
+    )
+    dados["comentarios_total"] = _comentarios_contados(db, cartao.id)
     return dados
 
 
@@ -464,6 +485,9 @@ def criar_cartao(
     db.add(cartao)
     db.flush()
     _sincronizar_membro_lista(db, cartao, lista, usuario)
+    _registrar_atividade(
+        db, cartao.id, usuario.id, "criado", {"titulo": cartao.titulo}
+    )
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -477,12 +501,25 @@ def atualizar_cartao(
     # `exclude_unset` no router: campo ausente = não mexer; campo presente com
     # `null` = limpar (permite remover título nulo? não; limpa datas/descrição e
     # lembrete — edição parcial de verdade). `titulo` é não-nulo no schema.
+    alterados: list[str] = []
     for campo in ("titulo", "descricao", "data_inicio", "data_entrega", "lembrete_min"):
         if campo in dados and not (campo == "titulo" and dados[campo] is None):
+            if getattr(cartao, campo) != dados[campo]:
+                alterados.append(campo)
             setattr(cartao, campo, dados[campo])
+    concluido_antes = cartao.concluido
     if dados.get("concluido") is not None:  # RN4: marca e desmarca sem bloquear
         cartao.concluido = bool(dados["concluido"])
         cartao.concluido_em = datetime.now(timezone.utc) if cartao.concluido else None
+    if alterados:
+        _registrar_atividade(db, cartao.id, usuario.id, "atualizado", {"campos": alterados})
+    if dados.get("concluido") is not None and cartao.concluido != concluido_antes:
+        _registrar_atividade(
+            db,
+            cartao.id,
+            usuario.id,
+            "concluido" if cartao.concluido else "reaberto",
+        )
     cartao.versao += 1
     db.commit()
     db.refresh(cartao)
@@ -518,10 +555,18 @@ def mover_cartao(
         posicoes = _posicoes_cartao(db, destino.id, exceto_id=cartao.id)
         nova_posicao = _posicao_para_indice(posicoes, indice)
 
+    lista_anterior = cartao.lista_id
     cartao.lista_id = destino.id
     cartao.posicao = nova_posicao
     cartao.versao += 1
     _sincronizar_membro_lista(db, cartao, destino, usuario)
+    _registrar_atividade(
+        db,
+        cartao.id,
+        usuario.id,
+        "movido",
+        {"lista_origem": lista_anterior, "lista_destino": destino.id},
+    )
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -535,6 +580,7 @@ def arquivar_cartao(
     _verificar_versao(cartao, versao)
     cartao.arquivado = True
     cartao.versao += 1
+    _registrar_atividade(db, cartao.id, usuario.id, "arquivado")
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -547,6 +593,7 @@ def restaurar_cartao(
     _verificar_versao(cartao, versao)
     cartao.arquivado = False
     cartao.versao += 1
+    _registrar_atividade(db, cartao.id, usuario.id, "restaurado")
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -568,6 +615,9 @@ def atribuir_cartao(
     if not _e_gestor(usuario) and usuario.id != alvo.id:
         _garantir_membro(db, cartao.id, usuario.id, OrigemMembro.ATRIBUIDOR, usuario.id)
     cartao.versao += 1
+    _registrar_atividade(
+        db, cartao.id, usuario.id, "atribuido", {"usuario_id": alvo.id}
+    )
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -580,6 +630,9 @@ def adicionar_membro(
     _buscar_usuario_ativo(db, membro_id, filial_id)
     _garantir_membro(db, cartao.id, membro_id, OrigemMembro.MANUAL, usuario.id)
     cartao.versao += 1
+    _registrar_atividade(
+        db, cartao.id, usuario.id, "membro_add", {"usuario_id": membro_id}
+    )
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -594,6 +647,9 @@ def remover_membro(
         CartaoMembro.usuario_id == membro_id,
     ).delete(synchronize_session=False)
     cartao.versao += 1
+    _registrar_atividade(
+        db, cartao.id, usuario.id, "membro_remove", {"usuario_id": membro_id}
+    )
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -675,3 +731,655 @@ def excluir_lista(db: Session, *, usuario: Usuario, quadro: Quadro, lista_id: in
         )
     db.delete(lista)
     db.commit()
+
+
+# ============================================ Fase 2 — Cartão rico (RF10–RF14)
+#
+# Etiquetas, checklists, comentários e atividade (RF14/§12). Tudo passa pelo
+# `_buscar_cartao`, então herda PV1–PV5 (cartão invisível → 404). Estas
+# **sub-rotinas não incrementam `versao`**: a versão otimista guarda o texto do
+# cartão (`PATCH /cartoes/{id}`), mover, arquivar e atribuir; etiquetas,
+# checklists e comentários são recursos próprios e não invalidam a ficha aberta.
+
+
+def _registrar_atividade(
+    db: Session,
+    cartao_id: int,
+    usuario_id: int | None,
+    tipo: str,
+    dados: dict | None = None,
+) -> None:
+    """Anexa um evento ao log append-only (§12). O commit é de quem chama."""
+    db.add(
+        CartaoAtividade(
+            cartao_id=cartao_id,
+            usuario_id=usuario_id,
+            tipo=tipo,
+            dados=dados,
+        )
+    )
+
+
+def listar_atividade(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int
+) -> list[dict]:
+    """Log do cartão, mais recente primeiro (limite de 200 eventos)."""
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    linhas = (
+        db.query(CartaoAtividade)
+        .filter(CartaoAtividade.cartao_id == cartao.id)
+        .order_by(CartaoAtividade.criado_em.desc(), CartaoAtividade.id.desc())
+        .limit(200)
+        .all()
+    )
+    nomes = _nomes_usuarios(db, [a.usuario_id for a in linhas])
+    return [
+        {
+            "id": a.id,
+            "cartao_id": a.cartao_id,
+            "usuario_id": a.usuario_id,
+            "usuario_nome": nomes.get(a.usuario_id),
+            "tipo": a.tipo,
+            "dados": a.dados,
+            "criado_em": a.criado_em,
+        }
+        for a in linhas
+    ]
+
+
+# ---------------------------------------------------------- Fase 2: etiquetas
+
+
+def _etiqueta_dict(etiqueta: Etiqueta) -> dict:
+    return {
+        "id": etiqueta.id,
+        "filial_id": etiqueta.filial_id,
+        "nome": etiqueta.nome,
+        "cor": etiqueta.cor,
+    }
+
+
+def listar_etiquetas(db: Session, filial_id: int) -> list[dict]:
+    linhas = (
+        db.query(Etiqueta)
+        .filter(Etiqueta.filial_id == filial_id)
+        .order_by(Etiqueta.criado_em.asc(), Etiqueta.id.asc())
+        .all()
+    )
+    return [_etiqueta_dict(e) for e in linhas]
+
+
+def criar_etiqueta(db: Session, *, filial_id: int, dados: dict) -> dict:
+    etiqueta = Etiqueta(
+        filial_id=filial_id, nome=dados.get("nome") or None, cor=dados["cor"]
+    )
+    db.add(etiqueta)
+    db.commit()
+    db.refresh(etiqueta)
+    return _etiqueta_dict(etiqueta)
+
+
+def _buscar_etiqueta(db: Session, filial_id: int, etiqueta_id: int) -> Etiqueta:
+    etiqueta = (
+        db.query(Etiqueta)
+        .filter(Etiqueta.id == etiqueta_id, Etiqueta.filial_id == filial_id)
+        .first()
+    )
+    if etiqueta is None:
+        raise _nao_encontrado()
+    return etiqueta
+
+
+def atualizar_etiqueta(
+    db: Session, *, filial_id: int, etiqueta_id: int, dados: dict
+) -> dict:
+    etiqueta = _buscar_etiqueta(db, filial_id, etiqueta_id)
+    if "nome" in dados:
+        etiqueta.nome = dados["nome"]
+    if dados.get("cor"):
+        etiqueta.cor = dados["cor"]
+    db.commit()
+    db.refresh(etiqueta)
+    return _etiqueta_dict(etiqueta)
+
+
+def excluir_etiqueta(db: Session, *, filial_id: int, etiqueta_id: int) -> None:
+    """Apaga a etiqueta; os vínculos caem por `ON DELETE CASCADE` no banco."""
+    etiqueta = _buscar_etiqueta(db, filial_id, etiqueta_id)
+    db.delete(etiqueta)
+    db.commit()
+
+
+def _etiquetas_do_cartao(db: Session, cartao_id: int) -> list[dict]:
+    linhas = (
+        db.query(Etiqueta)
+        .join(CartaoEtiqueta, CartaoEtiqueta.etiqueta_id == Etiqueta.id)
+        .filter(CartaoEtiqueta.cartao_id == cartao_id)
+        .order_by(Etiqueta.id.asc())
+        .all()
+    )
+    return [_etiqueta_dict(e) for e in linhas]
+
+
+def aplicar_etiqueta(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    etiqueta_id: int,
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    etiqueta = _buscar_etiqueta(db, filial_id, etiqueta_id)
+    vinculo = (
+        db.query(CartaoEtiqueta)
+        .filter(
+            CartaoEtiqueta.cartao_id == cartao.id,
+            CartaoEtiqueta.etiqueta_id == etiqueta.id,
+        )
+        .first()
+    )
+    if vinculo is None:  # idempotente: aplicar duas vezes não duplica nem loga
+        db.add(CartaoEtiqueta(cartao_id=cartao.id, etiqueta_id=etiqueta.id))
+        _registrar_atividade(
+            db,
+            cartao.id,
+            usuario.id,
+            "etiqueta_add",
+            {"etiqueta_id": etiqueta.id, "nome": etiqueta.nome, "cor": etiqueta.cor},
+        )
+        db.commit()
+        db.refresh(cartao)
+    return _para_cartao(db, cartao)
+
+
+def remover_etiqueta(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    etiqueta_id: int,
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    apagados = (
+        db.query(CartaoEtiqueta)
+        .filter(
+            CartaoEtiqueta.cartao_id == cartao.id,
+            CartaoEtiqueta.etiqueta_id == etiqueta_id,
+        )
+        .delete(synchronize_session=False)
+    )
+    if apagados:
+        _registrar_atividade(
+            db, cartao.id, usuario.id, "etiqueta_remove", {"etiqueta_id": etiqueta_id}
+        )
+        db.commit()
+        db.refresh(cartao)
+    return _para_cartao(db, cartao)
+
+
+# --------------------------------------------------------- Fase 2: checklists
+
+
+def _posicoes_checklist(db: Session, cartao_id: int, exceto_id: int | None = None):
+    q = db.query(CartaoChecklist.posicao).filter(CartaoChecklist.cartao_id == cartao_id)
+    if exceto_id is not None:
+        q = q.filter(CartaoChecklist.id != exceto_id)
+    return [p for (p,) in q.order_by(CartaoChecklist.posicao.asc()).all()]
+
+
+def _posicoes_item(db: Session, checklist_id: int, exceto_id: int | None = None):
+    q = db.query(CartaoChecklistItem.posicao).filter(
+        CartaoChecklistItem.checklist_id == checklist_id
+    )
+    if exceto_id is not None:
+        q = q.filter(CartaoChecklistItem.id != exceto_id)
+    return [p for (p,) in q.order_by(CartaoChecklistItem.posicao.asc()).all()]
+
+
+def _rebalancear_checklists(db: Session, cartao_id: int) -> None:
+    linhas = (
+        db.query(CartaoChecklist)
+        .filter(CartaoChecklist.cartao_id == cartao_id)
+        .order_by(CartaoChecklist.posicao.asc())
+        .all()
+    )
+    for indice, checklist in enumerate(linhas, start=1):
+        checklist.posicao = PASSO_FRACIONARIO * indice
+    db.flush()
+
+
+def _rebalancear_itens(db: Session, checklist_id: int) -> None:
+    linhas = (
+        db.query(CartaoChecklistItem)
+        .filter(CartaoChecklistItem.checklist_id == checklist_id)
+        .order_by(CartaoChecklistItem.posicao.asc())
+        .all()
+    )
+    for indice, item in enumerate(linhas, start=1):
+        item.posicao = PASSO_FRACIONARIO * indice
+    db.flush()
+
+
+def _com_espaco(posicoes, indice: int, recarregar) -> Decimal:
+    """Índice → fração; se o passo esgotou, rebalanceia e recalcula.
+
+    `recarregar` deve rebalancear e devolver as posições já normalizadas.
+    """
+    try:
+        return _posicao_para_indice(posicoes, indice)
+    except _EspacoEsgotado:
+        return _posicao_para_indice(recarregar(), indice)
+
+
+def _progresso_checklists(db: Session, cartao_id: int) -> tuple[int, int]:
+    """(total, concluídos) de itens de todos os checklists do cartão (RF11)."""
+    base = (
+        db.query(func.count(CartaoChecklistItem.id))
+        .join(CartaoChecklist, CartaoChecklistItem.checklist_id == CartaoChecklist.id)
+        .filter(CartaoChecklist.cartao_id == cartao_id)
+    )
+    total = base.scalar() or 0
+    concluidos = base.filter(CartaoChecklistItem.concluido.is_(True)).scalar() or 0
+    return total, concluidos
+
+
+def _itens_do_checklist(db: Session, checklist_id: int) -> list[CartaoChecklistItem]:
+    return (
+        db.query(CartaoChecklistItem)
+        .filter(CartaoChecklistItem.checklist_id == checklist_id)
+        .order_by(CartaoChecklistItem.posicao.asc(), CartaoChecklistItem.id.asc())
+        .all()
+    )
+
+
+def _item_dict(item: CartaoChecklistItem, nomes: dict[int, str]) -> dict:
+    return {
+        "id": item.id,
+        "checklist_id": item.checklist_id,
+        "texto": item.texto,
+        "concluido": item.concluido,
+        "responsavel_id": item.responsavel_id,
+        "responsavel_nome": nomes.get(item.responsavel_id),
+        "data_entrega": item.data_entrega,
+        "posicao": item.posicao,
+    }
+
+
+def _checklist_dict(db: Session, checklist: CartaoChecklist) -> dict:
+    itens = _itens_do_checklist(db, checklist.id)
+    nomes = _nomes_usuarios(db, [i.responsavel_id for i in itens])
+    return {
+        "id": checklist.id,
+        "cartao_id": checklist.cartao_id,
+        "titulo": checklist.titulo,
+        "posicao": checklist.posicao,
+        "total": len(itens),
+        "concluidos": sum(1 for i in itens if i.concluido),
+        "itens": [_item_dict(i, nomes) for i in itens],
+    }
+
+
+def _buscar_checklist(
+    db: Session, cartao_id: int, checklist_id: int
+) -> CartaoChecklist:
+    checklist = (
+        db.query(CartaoChecklist)
+        .filter(
+            CartaoChecklist.id == checklist_id,
+            CartaoChecklist.cartao_id == cartao_id,
+        )
+        .first()
+    )
+    if checklist is None:
+        raise _nao_encontrado()
+    return checklist
+
+
+def _buscar_item(db: Session, checklist_id: int, item_id: int) -> CartaoChecklistItem:
+    item = (
+        db.query(CartaoChecklistItem)
+        .filter(
+            CartaoChecklistItem.id == item_id,
+            CartaoChecklistItem.checklist_id == checklist_id,
+        )
+        .first()
+    )
+    if item is None:
+        raise _nao_encontrado()
+    return item
+
+
+def listar_checklists(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int
+) -> list[dict]:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    linhas = (
+        db.query(CartaoChecklist)
+        .filter(CartaoChecklist.cartao_id == cartao.id)
+        .order_by(CartaoChecklist.posicao.asc(), CartaoChecklist.id.asc())
+        .all()
+    )
+    return [_checklist_dict(db, c) for c in linhas]
+
+
+def criar_checklist(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int, dados: dict
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    posicoes = _posicoes_checklist(db, cartao.id)
+    checklist = CartaoChecklist(
+        cartao_id=cartao.id,
+        titulo=dados["titulo"],
+        posicao=_posicao_para_indice(posicoes, len(posicoes)),
+    )
+    db.add(checklist)
+    db.flush()
+    _registrar_atividade(
+        db,
+        cartao.id,
+        usuario.id,
+        "checklist_criado",
+        {"checklist_id": checklist.id, "titulo": checklist.titulo},
+    )
+    db.commit()
+    db.refresh(checklist)
+    return _checklist_dict(db, checklist)
+
+
+def atualizar_checklist(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    checklist_id: int,
+    dados: dict,
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    checklist = _buscar_checklist(db, cartao.id, checklist_id)
+    if dados.get("titulo") is not None:
+        checklist.titulo = dados["titulo"]
+    if dados.get("posicao") is not None:
+        checklist.posicao = _com_espaco(
+            _posicoes_checklist(db, cartao.id, exceto_id=checklist.id),
+            dados["posicao"],
+            lambda: (
+                _rebalancear_checklists(db, cartao.id),
+                _posicoes_checklist(db, cartao.id, exceto_id=checklist.id),
+            )[1],
+        )
+    db.commit()
+    db.refresh(checklist)
+    return _checklist_dict(db, checklist)
+
+
+def excluir_checklist(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int, checklist_id: int
+) -> None:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    checklist = _buscar_checklist(db, cartao.id, checklist_id)
+    titulo = checklist.titulo
+    db.delete(checklist)  # itens caem por cascade
+    _registrar_atividade(
+        db, cartao.id, usuario.id, "checklist_excluido", {"titulo": titulo}
+    )
+    db.commit()
+
+
+def criar_item(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    checklist_id: int,
+    dados: dict,
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    checklist = _buscar_checklist(db, cartao.id, checklist_id)
+    responsavel_id = dados.get("responsavel_id")
+    if responsavel_id is not None:
+        _buscar_usuario_ativo(db, responsavel_id, filial_id)
+    posicoes = _posicoes_item(db, checklist.id)
+    item = CartaoChecklistItem(
+        checklist_id=checklist.id,
+        texto=dados["texto"],
+        responsavel_id=responsavel_id,
+        data_entrega=dados.get("data_entrega"),
+        posicao=_posicao_para_indice(posicoes, len(posicoes)),
+    )
+    db.add(item)
+    db.flush()
+    _registrar_atividade(
+        db,
+        cartao.id,
+        usuario.id,
+        "item_criado",
+        {"checklist_id": checklist.id, "item_id": item.id, "texto": item.texto},
+    )
+    db.commit()
+    db.refresh(item)
+    return _item_dict(item, _nomes_usuarios(db, [item.responsavel_id]))
+
+
+def atualizar_item(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    checklist_id: int,
+    item_id: int,
+    dados: dict,
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    checklist = _buscar_checklist(db, cartao.id, checklist_id)
+    item = _buscar_item(db, checklist.id, item_id)
+    antes = {
+        campo: getattr(item, campo)
+        for campo in ("texto", "concluido", "responsavel_id", "data_entrega")
+    }
+    if dados.get("texto") is not None:
+        item.texto = dados["texto"]
+    if "responsavel_id" in dados:
+        if dados["responsavel_id"] is not None:
+            _buscar_usuario_ativo(db, dados["responsavel_id"], filial_id)
+        item.responsavel_id = dados["responsavel_id"]
+    if "data_entrega" in dados:
+        item.data_entrega = dados["data_entrega"]
+    if dados.get("concluido") is not None:
+        item.concluido = bool(dados["concluido"])
+    if dados.get("posicao") is not None:
+        item.posicao = _com_espaco(
+            _posicoes_item(db, checklist.id, exceto_id=item.id),
+            dados["posicao"],
+            lambda: (
+                _rebalancear_itens(db, checklist.id),
+                _posicoes_item(db, checklist.id, exceto_id=item.id),
+            )[1],
+        )
+    db.flush()
+    evento: dict = {"checklist_id": checklist.id, "item_id": item.id}
+    virou = dados.get("concluido")
+    antes_concluido = antes["concluido"]
+    if virou is not None and bool(virou) != antes_concluido:
+        if item.concluido:
+            _registrar_atividade(db, cartao.id, usuario.id, "item_concluido", evento)
+        else:
+            _registrar_atividade(db, cartao.id, usuario.id, "item_reaberto", evento)
+    elif any(getattr(item, campo) != antes[campo] for campo in antes):
+        _registrar_atividade(db, cartao.id, usuario.id, "item_atualizado", evento)
+    db.commit()
+    db.refresh(item)
+    return _item_dict(item, _nomes_usuarios(db, [item.responsavel_id]))
+
+
+def excluir_item(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    checklist_id: int,
+    item_id: int,
+) -> None:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    checklist = _buscar_checklist(db, cartao.id, checklist_id)
+    item = _buscar_item(db, checklist.id, item_id)
+    texto = item.texto
+    db.delete(item)
+    _registrar_atividade(
+        db,
+        cartao.id,
+        usuario.id,
+        "item_excluido",
+        {"checklist_id": checklist.id, "item_id": item_id, "texto": texto},
+    )
+    db.commit()
+
+
+# -------------------------------------------------------- Fase 2: comentários
+
+
+def _comentarios_contados(db: Session, cartao_id: int) -> int:
+    return (
+        db.query(func.count(CartaoComentario.id))
+        .filter(
+            CartaoComentario.cartao_id == cartao_id,
+            CartaoComentario.excluido.is_(False),
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _comentario_dict(comentario: CartaoComentario, nomes: dict[int, str]) -> dict:
+    return {
+        "id": comentario.id,
+        "cartao_id": comentario.cartao_id,
+        "usuario_id": comentario.usuario_id,
+        "usuario_nome": nomes.get(comentario.usuario_id),
+        # Soft-delete: a linha permanece (respostas não quebram), o texto não.
+        "texto": None if comentario.excluido else comentario.texto,
+        "resposta_a_id": comentario.resposta_a_id,
+        "excluido": comentario.excluido,
+        "criado_em": comentario.criado_em,
+        "editado_em": comentario.editado_em,
+    }
+
+
+def _comentario_do_cartao(
+    db: Session, cartao_id: int, comentario_id: int
+) -> CartaoComentario:
+    comentario = (
+        db.query(CartaoComentario)
+        .filter(
+            CartaoComentario.id == comentario_id,
+            CartaoComentario.cartao_id == cartao_id,
+        )
+        .first()
+    )
+    if comentario is None:
+        raise _nao_encontrado()
+    return comentario
+
+
+def listar_comentarios(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int
+) -> list[dict]:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    linhas = (
+        db.query(CartaoComentario)
+        .filter(CartaoComentario.cartao_id == cartao.id)
+        .order_by(CartaoComentario.criado_em.asc(), CartaoComentario.id.asc())
+        .all()
+    )
+    nomes = _nomes_usuarios(db, [c.usuario_id for c in linhas])
+    return [_comentario_dict(c, nomes) for c in linhas]
+
+
+def criar_comentario(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int, dados: dict
+) -> dict:
+    """Comentário com resposta em **um** nível (RF14)."""
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    resposta_a = dados.get("resposta_a_id")
+    if resposta_a is not None:
+        pai = _comentario_do_cartao(db, cartao.id, resposta_a)
+        if pai.resposta_a_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Só é possível responder em um nível.",
+            )
+    comentario = CartaoComentario(
+        cartao_id=cartao.id,
+        usuario_id=usuario.id,
+        texto=dados["texto"],
+        resposta_a_id=resposta_a,
+    )
+    db.add(comentario)
+    db.flush()
+    _registrar_atividade(
+        db, cartao.id, usuario.id, "comentario", {"comentario_id": comentario.id}
+    )
+    db.commit()
+    db.refresh(comentario)
+    return _comentario_dict(comentario, _nomes_usuarios(db, [comentario.usuario_id]))
+
+
+def atualizar_comentario(
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    comentario_id: int,
+    dados: dict,
+) -> dict:
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    comentario = _comentario_do_cartao(db, cartao.id, comentario_id)
+    if comentario.excluido:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Comentário excluído não pode ser editado.",
+        )
+    if comentario.usuario_id != usuario.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas o autor pode editar o comentário.",
+        )
+    comentario.texto = dados["texto"]
+    comentario.editado_em = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(comentario)
+    return _comentario_dict(comentario, _nomes_usuarios(db, [comentario.usuario_id]))
+
+
+def excluir_comentario(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int, comentario_id: int
+) -> dict:
+    """Soft-delete (RF14): a linha fica para não quebrar as respostas.
+
+    O autor exclui o próprio comentário; gestores (Admin/Gerente) moderam.
+    """
+    cartao = _buscar_cartao(db, usuario, cartao_id, filial_id)
+    comentario = _comentario_do_cartao(db, cartao.id, comentario_id)
+    if comentario.usuario_id != usuario.id and not _e_gestor(usuario):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas o autor ou um gestor pode excluir o comentário.",
+        )
+    if not comentario.excluido:
+        comentario.excluido = True
+        _registrar_atividade(
+            db,
+            cartao.id,
+            usuario.id,
+            "comentario_excluido",
+            {"comentario_id": comentario.id},
+        )
+        db.commit()
+        db.refresh(comentario)
+    return _comentario_dict(comentario, _nomes_usuarios(db, [comentario.usuario_id]))
