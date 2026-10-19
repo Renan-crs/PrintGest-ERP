@@ -178,20 +178,43 @@ tolerância (✅) e o banner progressivo com prazo + tempo restante + barra, al�
 de a mudança de estado (`tolerancia` → `ativa`) retirar o banner sem reabrir a
 tela (✅).
 
-### E6 — Testes — parcial
+### E6 — Testes — concluído
 - [x] `backend/tests/test_licenciamento.py` (via `httpx.MockTransport`): timeout
       na ativação/renovação (503, sem revogação), janela de tolerância,
       tolerância esgotada → leitura, diagnóstico da falha, backoff (1/5/15/60),
       `429`/`5xx` → 503, recusa em `200 {valido: false}` e fingerprint canônico.
 - [x] `desktop/tests/test_modoleitura.py` e `test_tela_principal.py`: mensagem
       por estado (revogada × tolerância) e texto/estilo do indicador.
-- [ ] Cold start com *delay* real (o MockTransport não simula atraso de 60 s);
-      coberto por timeout simulado. Rollover completo de token → backlog.
-- [ ] Mapear cada teste de aceite da §5 a um teste nomeado. *Parcial: aceites
-      1–5 cobertos por `test_timeout_na_renovacao_nao_revoga`,
-      `test_token_vencido_dentro_da_tolerancia_opera_normal`,
-      `test_tolerancia_esgotada_entra_em_modo_leitura` e
-      `test_revogada_mostra_mensagem_de_revogacao`.*
+- [x] Cold start com *delay* real (`_RedGestReal`, socket local que dorme antes
+      de responder): `test_cold_start_lento_conclui_sem_erro_visivel` (lento,
+      mas dentro do timeout → 200 sem erro) e
+      `test_cold_start_estoura_timeout_real_e_recupera` (acima do timeout →
+      503 sem revogar e recuperação quando o RedGest responde). O
+      `MockTransport` do httpx **não** aplica timeout ao handler; só um
+      transporte real prova que `licenca_timeout_segundos` está ligado à
+      requisição. O atraso de 60 s do cenário vira 1,5 s contra timeout de
+      0,2 s (mesma relação, sem prender a suíte).
+- [x] Rollover — o Contrato C **não tem token** (D3/D4 cancelados): o
+      equivalente é a vigência.
+      `test_revalidacao_renova_a_vigencia_e_reativa` (revalidar em tolerância
+      com `expira_em` novo substitui o local e volta a `ativa`, recalculando a
+      tolerância) e `test_revalidacao_de_licenca_vitalicia_continua_vitalicia`
+      (`expira_em: null` permanece vitalícia).
+- [x] Cada teste de aceite da §0 mapeado a um teste nomeado:
+
+| Aceite (§0) | Teste nomeado |
+| --- | --- |
+| 1. RedGest frio (~60 s): a renovação conclui sem erro visível | `test_cold_start_lento_conclui_sem_erro_visivel` (backend) |
+| 2. Inacessível por até 72 h após a vigência: opera normalmente | `test_vigencia_vencida_dentro_da_tolerancia_opera_normal` (backend); `test_banner_tolerancia_aparece_com_prazo_e_restante` (desktop) |
+| 3. Queda longa: nenhum cliente perde acesso | `test_cold_start_estoura_timeout_real_e_recupera`, `test_429_vira_503_e_nao_revoga` e `test_erro_5xx_vira_503_e_registra_diagnostico` (indisponibilidade nunca revoga); `test_revalidacao_renova_a_vigencia_e_reativa` (retorno) |
+| 4. Revogação explícita: modo leitura dentro da janela | `test_revogacao_volta_ao_modo_leitura` e `test_recusa_200_revogada_entra_modo_leitura` (backend) |
+| 5. A mensagem ao usuário diz *qual* é o motivo | `test_tolerancia_esgotada_mostra_diagnostico`, `test_revogada_mostra_mensagem_de_revogacao`, `test_mensagem_tolerancia_traz_o_prazo_do_documento` |
+
+**Nota (Contrato C).** Os aceites 1–2 falavam em *token* porque o plano original
+previa JWT local (D3/D4); com o Contrato C a vigência (`expira_em`) faz o papel
+do token e a tolerância de 72 h cobre o vencimento. O aceite 3 ("72 h de token +
+72 h de tolerância") vira "vigência + 72 h": uma queda de vários dias não bloqueia
+enquanto a vigência local valer, e nenhuma falha de rede revoga a licença.
 
 ---
 
@@ -235,8 +258,9 @@ tela (✅).
 
 1. **E0 + E1 + E2** — resolve o cenário que o documento quer cobrir (o "mínimo
    vendável" da resiliência). Entregável já utilizável.
-2. **E5 + E6** — UI e testes. **E5 concluído**; o E6 segue parcial (itens em
-   aberto acima: cold start/rollover e o mapa nomeado dos aceites).
+2. **E5 + E6** — UI e testes. **E5 e E6 concluídos**: o banner progressivo de
+   tolerância (§9.3) e a suíte de aceite nomeada (cold start real, rollover da
+   vigência e o mapa dos 5 aceites da §0).
 - ~~E3 e E4~~ cancelados: o Contrato C não emite JWT (ver revisão 2.1.0).
 - E0..E2 destravam os testes de aceite 1–4; o aceite 5 depende de E5.
 
