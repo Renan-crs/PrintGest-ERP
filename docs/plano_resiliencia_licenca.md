@@ -11,6 +11,21 @@ Referências de linha do código de hoje estão em
 `backend/app/models/licenca.py`, `desktop/printgest/main.py`,
 `desktop/printgest/ui/modoleitura.py` e `desktop/printgest/ui/tela_principal.py`.
 
+> **Revisão 2.1.0 — Contrato C (chave de produto).** O licenciamento migrou do
+> modelo `online_periodic` (CNPJ + código → JWT) para o **Contrato C** do RedGest
+> (`/api/v1/licencas-software/validar/`): chave de produto `XXXX-XXXX-XXXX-XXXX`
+> validada online, **sem JWT**. Consequências para este plano:
+>
+> - **D3 e E3 (validação local do JWT)**: cancelados — não há JWT a verificar.
+> - **D4 e E4 (extensão de emergência assinada)**: cancelados — a tolerância de
+>   72 h cobre a indisponibilidade.
+> - **D1, D2, D5, E0, E1, E2, E5 e E6** seguem válidos; onde o texto abaixo falar
+>   em "token"/`token_expira_em`, leia-se a vigência local `expira_em`.
+> - A cadência "renova antes de 1 h" (`licenca_renova_antes_segundos`) foi
+>   substituída por `licenca_revalidar_a_cada_segundos` (default 6 h).
+> - Decisões e contrato vivos em `docs/licenciamento_online_first.md`; o PRD
+>   (`docs/prd_2.0.md` §3) foi reescrito para o Contrato C.
+
 ---
 
 ## 0. Objetivo e critério de sucesso
@@ -53,8 +68,8 @@ emitindo fiscal) enquanto o RedGest estiver inacessível, distinguindo
 | --- | --- | --- | --- |
 | D1 | Duração da tolerância pós-expiração | **72 h** | É o número já anunciado na UI (`ativacao.py:224`). |
 | D2 | Backoff de tentativas | **1 / 5 / 15 min**, repetindo 15 min; zera no sucesso | §2 item 1 do documento. |
-| D3 | Validação local do token (assinatura RS256) | **Fazer** | Adiciona `cryptography` ao runtime. Reverte decisão do PRD v2.0 §3.3 — **marcar**. |
-| D4 | Extensão de emergência (licença assinada offline) | **Fazer** | Reverte decisão do PRD v2.0 §3.3 — **marcar**. |
+| D3 | Validação local do token (assinatura RS256) | **Descartado** (Contrato C: sem JWT) | Não reverte mais §3.3 do PRD; ver revisão 2.1.0. |
+| D4 | Extensão de emergência assinada | **Descartado** (Contrato C) | A tolerância de 72 h cobre a indisponibilidade; ver revisão 2.1.0. |
 | D5 | Cadência de renovação quando o token é longo | Manter checagem a cada 5 min, renovando só na janela (`renova_antes`) | O "a cada 6 h" do documento é propriedade do TTL do RedGest. |
 
 > D3 e D4 **reabrem** itens removidos de propósito no `docs/prd_2.0.md` §3.3
@@ -116,7 +131,7 @@ respeita o backoff.
 `estado="tolerancia"`, escritas liberadas (sem 423); após a tolerância →
 `estado="leitura"` e 423 nas escritas.
 
-### E3 — Validação local do token (D3)
+### E3 — Validação local do token (D3) — ❌ cancelada (Contrato C)
 - [ ] Adicionar `cryptography` ao `backend/requirements.txt` (justificativa:
       verificar a assinatura RS256 offline).
 - [ ] Chave pública do RedGest configurável (`PRINTGEST_REDGEST_PUBKEY` ou
@@ -128,7 +143,7 @@ respeita o backoff.
 
 **Aceite:** JWT adulterado → leitura; JWT válido sem rede → `ativa`/`tolerancia`.
 
-### E4 — Extensão de emergência (D4)
+### E4 — Extensão de emergência (D4) — ❌ cancelada (Contrato C)
 - [ ] Formato: JSON `{cnpj, emitido_em, valido_ate}` + assinatura RSA
       (destacada), assinado por chave privada mantida **offline** pelo dono.
 - [ ] Serviço para importar/validar o arquivo com a chave pública embutida;
@@ -185,11 +200,10 @@ de tolerância (✅); o banner progressivo fica para o backlog.
 - [x] `docs/prd_2.0.md` §3.2: tolerância 72 h (`licenca_tolerancia_horas`),
       timeout 90 s com backoff 60/300/900 s e a regra de que indisponibilidade
       **não** revoga (item novo, nº 8).
-- [ ] `docs/prd_2.0.md` §3: token 72 h / renovação 6 h e a nota sobre D3/D4
-      (reversões de §3.3) — **junto com E3/E4**, ainda não feitas.
-- [ ] `licenciamento_online_first.md`: substituir os valores de 4 h e 24–72 h
-      pelos novos. **Esse arquivo não existe no repositório** — localizar
-      (documento externo?) ou criar.
+- [x] `docs/prd_2.0.md` §3: reescrito para o Contrato C (chave de produto +
+      validação online), com a nota de que D3/D4 não se aplicam.
+- [x] `docs/licenciamento_online_first.md`: documento criado com as decisões
+      online-first vigentes (Contrato C, tolerância de 72 h, cadências).
 - [x] `CHANGELOG.md` (`## [Não lançado]`).
 
 ---
@@ -211,7 +225,7 @@ de tolerância (✅); o banner progressivo fica para o backlog.
 1. **E0 + E1 + E2** — resolve o cenário que o documento quer cobrir (o "mínimo
    vendável" da resiliência). Entregável já utilizável.
 2. **E5 + E6** — UI e testes, junto com as etapas acima.
-- [ ] E3 e E4 depois, como decisões (D3/D4) explícitas.
+- ~~E3 e E4~~ cancelados: o Contrato C não emite JWT (ver revisão 2.1.0).
 - E0..E2 destravam os testes de aceite 1–4; o aceite 5 depende de E5.
 
 **Sugestão de versão:** `0.3.0` (junto com o restante do `Não lançado`).

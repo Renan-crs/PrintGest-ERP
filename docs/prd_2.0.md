@@ -15,6 +15,7 @@
 | 1.0.0 | Versão inicial enxuta, sem licenciamento via terceiro. |
 | 1.2.0 (RedGest) | Versão superdimensionada: Local API Service, licenciamento offline-first com hardware ID/rebind/tamper, blind index de PII, Documenso, SOX/ISO 9001/WCAG. |
 | **2.0.0** | Recalibrada para o caso real: 5 máquinas na mesma rede com internet, licenciamento online-first via RedGest (token curto + refresh, sem hardware ID), LGPD proporcional ao porte, backlog explícito do que foi adiado. |
+| **2.1.0** | Licenciamento migrado para **chave de produto validada online** (RedGest Contrato C, `/api/v1/licencas-software/`): o usuário digita `XXXX-XXXX-XXXX-XXXX`, sem CNPJ e sem JWT. A resiliência (tolerância de 72 h, backoff, estados) é mantida; `D3`/`D4` do plano de resiliência deixam de se aplicar (ver §3). |
 
 ---
 
@@ -63,7 +64,7 @@ Donos e operadores de gráficas rápidas de pequeno porte no Brasil, tipicamente
 | # | Decisão | Resumo |
 |---|---|---|
 | D1 | Local API Service continua obrigatório | Centraliza acesso ao banco e RBAC; estações-cliente nunca acessam PostgreSQL diretamente. Mantido do PRD anterior por ser boa prática independente de porte. |
-| D2 | Licenciamento online-first, sem hardware ID | Como há internet como regra, a licença é validada por token de curta duração renovado automaticamente, vinculada ao CNPJ da gráfica — não à máquina. |
+| D2 | Licenciamento online-first por **chave de produto**, sem hardware ID | O operador digita a chave de produto e o Local API Service a valida online a cada poucas horas; a instalação é identificada por um fingerprint (não por CNPJ nem por hardware rebind). |
 | D3 | LGPD proporcional | Controle de acesso por usuário/nível + backup substituem criptografia de campo (blind index) como medida inicial; criptografia de PII vira item de backlog, não bloqueador de lançamento. |
 | D4 | Sem dependência de terceiro fora do RedGest para licenciamento | RedGest permanece como autoridade emissora, mas com contrato simplificado (ver §3). |
 | D5 | Multi-filial: dado pronto, funcionalidade não ativada | Tabelas já usam `filial_id`; telas e regras de consolidação entre filiais ficam para quando houver de fato uma segunda unidade. |
@@ -105,43 +106,46 @@ Donos e operadores de gráficas rápidas de pequeno porte no Brasil, tipicamente
 
 ---
 
-## 3. Licenciamento (RedGest — modelo online-first)
+## 3. Licenciamento (RedGest — chave de produto, validação online)
 
 ### 3.1 Princípio
 
-A licença é emitida e controlada pelo RedGest, vinculada ao **CNPJ da gráfica** (não a hardware). Apenas o Local API Service comunica-se com o RedGest; as estações-cliente nunca o fazem diretamente.
+A licença é emitida e controlada pelo RedGest e entregue como uma **chave de produto** (`XXXX-XXXX-XXXX-XXXX`) que o operador digita na primeira execução — o mesmo modelo mental de CorelDRAW/Windows. A validação é **online**. Apenas o Local API Service comunica-se com o RedGest; as estações-cliente nunca o fazem diretamente.
 
 ### 3.2 Fluxo
 
-1. **Ativação**: no primeiro uso, o operador informa CNPJ + código de licença (recebido na contratação). O Local API Service troca isso por credenciais (`client_id`/`client_secret`) junto ao RedGest — fluxo 100% online, sem ativação assistida manual.
-2. **Token**: RedGest emite um JWT RS256 de curta duração (ex.: 4 horas) contendo entitlements (`max_estacoes`, módulos habilitados, plano).
-3. **Renovação automática**: o Local API Service renova o token periodicamente (ex.: a cada 3h) antes de expirar. Processo silencioso, sem intervenção do usuário.
-4. **Falha de renovação (internet fora do ar)**: o RedGest inacessível vira `503` para o chamador e **nunca** revoga a licença (revogação só vem de `401/403`). O sistema continua operando com o token local; ao expirar, entra na tolerância (item 5) — e não em modo leitura imediato.
-5. **Janela de tolerância offline** (`licenca_tolerancia_horas`, **72h** por padrão): contada a partir da expiração do token. Esgotada sem renovação, o sistema entra em **modo leitura** (bloqueia escrita e emissão fiscal) até a conexão voltar.
-6. **Revogação** (inadimplência/cancelamento): refletida na próxima tentativa de renovação; sistema entra em modo leitura em poucas horas.
-7. **Troca da máquina-servidor**: reinstala o Local API Service na nova máquina e reativa com o mesmo CNPJ — sem fluxo de rebind com limite de tentativas.
-8. **Contato com o RedGest**: timeout de 90 s por padrão (`licenca_timeout_segundos`) e recuo progressivo após falhas consecutivas (`licenca_backoff_segundos`, 60/300/900 s), zerado na primeira renovação bem-sucedida.
+1. **Ativação**: no primeiro uso, o operador informa a chave de produto recebida na contratação; o Local API Service a valida online em `POST /api/v1/licencas-software/validar/`, autenticando por HMAC-SHA256 do `Sistema.api_key`. A resposta traz `valido`, `expira_em`, `primeira_ativacao`, `ativacoes_realizadas` e `limite_ativacoes`.
+2. **Vínculo por máquina**: cada ativação registra um `maquina_fingerprint` (SHA-256 estável da instalação). Reativar a mesma máquina não consome o `limite_ativacoes`; uma máquina nova consome.
+3. **Vigência**: a licença vale até `expira_em` (`null` = vitalícia). Não há JWT nem token de curta duração.
+4. **Revalidação automática**: o Local API Service reconsulta o RedGest a cada `licenca_revalidar_a_cada_segundos` (default 6 h). É essa revalidação que detecta revogação, bloqueio ou expiração.
+5. **Falha de revalidação (internet fora do ar)**: o RedGest inacessível vira `503` para o chamador e **nunca** revoga a licença (revogação só vem de `403`). O sistema segue operando dentro da vigência; ao vencê-la, entra na tolerância (item 6) — e não em modo leitura imediato.
+6. **Janela de tolerância offline** (`licenca_tolerancia_horas`, **72 h** por padrão): contada a partir da vigência (`expira_em`). Esgotada sem revalidação, o sistema entra em **modo leitura** (bloqueia escrita e emissão fiscal) até a conexão voltar.
+7. **Revogação/bloqueio** (inadimplência/cancelamento): refletido na próxima revalidação; `LICENCA_REVOGADA` é terminal e leva a modo leitura imediato (a regularização reativa o `BLOQUEADA`).
+8. **Troca da máquina-servidor**: reinstala o Local API Service na nova máquina e reativa com a mesma chave de produto — sem fluxo de rebind com limite de tentativas.
+9. **Limite de ativações**: ativar em mais máquinas do que o `limite_ativacoes` responde `409` com mensagem clara ao usuário.
+10. **Contato com o RedGest**: timeout de 90 s por padrão (`licenca_timeout_segundos`) e recuo progressivo após falhas consecutivas (`licenca_backoff_segundos`, 60/300/900 s), zerado na primeira revalidação bem-sucedida.
 
 ### 3.3 O que foi removido do desenho original (v1.2) e por quê
 
 | Removido | Motivo |
 |---|---|
 | Ativação offline assistida (código + suporte manual) | Só necessária se a gráfica nunca tiver internet na instalação — não é o caso aqui |
-| Hardware ID com tolerância/score + rebind limitado (2/90 dias) | Licença por CNPJ elimina a necessidade de vincular e revincular hardware |
+| Hardware ID com tolerância/score + rebind limitado (2/90 dias) | O `limite_ativacoes` da chave de produto já limita cópias sem exigir rebind de hardware |
 | Detecção elaborada de tamper de relógio (LVT assinado) | Proteção antipirataria desproporcional para o risco real deste produto/porte |
-| Cache de licença criptografado com DPAPI + HMAC | Token de curta duração já limita a janela de uso indevido sem precisar de criptografia de arquivo local elaborada |
+| Cache de licença criptografado com DPAPI + HMAC | Não há credencial de longa duração a proteger: a chave + o fingerprint são validados online |
+| Validação local do JWT (D3) e extensão de emergência assinada (D4) | Sem JWT não há assinatura a verificar; a tolerância de 72 h cobre a indisponibilidade do RedGest (revisão 2.1.0) |
 
 ### 3.4 Contrato com o RedGest
 
-Reaproveita o modelo genérico `Sistema`/`Licenca` (ver documento "Plano de generalização do RedGest"), com o ERP da gráfica cadastrado como:
+Consome o **Contrato C** do RedGest (endpoint `/api/v1/licencas-software/` do PRD v3.6 §6.4), com o sistema cadastrado como:
 
 ```
-codigo: grafica_erp
-tipo_licenciamento: online_periodic   -- novo tipo, mais simples que hardware_bound
-schema_entitlements: { cnpj_vinculado, max_estacoes, modulos_habilitados[] }
+codigo: printgest
+tipo_licenciamento: LICENCA
+api_key: <segredo HMAC do Sistema>   -- PRINTGEST_REDGEST_API_KEY
 ```
 
-**Pendência a resolver com quem mantém o RedGest:** confirmar que o tipo `online_periodic` será suportado — hoje o RedGest (v3.5) só tem os sistemas `ILPI_GESTAO` e `RH_DIGITAL`, nenhum deles com esse modelo de token curto.
+**Nota de depreciação:** o manual do RedGest marca `/licencas-software/` como depreciado em favor de `/api/v1/licencas/` (v4.x, assertion/JWK); o contrato segue suportado até o *sunset* de **01/03/2027**, quando o PrintGest deverá migrar.
 
 ---
 
@@ -194,7 +198,7 @@ Controles associados: bloqueio por tentativas de senha incorretas, expiração d
 | 1 | Fundação | Schema Alembic; Local API Service (FastAPI) com healthcheck; instalador com PostgreSQL embarcado; setup de serviços Windows |
 | 2 | Núcleo operacional | Cadastros, Movimento (OS/Orçamento/Venda Balcão), Estoque, RBAC básico |
 | 3 | Financeiro e Fiscal | Caixa, contas a pagar/receber, integração com gateway NF-e/NFC-e |
-| 4 | Licenciamento | Integração com RedGest no modelo `online_periodic` (§3); depende da pendência com o time do RedGest |
+| 4 | Licenciamento | Integração com o RedGest por **chave de produto validada online** (Contrato C, §3) |
 | 5 | Relatórios e fechamento | Relatórios operacionais, reajuste em bloco auditado, empacotamento final, testes de aceitação |
 
 ---
@@ -211,11 +215,12 @@ Diferente da versão anterior (focada quase exclusivamente em licenciamento), os
 - Acesso simultâneo de 5 estações sem lock indevido em OS diferentes
 
 **Licenciamento**
-- Ativação online (CNPJ + código)
-- Renovação automática de token
+- Ativação online por chave de produto (`XXXX-XXXX-XXXX-XXXX`), com fingerprint da máquina
+- Revalidação automática da chave (cadência de 6 h), detectando revogação/bloqueio/expiração
+- Chave inválida ou desconhecida → mensagem clara e licença segue *não ativada*
 - Queda de internet por período curto (dentro da janela de tolerância) — sistema continua operando
-- Queda de internet além da janela de tolerância — modo leitura, com mensagem clara ao usuário
-- Revogação de licença — reflexo em modo leitura dentro de poucas horas
+- Queda de internet além da vigência + 72 h de tolerância — modo leitura, com mensagem clara ao usuário
+- Limite de ativações excedido → `409`, com orientação de suporte
 
 **Infraestrutura**
 - Reinício da máquina-servidor — serviços voltam automaticamente, estações-cliente reconectam
@@ -243,15 +248,15 @@ Diferente da versão anterior (focada quase exclusivamente em licenciamento), os
 |---|---|
 | Local API Service | Serviço FastAPI local, único ponto de acesso ao PostgreSQL e de enforcement de RBAC |
 | Modo Leitura | Estado em que o ERP permite apenas consulta, bloqueando escrita e emissão fiscal, por falta de licença válida |
-| Token de licença | JWT RS256 de curta duração emitido pelo RedGest, renovado automaticamente pelo Local API Service |
-| Entitlement | Permissão específica contida no token de licença (ex.: `max_estacoes`) |
-| `tipo_licenciamento: online_periodic` | Modelo de licenciamento definido nesta versão: validação online recorrente, sem vínculo a hardware |
+| Chave de produto | Código `XXXX-XXXX-XXXX-XXXX` emitido pelo RedGest e digitado na ativação; validado online |
+| Fingerprint da máquina | Hash SHA-256 estável da instalação, enviado na validação para contar as ativações |
+| Contrato C | Modelo de licenciamento do RedGest (`/api/v1/licencas-software/`) para software desktop com chave de produto, autenticado por HMAC do `Sistema.api_key` |
 
 ---
 
 ## 11. Próximos Passos
 
 1. Validar este PRD com quem decide o escopo de negócio
-2. Resolver a pendência com o time do RedGest: suporte ao tipo `online_periodic` (§3.4)
+2. Acompanhar a depreciação do RedGest: `/licencas-software/` será aposentado (sunset 01/03/2027) em favor de `/api/v1/licencas/` (§3.4)
 3. Selecionar gateway fiscal (Focus NFe recomendado para começar)
 4. Iniciar Fase 1

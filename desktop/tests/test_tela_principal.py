@@ -207,7 +207,10 @@ def test_detalhe_licenca_inclui_motivo_e_diagnostico():
         {
             "estado": "tolerancia",
             "motivo": "Sem contato com o RedGest; operando normalmente em tolerância.",
-            "token_expira_em": "2026-10-18T09:00:00+00:00",
+            "chave": "************1045",
+            "expira_em": "2026-10-18T09:00:00+00:00",
+            "limite_ativacoes": 5,
+            "ativacoes_realizadas": 2,
             "tolerancia_expira_em": "2026-10-21T09:00:00+00:00",
             "ultima_tentativa_em": "2026-10-18T10:00:00+00:00",
             "ultimo_erro": "RedGest inacessível (ConnectError)",
@@ -215,6 +218,9 @@ def test_detalhe_licenca_inclui_motivo_e_diagnostico():
         False,
     )
     assert "tolerância." in detalhe
+    assert "Chave: ************1045" in detalhe
+    assert "Estações autorizadas: 5 (em uso: 2)" in detalhe
+    assert "Válida até: 18/10/2026 09:00" in detalhe
     assert "Tolerância até: 21/10/2026 09:00" in detalhe
     assert "Última verificação: 18/10/2026 10:00" in detalhe
     assert "Último erro: RedGest inacessível (ConnectError)" in detalhe

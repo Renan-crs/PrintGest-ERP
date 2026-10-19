@@ -20,15 +20,22 @@ class Settings(BaseSettings):
     admin_inicial_nome: str = "Administrador"
 
     redgest_url: str = "http://127.0.0.1:9100"
-    redgest_sistema: str = "grafica_erp"
+    redgest_sistema: str = "printgest"
+    # `api_key` do Sistema no RedGest (Contrato C — `/licencas-software/`). É o
+    # segredo compartilhado que assina (HMAC-SHA256) cada validação da chave de
+    # produto. Sem ele a ativação online não é possível.
+    redgest_api_key: str = ""
     licenca_refresh_intervalo_segundos: int = 300
-    licenca_renova_antes_segundos: int = 3600
+    # Cadência de revalidação online da chave de produto (default 6 h). A licença
+    # em si vale até `expira_em`; isso só controla de quanto em quanto tempo o
+    # RedGest é consultado para detectar revogação/bloqueio/expiração.
+    licenca_revalidar_a_cada_segundos: int = 6 * 60 * 60
     # Resiliência (plano docs/plano_resiliencia_licenca.md): um RedGest em plano
     # gratuito acorda em 30–60 s, então o timeout curto antigo (10 s) fazia a
-    # renovação falhar justamente no cold start.
+    # validação falhar justamente no cold start.
     licenca_timeout_segundos: int = 90
-    # Tolerância após o token expirar sem contato com o RedGest. Sem isso o
-    # sistema caía em modo leitura no instante da expiração (qualquer queda).
+    # Tolerância após a vigência (`expira_em`) vencer sem contato com o RedGest.
+    # Sem isso o sistema caía em modo leitura no instante do vencimento.
     licenca_tolerancia_horas: int = 72
     # Backoff entre tentativas de renovação após falhas, em CSV de segundos
     # (1, 5 e 15 min). pydantic-settings não parseia `list[int]` de env de forma

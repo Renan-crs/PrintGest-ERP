@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 """Semeia uma licença JÁ ATIVA no banco local (teste de sistema simulado).
 
-Para o teste de sistema o time quer rodar o stack como se a licença já tivesse
-sido ativada junto ao RedGest — sem depender do `scripts/redgest_stub.py` nem do
-fluxo de ativação. Este script grava (upsert idempotente) uma linha em `licenca`
-com status `ativa` e token válido por ~1 ano, o que faz:
+Para o teste de sistema o time quer rodar o stack como se a chave de produto já
+tivesse sido validada junto ao RedGest — sem depender do `scripts/redgest_stub.py`
+nem do fluxo de ativação. Este script grava (upsert idempotente) uma linha em
+`licenca` com status `ativa` e vigência de ~1 ano, o que faz:
 
 - `GET /v1/licenca` retornar `status=ativa` e `modo_leitura=false`;
 - o middleware de licença liberar escritas (sem HTTP 423);
-- o `loop_renovacao` NÃO tentar renovar (expiração longe demais), então o
-  RedGest continua desnecessário no ambiente de teste.
+- o `loop_renovacao` NÃO chamar o RedGest (a revalidação só ocorre a cada 6 h e a
+  vigência está longe), então o RedGest continua desnecessário no ambiente de teste.
+
+A chave semeada é a mesma do seed de `scripts/redgest_stub.py`, então o ambiente
+também funciona se o stub estiver no ar.
 
 Uso (com o Postgres portable da `.dev` no ar):
 
@@ -31,63 +34,49 @@ sys.path.insert(0, str(BACKEND))
 from app.core.config import settings  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
 from app.models.licenca import Licenca  # noqa: E402
+from app.services import licensa_service  # noqa: E402
 
-LICENCA_REDGEST_ID = "lic-printgest-teste-sistema"
-CNPJ = "11111111000111"  # mesmo CNPJ do bootstrap (Empresa demo)
-CODIGO = "TESTE-SISTEMA-0001"
-MODULOS = [
-    "vendas",
-    "producao",
-    "estoque",
-    "financeiro",
-    "cadastros",
-    "relatorios",
-]
-PLANO = "essencial"
+# Mesma chave do seed do `scripts/redgest_stub.py`.
+CHAVE = "A3F1-9C2B-77DE-1045"
+PLANO = "ANUAL"
+LIMITE_ATIVACOES = 5
 
 
 def _semear() -> Licenca:
-    db = SessionLocal()
+    sessao = SessionLocal()
     try:
-        lic = db.query(Licenca).filter(Licenca.cnpj == CNPJ).order_by(Licenca.id).first()
         agora = dt.datetime.now(dt.timezone.utc)
+        expira = agora + dt.timedelta(days=365)
+        lic = sessao.query(Licenca).order_by(Licenca.id).first()
         if lic is None:
-            lic = Licenca(
-                licenca_redgest_id=LICENCA_REDGEST_ID,
-                sistema=settings.redgest_sistema,
-                cnpj=CNPJ,
-                codigo_licenca=CODIGO,
-            )
-            db.add(lic)
-        else:
-            lic.licenca_redgest_id = LICENCA_REDGEST_ID
-            lic.codigo_licenca = CODIGO
+            lic = Licenca(chave_ativacao=CHAVE)
+            sessao.add(lic)
+        lic.chave_ativacao = CHAVE
+        lic.sistema = settings.redgest_sistema
         lic.plano = PLANO
         lic.status = "ativa"
-        lic.client_id = "teste-sistema-client"
-        lic.client_secret = "teste-sistema-secret"
-        lic.entitlements = {
-            "cnpj_vinculado": CNPJ,
-            "max_estacoes": 5,
-            "modulos_habilitados": MODULOS,
-        }
-        # Token fictício: o JWT só é armazenado, nunca validado localmente.
-        lic.token_jwt = "jwt.teste.sistema"
-        lic.token_expira_em = agora + dt.timedelta(days=366)
+        lic.expira_em = expira
+        lic.tolerancia_expira_em = expira + dt.timedelta(
+            hours=settings.licenca_tolerancia_horas
+        )
+        lic.limite_ativacoes = LIMITE_ATIVACOES
+        lic.ativacoes_realizadas = 1
+        lic.maquina_fingerprint = licensa_service._fingerprint()
         lic.ultima_validacao = agora
-        db.add(lic)
-        db.commit()
-        db.refresh(lic)
+        lic.ultima_tentativa_em = agora
+        lic.ultimo_erro = None
+        lic.entitlements = {"origem": "semear_licenca_ativa"}
+        sessao.commit()
+        sessao.refresh(lic)
         return lic
     finally:
-        db.close()
+        sessao.close()
 
 
 if __name__ == "__main__":
     lic = _semear()
-    expira = lic.token_expira_em.strftime("%Y-%m-%d %H:%M UTC")
-    print(f"OK. Licença ativa semeada:")
-    print(f"  cnpj={lic.cnpj}  codigo={lic.codigo_licenca}  plano={lic.plano}")
-    print(f"  status={lic.status}  modulos={len(MODULOS)}")
-    print(f"  token valido ate {expira}")
+    print("OK. Licença ativa semeada:")
+    print(f"  chave={licensa_service._mascarar(lic.chave_ativacao)}  plano={lic.plano}")
+    print(f"  status={lic.status}  limite_ativacoes={lic.limite_ativacoes}")
+    print(f"  vigente ate {lic.expira_em:%Y-%m-%d %H:%M UTC}")
     print("Subir o backend SEM PRINTGEST_LICENCA_DESABILITADA agora.")

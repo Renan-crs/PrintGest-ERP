@@ -1,14 +1,24 @@
-"""Modelo local da licença do sistema junto ao RedGest (`online_periodic`).
+"""Modelo local da licença — chave de produto validada online no RedGest.
 
-Guarda o vínculo ativo (CNPJ + código + credenciais retornadas na ativação) e o
-último JWT validado, para que o serviço renove por polling em `/validar` e negocie
-o modo de leitura quando o token expira (PRD v2.0 §3). Uma única linha representa
-a licença da instalação.
+O RedGest emite uma **chave de ativação** (`XXXX-XXXX-XXXX-XXXX`, Contrato C do
+manual de integração — `/api/v1/licencas-software/`) que o usuário digita na
+primeira execução. Esta tabela guarda a chave e o resultado da última validação
+online: vigência (`expira_em`), limite de ativações e o fingerprint da máquina.
+Uma única linha representa a licença da instalação.
+
+Resiliência (`docs/plano_resiliencia_licenca.md`): a licença vale até
+`expira_em`; depois disso a instalação opera em tolerância por
+`licenca_tolerancia_horas` (72 h por padrão) antes do modo leitura. Falhas de
+transporte nunca revogam — só uma resposta explícita do RedGest.
+
+Colunas de fluxos anteriores (`licenca_redgest_id`, `cnpj`, `codigo_licenca`,
+`client_id`, `client_secret`, `token_jwt`, `token_expira_em`) seguem no schema
+como anuláveis, sem uso, para não quebrar bases já migradas.
 """
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CHAR, DateTime, String, Text, func
+from sqlalchemy import BigInteger, CHAR, DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,15 +29,27 @@ class Licenca(Base):
     __tablename__ = "licenca"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    licenca_redgest_id: Mapped[str] = mapped_column(
-        String(40), nullable=False, unique=True
+    licenca_redgest_id: Mapped[str | None] = mapped_column(
+        String(40), nullable=True, unique=True
     )
     sistema: Mapped[str] = mapped_column(
-        String(60), nullable=False, server_default="grafica_erp"
+        String(60), nullable=False, server_default="printgest"
     )
-    cnpj: Mapped[str] = mapped_column(CHAR(14), nullable=False)
-    codigo_licenca: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    # Contrato C — chave de produto. O `fingerprint` é o SHA-256 canônico da
+    # máquina (enviado no corpo do `/validar`).
+    chave_ativacao: Mapped[str | None] = mapped_column(String(19))
+    maquina_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    limite_ativacoes: Mapped[int | None] = mapped_column(Integer)
+    ativacoes_realizadas: Mapped[int | None] = mapped_column(Integer)
+
+    # Legado (fluxo `online_periodic` por CNPJ + código; sem uso no Contrato C).
+    cnpj: Mapped[str | None] = mapped_column(CHAR(14), nullable=True)
+    codigo_licenca: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
     plano: Mapped[str | None] = mapped_column(String(20))
+    # Status local: ativa | bloqueada | revogada | expirada.
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="aguardando"
     )
@@ -36,8 +58,8 @@ class Licenca(Base):
     entitlements: Mapped[dict | None] = mapped_column(JSONB)
     token_jwt: Mapped[str | None] = mapped_column(Text)
     token_expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # Tolerância offline (plano E2): enquanto `agora <= tolerancia_expira_em` o
-    # sistema opera normalmente mesmo com o token vencido (RedGest inacessível).
+    # Tolerância offline: enquanto `agora <= tolerancia_expira_em` o sistema opera
+    # normalmente mesmo com a vigência vencida (RedGest inacessível).
     tolerancia_expira_em: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
