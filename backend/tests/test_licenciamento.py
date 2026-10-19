@@ -15,6 +15,7 @@ import json
 import httpx
 import pytest
 
+from app.core import cofre
 from app.core.config import settings
 from app.services import licensa_service
 from tests.conftest import auth
@@ -48,6 +49,7 @@ def _licenca_isolada(client, monkeypatch):
 
     licensa_service.ESTADO["modo_leitura"] = True
     licensa_service._fingerprint_do_hardware.cache_clear()
+    licensa_service._abrir_chave.cache_clear()
     yield
 
 
@@ -204,6 +206,39 @@ def test_ativacao_normaliza_chave_minuscula(client, monkeypatch):
     assert json.loads(registro[0].read())["chave_ativacao"] == CHAVE
 
 
+def test_ativacao_aceita_serial_sem_hifens(client, monkeypatch):
+    """Doc §4.2: o usuário pode colar o serial sem hífens."""
+    registro = _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client, chave="a1b2c3d4e5f67890").status_code == 200
+    assert json.loads(registro[0].read())["chave_ativacao"] == CHAVE
+
+
+def test_ativacao_aceita_serial_com_espacos(client, monkeypatch):
+    registro = _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client, chave=" A1B2 C3D4 E5F6 7890 ").status_code == 200
+    assert json.loads(registro[0].read())["chave_ativacao"] == CHAVE
+
+
+def test_serial_invalido_devolve_400_sem_chamar_redgest(client, monkeypatch):
+    """Formato avaliado localmente (doc §4.2): não gasta tentativa da cota."""
+    registro = _mock(monkeypatch, _resposta_ok())
+    resp = _ativar(client, chave="A1B2-C3D4")
+    assert resp.status_code == 400, resp.text
+    assert "xxxx-xxxx-xxxx-xxxx" in resp.json()["detail"].lower()
+    assert registro == []
+
+
+def test_parse_chave_normaliza_e_valida():
+    assert licensa_service._parse_chave("a1b2c3d4e5f67890") == CHAVE
+    assert licensa_service._parse_chave(" A1B2-C3D4-E5F6-7890 ") == CHAVE
+    assert licensa_service._parse_chave("A1B2C3D4-E5F67890") == CHAVE
+    assert licensa_service._parse_chave("A1B2-C3D4-E5F6-789") == ""
+    assert licensa_service._parse_chave("A1B2-C3D4-E5F6-7890-ABCD") == ""
+    assert licensa_service._parse_chave("NAO-EH-CHAVE-AQUI!!!") == ""
+    assert licensa_service._parse_chave("") == ""
+    assert licensa_service._parse_chave(None) == ""
+
+
 def test_chave_inexistente_devolve_400(client, monkeypatch):
     _mock(monkeypatch, httpx.Response(403, json={
         "detail": "Chave de ativação não encontrada.",
@@ -324,12 +359,22 @@ def test_timeout_na_revalidacao_nao_revoga(client, monkeypatch):
 def test_backoff_crescente_e_saturado(monkeypatch):
     """1/5/15/60 min por falha consecutiva (doc §9.2); satura no último passo."""
     monkeypatch.setattr(settings, "licenca_backoff_segundos", "60,300,900,3600")
+    monkeypatch.setattr(settings, "licenca_backoff_jitter_percentual", 0)
     assert (
         licensa_service._atraso_proximo_ciclo(0)
         == settings.licenca_refresh_intervalo_segundos
     )
     for falhas, segundos in ((1, 60), (2, 300), (3, 900), (4, 3600), (9, 3600)):
         assert licensa_service._atraso_proximo_ciclo(falhas) == segundos
+
+
+def test_backoff_aplica_jitter_dentro_da_faixa(monkeypatch):
+    """Doc §9.2: backoff exponencial **com jitter** (±20% por padrão)."""
+    monkeypatch.setattr(settings, "licenca_backoff_segundos", "60,300,900,3600")
+    monkeypatch.setattr(settings, "licenca_backoff_jitter_percentual", 20)
+    valores = {licensa_service._atraso_proximo_ciclo(1) for _ in range(300)}
+    assert valores <= set(range(48, 73)), sorted(valores)
+    assert len(valores) > 1  # de fato varia entre ciclos
 
 
 def test_backoff_com_config_invalida_usa_padrao(monkeypatch):
@@ -450,6 +495,63 @@ def test_fingerprint_sem_hardware_usa_fallback_estavel(monkeypatch):
         assert licensa_service._fingerprint() == esperado
     finally:
         licensa_service._fingerprint_do_hardware.cache_clear()
+
+
+# ------------------------------------------------ cofre do SO (doc §9.4)
+def test_chave_de_ativacao_e_guardada_no_cofre(client, monkeypatch):
+    """O banco não guarda a chave em texto puro; o serviço a abre para revalidar."""
+    from app.db import SessionLocal
+    from app.models.licenca import Licenca
+
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    sessao = SessionLocal()
+    try:
+        lic = sessao.query(Licenca).first()
+        guardada = lic.chave_ativacao
+        em_claro = licensa_service._chave_em_claro(lic)
+    finally:
+        sessao.close()
+
+    assert em_claro == CHAVE
+    if cofre.disponivel():
+        assert guardada.startswith(cofre.PREFIXO)
+        assert CHAVE not in guardada
+
+
+def test_revalidacao_envia_a_chave_em_claro(client, monkeypatch):
+    """A revalidação manda a chave (não o blob do cofre) ao RedGest."""
+    registro = _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    registro.clear()
+    assert client.post("/v1/licenca/renovar").status_code == 200
+    assert json.loads(registro[0].read())["chave_ativacao"] == CHAVE
+
+
+def test_renovar_com_cofre_ilegivel_pede_reativacao(client, monkeypatch):
+    """Banco restaurado de outro computador: blob ilegível → orienta reativar."""
+    from app.db import SessionLocal
+    from app.models.licenca import Licenca
+
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    sessao = SessionLocal()
+    try:
+        lic = sessao.query(Licenca).first()
+        # Blob do cofre válido em Base64, mas que não abre nesta máquina/chave.
+        lic.chave_ativacao = cofre.PREFIXO + "YWJjZGVm"
+        sessao.commit()
+    finally:
+        sessao.close()
+    licensa_service._abrir_chave.cache_clear()
+
+    resp = client.post("/v1/licenca/renovar")
+    assert resp.status_code == 400, resp.text
+    assert "reative" in resp.json()["detail"].lower()
+    assert client.get("/v1/licenca").json()["data"]["estado"] == "nao_ativada"
 
 
 # ------------------------------- estados e tolerância offline (plano E2)

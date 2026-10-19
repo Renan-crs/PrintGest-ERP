@@ -36,9 +36,12 @@ class Licenca(Base):
         String(60), nullable=False, server_default="printgest"
     )
 
-    # Contrato C — chave de produto. O `fingerprint` é o SHA-256 canônico da
-    # máquina (enviado no corpo do `/validar`).
-    chave_ativacao: Mapped[str | None] = mapped_column(String(19))
+    # Contrato C — chave de produto. Guardada **cifrada no cofre do SO** (DPAPI,
+    # escopo de máquina — doc de integração §9.4): o blob tem ~385 caracteres e
+    # depende do provedor, então a coluna é `Text` (linhas antigas, em texto
+    # puro, seguem legíveis). O `fingerprint` é o SHA-256 canônico da máquina
+    # (enviado no corpo do `/validar`).
+    chave_ativacao: Mapped[str | None] = mapped_column(Text)
     maquina_fingerprint: Mapped[str | None] = mapped_column(String(64))
     expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     limite_ativacoes: Mapped[int | None] = mapped_column(Integer)

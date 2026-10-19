@@ -8,9 +8,10 @@ from pydantic import BaseModel, Field
 class LicencaAtivarIn(BaseModel):
     chave_ativacao: str = Field(
         min_length=1,
-        max_length=19,
+        max_length=32,
         description=(
-            "Chave de produto entregue na contratação (formato XXXX-XXXX-XXXX-XXXX)."
+            "Chave de produto entregue na contratação (XXXX-XXXX-XXXX-XXXX). "
+            "Aceita com ou sem hífens; o servidor normaliza antes de validar."
         ),
     )
 

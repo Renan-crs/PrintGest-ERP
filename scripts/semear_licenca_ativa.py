@@ -31,6 +31,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(BACKEND))
 
+from app.core import cofre
 from app.core.config import settings  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
 from app.models.licenca import Licenca  # noqa: E402
@@ -49,9 +50,10 @@ def _semear() -> Licenca:
         expira = agora + dt.timedelta(days=365)
         lic = sessao.query(Licenca).order_by(Licenca.id).first()
         if lic is None:
-            lic = Licenca(chave_ativacao=CHAVE)
+            lic = Licenca()
             sessao.add(lic)
-        lic.chave_ativacao = CHAVE
+        # Doc de integração §9.4: a chave mora cifrada no cofre do SO.
+        lic.chave_ativacao = cofre.proteger(CHAVE)
         lic.sistema = settings.redgest_sistema
         lic.plano = PLANO
         lic.status = "ativa"
@@ -76,7 +78,8 @@ def _semear() -> Licenca:
 if __name__ == "__main__":
     lic = _semear()
     print("OK. Licença ativa semeada:")
-    print(f"  chave={licensa_service._mascarar(lic.chave_ativacao)}  plano={lic.plano}")
+    chave = licensa_service._chave_em_claro(lic)
+    print(f"  chave={licensa_service._mascarar(chave)}  plano={lic.plano}")
     print(f"  status={lic.status}  limite_ativacoes={lic.limite_ativacoes}")
     print(f"  vigente ate {lic.expira_em:%Y-%m-%d %H:%M UTC}")
     print("Subir o backend SEM PRINTGEST_LICENCA_DESABILITADA agora.")

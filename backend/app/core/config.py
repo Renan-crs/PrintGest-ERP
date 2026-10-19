@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # calcula pelo hardware (BIOS UUID / CPU ID / serial da placa-mãe / do disco).
     # Defina para fixar um valor (VMs com SMBIOS ausente, testes ou suporte).
     maquina_fingerprint: str = ""
+    # Cofre do SO para a chave de ativação (§9.4): `dpapi` (Windows, escopo de
+    # máquina) ou `nenhum` (grava em texto puro — só para dev/diagnóstico).
+    cofre: str = "dpapi"
     licenca_refresh_intervalo_segundos: int = 300
     # Cadência de revalidação online da chave de produto (default 6 h). A licença
     # em si vale até `expira_em`; isso só controla de quanto em quanto tempo o
@@ -45,6 +48,9 @@ class Settings(BaseSettings):
     # (1, 5, 15 e 60 min — doc de integração §9.2). pydantic-settings não parseia
     # `list[int]` de env de forma confiável — exposto por `licenca_backoff`.
     licenca_backoff_segundos: str = "60,300,900,3600"
+    # Jitter (±%) aplicado ao backoff para espaçar clientes que caiam juntos
+    # (§9.2: "backoff exponencial com jitter"). 0 desliga.
+    licenca_backoff_jitter_percentual: int = 20
     licenca_desabilitada: bool = False
 
     model_config = {"env_prefix": "PRINTGEST_", "env_file": ".env", "extra": "ignore"}
