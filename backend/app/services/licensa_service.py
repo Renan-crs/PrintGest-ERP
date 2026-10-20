@@ -97,11 +97,25 @@ _MSG_CHAVE_DESCONHECIDA = (
     "credencial de integração no RedGest."
 )
 
+# Marca (ASCII, estável) que precede os motivos de recusa específicos do
+# Contrato B em `licenca.ultimo_erro`. Só mensagens com esse prefixo são
+# exibidas como motivo da licença; erros transitórios de rede ficam de fora.
+_BLOQUEIO_ESPECIFICO = "[RedGest]"
+
 ESTADO: dict[str, bool] = {"modo_leitura": not settings.licenca_desabilitada}
 
 
 def _desabilitada() -> bool:
     return settings.licenca_desabilitada
+
+
+def contrato_b() -> bool:
+    """`True` quando a instalação fala o Contrato B (`/licencas/`, v4.0).
+
+    A flag é lida a cada chamada (e não no import) para que a virada de contrato
+    valha sem reiniciar o processo — e para a suíte poder alternar os contratos.
+    """
+    return (settings.redgest_contrato or "c").strip().lower() == "b"
 
 
 def _agora() -> dt.datetime:
@@ -112,6 +126,44 @@ def _cliente() -> httpx.Client:
     return httpx.Client(
         base_url=settings.redgest_url, timeout=settings.licenca_timeout_segundos
     )
+
+
+def _cliente_com_idempotencia(chave_idempotencia: str) -> httpx.Client:
+    """Cliente com o `Idempotency-Key` fixo de uma operação lógica (§10.1).
+
+    O header tem de ser o **mesmo** em todas as tentativas de uma operação (a
+    repetição devolve a resposta cacheada em vez de reexecutar); por isso o
+    cliente é criado por operação, não por requisição.
+    """
+    return httpx.Client(
+        base_url=settings.redgest_url,
+        timeout=settings.licenca_timeout_segundos,
+        headers={"Idempotency-Key": chave_idempotencia},
+    )
+
+
+def _correlacionar(resp: httpx.Response) -> None:
+    """Loga o `X-Request-Id` do RedGest, se houver (rastreio sem vazar segredo)."""
+    identificador = resp.headers.get("X-Request-Id")
+    if identificador:
+        logger.info("RedGest request-id: %s", identificador)
+
+
+def _bloquear(
+    db: Session, status_licenca: str, motivo: str, *, codigo: str = ""
+) -> None:
+    """Marca a licença local como não utilizável e levanta 423 com o motivo.
+
+    O `codigo` do RedGest é guardado em `entitlements["motivo_codigo"]` para a
+    UI/triagem sem depender do texto (que muda de idioma/redação).
+    """
+    lic = _licenca_local(db)
+    if lic is not None:
+        entitlements = dict(lic.entitlements or {})
+        entitlements["motivo_codigo"] = codigo
+        lic.entitlements = entitlements
+    _marcar_status(db, status_licenca, motivo)
+    raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=motivo)
 
 
 def _indisponivel(contexto: str, exc: Exception) -> HTTPException:
@@ -402,9 +454,14 @@ def _modo_leitura(estado: str) -> bool:
 
 
 def _motivo(lic: Licenca | None, estado: str) -> str:
-    if lic is not None and lic.status == STATUS_BLOQUEADA:
-        return "Licença bloqueada pelo RedGest — regularize o contrato/pagamento."
-    if lic is not None and lic.status == STATUS_EXPIRADA:
+    if lic is not None and lic.status in (STATUS_BLOQUEADA, STATUS_EXPIRADA):
+        # Contrato B: a recusa do RedGest (`licenca_suspensa`, `hardware_divergente`
+        # etc.) fica em `ultimo_erro` e é mais específica que o texto genérico.
+        especifico = (lic.ultimo_erro or "").strip()
+        if especifico and _BLOQUEIO_ESPECIFICO in especifico:
+            return especifico
+        if lic.status == STATUS_BLOQUEADA:
+            return "Licença bloqueada pelo RedGest — regularize o contrato/pagamento."
         return "Licença expirada. Renove o contrato para reativar."
     return {
         ESTADO_ATIVA: "Licença ativa.",
@@ -439,6 +496,7 @@ def situacao(db: Session) -> dict:
         ESTADO["modo_leitura"] = False
     return {
         "sistema": settings.redgest_sistema,
+        "contrato": "b" if contrato_b() else "c",
         "chave": _mascarar(_chave_em_claro(lic)) or None,
         "plano": lic.plano if lic else None,
         "status": lic.status if lic else ESTADO_NAO_ATIVADA,
@@ -492,6 +550,7 @@ def _persistir_ok(
 
 
 def _marcar_status(db: Session, novo_status: str, motivo: str) -> None:
+    """Persiste status + motivo e recompõe o estado (modo de leitura)."""
     lic = _licenca_local(db)
     if lic is None:
         return
@@ -500,6 +559,25 @@ def _marcar_status(db: Session, novo_status: str, motivo: str) -> None:
     lic.ultimo_erro = motivo
     db.commit()
     _recalcular_estado(lic)
+
+
+# ------------------------------------------------- credenciais (Contrato B)
+# O par `client_id`/`client_secret` do Contrato B é guardado **num único blob**
+# no cofre (`client_id|client_secret`): o RedGest rotaciona o segredo a cada
+# `/validar` e os dois valores só fazem sentido juntos. A coluna `client_id`
+# (legado) fica nula para não deixar metade do par em texto puro.
+_SEPARADOR_CREDENCIAL = "|"
+
+
+def _montar_credencial(client_id: str, client_secret: str) -> str:
+    return f"{(client_id or '').strip()}{_SEPARADOR_CREDENCIAL}{client_secret}"
+
+
+def _separar_credencial(guardado: str) -> tuple[str, str]:
+    if _SEPARADOR_CREDENCIAL not in guardado:
+        return guardado.strip(), ""
+    client_id, segredo = guardado.split(_SEPARADOR_CREDENCIAL, 1)
+    return client_id.strip(), segredo.strip()
 
 
 def _registrar_falha(db: Session, motivo: str) -> None:
@@ -615,12 +693,24 @@ def _tratar_erro(db: Session, resp: httpx.Response) -> None:
 
 
 # ---------------------------------------------------------------- operações
-def ativar(db: Session, *, chave_ativacao: str) -> dict:
+def ativar(
+    db: Session,
+    *,
+    chave_ativacao: str = "",
+    cnpj: str = "",
+    codigo_licenca: str = "",
+) -> dict:
     if _desabilitada():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licenciamento desabilitado nesta build de desenvolvimento.",
         )
+    if contrato_b():
+        # Import tardio: `licensa_contrato_b` reusa os helpers deste módulo e o
+        # import no topo criaria ciclo.
+        from app.services import licensa_contrato_b
+
+        return licensa_contrato_b.ativar(db, cnpj=cnpj, codigo_licenca=codigo_licenca)
     chave = _parse_chave(chave_ativacao)
     if not chave:
         # Formato avaliado localmente (doc §4.2): não gasta uma requisição (nem
@@ -647,6 +737,10 @@ def renovar(db: Session) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licença ainda não ativada.",
         )
+    if contrato_b():
+        from app.services import licensa_contrato_b
+
+        return licensa_contrato_b.revalidar(db)
     chave = _chave_em_claro(lic)
     if not chave:
         raise HTTPException(

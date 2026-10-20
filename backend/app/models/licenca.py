@@ -12,7 +12,7 @@ Resiliência (`docs/plano_resiliencia_licenca.md`): a licença vale até
 transporte nunca revogam — só uma resposta explícita do RedGest.
 
 Colunas de fluxos anteriores (`licenca_redgest_id`, `cnpj`, `codigo_licenca`,
-`client_id`, `client_secret`, `token_jwt`, `token_expira_em`) seguem no schema
+`token_jwt`, `token_expira_em`) seguem no schema
 como anuláveis, sem uso, para não quebrar bases já migradas.
 """
 
@@ -56,8 +56,11 @@ class Licenca(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="aguardando"
     )
+    # `client_id`/`client_secret` (Contrato B, `/api/v1/licencas/`): o par M2M é
+    # guardado **num único blob no cofre** (`client_id|client_secret`, DPAPI) e
+    # `client_secret` é `Text` como `chave_ativacao`. `client_id` fica nulo.
     client_id: Mapped[str | None] = mapped_column(String(120))
-    client_secret: Mapped[str | None] = mapped_column(String(255))
+    client_secret: Mapped[str | None] = mapped_column(Text)
     entitlements: Mapped[dict | None] = mapped_column(JSONB)
     token_jwt: Mapped[str | None] = mapped_column(Text)
     token_expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
