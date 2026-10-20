@@ -21,6 +21,11 @@ class Settings(BaseSettings):
 
     redgest_url: str = "http://127.0.0.1:9100"
     redgest_sistema: str = "printgest"
+    # Contrato com o RedGest: `c` = Contrato C (chave de produto validada em
+    # `/licencas-software/`, vigente) e `b` = Contrato B (`Licenca` v4.0 em
+    # `/licencas/`, handshake por CNPJ + código). O default só vira `b` na virada
+    # do plano `docs/migracao_redgest_v4.md` (fase M3), depois do piloto.
+    redgest_contrato: str = "c"
     # `api_key` do Sistema no RedGest (Contrato C — `/licencas-software/`). É o
     # segredo compartilhado que assina (HMAC-SHA256) cada validação da chave de
     # produto. Sem ele a ativação online não é possível.

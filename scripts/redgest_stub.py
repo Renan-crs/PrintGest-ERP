@@ -1,27 +1,47 @@
 #!/usr/bin/env python
 """RedGest Stub — servidor local de licenciamento para o PrintGest.
 
-Contrato vigente (Contrato C, §8 do manual do RedGest): **chave de produto**
-validada online, autenticada por HMAC do `Sistema.api_key`.
+Dois contratos são servidos, um por família de rotas:
+
+**Contrato C (vigente, §8 do manual)** — chave de produto validada online,
+autenticada por HMAC do `Sistema.api_key`:
 
   POST /api/v1/licencas-software/validar/   valida a chave + fingerprint (HMAC)
 
-Contrato legado (`online_periodic` por CNPJ + código), mantido só para
-desenvolvimento do fluxo antigo:
+**Contrato B (RedGest v4.x, §7 do manual — `docs/migracao_redgest_v4.md`)** —
+`/api/v1/licencas/` com `strategia_validacao` configurável. Em dev o stub roda
+`hardware_bound` (a estratégia escolhida para o PrintGest), cujo `/validar` exige
+`hardware_profile` vinculado; o handshake por CNPJ + código do §7.2 é exclusivo de
+`online_periodic`, então aqui ele é servido com o mesmo formato para o produto
+poder ser exercitado de ponta a ponta (`REDGEST_STUB_ESTRATEGIA=hardware_bound`):
 
-  POST /api/v1/sistemas/                    registra/atualiza um sistema (dev)
-  GET  /api/v1/sistemas/{codigo}            consulta o sistema + chave pública
-  POST /api/v1/licencas/                    cria licença (idempotente)
-  POST /api/v1/licencas/{id}/ativar         ativação inicial (CNPJ + código)
-  POST /api/v1/licencas/{id}/validar        validação periódica (pull)
-  POST /api/v1/licencas/{id}/revogar        revoga (simula inadimplência)
-  GET  /api/v1/health                       status do stub
+  POST /api/v1/sistemas/                     registra/atualiza um sistema (dev)
+  GET  /api/v1/sistemas/{codigo}             consulta o sistema + chave pública
+  POST /api/v1/licencas/                     cria licença (idempotente)
+  POST /api/v1/licencas/{codigo}/ativar/     handshake -> credenciais + vigência
+  POST /api/v1/licencas/{codigo}/validar/    revalida (credenciais + hardware)
+  POST /api/v1/licencas/{codigo}/revogar/    revoga (simula inadimplência)
+  GET  /api/v1/licencas/{codigo}             situação da licença (dev)
+  GET  /api/v1/licencas/{codigo}/eventos     auditoria das chamadas (dev)
+  GET  /api/v1/health                        status do stub
 
 Chaves de produto de teste (Contrato C):
 - válida:    `REDGEST_STUB_CHAVE` (default `A3F1-9C2B-77DE-1045`)
 - revogada:  `0000-0000-0000-0000`
 - bloqueada: `1111-1111-1111-1111`
 - expirada:  `2222-2222-2222-2222`
+- vitalícia: `3333-3333-3333-3333`
+
+Códigos de licença de teste (Contrato B — todos com CNPJ `SEED_CNPJ`):
+- `TESTE-GRAFICA-2026`      ativa, vence em 1 ano (o PrintGest usa este CNPJ)
+- `EXPIRADA-GRAFICA-2026`   venceu há 1 dia  -> `valida=false, licenca_expirada`
+                            com `grace_deadline` ainda futuro (tolerância)
+- `VENCIDA-GRAFICA-2026`    venceu há 10 dias -> grace esgotado (modo leitura)
+- `SUSPENSA-GRAFICA-2026`   suspensa          -> `licenca_suspensa`
+- `BLOQUEADA-GRAFICA-2026`  bloqueada         -> `licenca_bloqueada`
+- `REVOGADA-GRAFICA-2026`   revogada          -> `licenca_revogada`
+- `HARDWARE-2026`           vinculada a outra máquina -> `hardware_divergente`
+- `VITALICIA-GRAFICA-2026`  sem `data_fim` (vigência eterna)
 
 O segredo HMAC é `REDGEST_STUB_API_KEY` (default `chave-api-printgest-dev`) e
 precisa casar com `PRINTGEST_REDGEST_API_KEY` no PrintGest.
@@ -47,25 +67,39 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-SISTEMA = "grafica_erp"
-TIPO_LICENCIAMENTO = "online_periodic"
+SISTEMA = "printgest"
+TIPO_LICENCIAMENTO = "hardware_bound"
 STATUS_AGUARDANDO = "aguardando"
 STATUS_ATIVA = "ativa"
+STATUS_SUSPENSA = "suspensa"
+STATUS_BLOQUEADA = "bloqueada"
 STATUS_REVOGADA = "revogada"
 
 SEED_CNPJ = "00000000000191"
 SEED_CODIGO_LICENCA = "TESTE-GRAFICA-2026"
-SEED_PLANO = "mensal"
 SEED_MAX_ESTACOES = 5
 SEED_MODULOS = ["cadastros", "movimento", "estoque", "financeiro", "fiscal", "relatorios"]
 
+DIA = 24 * 3600
+# Tolerância do `hardware_bound` (§11.4/§12): `grace_deadline` = data_fim + 72 h.
+GRACE_HORAS = int(os.environ.get("REDGEST_STUB_GRACE_HORAS", "72"))
 TOKEN_TTL_SECONDS = int(os.environ.get("REDGEST_STUB_TOKEN_TTL", str(4 * 60 * 60)))
+# O /validar rotaciona o `client_secret`; o anterior vale por esta janela, para
+# cobrir o reenvio da mesma requisição (queda de rede entre resposta e gravação).
+ROTACAO_GRACA_SEGUNDOS = int(os.environ.get("REDGEST_STUB_ROTACAO_GRACA", "300"))
+
+MOTIVO_REVOGADA = "licenca_revogada"
+MOTIVO_BLOQUEADA = "licenca_bloqueada"
+MOTIVO_SUSPENSA = "licenca_suspensa"
+MOTIVO_EXPIRADA = "licenca_expirada"
+MOTIVO_NAO_ATIVADA = "licenca_nao_ativada"
+MOTIVO_HARDWARE_DIVERGENTE = "hardware_divergente"
 
 # --- Catálogo genérico de sistemas (plano §2.1, tipo `Sistema`) -----------------
 SISTEMAS: dict[str, dict[str, Any]] = {
     SISTEMA: {
         "codigo": SISTEMA,
-        "nome_exibicao": "ERP Gráfica Rápida",
+        "nome_exibicao": "PrintGest ERP",
         "tipo_licenciamento": TIPO_LICENCIAMENTO,
         "schema_entitlements": {
             "cnpj_vinculado": "string",
@@ -80,6 +114,74 @@ SISTEMAS: dict[str, dict[str, Any]] = {
 # --- Licenças e eventos em memória (dev) -----------------------------------------
 LICENCAS: dict[str, dict[str, Any]] = {}
 EVENTOS: dict[str, list[dict[str, Any]]] = {}
+
+
+def _epoch(agora: float, deslocamento: float | None) -> float | None:
+    return agora + deslocamento if deslocamento is not None else None
+
+
+def _iso(momento: float | None) -> str | None:
+    if momento is None:
+        return None
+    return dt.datetime.fromtimestamp(momento, dt.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+
+def _entitlements(max_estacoes: int = SEED_MAX_ESTACOES) -> dict[str, Any]:
+    return {
+        "cnpj_vinculado": SEED_CNPJ,
+        "max_estacoes": max_estacoes,
+        "modulos_habilitados": list(SEED_MODULOS),
+    }
+
+
+def _nova_licenca(
+    codigo: str,
+    *,
+    status: str = STATUS_AGUARDANDO,
+    dias_fim: float | None = 365,
+    cnpj: str = SEED_CNPJ,
+    hardware_fixo: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    agora = time.time()
+    return {
+        "id": codigo,
+        "sistema": SISTEMA,
+        "cnpj": cnpj,
+        "codigo_licenca": codigo,
+        "status": status,
+        "entitlements": _entitlements(),
+        "data_inicio": agora if status == STATUS_ATIVA else None,
+        "data_fim": _epoch(agora, dias_fim * DIA if dias_fim is not None else None),
+        "client_id": None,
+        "client_secret": None,
+        "secret_anterior": None,
+        "secret_anterior_em": None,
+        "hardware_sha256": _hash_perfil(hardware_fixo) if hardware_fixo else None,
+        "ativacoes": 0,
+        "ultima_validacao": None,
+        "criado_em": agora,
+    }
+
+
+def _semeiar_licencas() -> None:
+    """Matriz de cenários do Contrato B (id == código de licença, §7)."""
+    semeadas = {
+        SEED_CODIGO_LICENCA: {},
+        "EXPIRADA-GRAFICA-2026": {"dias_fim": -1},
+        "VENCIDA-GRAFICA-2026": {"dias_fim": -10},
+        "SUSPENSA-GRAFICA-2026": {"status": STATUS_SUSPENSA},
+        "BLOQUEADA-GRAFICA-2026": {"status": STATUS_BLOQUEADA},
+        "REVOGADA-GRAFICA-2026": {"status": STATUS_REVOGADA},
+        "HARDWARE-2026": {"hardware_fixo": {"cpu": "outra-maquina", "placa_mae": "0"}},
+        "VITALICIA-GRAFICA-2026": {"dias_fim": None},
+    }
+    for codigo, campos in semeadas.items():
+        # Sementes já estão vigentes: só o `criar_licenca` nasce `aguardando`.
+        opcoes = {"status": STATUS_ATIVA, **campos}
+        LICENCAS.setdefault(codigo, _nova_licenca(codigo, **opcoes))
+
 
 # --- Chave RS256 de dev ---------------------------------------------------------
 _KEY_DIR = Path(__file__).resolve().parent.parent / ".dev" / "redgest_stub_jwt"
@@ -126,31 +228,23 @@ def _assinar_jwt(payload: dict[str, Any]) -> str:
     return f"{signing_input}.{_b64url(assinatura)}"
 
 
-def _payload_token(client_id: str, licenca: dict[str, Any], agora: int, expira: int) -> dict[str, Any]:
-    return {
+def _token_b(licenca: dict[str, Any]) -> tuple[str, int, int]:
+    """JWT `licenciamento` do §7.4 (`token`, `token_expira_em`, `expires_in`)."""
+    agora = int(time.time())
+    expira = agora + TOKEN_TTL_SECONDS
+    payload = {
         "iss": "redgest-stub",
-        "sub": client_id,
+        "sub": licenca["client_id"],
         "jti": uuid.uuid4().hex,
         "sistema": licenca["sistema"],
-        "tipo": TIPO_LICENCIAMENTO,
+        "tipo": "licenciamento",
         "cnpj_vinculado": licenca["cnpj"],
-        "max_estacoes": licenca["max_estacoes"],
-        "modulos_habilitados": licenca["modulos"],
+        "max_estacoes": licenca["entitlements"].get("max_estacoes"),
+        "modulos_habilitados": licenca["entitlements"].get("modulos_habilitados"),
         "iat": agora,
         "exp": expira,
     }
-
-
-def _emitir_token(licenca: dict[str, Any]) -> dict[str, Any]:
-    agora = int(time.time())
-    expira = agora + TOKEN_TTL_SECONDS
-    licenca["token"] = _assinar_jwt(_payload_token(licenca["client_id"], licenca, agora, expira))
-    licenca["token_expira_em"] = expira
-    return {
-        "access_token": licenca["token"],
-        "token_type": "bearer",
-        "expires_in": TOKEN_TTL_SECONDS,
-    }
+    return _assinar_jwt(payload), expira, TOKEN_TTL_SECONDS
 
 
 def _evento(licenca_id: str, tipo: str, detalhe: str | None = None) -> None:
@@ -164,7 +258,8 @@ def _evento(licenca_id: str, tipo: str, detalhe: str | None = None) -> None:
 
 
 # --- Credenciais determinísticas (CNPJ + código) -----------------------------------
-def _client_credentials(cnpj: str, codigo: str) -> tuple[str, str]:
+def _credenciais(cnpj: str, codigo: str) -> tuple[str, str]:
+    """Par emitido no handshake. `client_secret` de 32 caracteres (hash hex)."""
     seed = f"{cnpj}:{codigo}"
     return (
         f"grafica_{cnpj}",
@@ -172,31 +267,45 @@ def _client_credentials(cnpj: str, codigo: str) -> tuple[str, str]:
     )
 
 
-def _licenca_do_seed(cnpj: str, codigo: str) -> dict[str, Any] | None:
-    if cnpj != SEED_CNPJ or codigo != SEED_CODIGO_LICENCA:
-        return None
-    return {
-        "sistema": SISTEMA,
-        "cnpj": cnpj,
-        "codigo_licenca": codigo,
-        "plano": SEED_PLANO,
-        "max_estacoes": SEED_MAX_ESTACOES,
-        "modulos": SEED_MODULOS,
-    }
+def _secret_aceito(licenca: dict[str, Any], candidato: str) -> bool:
+    """Secret vigente ou o anterior ainda dentro da tolerância de reenvio (§7.3).
 
-
-def _licenca_por_id(licenca_id: str) -> dict[str, Any]:
-    licenca = LICENCAS.get(licenca_id)
-    if not licenca:
-        raise HTTPException(status_code=404, detail="Licença não encontrada.")
-    return licenca
-
-
-def _check_credentials(licenca: dict[str, Any], client_id: str, client_secret: str) -> None:
-    if licenca.get("client_id") != client_id or not hmac.compare_digest(
-        client_secret, licenca.get("client_secret", "")
+    A rotação emite um novo `client_secret` a cada `/validar`; uma requisição
+    reenviada (queda de rede entre a resposta e a gravação) carrega o secret
+    antigo e precisa continuar válida durante essa tolerância.
+    """
+    candidatos = [licenca.get("client_secret")]
+    if (
+        licenca.get("secret_anterior") is not None
+        and licenca.get("secret_anterior_em") is not None
+        and time.time() - licenca["secret_anterior_em"] <= ROTACAO_GRACA_SEGUNDOS
     ):
-        raise HTTPException(status_code=401, detail="Credenciais inválidas (revogadas?).")
+        candidatos.append(licenca["secret_anterior"])
+    return any(
+        hmac.compare_digest(candidato, vigente)
+        for vigente in candidatos
+        if vigente
+    )
+
+
+def _hash_perfil(perfil: dict[str, Any]) -> str:
+    """SHA-256 do JSON canônico (chaves ordenadas) — mesmo cálculo do RedGest."""
+    canonico = json.dumps(perfil, sort_keys=True, default=str)
+    return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
+
+
+def _grace_deadline(licenca: dict[str, Any]) -> float | None:
+    fim = licenca.get("data_fim")
+    return fim + GRACE_HORAS * 3600 if fim else None
+
+
+def _dias_restantes(licenca: dict[str, Any]) -> int | None:
+    fim = licenca.get("data_fim")
+    return int((fim - time.time()) // DIA) if fim else None
+
+
+def _licenca_por_id(licenca_id: str) -> dict[str, Any] | None:
+    return LICENCAS.get(licenca_id)
 
 
 # --- Esquemas de entrada -----------------------------------------------------------
@@ -216,12 +325,25 @@ class LicencaCreateIn(BaseModel):
     plano: str | None = None
 
 
-class LicencaCredenciaisIn(BaseModel):
+class AtivarIn(BaseModel):
+    cnpj: str
+    codigo_licenca: str
+
+class ValidarIn(BaseModel):
+    client_id: str
+    client_secret: str
+    hardware_profile: dict[str, Any] | None = None
+    ip_origem: str | None = None
+    usuario: str | None = None
+    contexto: dict[str, Any] | None = None
+
+
+class CredenciaisIn(BaseModel):
     client_id: str
     client_secret: str
 
 
-app = FastAPI(title="RedGest Stub", version="0.2.0")
+app = FastAPI(title="RedGest Stub", version="1.0.0")
 
 
 @app.post("/api/v1/sistemas")
@@ -242,95 +364,156 @@ def consultar_sistema(codigo: str) -> dict[str, Any]:
 
 @app.post("/api/v1/licencas")
 def criar_licenca(body: LicencaCreateIn) -> dict[str, Any]:
+    """Cria/atualiza uma licença pelo código (idempotente — backoffice em dev)."""
     if body.sistema not in SISTEMAS:
         raise HTTPException(status_code=422, detail="Sistema não cadastrado.")
-    licenca = next(
-        (
-            l
-            for l in LICENCAS.values()
-            if l["sistema"] == body.sistema and l["cnpj"] == body.cnpj and l["codigo_licenca"] == body.codigo_licenca
-        ),
-        None,
-    )
-    if licenca:
-        return {"data": {"licenca_id": licenca["id"], "status": licenca["status"]}}
-    licenca_id = uuid.uuid4().hex[:12]
-    LICENCAS[licenca_id] = {
-        "id": licenca_id,
-        "sistema": body.sistema,
-        "cnpj": body.cnpj,
-        "codigo_licenca": body.codigo_licenca,
-        "plano": body.plano or "mensal",
-        "status": STATUS_AGUARDANDO,
-        "max_estacoes": 0,
-        "modulos": [],
-        "client_id": None,
-        "client_secret": None,
-        "data_inicio": None,
-        "token": None,
-        "token_expira_em": None,
-        "criado_em": time.time(),
-    }
-    _evento(licenca_id, "licenca.criada", body.cnpj)
-    return {"data": {"licenca_id": licenca_id, "status": STATUS_AGUARDANDO}}
+    codigo = body.codigo_licenca.strip().upper()
+    licenca = LICENCAS.get(codigo)
+    if licenca is None:
+        licenca = _nova_licenca(codigo, status=STATUS_AGUARDANDO, dias_fim=None, cnpj=body.cnpj)
+        LICENCAS[codigo] = licenca
+        _evento(codigo, "licenca.criada", body.cnpj)
+    return {"data": {"id": licenca["id"], "status": licenca["status"]}}
 
 
-@app.post("/api/v1/licencas/{licenca_id}/ativar")
-def ativar_licenca(licenca_id: str) -> dict[str, Any]:
+@app.post("/api/v1/licencas/{licenca_id}/ativar/")
+def ativar_licenca(licenca_id: str, body: AtivarIn, request: Request):
+    """Handshake do Contrato B (§7.2): credenciais + vigência, uma única vez."""
+    if not request.headers.get("Idempotency-Key"):
+        return _erro_chave(
+            400, "Header Idempotency-Key obrigatório.", "IDEMPOTENCY_KEY_OBRIGATORIA"
+        )
     licenca = _licenca_por_id(licenca_id)
-    seed = _licenca_do_seed(licenca["cnpj"], licenca["codigo_licenca"])
-    if not seed:
-        raise HTTPException(
-            status_code=401, detail="CNPJ ou código de licença inválido para este sistema."
+    if licenca is None:
+        return _erro_chave(404, "Licença não encontrada.", "LICENCA_NAO_ENCONTRADA")
+    if licenca["cnpj"] != body.cnpj or licenca["codigo_licenca"] != body.codigo_licenca:
+        # §14.1 cenário 2: CNPJ/codigo que nao conferem -> 400, como no RedGest.
+        return _erro_chave(
+            400,
+            "CNPJ ou codigo de licenca nao conferem.",
+            "CNPJ_NAO_CONFERE",
         )
     if licenca["status"] == STATUS_REVOGADA:
-        raise HTTPException(status_code=403, detail="Licença revogada, sem reativação.")
-    licenca["status"] = STATUS_ATIVA
-    licenca["plano"] = seed["plano"]
-    licenca["max_estacoes"] = seed["max_estacoes"]
-    licenca["modulos"] = seed["modulos"]
-    licenca["data_inicio"] = time.time()
-    client_id, client_secret = _client_credentials(licenca["cnpj"], licenca["codigo_licenca"])
-    licenca["client_id"] = client_id
-    licenca["client_secret"] = client_secret
-    _evento(licenca_id, "licenca.ativada", client_id)
-    return {
-        "data": {
-            "licenca_id": licenca_id,
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "sistema": licenca["sistema"],
-            "tipo_licenciamento": TIPO_LICENCIAMENTO,
-            **_emitir_token(licenca),
-        }
-    }
-
-
-@app.post("/api/v1/licencas/{licenca_id}/validar")
-def validar_licenca(licenca_id: str, body: LicencaCredenciaisIn) -> dict[str, Any]:
-    licenca = _licenca_por_id(licenca_id)
-    _check_credentials(licenca, body.client_id, body.client_secret)
-    if licenca["status"] == STATUS_REVOGADA:
-        raise HTTPException(status_code=403, detail="Licença revogada — não autorizada.")
+        return _erro_chave(400, "Licença revogada, sem reativação.", "LICENCA_REVOGADA")
     if licenca["status"] != STATUS_ATIVA:
-        raise HTTPException(status_code=400, detail="Licença ainda não ativada.")
-    _evento(licenca_id, "licenca.renovada", None)
-    return {
-        "data": {
-            "sistema": licenca["sistema"],
-            "tipo_licenciamento": TIPO_LICENCIAMENTO,
-            "cnpj_vinculado": licenca["cnpj"],
-            "max_estacoes": licenca["max_estacoes"],
-            "modulos_habilitados": licenca["modulos"],
-            **_emitir_token(licenca),
+        return _erro_chave(
+            400,
+            f"Licença {licenca['status']}, sem reativação.",
+            f"LICENCA_{licenca['status'].upper()}",
+        )
+    if licenca["data_fim"] is not None and licenca["data_fim"] <= time.time():
+        return _erro_chave(400, "Licença expirada, sem reativação.", "LICENCA_EXPIRADA")
+
+    if licenca["client_id"] is None:
+        licenca["client_id"], licenca["client_secret"] = _credenciais(
+            licenca["cnpj"], licenca["codigo_licenca"]
+        )
+        licenca["data_inicio"] = licenca["data_inicio"] or time.time()
+        _evento(licenca_id, "licenca.ativada", licenca["client_id"])
+    else:
+        # Reativação idempotente: devolve o mesmo par emitido na primeira vez.
+        _evento(licenca_id, "licenca.reativada", licenca["client_id"])
+
+    return JSONResponse(
+        content={
+            "data": {
+                "id": licenca_id,
+                "cliente_id": licenca["cnpj"],
+                "sistema_codigo": licenca["sistema"],
+                "status": licenca["status"],
+                "entitlements": licenca["entitlements"],
+                "data_inicio": _iso(licenca["data_inicio"]),
+                "data_fim": _iso(licenca["data_fim"]),
+                "client_id": licenca["client_id"],
+                "client_secret": licenca["client_secret"],
+                "modo": "on_premise",
+            }
         }
-    }
+    )
 
 
-@app.post("/api/v1/licencas/{licenca_id}/revogar")
-def revogar_licenca(licenca_id: str, body: LicencaCredenciaisIn) -> dict[str, Any]:
+@app.post("/api/v1/licencas/{licenca_id}/validar/")
+def validar_licenca(licenca_id: str, body: ValidarIn, request: Request):
+    """Revalidação periódica (§7.3): credenciais + `hardware_profile`."""
+    if not request.headers.get("Idempotency-Key"):
+        return _erro_chave(
+            400, "Header Idempotency-Key obrigatório.", "IDEMPOTENCY_KEY_OBRIGATORIA"
+        )
     licenca = _licenca_por_id(licenca_id)
-    _check_credentials(licenca, body.client_id, body.client_secret)
+    if licenca is None:
+        return _erro_chave(404, "Licença não encontrada.", "LICENCA_NAO_ENCONTRADA")
+    if licenca.get("client_id") != body.client_id or not _secret_aceito(
+        licenca, body.client_secret
+    ):
+        return _erro_chave(403, "Credenciais inválidas.", "CREDENCIAIS_INVALIDAS")
+
+    agora = time.time()
+    motivo = ""
+    valida = True
+    if licenca["status"] == STATUS_REVOGADA:
+        valida, motivo = False, MOTIVO_REVOGADA
+    elif licenca["status"] == STATUS_BLOQUEADA:
+        valida, motivo = False, MOTIVO_BLOQUEADA
+    elif licenca["status"] == STATUS_SUSPENSA:
+        valida, motivo = False, MOTIVO_SUSPENSA
+    elif licenca["status"] != STATUS_ATIVA:
+        valida, motivo = False, MOTIVO_NAO_ATIVADA
+    elif licenca["data_fim"] is not None and licenca["data_fim"] <= agora:
+        valida, motivo = False, MOTIVO_EXPIRADA
+
+    perfil = body.hardware_profile or {}
+    if valida and perfil:
+        digest = _hash_perfil(perfil)
+        vinculado = licenca["hardware_sha256"]
+        if vinculado is None:
+            licenca["hardware_sha256"] = digest  # bind na primeira validação (§11.4)
+            _evento(licenca_id, "hardware.vinculado", digest[:12])
+        elif not hmac.compare_digest(digest, vinculado):
+            valida, motivo = False, MOTIVO_HARDWARE_DIVERGENTE
+
+    token = None
+    token_expira_em = None
+    expires_in = None
+    if valida:
+        token, token_expira_em, expires_in = _token_b(licenca)
+        # §7.3: o /validar emite um novo secret e o anterior deixa de valer.
+        licenca["secret_anterior"] = licenca["client_secret"]
+        licenca["secret_anterior_em"] = agora
+        licenca["client_secret"] = hashlib.sha256(
+            f"{licenca['client_id']}:{uuid.uuid4().hex}".encode()
+        ).hexdigest()[:32]
+        licenca["ativacoes"] += 1
+    licenca["ultima_validacao"] = agora
+    _evento(licenca_id, "licenca.validada", motivo or "ok")
+
+    dados: dict[str, Any] = {
+        "licenca_id": licenca_id,
+        "valida": valida,
+        "status": STATUS_ATIVA if valida else licenca["status"],
+        "motivo": motivo,
+        "sistema_codigo": licenca["sistema"],
+        "cliente_id": licenca["cnpj"],
+        "entitlements": licenca["entitlements"],
+        "dias_restantes": _dias_restantes(licenca),
+        "grace_deadline": _iso(_grace_deadline(licenca)),
+        "token": token,
+        "token_expira_em": _iso(token_expira_em),
+        "expires_in": expires_in,
+        "client_id": licenca["client_id"],
+    }
+    if valida:
+        dados["client_secret"] = licenca["client_secret"]
+    return JSONResponse(content={"data": dados})
+
+
+@app.post("/api/v1/licencas/{licenca_id}/revogar/")
+def revogar_licenca(licenca_id: str, body: CredenciaisIn) -> dict[str, Any]:
+    """Simula inadimplência (admin em dev)."""
+    licenca = _licenca_por_id(licenca_id)
+    if licenca is None:
+        return {"data": {"licenca_id": licenca_id, "status": None}}
+    if licenca["client_id"] != body.client_id:
+        raise HTTPException(status_code=403, detail="Credenciais inválidas.")
     licenca["status"] = STATUS_REVOGADA
     _evento(licenca_id, "licenca.revogada", body.client_id)
     return {"data": {"licenca_id": licenca_id, "status": STATUS_REVOGADA}}
@@ -339,29 +522,33 @@ def revogar_licenca(licenca_id: str, body: LicencaCredenciaisIn) -> dict[str, An
 @app.get("/api/v1/licencas/{licenca_id}")
 def status_licenca(licenca_id: str) -> dict[str, Any]:
     licenca = _licenca_por_id(licenca_id)
+    if licenca is None:
+        raise HTTPException(status_code=404, detail="Licença não encontrada.")
     return {
         "data": {
-            "licenca_id": licenca_id,
+            "id": licenca["id"],
             "sistema": licenca["sistema"],
             "cnpj": licenca["cnpj"],
-            "plano": licenca["plano"],
             "status": licenca["status"],
-            "max_estacoes": licenca["max_estacoes"],
-            "modulos_habilitados": licenca["modulos"],
-            "data_inicio": licenca["data_inicio"],
-            "token_expira_em": licenca["token_expira_em"],
+            "entitlements": licenca["entitlements"],
+            "data_inicio": _iso(licenca["data_inicio"]),
+            "data_fim": _iso(licenca["data_fim"]),
+            "grace_deadline": _iso(_grace_deadline(licenca)),
+            "hardware_vinculado": licenca["hardware_sha256"],
+            "validacoes": licenca["ativacoes"],
+            "hardware_vinculado": licenca["hardware_sha256"],
         }
     }
 
 
 @app.get("/api/v1/licencas/{licenca_id}/eventos")
 def eventos_licenca(licenca_id: str) -> dict[str, Any]:
-    _licenca_por_id(licenca_id)
+    if licenca_id not in LICENCAS:
+        raise HTTPException(status_code=404, detail="Licença não encontrada.")
     return {"data": EVENTOS.get(licenca_id, [])}
 
 
 # --- Contrato C: chave de produto (`/licencas-software/validar/`) -----------------
-SISTEMA_CHAVE = "printgest"
 API_KEY_CHAVE = os.environ.get("REDGEST_STUB_API_KEY", "chave-api-printgest-dev")
 TOLERANCIA_ASSINATURA_SEGUNDOS = 300
 
@@ -509,6 +696,9 @@ def health() -> dict[str, str]:
         "sistema": SISTEMA,
         "tipo_licenciamento": TIPO_LICENCIAMENTO,
     }
+
+
+_semeiar_licencas()
 
 
 if __name__ == "__main__":

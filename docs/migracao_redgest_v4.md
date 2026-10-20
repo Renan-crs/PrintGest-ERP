@@ -51,6 +51,36 @@ diferentes** (manual §1 "Qual rota usar?" e a árvore de decisão da §1).
 > **Regra de bolso do manual (§7.1 das rotas):** "se a máquina é identificada e a
   licença é por equipamento → `LICENCA · hardware_bound`". É o nosso caso.
 
+> **Correção (19/10/2026):** a regra de bolso acima conflita com o §7.2 - ver §2.2.
+
+### 2.2 Achado: o handshake do §7.2 é exclusivo de `online_periodic`
+
+O §7.2 diz explicitamente que o handshake `cnpj` + `codigo_licenca`
+(→ `client_id`/`client_secret`) **só existe para `estrategia_validacao ==
+online_periodic`** (400 caso contrario). O §7.3 confirma que `hardware_profile`
+so e aceito em `hardware_bound`, e o §11.4 descreve o `hardware_bound` como
+perfil vinculado + rebind, **sem** handshake.
+
+Ou seja: **nao da para ter `hardware_bound` *e* ativacao por CNPJ + codigo**. As
+saidas, em ordem de preferencia, dependem de decisao do RedGest (a estrategia e
+**imutavel** apos o primeiro uso - §3):
+
+1. **`hardware_bound` com bind administrativo:** o `hardware_profile` e vinculado
+   no `PUT /licencas/{id}/hardware/` (§7.4) pelo time de implantacao e o desktop
+   so faz `/validar`. Hoje o `/validar` de `hardware_bound` responde
+   `sem_hardware_vinculado` para um perfil nunca visto, entao o app **precisa** do
+   bind feito antes - nao ha caminho de bind pelo proprio app.
+2. **`online_periodic`:** o handshake funciona como documentado e o desktop reusa
+   `client_id`/`client_secret`; o custo e o TTL de JWT de 4 h (§11.3 pede
+   validacao a cada 3 h) e o `modo_leitura` emitido pelo servidor, contra a
+   tolerancia offline de 72 h que ja implementamos. Ainda assim e muito melhor
+   que `assinatura_simples` (grace 0).
+
+O stub local (M1) implementa **os dois lados** - o handshake com o formato do
+§7.2 e a checagem de `hardware_profile` do §7.3 - para que o adaptador (M2) seja
+exercitado de ponta a ponta sem depender da escolha. No corte muda so a origem do
+`client_secret` (§3), nao o desenho do cliente.
+
 ### 2.1 Decisão de produto pendente: a UX de ativação
 
 Hoje o usuário digita **um serial**. No Contrato B a ativação é um *handshake*
