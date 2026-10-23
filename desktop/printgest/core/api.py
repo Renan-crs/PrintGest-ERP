@@ -448,8 +448,22 @@ class Api:
     def situacao_licenca(self, token: str | None = None) -> dict:
         return self._get("/v1/licenca", token)
 
-    def ativar_licenca(self, token: str | None, chave: str) -> dict:
-        return self._post("/v1/licenca/ativar", {"chave_ativacao": chave}, token)
+    def ativar_licenca(
+        self,
+        token: str | None,
+        chave: str | None = None,
+        *,
+        cnpj: str | None = None,
+        codigo: str | None = None,
+    ) -> dict:
+        corpo: dict[str, str] = {}
+        if chave:
+            corpo["chave_ativacao"] = chave
+        if cnpj:
+            corpo["cnpj"] = cnpj
+        if codigo:
+            corpo["codigo_licenca"] = codigo
+        return self._post("/v1/licenca/ativar", corpo, token)
 
     def renovar_licenca(self, token: str | None) -> dict:
         return self._post("/v1/licenca/renovar", {}, token)
