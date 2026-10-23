@@ -122,9 +122,26 @@ def _agora() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
+def _base_redgest() -> str:
+    """Base do RedGest normalizada — origem apenas, sem path de API.
+
+    Os caminhos de cada contrato já carregam o prefixo completo
+    (`/api/v1/licencas-software/validar/`, `/api/v1/licencas/...`). Se a variável
+    `PRINTGEST_REDGEST_URL` vier com `/api/v1` ou uma barra final (erro fácil de
+    cometer ao copiar a URL do painel), o `httpx` concatena e a requisição vira
+    `/api/v1/api/v1/...` — 404 que, para o usuário, parece "chave inválida".
+    Descartar esse sufixo aqui evita o 404 silencioso.
+    """
+    base = (settings.redgest_url or "").strip().rstrip("/")
+    sufixo = "/api/v1"
+    while base.lower().endswith(sufixo):
+        base = base[: -len(sufixo)].rstrip("/")
+    return base
+
+
 def _cliente() -> httpx.Client:
     return httpx.Client(
-        base_url=settings.redgest_url, timeout=settings.licenca_timeout_segundos
+        base_url=_base_redgest(), timeout=settings.licenca_timeout_segundos
     )
 
 
@@ -136,7 +153,7 @@ def _cliente_com_idempotencia(chave_idempotencia: str) -> httpx.Client:
     cliente é criado por operação, não por requisição.
     """
     return httpx.Client(
-        base_url=settings.redgest_url,
+        base_url=_base_redgest(),
         timeout=settings.licenca_timeout_segundos,
         headers={"Idempotency-Key": chave_idempotencia},
     )

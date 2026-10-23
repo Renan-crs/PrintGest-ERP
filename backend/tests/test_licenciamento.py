@@ -31,6 +31,29 @@ CAMINHO = "/api/v1/licencas-software/validar/"
 FINGERPRINT_FIXO = "a" * 64
 
 
+@pytest.mark.parametrize(
+    "configurado, esperado",
+    [
+        ("http://127.0.0.1:9100", "http://127.0.0.1:9100"),
+        ("http://127.0.0.1:9100/", "http://127.0.0.1:9100"),
+        ("https://redgest.exemplo.com/api/v1/", "https://redgest.exemplo.com"),
+        ("https://redgest.exemplo.com/api/v1", "https://redgest.exemplo.com"),
+        ("https://redgest.exemplo.com/API/V1//", "https://redgest.exemplo.com"),
+    ],
+)
+def test_base_redgest_nao_duplica_o_prefixo_da_api(
+    monkeypatch, configurado, esperado
+):
+    """A URL configurada não pode carregar o path da API.
+
+    Os caminhos de cada contrato já incluem `/api/v1/...`. Se o operador colar a
+    URL com esse sufixo, o `httpx` concatena e a chamada vira
+    `/api/v1/api/v1/...` — 404 que a UI mostraria como falha de licença.
+    """
+    monkeypatch.setattr(settings, "redgest_url", configurado)
+    assert licensa_service._base_redgest() == esperado
+
+
 @pytest.fixture(autouse=True)
 def _licenca_isolada(client, monkeypatch):
     """Roda DEPOIS do conftest: limpa a licença local e configura o segredo HMAC."""
@@ -465,6 +488,26 @@ def test_erro_5xx_vira_503_e_registra_diagnostico(client, monkeypatch):
     data = client.get("/v1/licenca").json()["data"]
     assert data["estado"] == "ativa"
     assert "indisponível" in (data["ultimo_erro"] or "").lower()
+
+
+def test_status_inesperado_404_vira_502_e_nao_revoga(client, monkeypatch):
+    """404 (ex.: URL do RedGest com path duplicado) não pode revogar.
+
+    Só uma recusa explícita do servidor revoga. Um status que o contrato não
+    prevê é falha de integração: o cliente vê 502 e a licença local continua
+    ativa — o oposto do que aconteceria se o 404 fosse lido como \"inválida\".
+    """
+    _mock(monkeypatch, _resposta_ok())
+    assert _ativar(client).status_code == 200
+
+    _mock(monkeypatch, httpx.Response(404, json={"detail": "Not Found"}))
+    resp = client.post("/v1/licenca/renovar")
+    assert resp.status_code == 502, resp.text
+    assert "inesperada" in resp.json()["detail"].lower()
+
+    data = client.get("/v1/licenca").json()["data"]
+    assert data["estado"] == "ativa"
+    assert data["status"] == "ativa"
 
 
 # -------------------------------- recusa dentro de um 200 (`valido: false`)
