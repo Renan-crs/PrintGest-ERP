@@ -133,10 +133,11 @@ com `cnpj` + `codigo_licenca`. Duas saídas:
 
 | Fase | Conteúdo | Bloqueio |
 |---|---|---|
-| **M0** (agora) | Observar os headers `Deprecation`/`Sunset`; fechar a UX (§2.1) e pedir o onboarding (§3). Nenhum código de produção muda. | decisão de produto |
-| **M1** | RedGest provisiona o modelo v4 do `printgest` e o stub local ganha o Contrato B. | RedGest |
-| **M2** | Adaptador Contrato B atrás de flag; *dual-run* com o Contrato C (cada instalação usa um). | M1 |
-| **M3** | Piloto em um cliente, medição, virada do default. | M2 |
+| **M0** | Observar os headers `Deprecation`/`Sunset`; fechar a UX (§2.1) e pedir o onboarding (§3). Nenhum código de produção muda. | decisão de produto |
+| **M1** | Stub atualizado para Contrato B v4.0 (concluído). | RedGest |
+| **M2a** | Backend: adaptador Contrato B atrás de flag; *dual-run* com o Contrato C (concluído). | M1 |
+| **M2b** | Desktop: ativação dinâmica (CNPJ + código) (concluído). | M2a |
+| **M3** | Homologação com RedGest real (quando provisionado), piloto em um cliente, medição, virada do default. | M2b |
 | **M4** | Remover o Contrato C e a flag (antes de 01/03/2027); atualizar PRD/CHANGELOG. | M3 |
 
 ## 6. Riscos

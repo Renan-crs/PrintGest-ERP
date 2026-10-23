@@ -122,7 +122,10 @@ class _Roteador:
     # ---------------------------------------------------------------- telas
 
     def _abrir_ativacao(self, sit: dict) -> None:
-        janela = AtivacaoWindow(self._api, token=self._token)
+        contrato = ""
+        if isinstance(sit, dict):
+            contrato = str(sit.get("contrato") or "")
+        janela = AtivacaoWindow(self._api, token=self._token, contrato=contrato)
         janela.ativada.connect(lambda: self._abrir_dashboard(False))
         janela.saida.connect(QApplication.instance().quit)
         self._abrir(janela)

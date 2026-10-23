@@ -62,7 +62,7 @@ Só o Local API Service fala com o RedGest; as estações-cliente nunca o fazem.
 - Enquanto o RedGest estiver fora, o sistema continua operando dentro da
   vigência + 72 h de tolerância.
 
-## 5. Depreciação
+## 5. Depreciação / Contratos
 
 O RedGest marca `LicencaSoftware` v3.6 (`/licencas-software/`) como depreciado:
 as respostas passam a trazer `Deprecation: true`,
@@ -70,7 +70,15 @@ as respostas passam a trazer `Deprecation: true`,
 endpoint **permanece como adapter** até essa data; o PrintGest deve migrar antes
 de **01/03/2027**.
 
-A migração **não** é uma troca de endpoint: `/licencas/` é outro contrato
+O PrintGest suporta **dois contratos** controlados por `PRINTGEST_REDGEST_CONTRATO`:
+- **`c` (padrão):** Contrato C — validação por chave de produto em
+  `/api/v1/licencas-software/validar/`.
+- **`b`:** Contrato B v4.0 — ativação por `cnpj` + `codigo_licenca` em
+  `/api/v1/licencas/`, com `client_id`/`client_secret` (credenciais guardadas
+  no cofre do SO). A UI exibe o formulário dinâmico conforme `GET /v1/licenca`
+  retorna `contrato`.
+
+A migração **não** é apenas uma troca de endpoint: `/licencas/` é outro contrato
 (Contrato B v4.0, model `Licenca`, ativação por `cnpj` + `codigo_licenca`,
 credencial `client_id`/`client_secret`, resposta com JWT e `grace_deadline`). O
 alvo do PrintGest é a estratégia **`hardware_bound`** (desktop identificado por
@@ -101,8 +109,11 @@ sem SMBIOS confiável, testes ou suporte).
 
 ## 7. Conformidade com a documentação oficial do RedGest
 
-Referência: *"Documento de Integração — chave de ativação (serial)"* v1.0
-(18/10/2026), aprovado para implementação. Pontos conferidos no código:
+Referências:
+- *"Documento de Integração — chave de ativação (serial)"* v1.0 (18/10/2026), aprovado para implementação (Contrato C).
+- *"Contrato B v4.0 — RedGest Licenças"* (migração planejada) — ver `docs/migracao_redgest_v4.md`.
+
+Pontos conferidos no código (Contrato C):
 
 | Item da doc | Situação |
 |---|---|

@@ -43,10 +43,11 @@ class AtivacaoWindow(QMainWindow):
     ativada = Signal()
     saida = Signal()
 
-    def __init__(self, api: Api, token: str | None = None) -> None:
+    def __init__(self, api: Api, token: str | None = None, contrato: str = "c") -> None:
         super().__init__()
         self._api = api
         self._token = token
+        self._contrato_b = (contrato or "c").strip().lower() == "b"
         self.setWindowTitle("PrintGest ERP — Ativação de Licença do Sistema")
         self.setMinimumSize(960, 640)
 
@@ -70,10 +71,16 @@ class AtivacaoWindow(QMainWindow):
         titulo.setObjectName("titulo")
         cabeçalho.addWidget(titulo)
 
-        subtitulo = QLabel(
-            "Digite a chave de produto entregue na contratação do PrintGest para "
-            "liberar o acesso a todas as estações de trabalho da gráfica."
-        )
+        if self._contrato_b:
+            subtitulo = QLabel(
+                "Informe o CNPJ da empresa e o código da licença enviados pelo "
+                "RedGest para liberar o acesso a todas as estações de trabalho da gráfica."
+            )
+        else:
+            subtitulo = QLabel(
+                "Digite a chave de produto entregue na contratação do PrintGest para "
+                "liberar o acesso a todas as estações de trabalho da gráfica."
+            )
         subtitulo.setObjectName("subtitulo")
         subtitulo.setWordWrap(True)
         cabeçalho.addWidget(subtitulo)
@@ -90,7 +97,10 @@ class AtivacaoWindow(QMainWindow):
         self.setCentralWidget(base)
         QShortcut(QKeySequence(Qt.Key.Key_F10), self, self._ativar)
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.saida.emit)
-        self._campo_chave.setFocus()
+        if self._contrato_b:
+            self._campo_cnpj.setFocus()
+        else:
+            self._campo_chave.setFocus()
 
     # ------------------------------------------------------------------ helpers
 
@@ -141,20 +151,40 @@ class AtivacaoWindow(QMainWindow):
         form.setContentsMargins(24, 20, 24, 20)
         form.setSpacing(10)
 
-        form.addWidget(self._rotulo("Chave de Produto"))
-        self._campo_chave = QLineEdit()
-        self._campo_chave.setMaxLength(19)
-        self._campo_chave.setProperty("mono", "true")
-        self._campo_chave.setPlaceholderText("XXXX-XXXX-XXXX-XXXX")
-        self._campo_chave.textChanged.connect(self._manter_chave_formatada)
-        form.addWidget(self._campo_chave)
-        formato = QLabel(
-            "A chave tem 16 caracteres hexadecimais (4 blocos de 4, separados por "
-            "hífen) e é validada online no servidor de licenças."
-        )
-        formato.setObjectName("subtitulo")
-        formato.setWordWrap(True)
-        form.addWidget(formato)
+        if self._contrato_b:
+            form.addWidget(self._rotulo("CNPJ"))
+            self._campo_cnpj = QLineEdit()
+            self._campo_cnpj.setPlaceholderText("00.000.000/0000-00")
+            form.addWidget(self._campo_cnpj)
+
+            form.addWidget(self._rotulo("Código da Licença"))
+            self._campo_codigo = QLineEdit()
+            self._campo_codigo.setProperty("mono", "true")
+            self._campo_codigo.setPlaceholderText("Código enviado pelo RedGest")
+            form.addWidget(self._campo_codigo)
+
+            formato = QLabel(
+                "Para o Contrato B (RedGest v4.0), informe o CNPJ e o código da "
+                "licença. A ativação é online e associa o equipamento à licença."
+            )
+            formato.setObjectName("subtitulo")
+            formato.setWordWrap(True)
+            form.addWidget(formato)
+        else:
+            form.addWidget(self._rotulo("Chave de Produto"))
+            self._campo_chave = QLineEdit()
+            self._campo_chave.setMaxLength(19)
+            self._campo_chave.setProperty("mono", "true")
+            self._campo_chave.setPlaceholderText("XXXX-XXXX-XXXX-XXXX")
+            self._campo_chave.textChanged.connect(self._manter_chave_formatada)
+            form.addWidget(self._campo_chave)
+            formato = QLabel(
+                "A chave tem 16 caracteres hexadecimais (4 blocos de 4, separados por "
+                "hífen) e é validada online no servidor de licenças."
+            )
+            formato.setObjectName("subtitulo")
+            formato.setWordWrap(True)
+            form.addWidget(formato)
 
         self._erro = QLabel("")
         self._erro.setProperty("role", "error")
@@ -264,6 +294,8 @@ class AtivacaoWindow(QMainWindow):
 
     def _manter_chave_formatada(self, texto: str) -> None:
         """Mantém a chave em XXXX-XXXX-XXXX-XXXX sem roubar o cursor (P5)."""
+        if not hasattr(self, "_campo_chave"):
+            return
         formatado = self._formatar_chave(texto)
         if formatado == texto:
             return
@@ -301,6 +333,43 @@ class AtivacaoWindow(QMainWindow):
         rodar(self._api.testar_comunicacao, ok, erro)
 
     def _ativar(self) -> None:
+        if self._contrato_b:
+            cnpj = self._campo_cnpj.text().strip()
+            codigo = self._campo_codigo.text().strip()
+            if not cnpj:
+                self._erro.setText("Informe o CNPJ da empresa.")
+                return
+            if not codigo:
+                self._erro.setText("Informe o código da licença.")
+                return
+            self._erro.setText("")
+            self._marcar_passo(1)
+            self._botao_ativar.setEnabled(False)
+            self._botao_ativar.setText("Validando online…")
+
+            def chamada():
+                return self._api.ativar_licenca(self._token, cnpj=cnpj, codigo=codigo)
+
+            def ok(_) -> None:
+                self._botao_ativar.setEnabled(True)
+                self._botao_ativar.setText("Validar e Ativar Licença Online")
+                self._marcar_passo(2)
+                self._erro.setProperty("role", "success")
+                self._erro.setText("Licença ativada! Carregando o sistema…")
+                aplicar_estilo(self._erro)
+                self.ativada.emit()
+
+            def erro(msg: str) -> None:
+                self._botao_ativar.setEnabled(True)
+                self._botao_ativar.setText("Validar e Ativar Licença Online")
+                self._marcar_passo(0)
+                self._erro.setProperty("role", "error")
+                self._erro.setText(msg)
+                aplicar_estilo(self._erro)
+
+            rodar(chamada, ok, erro)
+            return
+
         chave = self._campo_chave.text().strip().upper()
         if not _FORMATO_CHAVE.match(chave):
             self._erro.setText(
