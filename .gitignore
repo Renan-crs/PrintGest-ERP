@@ -41,6 +41,7 @@ backend/_*.txt
 backend/api_test.ps1
 backend/api_test.py
 backend/test_token.txt
+*_preview.png
 
 # Editores / SO
 .vscode/
@@ -48,3 +49,4 @@ backend/test_token.txt
 *.swp
 .DS_Store
 Thumbs.db
+*.code-workspace
