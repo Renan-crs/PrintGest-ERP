@@ -12,7 +12,9 @@ de cada tag está indicado para rastreabilidade.
 ## [Não lançado]
 
 ### Adicionado
-
+- **Licenciamento:** suporte ao Contrato B v4.0 (RedGest `/api/v1/licencas/`) atrás da flag `PRINTGEST_REDGEST_CONTRATO=b`. Ativação por CNPJ + código, credenciais `client_id`/`client_secret` no cofre local, estado derivado com tolerância de 72 h. Contrato C permanece como padrão.
+- **Desktop (ativação):** formulário dinâmico conforme o contrato retornado por `GET /v1/licenca` (CNPJ + código para Contrato B).
+- **Desktop (Dashboard):** revisão de design da Tela Inicial (Apple HIG + UI/UX Pro Max). Contraste do verde corrigido de 4,40:1 para 6,16:1 sobre branco; hierarquia de CTA (um primário + secundários); estado vazio com ação de recuperação em Entregas e Faturamento; séries do gráfico distinguíveis sem depender de cor, com legenda e valor exato; nomes acessíveis nos KPI, lista e barras. Registro em `docs/revisao_dashboard_design.md`.
 - **Módulo Projetos (Quadro Kanban) — Fase 1 (Núcleo), backend.** Namespace novo
   `/v1/projetos`, **aditivo**: `/v1/os` e o quadro atual de Projetos seguem
   intactos. Quadro por filial com listas configuráveis e cartões, membros,
