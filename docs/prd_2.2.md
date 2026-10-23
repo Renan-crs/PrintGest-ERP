@@ -233,6 +233,18 @@ A licença é emitida e controlada pelo RedGest. Ela carrega **vigência**, **pl
 
 O contrato C permanece o default e **não muda de comportamento**; o B ativa por flag, com *dual-run* (cada instalação usa um).
 
+### 4.6 Fluxo de instalação (serial antes do login)
+
+Como em programas licenciados por serial, a **tela de ativação é o gate de instalação** e aparece **antes do login**:
+
+1. No primeiro start, o desktop consulta `GET /v1/licenca` **sem sessão** (rota liberada pelo Local API Service).
+2. `nao_ativada` → abre a tela de serial (Contrato C: chave de produto; Contrato B: CNPJ + código) e só segue para o login após validar.
+3. `ativa`/`tolerancia` → vai direto ao login.
+4. Depois de ativada, a licença fica gravada no banco local e as execuções seguintes **não pedem o serial** de novo; ele só reaparece se a instalação for refeita (sem linha em `licenca`).
+5. Estado de leitura/revogação continua tratado **após o login** (a consulta de licença não é bloqueante para o operador entrar em modo leitura).
+
+`PRINTGEST_LICENCA_DESABILITADA=true` mantém o atalho de desenvolvimento (pula a etapa). Para testar o fluxo de instalação, `scripts/limpar_licenca.py --sim` remove a licença local (equivale a reinstalar).
+
 ### 4.5 Enforcement de plano no servidor (D4/D5)
 
 O gating de módulos por plano é aplicado **no Local API Service**, em três pontos:
