@@ -127,7 +127,8 @@ def test_admin_ve_cards_reais_e_filial_no_cabecalho(app, pumpar):
     assert inicio._lista_entregas.item(0).text() == (
         f"Ana · Impressão de cartões · {_HOJE.isoformat()} · PRODUCAO"
     )
-    assert inicio._lista_entregas.item(1).text().startswith("⚠ ")
+    # atraso não depende só da cor: o texto carrega o aviso (§1 color-not-only)
+    assert inicio._lista_entregas.item(1).text().startswith("⚠ Atrasada · ")
 
     # faturamento realizado × previsto com 7 dias
     assert inicio._combo_dias.currentData() == 7
@@ -225,13 +226,13 @@ def test_estoque_critico_zerado_estado_neutro(app, pumpar):
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Jo", "login": "jo", "nivel_acesso": "operador"}})
     principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
     inicio = principal._pagina_inicio
-    pumpar(lambda: not inicio._lbl_estoque.text().startswith("Aguardando"))
-    assert inicio._lbl_estoque.text() == "Nenhum item abaixo do mínimo"
+    pumpar(lambda: not inicio._lbl_estoque.text().startswith("Consultando"))
+    assert inicio._lbl_estoque.text() == "✓ Nenhum item abaixo do mínimo"
     assert inicio._lbl_estoque.property("role") == "success"
     assert inicio._btn_estoque.isHidden()  # sem barra nem link com 0 itens
 
 
-def test_entregas_vazias_usam_texto_do_spec(app, pumpar):
+def test_entregas_vazias_mostram_estado_vazio_com_acao(app, pumpar):
     def _handler_vazio_entregas(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/v1/dashboard/resumo":
             dados = _resumo()
@@ -245,11 +246,20 @@ def test_entregas_vazias_usam_texto_do_spec(app, pumpar):
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Jo", "login": "jo", "nivel_acesso": "operador"}})
     principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
     inicio = principal._pagina_inicio
-    pumpar(lambda: inicio._lista_entregas.count() == 1)
-    assert inicio._lista_entregas.item(0).text() == "Nenhuma entrega para hoje ou atrasada."
+    # estado vazio: a lista some e entra o convite à ação (§8 empty-states)
+    pumpar(lambda: not inicio._vazio_entregas.isHidden())
+    assert inicio._lista_entregas.isHidden()
+    assert not inicio._vazio_entregas.isHidden()
+    textos = [
+        w.text() for w in inicio._vazio_entregas.findChildren(QLabel)
+    ]
+    assert "Nenhuma entrega para hoje ou atrasada." in textos
+    # há uma ação de recuperação visível, não só um texto morto
+    acoes = [b for b in inicio._vazio_entregas.findChildren(QPushButton)]
+    assert acoes and acoes[0].text() == "Ver Ordens de Serviço"
 
 
-def test_faturamento_vazio_mostra_sem_dados(app, pumpar):
+def test_faturamento_vazio_mostra_convite(app, pumpar):
     def _handler_sem_fat(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/v1/dashboard/resumo":
             dados = _resumo()
@@ -264,8 +274,8 @@ def test_faturamento_vazio_mostra_sem_dados(app, pumpar):
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}})
     principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
     inicio = principal._pagina_inicio
-    pumpar(lambda: inicio._lbl_grafico.text() == "Sem dados no período")
-    assert inicio._lbl_grafico.text() == "Sem dados no período"
+    pumpar(lambda: "sem movimenta" in inicio._lbl_grafico.text().lower())
+    assert "Sem movimentação no período" in inicio._lbl_grafico.text()
 
 
 def test_acesso_rapido_navega_para_cliente(app, pumpar):

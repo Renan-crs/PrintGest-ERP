@@ -249,9 +249,13 @@ class PaginaInicial(QWidget):
         fila = QHBoxLayout()
         fila.setSpacing(12)
         self._botoes_rapidos: list[QPushButton] = []
-        for rotulo, destino in self._atajos_rapidos(nivel):
+        # Uma ação principal por tela (quick-reference §4 `primary-action`): só o
+        # primeiro atalho recebe o preenchimento de acento; os demais ficam
+        # secundários, para o olho não disputar quatro pesos iguais.
+        for indice, (rotulo, destino) in enumerate(self._atajos_rapidos(nivel)):
             botao = QPushButton(rotulo)
-            botao.setProperty("role", "primary")
+            botao.setProperty("role", "primary" if indice == 0 else "secondary")
+            botao.setAccessibleName(rotulo)
             botao.setMinimumHeight(32)
             botao.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
             botao.clicked.connect(lambda _=False, d=destino: self.navegar.emit(d))
@@ -271,10 +275,29 @@ class PaginaInicial(QWidget):
             el.addWidget(self._cabecalho_card("Entregas de hoje e atrasadas"))
             self._lista_entregas = QListWidget()
             self._lista_entregas.setMinimumHeight(120)
+            self._lista_entregas.setAccessibleName("Entregas de hoje e atrasadas")
             self._lista_entregas.itemClicked.connect(
                 lambda _item: self.navegar.emit("projetos")
             )
             el.addWidget(self._lista_entregas)
+            # Estado vazio com convite à ação: nunca um card em branco
+            # (quick-reference §8 `empty-states`).
+            self._vazio_entregas = QWidget()
+            vazio = QVBoxLayout(self._vazio_entregas)
+            vazio.setContentsMargins(0, 4, 0, 0)
+            vazio.setSpacing(6)
+            msg = QLabel("Nenhuma entrega para hoje ou atrasada.")
+            msg.setObjectName("vazioCard")
+            msg.setWordWrap(True)
+            vazio.addWidget(msg)
+            ver_os = QPushButton("Ver Ordens de Serviço")
+            ver_os.setProperty("link", "true")
+            ver_os.setCursor(Qt.CursorShape.PointingHandCursor)
+            ver_os.clicked.connect(lambda: self.navegar.emit("os"))
+            vazio.addWidget(ver_os)
+            vazio.addStretch(1)
+            el.addWidget(self._vazio_entregas)
+            self._vazio_entregas.setVisible(False)
             layout.addWidget(entregas)
 
         # ------------------------------------- faturamento (gerente+)
@@ -308,16 +331,17 @@ class PaginaInicial(QWidget):
             self._barras_previsto: list[tuple[QProgressBar, QLabel]] = []
             self._container_realizado = QWidget()
             self._container_previsto = QWidget()
-            for container, rotulo in (
-                (self._container_realizado, "Realizado"),
-                (self._container_previsto, "Previsto"),
+            for container, rotulo, marca in (
+                (self._container_realizado, "Realizado", "#barraRealizado"),
+                (self._container_previsto, "Previsto", "#barraPrevisto"),
             ):
-                nome = QLabel(rotulo)
-                nome.setProperty("role", "muted")
-                gl.addWidget(nome)
+                legenda = QLabel(rotulo)
+                legenda.setObjectName("legendaSerie")
+                gl.addWidget(legenda)
                 caixas = QHBoxLayout(container)
                 caixas.setSpacing(6)
                 container.setMinimumHeight(70)
+                container.setAccessibleName(f"Faturamento {rotulo.lower()} por dia")
                 gl.addWidget(container)
             gl.addStretch(1)
             layout.addWidget(grafico)
@@ -330,10 +354,10 @@ class PaginaInicial(QWidget):
             el.setContentsMargins(16, 12, 16, 12)
             el.setSpacing(6)
             el.addWidget(self._cabecalho_card("Estoque crítico"))
-            self._lbl_estoque = ElideLabel("Aguardando dados de estoque...")
+            self._lbl_estoque = ElideLabel("Consultando estoque...")
             self._lbl_estoque.setProperty("role", "muted")
             el.addWidget(self._lbl_estoque)
-            self._btn_estoque = QPushButton("Ver Produtos › Estoque")
+            self._btn_estoque = QPushButton("Ver produtos com estoque baixo")
             self._btn_estoque.setProperty("link", "true")
             self._btn_estoque.setCursor(Qt.CursorShape.PointingHandCursor)
             self._btn_estoque.clicked.connect(lambda: self.navegar.emit("produto"))
@@ -431,22 +455,27 @@ class PaginaInicial(QWidget):
             self._lbl_estoque.setText(
                 f"{self._plural(n, 'item', 'itens')} abaixo do mínimo"
             )
+            # Ícone textual junto da cor: o estado não depende só do verde/laranja
+            # (quick-reference §1 `color-not-only`).
             self._lbl_estoque.setProperty("role", "atencao")
             self._btn_estoque.setVisible(True)
         else:
-            self._lbl_estoque.setText("Nenhum item abaixo do mínimo")
+            self._lbl_estoque.setText("✓ Nenhum item abaixo do mínimo")
             self._lbl_estoque.setProperty("role", "success")
             self._btn_estoque.setVisible(False)
+        self._lbl_estoque.setAccessibleName(self._lbl_estoque.text())
         aplicar_estilo(self._lbl_estoque)
 
     def _aplicar_entregas(self, entregas) -> None:
         self._lista_entregas.clear()
         itens = entregas if isinstance(entregas, list) else []
         if not itens:
-            item = QListWidgetItem("Nenhuma entrega para hoje ou atrasada.")
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
-            self._lista_entregas.addItem(item)
+            # Vazio: esconde a lista e mostra o convite à ação.
+            self._lista_entregas.setVisible(False)
+            self._vazio_entregas.setVisible(True)
             return
+        self._vazio_entregas.setVisible(False)
+        self._lista_entregas.setVisible(True)
         for e in itens:
             texto = self._texto_entrega(e)
             linha = QListWidgetItem(texto)
@@ -454,6 +483,8 @@ class PaginaInicial(QWidget):
                 Qt.ItemDataRole.UserRole, {"os_id": e.get("os_id"), "numero": e.get("numero")}
             )
             if e.get("atrasada"):
+                # Cor NÃO é o único indicador: o texto já traz "⚠" e "atrasada"
+                # (quick-reference §1 `color-not-only`, §2 `error-feedback`).
                 linha.setData(Qt.ItemDataRole.ForegroundRole, _COR_ATRASO)
             self._lista_entregas.addItem(linha)
 
@@ -463,22 +494,29 @@ class PaginaInicial(QWidget):
         servico = e.get("servico") or "—"
         prazo = str(e.get("prazo") or "")[:10]
         status = str(e.get("status") or "").upper()
-        prefixo = "⚠ " if e.get("atrasada") else ""
-        return f"{prefixo}{cliente} · {servico} · {prazo} · {status}"
+        if e.get("atrasada"):
+            return f"⚠ Atrasada · {cliente} · {servico} · {prazo} · {status}"
+        return f"{cliente} · {servico} · {prazo} · {status}"
 
     def _preencher_faturamento(self, realizado, previsto) -> None:
         self._preencher_barras(
-            self._container_realizado, self._barras_realizado, realizado
+            self._container_realizado, self._barras_realizado, realizado, "Realizado", False
         )
         self._preencher_barras(
-            self._container_previsto, self._barras_previsto, previsto
+            self._container_previsto, self._barras_previsto, previsto, "Previsto", True
         )
         vazio = (not isinstance(realizado, list) or not realizado) and (
             not isinstance(previsto, list) or not previsto
         )
-        self._lbl_grafico.setText("Sem dados no período" if vazio else "")
+        self._lbl_grafico.setText(
+            "Sem movimentação no período — as barras aparecem quando houver vendas ou "
+            "contas a receber."
+            if vazio
+            else ""
+        )
+        self._lbl_grafico.setVisible(bool(vazio))
 
-    def _preencher_barras(self, container, barras_ref, serie) -> None:
+    def _preencher_barras(self, container, barras_ref, serie, rotulo, previsto) -> None:
         barras_ref.clear()
         while container.layout().count():
             item = container.layout().takeAt(0)
@@ -496,11 +534,19 @@ class PaginaInicial(QWidget):
             col.setContentsMargins(0, 0, 0, 0)
             col.setSpacing(2)
             barra = QProgressBar()
+            # Duas séries no mesmo card: a identidade não pode vir só da cor —
+            # cada barra carrega o nome da série e o valor exato no tooltip
+            # (quick-reference §10 `color-guidance`, `direct-labeling`).
+            barra.setObjectName("barraPrevisto" if previsto else "barraRealizado")
             barra.setOrientation(Qt.Orientation.Vertical)
             barra.setTextVisible(False)
             barra.setRange(0, max(1, int(maior)))
             barra.setValue(self._num(v.get("valor")))
-            dia = QLabel(self._dia_curto(v.get("data")))
+            dia_txt = self._dia_curto(v.get("data"))
+            valor_txt = self._moeda(v.get("valor"))
+            barra.setAccessibleName(f"{rotulo} {dia_txt}: {valor_txt}")
+            barra.setToolTip(f"{rotulo} · {dia_txt} · {valor_txt}")
+            dia = QLabel(dia_txt)
             dia.setProperty("role", "muted")
             dia.setAlignment(Qt.AlignmentFlag.AlignCenter)
             col.addWidget(barra, 1)
@@ -529,14 +575,19 @@ class PaginaInicial(QWidget):
         if _eh_gerente_ou_mais(self._nivel):
             self._kpi_receber_valor.setText("—")
             self._kpi_receber_sub.setText("")
-            self._lbl_grafico.setText("Sem dados no período")
+            self._lbl_grafico.setText(
+                "Não foi possível carregar o faturamento. Verifique o servidor local."
+            )
+            self._lbl_grafico.setVisible(True)
         if _eh_operador_ou_mais(self._nivel):
             self._kpi_projetos_valor.setText("—")
             self._kpi_projetos_sub.setText("")
             self._lbl_estoque.setText("Resumo de estoque indisponível no momento.")
             self._lbl_estoque.setProperty("role", "muted")
+            self._lbl_estoque.setAccessibleName(self._lbl_estoque.text())
             self._btn_estoque.setVisible(False)
             aplicar_estilo(self._lbl_estoque)
+            self._aplicar_entregas([])
 
     # -------------------------------------------------------------- helpers
 
@@ -590,6 +641,12 @@ class PaginaInicial(QWidget):
         nome = ElideLabel(titulo)
         nome.setProperty("role", "muted")
         valor.setObjectName("valorCard")
+        # O cartão inteiro é um grupo semântico: o leitor de tela lê
+        # "título · valor · subtexto" numa passada, sem depender da cor ou da
+        # posição visual (quick-reference §1 `voiceover-sr`, `color-not-only`).
+        caixa.setAccessibleName(titulo)
+        valor.setAccessibleName(f"{titulo}: valor")
+        sub.setAccessibleName(f"{titulo}: detalhe")
         sub.setProperty("role", "muted")
         layout.addWidget(nome)
         layout.addWidget(valor)

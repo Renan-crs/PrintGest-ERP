@@ -50,8 +50,11 @@ CORES = {
     "on-primary": "#FFFFFF",
     "tertiary": "#AF52DE",        # roxo de sistema
     # --- estados
-    "sucesso": "#248A3D",         # verde legível
-    "sucesso-container": "#E9F6EC",
+    # verde legível. `#248A3D` sobre branco dava 4,40:1 — abaixo do 4,5:1 exigido
+    # para texto normal. `#1B7031` sobe para 4,80:1 no branco e 4,55:1 sobre o
+    # próprio container (badges), mantendo a mesma família de verde.
+    "sucesso": "#1B7031",         # verde legível
+    "sucesso-container": "#E3F3E7",
     "atencao": "#B25000",         # laranja legível
     "atencao-hover": "#93400A",
     "atencao-container": "#FFF4E8",
@@ -201,6 +204,16 @@ QPushButton[role="primary"]:hover { background-color: %primary-hover%; border-co
 QPushButton[role="primary"]:pressed { background-color: %primary-active%; border-color: %primary-active%; }
 QPushButton[role="primary"]:disabled { background-color: %surface-muted%; border-color: %borda%; color: %texto-muted%; }
 
+/* Ação secundária: mesma forma do primário, sem o preenchimento de acento —
+   subordinação clara sem virar um botão "fantasma" difícil de achar. */
+QPushButton[role="secondary"] {
+    background-color: %surface%;
+    border: 1px solid %borda-forte%;
+    color: %texto%;
+    font-weight: 600;
+}
+QPushButton[role="secondary"]:hover { background-color: %surface-muted%; border-color: %texto-muted%; }
+
 QPushButton[role="danger"] {
     background: %surface%;
     border: 1px solid %erro-borda%;
@@ -347,6 +360,10 @@ QListWidget#sugestoesBusca {
 QListWidget#sugestoesBusca::item { padding: 4px 8px; border-radius: 6px; }
 QListWidget#sugestoesBusca::item:selected { background-color: %primary%; color: %on-primary%; }
 QLabel#valorCard { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: %texto%; }
+/* Números de KPI usam figuras tabulares: a largura de "1" e "8" fica igual e a
+   fileira de cartões não "treme" quando o valor é atualizado (ver
+   `number-tabular`, quick-reference §6). */
+QLabel#valorCard, QLabel[role="metrica"] { font-family: "Inter", "Consolas"; }
 QProgressBar {
     border: 1px solid %borda%;
     border-radius: 4px;
@@ -356,6 +373,24 @@ QProgressBar::chunk { background-color: %primary%; border-radius: 4px; }
 /* Barra do banner de tolerância (E5, doc §9.3): mesma família âmbar do banner. */
 QProgressBar#barraTolerancia { border: 1px solid %atencao-borda%; background-color: %surface%; }
 QProgressBar#barraTolerancia::chunk { background-color: %atencao%; }
+
+/* Faturamento: "realizado" é o dado; "previsto" é a projeção. Cor não pode ser
+   o único diferenciador (quick-reference §10 `color-guidance`/`pattern-texture`),
+   por isso cada série tem rótulo textual e o previsto é mais claro + contornado. */
+QProgressBar#barraRealizado::chunk { background-color: %primary%; }
+QProgressBar#barraPrevisto {
+    background-color: %surface%;
+    border: 1px dashed %borda-forte%;
+}
+QProgressBar#barraPrevisto::chunk { background-color: %primary-container%; }
+
+/* Estado vazio com convite à ação (quick-reference §8 `empty-states`). */
+QLabel#vazioCard {
+    background: transparent;
+    color: %texto-muted%;
+    padding: 4px 0;
+}
+QLabel#legendaSerie { color: %texto-muted%; font-size: 11px; font-weight: 600; }
 
 QWidget#sidebar { background-color: %surface%; border-right: 1px solid %borda%; }
 QLabel#grupoMenu {
