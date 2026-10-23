@@ -108,24 +108,26 @@ com `cnpj` + `codigo_licenca`. Duas saídas:
 
 ## 4. Trabalho no PrintGest (fase M2)
 
-- [ ] `licensa_service`: adaptador do Contrato B atrás de
+- [x] `licensa_service`: adaptador do Contrato B atrás de
       `PRINTGEST_REDGEST_CONTRATO` (`c` = default atual, `b` = v4.0).
-  - [ ] Ativação via handshake com `Idempotency-Key` (uuid4); guardar
+  - [x] Ativação via handshake com `Idempotency-Key` (uuid4); guardar
         `client_id`/`client_secret` no **cofre do SO** (já existe DPAPI, §8 do
         doc de decisões).
-  - [ ] Revalidação com `client_id`/`client_secret` + `hardware_profile`
+  - [x] Revalidação com `client_id`/`client_secret` + `hardware_profile`
         canônico (reusar `_fingerprint_do_hardware`, que já ordena chaves).
-  - [ ] Persistir `token`/`token_expira_em`/`grace_deadline`; derivar o estado de
+  - [x] Persistir `token`/`token_expira_em`/`grace_deadline`; derivar o estado de
         `valida`/`motivo` no lugar de `expira_em` + 72 h.
   - [ ] Verificação **local** do JWT com a JWK embutida → reabilita D3/E3
-        (operação offline até o `grace_deadline`).
-  - [ ] `motivo=hardware_divergente` → mensagem "rebind necessário" + fluxo de
+        (operação offline até o `grace_deadline`). *Adiada*: na primeira passada
+        o `grace_deadline` + `expira_em` persistidos bastam; a verificação local
+        exige PyJWT (não instalado).
+  - [x] `motivo=hardware_divergente` → mensagem "rebind necessário" + fluxo de
         rebind.
-- [ ] UI de ativação: CNPJ + código (ou alias do serial — §2.1).
+- [x] UI de ativação: CNPJ + código (ou alias do serial — §2.1).
 - [ ] Migração de instalações: bases do Contrato C **não têm** `client_secret`;
       o corte exige reativação assistida (ou handshake em lote — decidir com o
       RedGest).
-- [ ] Testes: os 12 itens da §14.1 do manual viram a matriz de aceite do
+- [x] Testes: os 12 itens da §14.1 do manual viram a matriz de aceite do
       adaptador, exercitada contra o stub local (`scripts/redgest_stub.py`),
       estendido para o Contrato B.
 
@@ -139,6 +141,16 @@ com `cnpj` + `codigo_licenca`. Duas saídas:
 | **M2b** | Desktop: ativação dinâmica (CNPJ + código) (concluído). | M2a |
 | **M3** | Homologação com RedGest real (quando provisionado), piloto em um cliente, medição, virada do default. | M2b |
 | **M4** | Remover o Contrato C e a flag (antes de 01/03/2027); atualizar PRD/CHANGELOG. | M3 |
+
+### 5.1 Verificação contra o RedGest real (23/10/2026)
+
+Contrato C segue como padrão (`contrato: "c"`, `plano: ANUAL`, ativa até
+2027-10-19). A chamada de revalidação agora atinge o caminho correto —
+`POST https://redgest-system.onrender.com/api/v1/licencas-software/validar/` —
+e recebe **403** do RedGest, mapeado para **400 "chave não reconhecida"**
+(`SISTEMA_SEM_CREDENCIAL`/`CHAVE_NAO_ENCONTRADA`). Ou seja: o `printgest` ainda
+não está provisionado no RedGest real (§3). A licença local permaneceu **ativa**
+— uma resposta de recusa de credencial não revoga.
 
 ## 6. Riscos
 
