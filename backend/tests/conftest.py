@@ -24,6 +24,11 @@ from sqlalchemy.orm import sessionmaker
 # Desliga o auto-migrate do lifespan para nunca tocar no banco de desenvolvimento.
 os.environ["PRINTGEST_AUTO_MIGRATE"] = "false"
 
+# A suíte do Contrato C pressupõe o default `c`. O `.env` da máquina pode estar
+# em piloto do Contrato B (`PRINTGEST_REDGEST_CONTRATO=b`) e não pode virar o
+# contrato dos testes — os casos do Contrato B ligam a flag via monkeypatch.
+os.environ["PRINTGEST_REDGEST_CONTRATO"] = "c"
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEST_DB = "printgest_test"
 _HOST = "127.0.0.1:5432"
