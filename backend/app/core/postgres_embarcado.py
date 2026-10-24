@@ -66,8 +66,9 @@ def raiz_do_postgres() -> Path:
         return Path(settings.pg_raiz.strip())
     if getattr(sys, "frozen", False):
         # Layout do instalador: {app}\PrintGestAPI\PrintGestAPI.exe e
-        # {app}\postgres\pgsql\bin — a raiz é irmã da pasta do executável.
-        return Path(sys.executable).resolve().parent / "postgres"
+        # {app}\postgres\pgsql\bin — a raiz é IRMÃ da pasta do executável
+        # (não a pasta do exe, e nem o cwd do atalho).
+        return Path(sys.executable).resolve().parent.parent / "postgres"
     return Path(__file__).resolve().parents[3] / ".dev" / "postgres"
 
 
@@ -119,19 +120,37 @@ def _iniciar(
     bin_dir: Path, data_dir: Path, log: Path, host: str, porta: int
 ) -> None:
     logger.info("Iniciando o PostgreSQL embarcado em %s:%s...", host, porta)
-    _rodar(
-        [
-            bin_dir / "pg_ctl.exe",
-            "start",
-            "-D",
-            data_dir,
-            "-l",
-            log,
-            "-o",
-            f"-p {porta} -c listen_addresses={host}",
-        ],
-        "pg_ctl start",
+    # NÃO capturar a saída do `pg_ctl start`: o postgres.exe (processo NETO,
+    # destacado) herda os handles de stdout/stderr do pg_ctl — com pipe, o
+    # `subprocess.run` espera o EOF do pipe que o postgres mantém aberto e
+    # trava para sempre (doc do pg_ctl: use `-l` para o log). O diagnóstico
+    # de erro vem do retorno e do `postgres.log` apontado por `-l`.
+    comando = [
+        str(bin_dir / "pg_ctl.exe"),
+        "start",
+        "-D",
+        str(data_dir),
+        "-l",
+        str(log),
+        "-o",
+        f"-p {porta} -c listen_addresses={host}",
+    ]
+    resultado = subprocess.run(
+        comando,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
+    if resultado.returncode != 0:
+        cauda = ""
+        try:
+            cauda = log.read_text(encoding="utf-8", errors="replace")[-2000:]
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"Falha ao preparar o banco local (pg_ctl start).\n{cauda.strip()}"
+        )
 
 
 def _aguardar(bin_dir: Path, host: str, porta: int) -> None:

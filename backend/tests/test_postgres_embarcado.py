@@ -58,6 +58,26 @@ def test_raiz_por_configuracao_vence_o_padrao(monkeypatch, tmp_path):
     assert pg.raiz_do_postgres() == tmp_path
 
 
+def test_raiz_congelada_e_irma_da_pasta_do_exe(monkeypatch, tmp_path):
+    """Layout do instalador: {app}\\PrintGestAPI\\PrintGestAPI.exe + {app}\\postgres.
+
+    A raiz é a pasta IRMÃ da pasta do executável — `parent` em vez de
+    `parent.parent` apontaria para {app}\\PrintGestAPI\\postgres (bug cobrado
+    no smoke test da instalação).
+    """
+    import sys
+
+    app_dir = tmp_path / "PrintGest"
+    api_dir = tmp_path / "PrintGestAPI"
+    api_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(settings, "pg_raiz", "")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(api_dir / "PrintGestAPI.exe"))
+
+    assert pg.raiz_do_postgres() == tmp_path / "postgres"
+
+
 def test_raiz_padrao_do_repositorio_aponta_para_dev(monkeypatch):
     monkeypatch.setattr(settings, "pg_raiz", "")
     esperado = Path(pg.__file__).resolve().parents[3] / ".dev" / "postgres"
@@ -175,6 +195,41 @@ def test_falha_do_initdb_explode_com_a_saida(tmp_path, monkeypatch):
     monkeypatch.setattr(pg.subprocess, "run", run_fake)
     with pytest.raises(RuntimeError, match="initdb"):
         pg.garantir_postgres()
+
+
+def test_iniciar_nao_captura_a_saida_do_pg_ctl(monkeypatch, tmp_path):
+    """Regressão do deadlock: o postgres.exe (neto, destacado) herda o pipe de
+    stdout do `pg_ctl start` — com `capture_output` o `subprocess.run` espera
+    um EOF que nunca chega e o daemon trava na primeira execução."""
+    import subprocess
+
+    capturado: dict = {}
+
+    def run_fake(comando, **kwargs):
+        capturado["kwargs"] = kwargs
+        return _Resultado(rc=0)
+
+    monkeypatch.setattr(pg.subprocess, "run", run_fake)
+    pg._iniciar(
+        tmp_path, tmp_path, tmp_path / "postgres.log", "127.0.0.1", 5433
+    )
+    assert capturado["kwargs"]["stdout"] is subprocess.DEVNULL
+    assert capturado["kwargs"]["stderr"] is subprocess.DEVNULL
+    assert capturado["kwargs"]["stdin"] is subprocess.DEVNULL
+
+
+def test_iniciar_falha_inclui_a_cauda_do_log(tmp_path, monkeypatch):
+    log = tmp_path / "postgres.log"
+    log.write_text("... FATAL: porta em uso\n", encoding="utf-8")
+
+    def run_fake(comando, **_):
+        return _Resultado(rc=1)
+
+    monkeypatch.setattr(pg.subprocess, "run", run_fake)
+    with pytest.raises(RuntimeError, match="porta em uso"):
+        pg._iniciar(
+            tmp_path, tmp_path, log, "127.0.0.1", 5433
+        )
 
 
 def test_banco_com_nome_invalido_e_recusado(tmp_path, monkeypatch):

@@ -24,6 +24,9 @@ DefaultDirName={localappdata}\Programs\PrintGest
 DefaultGroupName={#NomeApp}
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
+; Caminho relativo ao diretorio do script (compilado via /O no empacotar.ps1)
+OutputDir=..\dist_installer
+OutputBaseFilename=PrintGest-Setup-{#VersaoApp}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern

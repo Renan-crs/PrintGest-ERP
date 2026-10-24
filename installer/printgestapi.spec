@@ -8,8 +8,10 @@
 # `datas` embarca o que o runtime carrega fora de imports:
 #   - alembic.ini + alembic/  -> migrations aplicadas no primeiro startup
 #     (app/core/migrations.py resolve ambos a partir de sys._MEIPASS).
-# console=False: o daemon roda oculto; o log vai para logs/printgest-api.log
-# (anexado pelo run_server.py) e o desktop o sobe sem janela.
+# console=True + CREATE_NO_WINDOW: apps PyInstaller windowed travam no startup
+# porque uvicorn/logging escrevem em um stderr que não existe (sem console).
+# O desktop sobe este exe com CREATE_NO_WINDOW | DETACHED_PROCESS — o console
+# nunca aparece para o usuário; direto do Explorador ele aparece (debug).
 
 import os
 
@@ -65,7 +67,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
