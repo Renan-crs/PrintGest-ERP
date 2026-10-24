@@ -20,7 +20,28 @@ from app.core.config import settings
 
 logger = logging.getLogger("printgest")
 
-_BACKEND_DIR = Path(__file__).resolve().parents[2]
+# No exe congelado (PyInstaller onedir) os dados carregados por `datas` ficam
+# em `sys._MEIPASS` (pasta `_internal` do bundle): `alembic.ini` e `alembic/`.
+# Em dev continua sendo a raiz do backend (o subprocesso roda a partir dali).
+if getattr(sys, "frozen", False):
+    _BACKEND_DIR = Path(getattr(sys, "_MEIPASS", "."))
+else:
+    _BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+
+def _upgrade_congelado() -> None:
+    """`alembic upgrade head` pela API Python (exe congelado não tem `python -m`).
+
+    O `Config` é montado sem arquivo: `alembic/env.py` só chama `fileConfig`
+    quando `config.config_file_name` existe — sem ini, o logging da aplicação
+    (root + request_id) não é reconfigurado pelo Alembic no processo vivo.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
+    command.upgrade(cfg, "head")
 
 
 def aplicar_migrations() -> None:
@@ -30,8 +51,16 @@ def aplicar_migrations() -> None:
     (o `env.py` chama `fileConfig`, que reconfiguraria o logger da aplicação).
     Em caso de falha o startup é abortado — melhor falhar cedo e alto do que
     servir 500s por drift de schema.
+
+    No executável empacotado não há interpretador para o subprocesso — a mesma
+    atualização roda pela API Python do Alembic, no processo.
     """
     if not settings.auto_migrate:
+        return
+
+    if getattr(sys, "frozen", False):
+        _upgrade_congelado()
+        logger.info("Migrations Alembic verificadas (upgrade head).")
         return
 
     env = {**os.environ, "PRINTGEST_DATABASE_URL": settings.database_url}

@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     # calcula pelo hardware (BIOS UUID / CPU ID / serial da placa-mãe / do disco).
     # Defina para fixar um valor (VMs com SMBIOS ausente, testes ou suporte).
     maquina_fingerprint: str = ""
+    # PostgreSQL embarcado (instalador): `true` faz o Local API Service preparar
+    # e subir o banco que acompanha a instalação no primeiro uso — initdb, pg_ctl
+    # start e CREATE DATABASE (docs/empacotamento.md). Em dev o fluxo continua
+    # sendo o `scripts/setup_postgres.ps1` e este módulo não roda.
+    pg_embarcado: bool = False
+    # Raiz do PostgreSQL embarcado (espera `pgsql\bin` dentro). Vazio = pasta
+    # `postgres` ao lado do executável (layout do instalador) no exe congelado,
+    # ou `.dev/postgres` quando rodando do repositório.
+    pg_raiz: str = ""
     # Cofre do SO para a chave de ativação (§9.4): `dpapi` (Windows, escopo de
     # máquina) ou `nenhum` (grava em texto puro — só para dev/diagnóstico).
     cofre: str = "dpapi"

@@ -21,6 +21,12 @@ dist/
 *.spec
 *.exe
 *.msi
+# Saída do instalador (scripts/empacotar.ps1)
+dist_installer/
+# Log em arquivo do backend empacotado (run_server.py)
+backend/logs/
+# Specs do instalador são versionados (build/ continua ignorado)
+!installer/*.spec
 
 # Graphify (grafo de conhecimento — saída local de cada dev)
 graphify-out/

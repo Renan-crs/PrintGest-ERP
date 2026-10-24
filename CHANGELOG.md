@@ -12,6 +12,11 @@ de cada tag está indicado para rastreabilidade.
 ## [Não lançado]
 
 ### Adicionado
+- **Empacotamento/instalador:** pipeline de build versionado em `scripts/empacotar.ps1` + `installer/` (specs PyInstaller do backend e do desktop, script Inno Setup). Gera o `PrintGest-Setup-<versão>.exe` — instalação por usuário (sem UAC) com **desinstalador** que encerra o daemon, para o PostgreSQL embarcado e remove o cluster local. Arquitetura e operação documentadas em `docs/empacotamento.md`.
+- **Backend (PostgreSQL embarcado):** `app/core/postgres_embarcado.py` prepara o cluster na primeira execução da instalação (initdb → pg_ctl start → CREATE DATABASE), ativado por `PRINTGEST_PG_EMBARCADO=true`. Host/porta/usuário/banco vêm do próprio `PRINTGEST_DATABASE_URL`.
+- **Backend (exe congelado):** migrations Alembic passam a rodar pela API Python quando congelado (`sys._MEIPASS` resolve `alembic.ini`/`alembic/` do bundle) — o subprocesso `python -m alembic` só existe em dev.
+- **Backend (entry point):** `run_server.py` carrega o `.env` ao lado do executável, anexa log em `logs/printgest-api.log` e serve o uvicorn sem reload.
+- **Desktop (daemon):** `printgest/core/daemon.py` sobe o `PrintGestAPI.exe` instalado quando o `/health` não responde, com diálogo de espera na primeira execução (initdb); em dev nada muda.
 - **Licenciamento:** suporte ao Contrato B v4.0 (RedGest `/api/v1/licencas/`) atrás da flag `PRINTGEST_REDGEST_CONTRATO=b`. Ativação por CNPJ + código, credenciais `client_id`/`client_secret` no cofre local, estado derivado com tolerância de 72 h. Contrato C permanece como padrão.
 - **Desktop (ativação):** formulário dinâmico conforme o contrato retornado por `GET /v1/licenca` (CNPJ + código para Contrato B).
 - **Desktop (instalação):** a tela de serial passa a ser o **gate de instalação**, exibida **antes do login** quando não há licença local. Depois de ativada, a licença fica gravada no Local API Service e o login abre direto o sistema; a tela só reaparece se a instalação for refeita (licença ausente). `scripts/limpar_licenca.py --sim` reproduz esse estado para teste; `desktop/tools/render_ativacao.py` gera a prévia visual.

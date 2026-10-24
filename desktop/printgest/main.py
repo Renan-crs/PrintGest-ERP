@@ -1,9 +1,17 @@
 import os
 import sys
+import time
 
-from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+    QProgressDialog,
+    QWidget,
+)
 
 from printgest import APP_NAME, __version__
+from printgest.core import daemon
 from printgest.core.api import Api
 from printgest.core.tarefas import rodar
 from printgest.ui.ativacao import AtivacaoWindow
@@ -200,12 +208,38 @@ class _Roteador:
         self._abrir(principal)
 
 
+def _preparar_daemon(app: QApplication) -> None:
+    """Instalação empacotada: sobe o Local API Service antes do fluxo normal.
+
+    A primeira execução paga o initdb do PostgreSQL embarcado (segundos); o
+    diálogo indeterminado mantém o usuário informado em vez de uma janela
+    congelada. Sem nada para subir (dev) a chamada é uma sondagem rápida.
+    """
+    if daemon.saude():
+        return
+    if daemon.caminho_do_backend() is None:
+        return
+    espera = QProgressDialog(
+        "Preparando o banco de dados local...\nA primeira execução pode levar alguns segundos.",
+        None,
+        0,
+        0,
+    )
+    espera.setWindowTitle(APP_NAME)
+    espera.setWindowModality(Qt.WindowModality.WindowModal)
+    espera.setMinimumDuration(0)
+    espera.show()
+    daemon.garantir(a_cada_iteracao=app.processEvents)
+    espera.close()
+
+
 def main() -> None:
     sys.excepthook = _erro_inesperado
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(__version__)
     aplicar_theme(app)
+    _preparar_daemon(app)
 
     api = Api()
     app.aboutToQuit.connect(api.fechar)
