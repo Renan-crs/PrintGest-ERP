@@ -53,8 +53,17 @@ Saída: `dist_installer\PrintGest-Setup-<versão>.exe`.
   comum não teria permissão de escrita. Bônus: zero prompt de UAC.
 - **`API_HOST=127.0.0.1`** no `.env` da instalação: evita o prompt do firewall
   do Windows na primeira execução e não expõe a API local.
-- **`console=False` no daemon + log em arquivo**: sem janela preta piscando; o
-  diagnóstico vive em `PrintGestAPI\logs\printgest-api.log`.
+- **`console=True` no daemon + `CREATE_NO_WINDOW` no desktop**: um exe
+  PyInstaller *windowed* trava no startup — uvicorn/logging escrevem em um
+  `sys.stderr` que não existe sem console. O desktop sobe o daemon com
+  `CREATE_NO_WINDOW | DETACHED_PROCESS`, então o usuário nunca vê console;
+  abrindo o `PrintGestAPI.exe` direto do Explorador ele aparece (útil para
+  suporte).
+- **`pg_ctl start` sem captura de saída**: o `postgres.exe` (processo neto,
+  destacado) herda os handles de stdout do `pg_ctl` — com pipe, o
+  `subprocess.run` espera um EOF que nunca chega e o daemon trava na primeira
+  execução. O start roda com std em `DEVNULL` (o log do banco continua no
+  `postgres.log` via `-l`).
 - **PostgreSQL podado**: o zip de binários traz `pgAdmin 4` (~673 MB), `doc`,
   `include` e `StackBuilder`, que nada tem a ver com o runtime do servidor.
   O `empacotar.ps1` copia só `bin`, `lib` e `share` (sem `wx*.dll`/`ecpg`) —
@@ -63,8 +72,7 @@ Saída: `dist_installer\PrintGest-Setup-<versão>.exe`.
   `app/core/migrations.py` detecta `sys.frozen` e roda `command.upgrade` da
   API Python, com `alembic.ini` + `alembic/` vindos de `sys._MEIPASS` (o
   `Config` é montado sem arquivo para o `env.py` não reconfigurar o logging
-  da aplicação via `fileConfig`).
-- **`.env` ao lado do exe**: o pydantic resolve `env_file` pelo CWD, que num
+  da aplicação via `fileConfig`).- **`.env` ao lado do exe**: o pydantic resolve `env_file` pelo CWD, que num
   atalho do menu Iniciar não é a pasta do app. O `run_server.py` injeta o
   `.env` do diretório do executável no ambiente (variáveis reais continuam
   vencendo — útil para diagnóstico).
@@ -125,3 +133,25 @@ Variáveis de emergência (setadas no processo, vencem o `.env`):
 - [ ] Atualização in-place (detector de versão + download incremental).
 - [ ] Backup/restauração do cluster via interface (hoje: cópia do `data`).
 - [ ] Serviço do Windows opcional para o daemon (auto-start no boot).
+
+## 8. Validação executada (24/10/2026, máquina de dev)
+
+Instalação silenciosa em pasta de teste + primeira execução **fria** (cluster
+zerado), sem tocar nos serviços de dev (PostgreSQL de dev em 5432 e daemon de
+dev em 8000 — o teste usou 5433/8010 via variáveis de ambiente):
+
+| Verificação | Resultado |
+| --- | --- |
+| `PrintGest-Setup-0.2.2.exe /VERYSILENT` | layout completo (2 exes, PG, `.env`, `unins000.exe`) |
+| Primeira execução do `PrintGestAPI.exe` | initdb → start → createdb → migrations (head `d7a1c4e8b2f3`, 37 tabelas) → bootstrap → uvicorn em **19,9 s** |
+| `GET /health` / `GET /v1/licenca` | 200 / `nao_ativada` (gate de serial antes do login) |
+| Log em arquivo (`logs/printgest-api.log`) | migrations e requisições registradas |
+| Segunda execução (cluster quente) | servindo em **4,5 s** |
+| Desinstalação (`unins000.exe /VERYSILENT`) | daemon encerrado, PostgreSQL parado, app/atalhos/registro removidos |
+
+Bugs achados e corrigidos nessa bateria: exe windowed travava no startup
+(uvicorn/logging sem stderr) → daemon agora é `console=True` lançado com
+`CREATE_NO_WINDOW`; `pg_ctl start` com `capture_output` deadlockava (pipe
+herdado pelo postgres) → start com std em `DEVNULL`; raiz do PostgreSQL
+congelada apontava para dentro da pasta do exe → correção para a pasta irmã
+(três testes de regressão).
