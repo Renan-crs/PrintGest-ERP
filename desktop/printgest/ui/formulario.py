@@ -89,25 +89,73 @@ class CampoForm:
 
 
 class CampoTexto(CampoForm):
-    def __init__(self, rotulo: str, valor="", mono: bool = False, maximo=200, mascara="") -> None:
+    def __init__(
+        self,
+        rotulo: str,
+        valor="",
+        mono: bool = False,
+        maximo=200,
+        mascara="",
+        caixa_alta: bool = False,
+        apenas_digitos: bool = False,
+    ) -> None:
         super().__init__(rotulo)
         self._edicao = QLineEdit(valor)
         self._edicao.setMaxLength(maximo)
+        self._caixa_alta = caixa_alta
+        self._apenas_digitos = apenas_digitos
+        self._maximo_digitos = maximo
+        self._reformatando = False
         if mascara:
             self._edicao.setInputMask(mascara)
+        if apenas_digitos and not mascara:
+            # O maxLength conta TODOS os caracteres: colar "12.345.678/0001-99"
+            # (18) truncaria antes de extrair os 14 dígitos. Libera folga para a
+            # pontuação e limita os dígitos no `valor()`.
+            self._edicao.setMaxLength(maximo * 2)
+            self._edicao.textChanged.connect(self._manter_digitos)
+        if caixa_alta:
+            self._edicao.textChanged.connect(self._para_maiusculas)
         if mono:
             self._edicao.setProperty("mono", "true")
-            aplicar_estilo(self._edicao)
+        aplicar_estilo(self._edicao)
 
     @property
     def widget(self) -> QLineEdit:
         return self._edicao
 
+    def _para_maiusculas(self, texto: str) -> None:
+        """Normaliza para maiúsculas (UF, siglas) sem roubar o cursor (P5)."""
+        if texto == texto.upper():
+            return
+        posicao = self._edicao.cursorPosition()
+        self._edicao.blockSignals(True)
+        self._edicao.setText(texto.upper())
+        self._edicao.blockSignals(False)
+        self._edicao.setCursorPosition(posicao)
+
+    def _manter_digitos(self, texto: str) -> None:
+        """Descarta não dígitos ao digitar/colar (CNPJ, CEP sem máscara)."""
+        if self._reformatando:
+            return
+        filtrado = "".join(c for c in texto if c.isdigit())
+        if filtrado == texto:
+            return
+        self._reformatando = True
+        posicao = self._edicao.cursorPosition()
+        self._edicao.setText(filtrado)
+        self._edicao.setCursorPosition(min(posicao, len(filtrado)))
+        self._reformatando = False
+
     def valor(self) -> str:
         texto = self._edicao.text().strip()
         if self._edicao.inputMask() and self._mask_vazia():
             return ""
-        return texto.replace("_", "") if self._edicao.inputMask() else texto
+        if self._edicao.inputMask():
+            texto = texto.replace("_", "")
+        if self._apenas_digitos:
+            return "".join(c for c in texto if c.isdigit())[: self._maximo_digitos]
+        return texto
 
     def _mask_vazia(self) -> bool:
         """True quando não há dado digitado — só restaram os separadores da máscara."""
@@ -131,6 +179,83 @@ class CampoTexto(CampoForm):
 
     def definir_mascara(self, mascara: str) -> None:
         self._edicao.setInputMask(mascara)
+
+
+def formatar_telefone(valor) -> str:
+    """Formata fixo/celular brasileiro: 10 dígitos → '(00) 0000-0000'; 11 → '(00) 00000-0000'.
+
+    Aceita qualquer entrada (com ou sem DDD, pontuação variada) e descarta o
+    excesso. Texto sem dígitos vira '' para o payload enviar `null`.
+    """
+    digitos = "".join(c for c in str(valor or "") if c.isdigit())[:11]
+    if not digitos:
+        return ""
+    if len(digitos) <= 2:
+        return f"({digitos}"
+    ddd, resto = digitos[:2], digitos[2:]
+    if len(resto) <= 4:
+        return f"({ddd}) {resto}"
+    if len(resto) <= 8:
+        return f"({ddd}) {resto[:4]}-{resto[4:]}"
+    return f"({ddd}) {resto[:5]}-{resto[5:]}"
+
+
+class CampoTelefone(CampoForm):
+    """Telefone/celular com máscara adaptativa (fixo 10 ou celular 11 dígitos).
+
+    O comprimento varia entre fixo e celular, então um `setInputMask` fixo
+    recusaria um dos formatos — aqui a formatação é aplicada a cada digitação,
+    preservando a posição do cursor.
+    """
+
+    def __init__(self, rotulo: str, valor="", maximo: int = 20) -> None:
+        super().__init__(rotulo)
+        self._maximo = maximo
+        self._reformatando = False
+        self._edicao = QLineEdit()
+        self._edicao.setMaxLength(16)
+        self._edicao.setProperty("mono", "true")
+        self._edicao.setPlaceholderText("(00) 00000-0000")
+        aplicar_estilo(self._edicao)
+        self._edicao.textChanged.connect(self._reformatar)
+        self.definir(valor)
+
+    @property
+    def widget(self) -> QLineEdit:
+        return self._edicao
+
+    def _reformatar(self, texto: str) -> None:
+        if self._reformatando:
+            return
+        formatado = formatar_telefone(texto)
+        if formatado == texto:
+            return
+        posicao_antiga = self._edicao.cursorPosition()
+        digitos_antes = sum(1 for c in texto[:posicao_antiga] if c.isdigit())
+        self._reformatando = True
+        self._edicao.setText(formatado)
+        # Reposiciona o cursor após o mesmo número de dígitos digitados.
+        if digitos_antes <= 0:
+            nova_posicao = 0
+        else:
+            contador = 0
+            nova_posicao = len(formatado)
+            for i, ch in enumerate(formatado):
+                if ch.isdigit():
+                    contador += 1
+                    if contador == digitos_antes:
+                        nova_posicao = i + 1
+                        break
+        self._edicao.setCursorPosition(nova_posicao)
+        self._reformatando = False
+
+    def valor(self) -> str:
+        return formatar_telefone(self._edicao.text())
+
+    def definir(self, valor) -> None:
+        self._reformatando = True
+        self._edicao.setText(formatar_telefone("" if valor is None else str(valor)))
+        self._reformatando = False
 
 
 class CampoArea(CampoForm):

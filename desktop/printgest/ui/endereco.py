@@ -23,8 +23,14 @@ class BlocoEndereco:
         self.complemento = CampoTexto("Complemento", maximo=80)
         self.bairro = CampoTexto("Bairro", maximo=80)
         self.cidade = CampoTexto("Cidade", maximo=80)
-        self.uf = CampoTexto("UF", mono=True, maximo=2, mascara=MASCARA_UF)
-        self.cep = CampoTexto("CEP", mono=True, maximo=8, mascara=MASCARA_CEP)
+        # UF em CHAR(2): 'A' da máscara aceita minúsculas — `caixa_alta` normaliza.
+        self.uf = CampoTexto(
+            "UF", mono=True, maximo=2, mascara=MASCARA_UF, caixa_alta=True
+        )
+        # CEP é CHAR(8) no banco: a máscara é só visual, o valor sai só com dígitos.
+        self.cep = CampoTexto(
+            "CEP", mono=True, maximo=8, mascara=MASCARA_CEP, apenas_digitos=True
+        )
 
     @property
     def campos(self) -> list:

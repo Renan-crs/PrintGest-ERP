@@ -11,6 +11,7 @@ from printgest.ui.formulario import (
     CampoCheck,
     CampoCombo,
     CampoData,
+    CampoTelefone,
     CampoTexto,
     CampoValor,
     data_iso,
@@ -55,8 +56,8 @@ class PaginaClientes(PaginaCrud):
         self._ie = CampoTexto("Inscrição Estadual", mono=True, maximo=20)
         self._nasc = CampoData("Data de Nascimento")
         self._email = CampoTexto("E-mail", maximo=120).larga()
-        self._telefone = CampoTexto("Telefone", mono=True, maximo=20)
-        self._celular = CampoTexto("Celular / WhatsApp", mono=True, maximo=20)
+        self._telefone = CampoTelefone("Telefone")
+        self._celular = CampoTelefone("Celular / WhatsApp")
         self._obs = CampoArea("", linhas=2).larga()
         self._foto = CampoArquivo("Foto do Cliente").larga()
 

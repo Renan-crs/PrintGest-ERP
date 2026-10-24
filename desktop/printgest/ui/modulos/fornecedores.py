@@ -14,6 +14,7 @@ from printgest.ui.formulario import (
     MASCARA_CPF,
     CampoArea,
     CampoCombo,
+    CampoTelefone,
     CampoTexto,
     limpo,
     primeiro_valor,
@@ -56,8 +57,8 @@ class PaginaFornecedores(PaginaCrud):
         self._ie = CampoTexto("Inscrição Estadual", mono=True, maximo=20)
         self._representante = CampoTexto("Representante Comercial", maximo=120)
         self._email = CampoTexto("E-mail", maximo=120).larga()
-        self._telefone = CampoTexto("Telefone", mono=True, maximo=20)
-        self._celular = CampoTexto("Celular / WhatsApp", mono=True, maximo=20)
+        self._telefone = CampoTelefone("Telefone")
+        self._celular = CampoTelefone("Celular / WhatsApp")
         self._obs = CampoArea("", linhas=3).larga()
 
         self._end = BlocoEndereco()

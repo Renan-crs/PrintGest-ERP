@@ -37,6 +37,7 @@ from printgest.ui.formulario import (
     CampoArquivo,
     CampoCheck,
     CampoCombo,
+    CampoTelefone,
     CampoTexto,
     CampoValor,
     dispor_campos,
@@ -228,7 +229,8 @@ class PaginaEmpresa(PaginaFicha):
     def _secoes(self):
         self._razao = CampoTexto("Razão social", maximo=200).obrigatorio()
         self._fantasia = CampoTexto("Nome fantasia", maximo=120)
-        self._cnpj = CampoTexto("CNPJ", maximo=14)
+        # CHAR(14) no banco: a entrada aceita CNPJ colado formatado e sai só com dígitos.
+        self._cnpj = CampoTexto("CNPJ", maximo=14, apenas_digitos=True)
         self._ie = CampoTexto("Inscrição estadual", maximo=20)
         self._im = CampoTexto("Inscrição municipal", maximo=20)
         self._regime = CampoTexto("Regime tributário", maximo=60)
@@ -241,9 +243,9 @@ class PaginaEmpresa(PaginaFicha):
         self._complemento = CampoTexto("Complemento", maximo=80)
         self._bairro = CampoTexto("Bairro", maximo=80)
         self._cidade = CampoTexto("Cidade", maximo=80)
-        self._uf = CampoTexto("UF", maximo=2)
-        self._cep = CampoTexto("CEP", maximo=8)
-        self._telefone = CampoTexto("Telefone", maximo=20)
+        self._uf = CampoTexto("UF", maximo=2, caixa_alta=True)
+        self._cep = CampoTexto("CEP", maximo=8, apenas_digitos=True)
+        self._telefone = CampoTelefone("Telefone")
         self._email = CampoTexto("E-mail", maximo=120)
         self._site = CampoTexto("Site", maximo=160)
         return [
