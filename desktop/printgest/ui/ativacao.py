@@ -48,55 +48,81 @@ class AtivacaoWindow(QMainWindow):
         self._api = api
         self._token = token
         self._contrato_b = (contrato or "c").strip().lower() == "b"
-        self.setWindowTitle("PrintGest ERP — Ativação de Licença do Sistema")
-        self.setMinimumSize(960, 640)
+        self.setWindowTitle("PrintGest ERP - Ativação de Licença")
+        self.setMinimumSize(1024, 720)
 
+        # Container principal centralizado
         base = QWidget()
-        layout = QVBoxLayout(base)
-        layout.setContentsMargins(24, 20, 24, 12)
-        layout.setSpacing(14)
+        main_layout = QVBoxLayout(base)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        cabeçalho = QVBoxLayout()
-        cabeçalho.setSpacing(4)
-        linha_badge = QHBoxLayout()
-        linha_badge.addWidget(badge("Setup Inicial", "primary"))
-        linha_badge.addStretch(1)
-        protocolo = QLabel("PRD-2.0 / §3.REDGEST")
-        protocolo.setProperty("mono", "true")
-        protocolo.setProperty("role", "muted")
-        linha_badge.addWidget(protocolo)
-        cabeçalho.addLayout(linha_badge)
+        # --- CABEÇALHO (Boas-vindas) ---
+        header = QVBoxLayout()
+        header.setSpacing(10)
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        titulo = QLabel("Ativação de Licença do Sistema — PrintGest ERP")
+        logo_placeholder = QLabel("🛡️")
+        logo_placeholder.setStyleSheet("font-size: 48px; margin-bottom: 10px;")
+        logo_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(logo_placeholder)
+
+        titulo = QLabel("Bem-vindo ao PrintGest ERP")
         titulo.setObjectName("titulo")
-        cabeçalho.addWidget(titulo)
+        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(titulo)
 
         if self._contrato_b:
             subtitulo = QLabel(
-                "Informe o CNPJ da empresa e o código da licença enviados pelo "
-                "RedGest para liberar o acesso a todas as estações de trabalho da gráfica."
+                "Para liberar o acesso às estações de trabalho da sua gráfica,\n"
+                "por favor, informe o CNPJ e o código da licença enviados pelo RedGest."
             )
         else:
             subtitulo = QLabel(
-                "Digite a chave de produto entregue na contratação do PrintGest para "
-                "liberar o acesso a todas as estações de trabalho da gráfica."
+                "Para liberar o acesso às estações de trabalho da sua gráfica,\n"
+                "por favor, informe a chave de produto entregue na contratação."
             )
         subtitulo.setObjectName("subtitulo")
         subtitulo.setWordWrap(True)
-        cabeçalho.addWidget(subtitulo)
-        layout.addLayout(cabeçalho)
+        subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(subtitulo)
+        
+        main_layout.addLayout(header)
+        main_layout.addSpacing(30)
 
-        layout.addWidget(self._stepper())
-
-        corpo = QHBoxLayout()
-        corpo.setSpacing(16)
-        corpo.addWidget(self._painel_form(), 3)
-        corpo.addWidget(self._painel_info(), 2)
-        layout.addLayout(corpo)
+        # --- ÁREA CENTRAL (Formulário + Info) ---
+        content = QHBoxLayout()
+        content.setSpacing(40)
+        
+        # Coluna do Formulário
+        form_col = QVBoxLayout()
+        form_col.setSpacing(20)
+        
+        self._stepper_widget = self._stepper()
+        form_col.addWidget(self._stepper_widget)
+        
+        form_card = self._painel_form()
+        form_col.addWidget(form_card)
+        
+        content.addLayout(form_col, 3)
+        
+        # Coluna de Informações (Onboarding)
+        info_col = QVBoxLayout()
+        info_col.setSpacing(20)
+        info_col.addWidget(self._painel_info())
+        info_col.addStretch(1)
+        
+        content.addLayout(info_col, 2)
+        
+        main_layout.addLayout(content)
+        main_layout.addStretch(1)
 
         self.setCentralWidget(base)
+        
+        # Atalhos e Foco
         QShortcut(QKeySequence(Qt.Key.Key_F10), self, self._ativar)
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.saida.emit)
+        
         if self._contrato_b:
             self._campo_cnpj.setFocus()
         else:
@@ -148,13 +174,14 @@ class AtivacaoWindow(QMainWindow):
         card = QWidget()
         card.setObjectName("card")
         form = QVBoxLayout(card)
-        form.setContentsMargins(24, 20, 24, 20)
-        form.setSpacing(10)
+        form.setContentsMargins(32, 32, 32, 32)
+        form.setSpacing(18)
 
         if self._contrato_b:
-            form.addWidget(self._rotulo("CNPJ"))
+            form.addWidget(self._rotulo("CNPJ da Empresa"))
             self._campo_cnpj = QLineEdit()
             self._campo_cnpj.setPlaceholderText("00.000.000/0000-00")
+            self._campo_cnpj.textChanged.connect(self._manter_cnpj_formatado)
             form.addWidget(self._campo_cnpj)
 
             form.addWidget(self._rotulo("Código da Licença"))
@@ -169,6 +196,7 @@ class AtivacaoWindow(QMainWindow):
             )
             formato.setObjectName("subtitulo")
             formato.setWordWrap(True)
+            formato.setAlignment(Qt.AlignmentFlag.AlignLeft)
             form.addWidget(formato)
         else:
             form.addWidget(self._rotulo("Chave de Produto"))
@@ -184,27 +212,28 @@ class AtivacaoWindow(QMainWindow):
             )
             formato.setObjectName("subtitulo")
             formato.setWordWrap(True)
+            formato.setAlignment(Qt.AlignmentFlag.AlignLeft)
             form.addWidget(formato)
 
         self._erro = QLabel("")
         self._erro.setProperty("role", "error")
         self._erro.setWordWrap(True)
+        self._erro.setAlignment(Qt.AlignmentFlag.AlignCenter)
         form.addWidget(self._erro)
 
         form.addStretch(1)
 
-        btn_testar = botao_com_atalho("Testar Local API Service")
-        btn_testar[1].clicked.connect(self._testar)
-        btn_ativar = botao_com_atalho("Validar e Ativar Licença Online", "F10", "primary")
+        # Ações principais com hierarquia clara
+        btn_ativar = botao_com_atalho("Validar e Ativar Licença", "F10", "primary")
         btn_ativar[1].clicked.connect(self._ativar)
-        btn_sair = botao_com_atalho("Sair", "Esc")
-        btn_sair[1].clicked.connect(self.saida.emit)
+        form.addWidget(btn_ativar[0])
 
-        ativacao = QHBoxLayout()
-        ativacao.setSpacing(10)
-        ativacao.addWidget(btn_testar[0], 1)
-        ativacao.addWidget(btn_ativar[0], 2)
-        form.addLayout(ativacao)
+        btn_testar = botao_com_atalho("Testar Local API Service", None, "secondary")
+        btn_testar[1].clicked.connect(self._testar)
+        form.addWidget(btn_testar[0])
+
+        btn_sair = botao_com_atalho("Sair", "Esc", "muted")
+        btn_sair[1].clicked.connect(self.saida.emit)
         form.addWidget(btn_sair[0])
 
         self._botao_ativar = btn_ativar[1]
@@ -287,7 +316,34 @@ class AtivacaoWindow(QMainWindow):
         return label
 
     @staticmethod
+    def _formatar_cnpj(texto: str) -> str:
+        """Aplica máscara de CNPJ: 00.000.000/0000-00."""
+        bruto = "".join(c for c in texto if c.isdigit())[:14]
+        if len(bruto) <= 2:
+            return bruto
+        if len(bruto) <= 5:
+            return f"{bruto[:2]}.{bruto[2:]}"
+        if len(bruto) <= 8:
+            return f"{bruto[:2]}.{bruto[2:5]}.{bruto[5:]}"
+        if len(bruto) <= 12:
+            return f"{bruto[:2]}.{bruto[2:5]}.{bruto[5:8]}/{bruto[8:]}"
+        return f"{bruto[:2]}.{bruto[2:5]}.{bruto[5:8]}/{bruto[8:12]}-{bruto[12:]}"
+
+    def _manter_cnpj_formatado(self, texto: str) -> None:
+        """Mantém o CNPJ formatado sem roubar o cursor."""
+        formatado = self._formatar_cnpj(texto)
+        if formatado == texto:
+            return
+        posicao = self._campo_cnpj.cursorPosition()
+        # Cálculo simplificado de deslocamento para máscara
+        self._campo_cnpj.blockSignals(True)
+        self._campo_cnpj.setText(formatado)
+        self._campo_cnpj.blockSignals(False)
+        self._campo_cnpj.setCursorPosition(posicao)
+
+    @staticmethod
     def _formatar_chave(texto: str) -> str:
+
         """Normaliza para hexadecimais maiúsculos com hífens a cada 4 caracteres."""
         bruto = "".join(c for c in texto.upper() if c in "0123456789ABCDEF")[:16]
         return "-".join(bruto[i : i + 4] for i in range(0, len(bruto), 4))

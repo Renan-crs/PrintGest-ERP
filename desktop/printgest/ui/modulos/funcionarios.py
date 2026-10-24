@@ -12,6 +12,7 @@ from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
     CampoData,
+    CampoTelefone,
     CampoTexto,
     CampoValor,
     data_iso,
@@ -44,7 +45,7 @@ class PaginaFuncionarios(PaginaCrud):
         self._cpf = CampoTexto("CPF", mono=True, maximo=14, mascara=MASCARA_CPF)
         self._nascimento = CampoData("Data de Nascimento")
         self._email = CampoTexto("E-mail", maximo=120)
-        self._telefone = CampoTexto("Telefone", mono=True, maximo=20)
+        self._telefone = CampoTelefone("Telefone")
 
         self._cargo = CampoTexto("Cargo / Função", maximo=60)
         self._admissao = CampoData("Data de Admissão")
