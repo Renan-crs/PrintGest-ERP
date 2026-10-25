@@ -448,6 +448,11 @@ class Api:
     def situacao_licenca(self, token: str | None = None) -> dict:
         return self._get("/v1/licenca", token)
 
+    # A ativação conversa com o RedGest, que em plano gratuito acorda em 30–60 s
+    # (PRD §4.3: timeout ≥ 90 s). O timeout padrão do cliente (8 s) serviria só
+    # para o daemon local — aqui a chamada atravessa daemon + RedGest.
+    TIMEOUT_ATIVACAO_SEGUNDOS = 95.0
+
     def ativar_licenca(
         self,
         token: str | None,
@@ -463,7 +468,12 @@ class Api:
             corpo["cnpj"] = cnpj
         if codigo:
             corpo["codigo_licenca"] = codigo
-        return self._post("/v1/licenca/ativar", corpo, token)
+        return self._post(
+            "/v1/licenca/ativar",
+            corpo,
+            token,
+            timeout=self.TIMEOUT_ATIVACAO_SEGUNDOS,
+        )
 
     def renovar_licenca(self, token: str | None) -> dict:
         return self._post("/v1/licenca/renovar", {}, token)
@@ -485,8 +495,13 @@ class Api:
         resp = self._cliente.get(path, headers=self._headers(token), params=params)
         return self._tratar(resp)
 
-    def _post(self, path: str, payload: dict, token: str | None = None) -> dict:
-        resp = self._cliente.post(path, json=payload, headers=self._headers(token))
+    def _post(
+        self, path: str, payload: dict, token: str | None = None, timeout: float | None = None
+    ) -> dict:
+        kwargs: dict = {"json": payload, "headers": self._headers(token)}
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        resp = self._cliente.post(path, **kwargs)
         return self._tratar(resp)
 
     def _put(self, path: str, payload: dict, token: str | None = None) -> dict:
