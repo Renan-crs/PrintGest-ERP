@@ -12,9 +12,10 @@ from PySide6.QtWidgets import (
 
 from printgest import APP_NAME, __version__
 from printgest.core import daemon
-from printgest.core.api import Api
+from printgest.core.api import Api, modo_estacao
 from printgest.core.tarefas import rodar
 from printgest.ui.ativacao import AtivacaoWindow
+from printgest.ui.conexao import ConexaoWindow
 from printgest.ui.login import LoginWindow
 from printgest.ui.modoleitura import ModoLeituraWindow
 from printgest.ui.tela_principal import TelaPrincipal
@@ -58,19 +59,24 @@ class _Roteador:
     execuções seguintes o login abre direto o sistema; a tela só volta a ser
     pedida se a instalação for refeita (licença ausente).
 
+    **Modo Estação** (`estacao=True`, instalador com `PRINTGEST_API_URL`): o
+    serial NÃO é pedido aqui — a licença pertence ao servidor da gráfica, que
+    já responde pelo modo de leitura; a tela inicial é a de conexão.
+
     Com `PRINTGEST_LICENCA_DESABILITADA=true`, a etapa de licença é pulada e o
     login abre direto o sistema (desenvolvimento).
     """
 
-    def __init__(self, api: Api) -> None:
+    def __init__(self, api: Api, estacao: bool = False) -> None:
         self._api = api
         self._token: str | None = None
         self._janela: QWidget | None = None
         self._licenca_desabilitada = _licenca_desabilitada()
+        self._estacao = estacao
 
     def iniciar(self) -> None:
         """Ponto de entrada: o serial precede o login (gate de instalação)."""
-        if self._licenca_desabilitada:
+        if self._licenca_desabilitada or self._estacao:
             self._abrir_login()
             return
         self._verificar_licenca()
@@ -239,6 +245,11 @@ def main() -> None:
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(__version__)
     aplicar_theme(app)
+
+    if modo_estacao():
+        _iniciar_modo_estacao(app)
+        sys.exit(app.exec())
+
     _preparar_daemon(app)
 
     api = Api()
@@ -247,6 +258,20 @@ def main() -> None:
     roteador = _Roteador(api)
     roteador.iniciar()
     sys.exit(app.exec())
+
+
+def _iniciar_modo_estacao(app: QApplication) -> None:
+    """Estação: primeiro conecta ao servidor, depois login (sem serial)."""
+    janela = ConexaoWindow()
+
+    def conectar(endereco: str) -> None:
+        api = Api(base_url=endereco)
+        app.aboutToQuit.connect(api.fechar)
+        _Roteador(api, estacao=True).iniciar()
+
+    janela.conectado.connect(conectar)
+    janela.saida.connect(app.quit)
+    janela.show()
 
 
 if __name__ == "__main__":

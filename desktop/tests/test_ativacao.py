@@ -12,6 +12,7 @@ Cobre o fluxo com `httpx.MockTransport` (sem daemon real):
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 from PySide6.QtWidgets import QLineEdit, QMessageBox, QPushButton
@@ -231,16 +232,70 @@ def test_validando_mostra_barra_e_cancelar_devolve_o_formulario(app):
     assert janela._campo_chave.isEnabled()
 
 
-def test_resultado_apos_cancelar_ainda_e_aplicado(app, pumpar):
-    """Cancelada a espera, a licença ativada entra assim mesmo (fato consumado)."""
+def test_resultado_apos_cancelar_e_descartado(app, monkeypatch):
+    """Cancelar aborta de verdade (D2): resposta em voo é descartada.
+
+    O pedido HTTP é interrompido fechando o cliente dedicado; qualquer
+    resultado que já vinha é ignorado pelo token da tentativa.
+    """
+    capturado: dict = {}
+
+    def rodar_fake(fn, on_ok, on_erro):
+        capturado["ok"], capturado["erro"] = on_ok, on_erro
+
+    import printgest.ui.ativacao as mod_ativacao
+
+    monkeypatch.setattr(mod_ativacao, "rodar", rodar_fake)
+
     janela = _janela(lambda r: httpx.Response(200, json={"data": _RESPOSTA_ATIVA}))
     janela._campo_chave.setText(_CHAVE)
-    janela._entrar_em_validacao()
+    janela._ativar()
+    cliente = janela._cliente_ativacao
+    assert cliente is not None
+
     janela._cancelar_validacao()
-    janela._cancelado is True
-    janela._disparar(lambda: dict(_RESPOSTA_ATIVA))
-    pumpar(lambda: janela._cartao.currentIndex() == 1)
-    assert "Licença ativada" in janela._sucesso_titulo.text()
+    assert janela._cliente_ativacao is None  # cliente fechado = HTTP abortado
+    assert janela._cartao.currentIndex() == 0
+
+    # Respostas tardias (ok OU erro) não tocam a tela cancelada.
+    capturado["ok"](dict(_RESPOSTA_ATIVA))
+    capturado["erro"]("qualquer falha tardia")
+    app.processEvents()
+    assert janela._cartao.currentIndex() == 0
+    assert janela._erro.text() == ""
+    assert janela._botao_ativar.text() == "Ativar licença (F10)"
+
+
+def test_nova_tentativa_nao_recebe_resultado_da_antiga(app, monkeypatch):
+    capturado: list = []
+
+    def rodar_fake(fn, on_ok, on_erro):
+        capturado.append((on_ok, on_erro))
+
+    import printgest.ui.ativacao as mod_ativacao
+
+    monkeypatch.setattr(mod_ativacao, "rodar", rodar_fake)
+
+    janela = _janela(lambda r: httpx.Response(200, json={"data": _RESPOSTA_ATIVA}))
+    janela._campo_chave.setText(_CHAVE)
+    janela._ativar()          # tentativa 1
+    janela._cancelar_validacao()
+    janela._ativar()          # tentativa 2 (nova espera)
+
+    ok_antigo = capturado[0][0]
+    ok_antigo({"plano": "ERRADO"})  # resultado da tentativa 1 chega atrasado
+    assert janela._cartao.currentIndex() == 0
+    assert janela._sucesso_resumo.text() == ""
+
+
+def test_cliente_da_ativacao_reusa_o_transport_da_api(app):
+    """O cliente dedicado atravessa o mesmo transporte (testes: MockTransport)."""
+    janela = _janela(lambda r: httpx.Response(200))
+    cliente = janela._api.cliente_para_ativacao()
+    try:
+        assert cliente.timeout.connect == janela._api.TIMEOUT_ATIVACAO_SEGUNDOS
+    finally:
+        cliente.close()
 
 
 # ------------------------------------------------------ conexão local (D3)
@@ -305,6 +360,49 @@ def test_cancelar_a_saida_nao_emite(app, monkeypatch):
 
 
 # ------------------------------------------------- textos e contrato (C1–C4)
+
+
+def test_canal_do_codigo_e_portal_e_email(app):
+    """P4 (confirmado pelo responsável): código chega por e-mail/portal."""
+    janela = _janela(lambda r: httpx.Response(200), contrato="b")
+    assert "por e-mail" in janela._campo_codigo.placeholderText()
+    textos = janela._painel_detalhes.findChildren(type(janela._status))
+    conteudo = " ".join(w.text() for w in textos).lower()
+    assert "portal" in conteudo
+
+
+def test_marca_vetorial_existe_e_e_decorativa(app):
+    """E2: SVG da marca no bundle; label decorativo (accessibleName vazio)."""
+    import printgest.ui.ativacao as mod_ativacao
+
+    svg = (
+        Path(mod_ativacao.__file__).resolve().parent
+        / "assets"
+        / "marca-printgest.svg"
+    )
+    janela = _janela(lambda r: httpx.Response(200), contrato="b")
+    marca = janela._marca()
+    assert svg.exists() and svg.stat().st_size > 0
+    assert marca.pixmap() is not None
+    assert marca.accessibleName() == ""
+
+
+def test_detalhes_tecnicos_abrem_e_fecha(app, monkeypatch):
+    """Painel recolhido por padrão; o toggle mostra/oculta (D7)."""
+    janela = _janela(lambda r: httpx.Response(200), contrato="b")
+    monkeypatch.setattr(janela, "_animacoes", False)  # determinístico no teste
+    assert janela._painel_detalhes.isHidden()
+    janela._botao_detalhes.toggle()
+    assert not janela._painel_detalhes.isHidden()
+    assert "▾" in janela._botao_detalhes.text()
+    janela._botao_detalhes.toggle()
+    assert janela._painel_detalhes.isHidden()
+
+
+def test_animacoes_respeitam_a_preferencia_do_windows():
+    from printgest.ui.ativacao import AtivacaoWindow
+
+    assert isinstance(AtivacaoWindow._animacoes_habilitadas(), bool)
 
 
 def test_textos_da_superficie_sem_jargao(app):

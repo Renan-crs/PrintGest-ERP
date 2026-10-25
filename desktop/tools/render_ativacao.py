@@ -59,6 +59,7 @@ def handler(request: httpx.Request) -> httpx.Response:
 
 
 def preparar_estado(tela: AtivacaoWindow) -> None:
+    tela._animacoes = False  # determinístico: sem animação em screenshot
     if ESTADO == "erro":
         if tela._contrato_b:
             tela._campo_cnpj.setText("11222333000182")  # DV inválido
@@ -74,6 +75,8 @@ def preparar_estado(tela: AtivacaoWindow) -> None:
                 tela._erro_chave,
                 "Informe a chave completa (XXXX-XXXX-XXXX-XXXX).",
             )
+    elif ESTADO == "detalhes":
+        tela._botao_detalhes.toggle()
     elif ESTADO == "validando":
         if tela._contrato_b:
             tela._campo_cnpj.setText("11.222.333/0001-81")

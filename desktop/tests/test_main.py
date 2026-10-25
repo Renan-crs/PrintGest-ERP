@@ -143,3 +143,19 @@ def test_flag_dev_pula_o_serial_e_abre_login(app, monkeypatch):
 
     assert isinstance(roteador._janela, LoginWindow)
     assert _REQUISICOES == []  # não consulta a licença
+
+
+def test_modo_estacao_pula_o_serial_e_vai_ao_login(app):
+    """D6/P5: estação não pede serial — a licença é do servidor da gráfica."""
+    _REQUISICOES.clear()
+    from printgest.main import _Roteador
+    from printgest.ui.login import LoginWindow
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    roteador = _Roteador(api, estacao=True)
+
+    roteador.iniciar()
+
+    assert isinstance(roteador._janela, LoginWindow)
+    # Nenhuma chamada de LICENÇA no modo Estação (o /health é do LoginWindow).
+    assert all(c == "/health" for c in _REQUISICOES)

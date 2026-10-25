@@ -7,10 +7,36 @@ API — a UI só precisa apresentar a mensagem.
 
 from __future__ import annotations
 
+import os
+
 import httpx
 
 BASE_URL = "http://127.0.0.1:8000"
 TIMEOUT = 8.0
+
+_LIGADO = {"1", "true", "yes", "on", "sim"}
+
+
+def base_url_padrao() -> str:
+    """Endereço do Local API Service: o do servidor (modo Estação) ou o local.
+
+    O instalador de uma estação define `PRINTGEST_API_URL` apontando para a
+    máquina servidora da gráfica; sem a variável, o alvo é o daemon local
+    embutido no modo Servidor.
+    """
+    endereco = os.environ.get("PRINTGEST_API_URL", "").strip()
+    if not endereco:
+        return BASE_URL
+    if "://" not in endereco:
+        endereco = f"http://{endereco}"
+    return endereco.rstrip("/")
+
+
+def modo_estacao() -> bool:
+    """True quando esta instalação é uma estação (servidor em outra máquina)."""
+    return bool(os.environ.get("PRINTGEST_API_URL", "").strip()) or os.environ.get(
+        "PRINTGEST_MODO_ESTACAO", ""
+    ).strip().lower() in _LIGADO
 
 
 class ApiError(Exception):
@@ -32,6 +58,8 @@ class Api:
         timeout: float = TIMEOUT,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._transport = transport
         self._cliente = httpx.Client(
             base_url=base_url, timeout=timeout, transport=transport
         )
@@ -453,6 +481,18 @@ class Api:
     # para o daemon local — aqui a chamada atravessa daemon + RedGest.
     TIMEOUT_ATIVACAO_SEGUNDOS = 95.0
 
+    def cliente_para_ativacao(self) -> httpx.Client:
+        """Cliente dedicado da ativação: fechável para abortar a espera (D2).
+
+        Fechar o cliente em pleno voo interrompe a requisição de verdade; o
+        cliente compartilhado segue intocado para o resto da aplicação.
+        """
+        return httpx.Client(
+            base_url=self._base_url,
+            timeout=self.TIMEOUT_ATIVACAO_SEGUNDOS,
+            transport=self._transport,
+        )
+
     def ativar_licenca(
         self,
         token: str | None,
@@ -460,6 +500,7 @@ class Api:
         *,
         cnpj: str | None = None,
         codigo: str | None = None,
+        cliente: httpx.Client | None = None,
     ) -> dict:
         corpo: dict[str, str] = {}
         if chave:
@@ -468,6 +509,11 @@ class Api:
             corpo["cnpj"] = cnpj
         if codigo:
             corpo["codigo_licenca"] = codigo
+        if cliente is not None:
+            resp = cliente.post(
+                "/v1/licenca/ativar", json=corpo, headers=self._headers(token)
+            )
+            return self._tratar(resp)
         return self._post(
             "/v1/licenca/ativar",
             corpo,

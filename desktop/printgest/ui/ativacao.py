@@ -18,8 +18,13 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import QRect, Qt, Signal
-from PySide6.QtGui import QColor, QKeySequence, QPalette, QPainter, QPixmap, QShortcut
+from PySide6.QtCore import QAbstractAnimation, QPropertyAnimation, Qt, Signal
+from PySide6.QtGui import (
+    QColor,
+    QKeySequence,
+    QPalette,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -36,18 +41,18 @@ from PySide6.QtWidgets import (
 
 from printgest.core.api import Api
 from printgest.core.tarefas import rodar
-from printgest.ui.widgets import aplicar_estilo, formatar_datahora
+from printgest.ui.widgets import (
+    EtiquetaQuebra,
+    aplicar_estilo,
+    formatar_datahora,
+    marca_printgest,
+)
 
 _FORMATO_CHAVE = re.compile(r"^[0-9A-F]{4}(-[0-9A-F]{4}){3}$")
 
 # Passos (D1): indicador não interativo — texto + pontos, sem cara de botão.
 _PASSOS_B = ["Dados da licença", "Validação online", "Sistema liberado"]
 _PASSOS_C = ["Chave de produto", "Validação online", "Sistema liberado"]
-
-# Marca provisória (até existir logotipo vetorial do produto): "P" em quadrado
-# arredondado no azul do sistema — desenhada em código, sem emoji (E2/A7).
-_MARCA_FUNDO = "#0071E3"
-_MARCA_TEXTO = "#FFFFFF"
 
 # Espaçamentos da escala 4/8/16/24 (B1): rótulo→campo 4, entre grupos 24.
 _GAP_ROTULO_CAMPO = 4
@@ -67,7 +72,10 @@ class AtivacaoWindow(QMainWindow):
         self._contrato_b = (contrato or "c").strip().lower() == "b"
         self._passo = 1
         self._validando = False
-        self._cancelado = False
+        self._tentativa = 0
+        self._cliente_ativacao: "httpx.Client | None" = None  # só p/ abortar (D2)
+        self._animacao_detalhes = None
+        self._animacoes = self._animacoes_habilitadas()
         self.setWindowTitle("PrintGest ERP — Ativação de licença")
         self.setMinimumSize(960, 640)
 
@@ -115,25 +123,7 @@ class AtivacaoWindow(QMainWindow):
 
     @staticmethod
     def _marca() -> QLabel:
-        pm = QPixmap(44, 44)
-        pm.fill(Qt.GlobalColor.transparent)
-        p = QPainter(pm)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(_MARCA_FUNDO))
-        p.drawRoundedRect(0, 0, 44, 44, 10, 10)
-        fonte = p.font()
-        fonte.setPointSizeF(19)
-        fonte.setBold(True)
-        p.setFont(fonte)
-        p.setPen(QColor(_MARCA_TEXTO))
-        p.drawText(QRect(0, -2, 44, 44), Qt.AlignmentFlag.AlignCenter, "P")
-        p.end()
-        lbl = QLabel()
-        lbl.setPixmap(pm)
-        lbl.setFixedSize(44, 44)
-        lbl.setAccessibleName("")  # decorativa (A7): o leitor de tela ignora
-        return lbl
+        return marca_printgest()
 
     @staticmethod
     def _titulo() -> QLabel:
@@ -142,11 +132,10 @@ class AtivacaoWindow(QMainWindow):
         return lbl
 
     def _subtitulo(self) -> QLabel:
-        lbl = QLabel(
+        lbl = EtiquetaQuebra(
             "Informe os dados da contratação para liberar este computador."
         )
         lbl.setObjectName("subtitulo")
-        lbl.setWordWrap(True)
         lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         return lbl
 
@@ -202,7 +191,7 @@ class AtivacaoWindow(QMainWindow):
             corpo.addSpacing(_GAP_ENTRE_GRUPOS)
             corpo.addWidget(self._rotulo("Código da licença"))
             self._campo_codigo = self._campo(
-                "Código da licença", "Informe o código da contratação"
+                "Código da licença", "Informe o código enviado por e-mail"
             )
             self._campo_codigo.returnPressed.connect(self._ativar)
             self._erro_codigo = self._rotulo_erro()
@@ -222,16 +211,14 @@ class AtivacaoWindow(QMainWindow):
             ajuda = "Cole a chave com 4 blocos enviada na contratação."
 
         corpo.addSpacing(_GAP_ENTRE_GRUPOS)
-        lbl_ajuda = QLabel(ajuda)
+        lbl_ajuda = EtiquetaQuebra(ajuda)
         lbl_ajuda.setObjectName("ajudaCampo")
-        lbl_ajuda.setWordWrap(True)
         lbl_ajuda.setAccessibleName(f"Ajuda: {ajuda}")
         corpo.addWidget(lbl_ajuda)
 
         # Erro geral (mensagem do servidor) — junto dos campos (C6).
-        self._erro = QLabel("")
+        self._erro = EtiquetaQuebra("")
         self._erro.setObjectName("erroCampo")
-        self._erro.setWordWrap(True)
         corpo.addWidget(self._erro)
 
         self._linha_validando = self._linha_de_validacao()
@@ -286,19 +273,16 @@ class AtivacaoWindow(QMainWindow):
         corpo.setContentsMargins(24, 28, 24, 24)
         corpo.setSpacing(8)
 
-        self._sucesso_titulo = QLabel("Licença ativada neste computador.")
+        self._sucesso_titulo = EtiquetaQuebra("Licença ativada neste computador.")
         self._sucesso_titulo.setObjectName("tituloSucesso")
-        self._sucesso_titulo.setWordWrap(True)
         corpo.addWidget(self._sucesso_titulo)
 
-        self._sucesso_resumo = QLabel("")
+        self._sucesso_resumo = EtiquetaQuebra("")
         self._sucesso_resumo.setObjectName("subtitulo")
-        self._sucesso_resumo.setWordWrap(True)
         corpo.addWidget(self._sucesso_resumo)
 
-        nota = QLabel("Este computador agora é o servidor da sua gráfica.")
+        nota = EtiquetaQuebra("Este computador agora é o servidor da sua gráfica.")
         nota.setObjectName("ajudaCampo")
-        nota.setWordWrap(True)
         corpo.addWidget(nota)
 
         corpo.addStretch(1)
@@ -324,24 +308,23 @@ class AtivacaoWindow(QMainWindow):
         c1 = QLabel("Este computador")
         c1.setObjectName("rotuloCampo")
         corpo.addWidget(c1)
-        t1 = QLabel(
+        t1 = EtiquetaQuebra(
             "Este computador será o servidor da sua gráfica: guarda o banco de "
             "dados e atende até 5 estações de trabalho do balcão e da produção."
         )
         t1.setObjectName("ajudaCampo")
-        t1.setWordWrap(True)
         corpo.addWidget(t1)
 
         c2 = QLabel("Sobre a licença")
         c2.setObjectName("rotuloCampo")
         corpo.addWidget(c2)
-        t2 = QLabel(
-            "A licença é validada pela internet, uma única vez. O sistema "
-            "confere periodicamente a situação do contrato com o servidor de "
-            "licenças do fabricante."
+        t2 = EtiquetaQuebra(
+            "A licença é validada pela internet, uma única vez. O código é "
+            "enviado por e-mail e também fica disponível no portal de "
+            "licenças do fabricante. O sistema confere periodicamente a "
+            "situação do contrato com o servidor de licenças."
         )
         t2.setObjectName("ajudaCampo")
-        t2.setWordWrap(True)
         corpo.addWidget(t2)
         self._painel_detalhes.setVisible(False)
         return self._painel_detalhes
@@ -366,8 +349,52 @@ class AtivacaoWindow(QMainWindow):
         return rodape
 
     def _alternar_detalhes(self, aberto: bool) -> None:
-        self._painel_detalhes.setVisible(aberto)
+        painel = self._painel_detalhes
         self._botao_detalhes.setText("Detalhes técnicos ▾" if aberto else "Detalhes técnicos ▸")
+        if not self._animacoes:
+            painel.setVisible(aberto)
+            return
+        # D7: 160 ms (faixa 120–200 ms), OutCubic; desligado quando o Windows
+        # pede "reduzir animações" (SPI_GETCLIENTAREAANIMATION).
+        if aberto:
+            painel.setMaximumHeight(0)
+            painel.show()
+            altura = painel.sizeHint().height()
+            anim = QPropertyAnimation(painel, b"maximumHeight", self)
+            anim.setDuration(160)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            anim.setStartValue(0)
+            anim.setEndValue(max(altura, 1))
+            anim.finished.connect(lambda: painel.setMaximumHeight(16777215))
+        else:
+            altura = max(painel.height(), 1)
+            anim = QPropertyAnimation(painel, b"maximumHeight", self)
+            anim.setDuration(160)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            anim.setStartValue(altura)
+            anim.setEndValue(0)
+            anim.finished.connect(painel.hide)
+        self._animacao_detalhes = anim
+        anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+
+    @staticmethod
+    def _animacoes_habilitadas() -> bool:
+        """Opção do Windows "Animar controles e elementos dentro de janelas".
+
+        Respeitar a preferência do usuário é parte do D7: com animações
+        desligadas no sistema, a interface muda de estado instantaneamente.
+        """
+        try:
+            import ctypes
+            import ctypes.wintypes as wintypes
+
+            ligado = wintypes.BOOL()
+            ok = ctypes.windll.user32.SystemParametersInfoW(
+                0x1042, 0, ctypes.byref(ligado), 0  # SPI_GETCLIENTAREAANIMATION
+            )
+            return bool(ok and ligado.value)
+        except Exception:  # noqa: BLE001 — fora do Windows ou indisponível: liga
+            return True
 
     @staticmethod
     def _linha_tolerancia() -> QLabel:
@@ -389,9 +416,8 @@ class AtivacaoWindow(QMainWindow):
 
     @staticmethod
     def _rotulo_erro() -> QLabel:
-        lbl = QLabel("")
+        lbl = EtiquetaQuebra("")
         lbl.setObjectName("erroCampo")
-        lbl.setWordWrap(True)
         lbl.hide()
         return lbl
 
@@ -609,15 +635,22 @@ class AtivacaoWindow(QMainWindow):
             campo.setEnabled(True)
 
     def _cancelar_validacao(self) -> None:
-        """Devolve o formulário ao usuário; o resultado ainda é aplicado.
+        """Aborta a ativação em pleno voo (D2) e descarta o resultado.
 
-        O pedido HTTP não é abortado (a thread do `rodar` não expõe cancelamento
-        cooperativo) — se a ativação chegar com sucesso, ela é válida e entra.
-        Cancelar devolve apenas o controle da janela (limitação documentada).
+        Fecha o cliente dedicado — a requisição em curso é interrompida de
+        verdade — e invalida o token da tentativa: qualquer resposta que já
+        vinha é descartada. Se o servidor já tiver ativado, uma nova tentativa
+        devolve a situação atual e a tela avança normalmente.
         """
         if not self._validando:
             return
-        self._cancelado = True
+        self._tentativa += 1  # invalida o resultado em voo
+        cliente, self._cliente_ativacao = self._cliente_ativacao, None
+        if cliente is not None:
+            try:
+                cliente.close()  # aborta o HTTP em andamento
+            except Exception:  # noqa: BLE001 — best-effort na thread da UI
+                pass
         self._sair_da_validacao()
 
     def _campos_do_contrato(self) -> list[QLineEdit]:
@@ -644,8 +677,10 @@ class AtivacaoWindow(QMainWindow):
             cnpj = "".join(c for c in self._campo_cnpj.text() if c.isdigit())
             self._entrar_em_validacao()
 
-            def chamada():
-                return self._api.ativar_licenca(self._token, cnpj=cnpj, codigo=codigo)
+            def chamada(cliente):
+                return self._api.ativar_licenca(
+                    self._token, cnpj=cnpj, codigo=codigo, cliente=cliente
+                )
 
             self._disparar(chamada)
             return
@@ -661,21 +696,45 @@ class AtivacaoWindow(QMainWindow):
         self._limpar_erro_campo(self._campo_chave, self._erro_chave)
         self._entrar_em_validacao()
 
-        def chamada():
-            return self._api.ativar_licenca(self._token, chave)
+        def chamada(cliente):
+            return self._api.ativar_licenca(self._token, chave, cliente=cliente)
 
         self._disparar(chamada)
 
-    def _disparar(self, chamada) -> None:
+    def _disparar(self, fabrica) -> None:
+        """Ativa num cliente dedicado, com token de tentativa (D2).
+
+        O token invalida resultados de tentativas superadas: um "Cancelar"
+        aborta o pedido de verdade (fecha o cliente) e qualquer resposta que
+        já estivesse em voo é descartada — uma nova tentativa nunca recebe o
+        resultado de outra.
+        """
+        self._tentativa += 1
+        tentativa = self._tentativa
+        cliente = self._api.cliente_para_ativacao()
+        self._cliente_ativacao = cliente
+
+        def finalizar() -> None:
+            if self._cliente_ativacao is cliente:
+                self._cliente_ativacao = None
+            try:
+                cliente.close()
+            except Exception:  # noqa: BLE001 — best-effort na thread da UI
+                pass
+
         def ok(situacao) -> None:
-            # Licença ativada é fato consumado: aplica mesmo se o usuário
-            # tiver cancelado a espera (o pedido seguiu e teve sucesso).
+            finalizar()
+            if tentativa != self._tentativa:
+                return  # tentativa cancelada/superada: descarta
             self._sair_da_validacao()
             self._definir_passo(3)
             self._preencher_sucesso(situacao if isinstance(situacao, dict) else {})
             self._cartao.setCurrentIndex(1)
 
         def erro(msg: str) -> None:
+            finalizar()
+            if tentativa != self._tentativa:
+                return  # cancelada: o aborto é o comportamento pedido
             self._sair_da_validacao()
             self._definir_passo(1)
             self._erro.setText(msg)
@@ -683,7 +742,7 @@ class AtivacaoWindow(QMainWindow):
             if campo is not None:
                 campo.setFocus()
 
-        rodar(chamada, ok, erro)
+        rodar(lambda: fabrica(cliente), ok, erro)
 
     def _campo_do_erro(self, msg: str) -> QLineEdit | None:
         """Foca o campo relacionado à mensagem do servidor, quando houver (C6)."""
