@@ -72,15 +72,20 @@ Saída: `dist_installer\PrintGest-Setup-<versão>.exe`.
   `app/core/migrations.py` detecta `sys.frozen` e roda `command.upgrade` da
   API Python, com `alembic.ini` + `alembic/` vindos de `sys._MEIPASS` (o
   `Config` é montado sem arquivo para o `env.py` não reconfigurar o logging
-  da aplicação via `fileConfig`).- **`.env` ao lado do exe**: o pydantic resolve `env_file` pelo CWD, que num
+  da aplicação via `fileConfig`).
+- **`.env` ao lado do exe**: o pydantic resolve `env_file` pelo CWD, que num
   atalho do menu Iniciar não é a pasta do app. O `run_server.py` injeta o
   `.env` do diretório do executável no ambiente (variáveis reais continuam
   vencendo — útil para diagnóstico).
 
 ## 3. O que o `.env` da instalação carrega
 
-Gerado pelo `empacotar.ps1` a partir de `backend\.env`, com três chaves
-forçadas:
+Gerado pelo `empacotar.ps1` a partir de **`installer/env.instalacao`** (quando
+existe — credenciais por cliente, fora do git) ou do template versionado
+**`installer/env.instalacao.example`**. **O `backend\.env` de dev não é lido**:
+o pacote nunca herda segredos do ambiente de desenvolvimento.
+
+Três chaves são sempre impostas pelo build:
 
 ```env
 PRINTGEST_PG_EMBARCADO=true     # daemon prepara o cluster na 1ª execução
@@ -88,10 +93,20 @@ PRINTGEST_API_HOST=127.0.0.1    # sem firewall prompt / sem exposição
 PRINTGEST_ENV=local             # passa na checagem anti-defaults (P17)
 ```
 
-O restante (URL/`api_key` do RedGest, contrato, `DATABASE_URL`) vem do
-`.env` de dev. **Atenção**: isso inclui a `api_key` do sistema no RedGest —
-o pacote é para piloto interno; para distribuição externa, mover a credencial
-para uma fonte por cliente (ou emissão individual por instalação).
+**Credencial RedGest (`api_key`)** — por padrão o pacote **não** carrega
+nenhuma:
+
+- **Contrato B** (CNPJ + código): o handshake não usa `api_key` — o pacote
+  sai limpo. As credenciais M2M vêm da ativação e ficam no cofre do SO
+  (DPAPI) da máquina do cliente.
+- **Contrato C** (chave de produto): a validação é assinada com a
+  `api_key` do Sistema — preencha em `installer/env.instalacao` (ignorado
+  pelo git). **O build recusa `CONTRATO=c` com a chave vazia** para nunca
+  embarcar um pacote que não ativa.
+
+Quem distribui o mesmo Setup para N clientes com Contrato C embute a mesma
+credencial em todos — avaliar emissão individual ou proxy por cliente antes
+de distribuir externamente.
 
 ## 4. Desinstalador
 
@@ -127,27 +142,65 @@ Variáveis de emergência (setadas no processo, vencem o `.env`):
 - Inno Setup 6 (`winget install JRSoftware.InnoSetup` — o script usa o ISCC
   per-user em `%LOCALAPPDATA%\Programs\Inno Setup 6`).
 
-## 7. Roadmap
+## 7. Assinatura digital e SmartScreen
 
-- [ ] Assinatura digital do instalador e dos exes (evita SmartScreen).
+Um Setup sem assinatura dispara o **SmartScreen** ("O Windows protegeu o
+computador") na primeira máquina que o executa — quem instala clica em "Mais
+informações → Executar assim mesmo". Para o piloto interno isso é aceitável;
+para cliente, só o certificado resolve.
+
+O pipeline já está pronto: `signtool` do Windows SDK é detectado
+automaticamente e assina **os dois exes antes de virarem Setup** e o próprio
+Setup depois, com carimbo de tempo (timestamp) — a assinatura não expira com o
+certificado:
+
+```powershell
+# thumbprint do certificado em Cert:\CurrentUser\My
+powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Assinar <THUMBPRINT>
+
+# ou um arquivo .pfx (senha na variável PRINTGEST_SIGN_SENHA)
+powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Assinar C:\cert\printgest.pfx
+```
+
+Onde conseguir um certificado de *code signing* (preços de out/2026, a
+título de referência):
+
+| Opção | Custo aprox. | Observação |
+| --- | --- | --- |
+| **Azure Trusted Signing** (Microsoft) | US$ 9,99/mês | individuais e empresas; exige `AzureSignTool` no lugar do `signtool` clássico |
+| Certum / SSL.com / GlobalSign (OV) | ~US$ 70–250/ano | `signtool` clássico, pronto no script |
+| Certificado autoassinado (PowerShell) | grátis | **não resolve** o SmartScreen — só prova integridade |
+
+SmartScreen limpa com reputação: nos primeiros downloads de um exe recém
+assinado ainda pode aparecer o aviso azul até o arquivo acumular reputação
+(certificados EV pulam essa fila).
+
+## 8. Roadmap
+
+- [x] Assinatura digital no pipeline (`-Assinar` + `signtool`) — falta o certificado.
+- [ ] Certificado de code signing (Azure Trusted Signing ou OV).
 - [ ] Atualização in-place (detector de versão + download incremental).
 - [ ] Backup/restauração do cluster via interface (hoje: cópia do `data`).
 - [ ] Serviço do Windows opcional para o daemon (auto-start no boot).
 
-## 8. Validação executada (24/10/2026, máquina de dev)
+## 9. Validação executada (24/10/2026, máquina de dev)
 
 Instalação silenciosa em pasta de teste + primeira execução **fria** (cluster
 zerado), sem tocar nos serviços de dev (PostgreSQL de dev em 5432 e daemon de
-dev em 8000 — o teste usou 5433/8010 via variáveis de ambiente):
+dev em 8000 — o teste usou 5433/8010 via variáveis de ambiente). Validação
+repetida após a mudança do `.env` para o template sem segredos:
 
 | Verificação | Resultado |
 | --- | --- |
 | `PrintGest-Setup-0.2.2.exe /VERYSILENT` | layout completo (2 exes, PG, `.env`, `unins000.exe`) |
-| Primeira execução do `PrintGestAPI.exe` | initdb → start → createdb → migrations (head `d7a1c4e8b2f3`, 37 tabelas) → bootstrap → uvicorn em **19,9 s** |
-| `GET /health` / `GET /v1/licenca` | 200 / `nao_ativada` (gate de serial antes do login) |
+| `.env` instalado | template público, **sem `api_key`** (Contrato B não usa) |
+| Contrato C sem `api_key` | build **recusa em 2 s** (fail-fast, antes de qualquer PyInstaller) |
+| Primeira execução do `PrintGestAPI.exe` | initdb → start → createdb → migrations (head `d7a1c4e8b2f3`, 37 tabelas) → bootstrap → uvicorn em **18,2 s** |
+| `GET /health` / `GET /v1/licenca` | 200 / `nao_ativada` com `contrato: b` (gate de serial antes do login) |
 | Log em arquivo (`logs/printgest-api.log`) | migrations e requisições registradas |
 | Segunda execução (cluster quente) | servindo em **4,5 s** |
 | Desinstalação (`unins000.exe /VERYSILENT`) | daemon encerrado, PostgreSQL parado, app/atalhos/registro removidos |
+| Ambiente de dev após a bateria | backend :8000 e PostgreSQL :5432 no ar e saudáveis |
 
 Bugs achados e corrigidos nessa bateria: exe windowed travava no startup
 (uvicorn/logging sem stderr) → daemon agora é `console=True` lançado com
