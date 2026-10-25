@@ -63,6 +63,10 @@ CORES = {
     "erro-container": "#FCEEEE",
     "erro-borda": "#F2B8BC",
     "focus": "#0071E3",
+    # Revisão da tela de ativação (out/2026): texto de ação sobre o canvas
+    # (4,34:1 do primary ficava abaixo de 4,5:1) e borda de campo >= 3:1.
+    "acao": "#0066CC",           # links/botões de texto sobre canvas (5,1:1)
+    "borda-campo": "#8E8E93",     # borda de campo da ativação (3,3:1 no branco)
 }
 
 _QSS = """
@@ -609,6 +613,44 @@ QPushButton[role="ghost"] { border: none; color: %texto-muted%; }
 QPushButton[role="ghost"]:hover { color: %erro%; background-color: %erro-container%; }
 
 QWidget#rodape { background-color: %surface%; border-top: 1px solid %borda%; }
+
+/* ============== Tela de Ativação (revisão out/2026) =====================
+   Escopo por objectName/property: nada aqui alcança as demais telas.
+   Tipografia: título 24/700, rótulo 13/600 (sentence case), auxiliar 12/400. */
+QLabel#tituloAtivacao { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+QLabel#tituloSucesso { font-size: 20px; font-weight: 700; }
+QLabel#rotuloCampo { font-size: 13px; font-weight: 600; color: %texto%; }
+QLabel#ajudaCampo { font-size: 12px; font-weight: 400; color: %texto-muted%; }
+QLabel#erroCampo { font-size: 12px; font-weight: 400; color: %erro%; }
+QLabel#statusServidor { font-size: 12px; font-weight: 400; }
+
+/* Ações de texto (Sair/Cancelar/Detalhes/Tentar): plano, no azul de ação
+   legível sobre o canvas (5,1:1). */
+QPushButton#botaoFlat {
+    background: transparent;
+    border: none;
+    color: %acao%;
+    font-weight: 600;
+    padding: 6px 8px;
+}
+QPushButton#botaoFlat:hover { color: %acao%; background-color: %surface-muted%; border-radius: 6px; }
+QPushButton#botaoFlat:disabled { color: %borda-forte%; }
+
+/* Indicador de progresso (D1): pontos de 8 px, sem cara de botão. */
+QLabel[passo="pendente"] { background-color: %borda%; border-radius: 4px; }
+QLabel[passo="atual"] { background-color: %primary%; border-radius: 4px; }
+QLabel[passo="feito"] { background-color: %sucesso%; border-radius: 4px; }
+
+/* Campos da ativação: borda >= 3:1 (A3), anel de foco de 2 px e estado de
+   erro — o padding compensa o pixel extra da borda para não tremer. */
+QLineEdit[formAtivacao="true"] { border: 1px solid %borda-campo%; }
+QLineEdit[formAtivacao="true"]:hover { border: 1px solid %texto-muted%; }
+QLineEdit[formAtivacao="true"]:focus { border: 2px solid %focus%; padding: 7px 9px; }
+QLineEdit[formAtivacao="true"][estado="erro"] { border: 2px solid %erro%; padding: 7px 9px; }
+
+/* Barra indeterminada da validação (D2) — só nesta tela. */
+QProgressBar#barraAtiva { background-color: %surface-muted%; border: none; border-radius: 2px; }
+QProgressBar#barraAtiva::chunk { background-color: %primary%; border-radius: 2px; }
 """
 
 

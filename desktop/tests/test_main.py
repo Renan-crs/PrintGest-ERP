@@ -87,7 +87,8 @@ def test_iniciar_sem_licenca_abre_ativacao_antes_do_login(app, monkeypatch):
 
     assert isinstance(roteador._janela, AtivacaoWindow)
     assert roteador._janela._token is None  # ativação antes de autenticar
-    assert _REQUISICOES == ["/v1/licenca"]
+    # D3: a tela também faz o diagnóstico automático do servidor local.
+    assert _REQUISICOES == ["/v1/licenca", "/health"]
 
 
 def test_iniciar_com_licenca_ja_ativada_nao_pede_serial(app, monkeypatch):

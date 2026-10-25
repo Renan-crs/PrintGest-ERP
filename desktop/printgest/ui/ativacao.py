@@ -1,40 +1,57 @@
-"""Tela 1.2 — Ativação de Licença do Sistema (PrintGest ERP).
+"""Tela 1.2 — Ativação de Licença (primeira execução, modo Servidor).
 
-O usuário digita a **chave de produto** (`XXXX-XXXX-XXXX-XXXX`) entregue na
-contratação. O on-premise valida a chave online no RedGest (Contrato C,
-`/api/v1/licencas-software/validar/`) e guarda a licença local; a partir daí a
-revalidação acontece em segundo plano.
+Coluna única centralizada (revisão UI/UX out/2026 — docs/revisao_tela_ativacao.md):
+- três ações com rótulo visível, altura >= 40 px e atalho no próprio texto;
+- formulário dinâmico pelo contrato ativo (PRD §5.1): B = CNPJ + código,
+  C = chave de produto XXXX-XXXX-XXXX-XXXX;
+- validação em linha (dígito verificador do CNPJ) e erro junto do campo;
+- progresso não interativo "Passo X de 3" (D1); ao ativar, resumo + Entrar;
+- PT-BR sem jargão na superfície (C2/C4); detalhes técnicos recolhidos e
+  diagnóstico do servidor local automático (D3).
+
+Regras preservadas (PRD §4/§5.1): F10 ativa, Esc sai (com confirmação), timeout
+de ativação >= 90 s no cliente (`Api.TIMEOUT_ATIVACAO_SEGUNDOS`) e nenhuma
+revogação por indisponibilidade — tratada pelo servidor (503 nunca revoga).
 """
 
 from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtGui import QColor, QKeySequence, QPalette, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
-    QPlainTextEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
     QSizePolicy,
-    QSpacerItem,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from printgest.core.api import Api
 from printgest.core.tarefas import rodar
-from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
+from printgest.ui.widgets import aplicar_estilo, formatar_datahora
 
 _FORMATO_CHAVE = re.compile(r"^[0-9A-F]{4}(-[0-9A-F]{4}){3}$")
 
-_PASSOS = [
-    ("Chave de Produto", "4 blocos hexadecimais"),
-    ("Validação Online", "Confirmação no servidor"),
-    ("Sistema Liberado", "Sincronização balcão"),
-]
+# Passos (D1): indicador não interativo — texto + pontos, sem cara de botão.
+_PASSOS_B = ["Dados da licença", "Validação online", "Sistema liberado"]
+_PASSOS_C = ["Chave de produto", "Validação online", "Sistema liberado"]
+
+# Marca provisória (até existir logotipo vetorial do produto): "P" em quadrado
+# arredondado no azul do sistema — desenhada em código, sem emoji (E2/A7).
+_MARCA_FUNDO = "#0071E3"
+_MARCA_TEXTO = "#FFFFFF"
+
+# Espaçamentos da escala 4/8/16/24 (B1): rótulo→campo 4, entre grupos 24.
+_GAP_ROTULO_CAMPO = 4
+_GAP_ENTRE_GRUPOS = 24
 
 
 class AtivacaoWindow(QMainWindow):
@@ -48,276 +65,392 @@ class AtivacaoWindow(QMainWindow):
         self._api = api
         self._token = token
         self._contrato_b = (contrato or "c").strip().lower() == "b"
-        self.setWindowTitle("PrintGest ERP - Ativação de Licença")
-        self.setMinimumSize(1024, 720)
+        self._passo = 1
+        self._validando = False
+        self._cancelado = False
+        self.setWindowTitle("PrintGest ERP — Ativação de licença")
+        self.setMinimumSize(960, 640)
 
-        # Container principal centralizado
         base = QWidget()
-        main_layout = QVBoxLayout(base)
-        main_layout.setContentsMargins(40, 40, 40, 40)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        externa = QVBoxLayout(base)
+        externa.setContentsMargins(48, 40, 48, 24)
+        externa.addStretch(3)
 
-        # --- CABEÇALHO (Boas-vindas) ---
-        header = QVBoxLayout()
-        header.setSpacing(10)
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Coluna de largura fixa, centralizada como BLOCO: itens sem alinhamento
+        # por-item para o heightForWidth dos labels com quebra funcionar (A2).
+        bloco = QWidget()
+        bloco.setMaximumWidth(560)
+        coluna = QVBoxLayout(bloco)
+        coluna.setContentsMargins(0, 0, 0, 0)
+        coluna.setSpacing(8)
 
-        logo_placeholder = QLabel("🛡️")
-        logo_placeholder.setStyleSheet("font-size: 48px; margin-bottom: 10px;")
-        logo_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.addWidget(logo_placeholder)
-
-        titulo = QLabel("Bem-vindo ao PrintGest ERP")
-        titulo.setObjectName("titulo")
-        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.addWidget(titulo)
-
-        if self._contrato_b:
-            subtitulo = QLabel(
-                "Para liberar o acesso às estações de trabalho da sua gráfica,\n"
-                "por favor, informe o CNPJ e o código da licença enviados pelo RedGest."
-            )
-        else:
-            subtitulo = QLabel(
-                "Para liberar o acesso às estações de trabalho da sua gráfica,\n"
-                "por favor, informe a chave de produto entregue na contratação."
-            )
-        subtitulo.setObjectName("subtitulo")
-        subtitulo.setWordWrap(True)
-        subtitulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.addWidget(subtitulo)
-        
-        main_layout.addLayout(header)
-        main_layout.addSpacing(30)
-
-        # --- ÁREA CENTRAL (Formulário + Info) ---
-        content = QHBoxLayout()
-        content.setSpacing(40)
-        
-        # Coluna do Formulário
-        form_col = QVBoxLayout()
-        form_col.setSpacing(20)
-        
-        self._stepper_widget = self._stepper()
-        form_col.addWidget(self._stepper_widget)
-        
-        form_card = self._painel_form()
-        form_col.addWidget(form_card)
-        
-        content.addLayout(form_col, 3)
-        
-        # Coluna de Informações (Onboarding)
-        info_col = QVBoxLayout()
-        info_col.setSpacing(20)
-        info_col.addWidget(self._painel_info())
-        info_col.addStretch(1)
-        
-        content.addLayout(info_col, 2)
-        
-        main_layout.addLayout(content)
-        main_layout.addStretch(1)
+        coluna.addWidget(self._marca(), 0, Qt.AlignmentFlag.AlignHCenter)
+        coluna.addSpacing(8)
+        coluna.addWidget(self._titulo())
+        coluna.addWidget(self._subtitulo())
+        coluna.addWidget(self._cabecalho_passo())
+        coluna.addWidget(self._cartao())
+        coluna.addWidget(self._painel_detalhes())
+        coluna.addLayout(self._rodape())
+        coluna.addSpacing(4)
+        coluna.addWidget(self._linha_tolerancia())
+        externa.addWidget(bloco, 0, Qt.AlignmentFlag.AlignHCenter)
+        externa.addStretch(4)
 
         self.setCentralWidget(base)
-        
-        # Atalhos e Foco
+
+        # Teclado e foco (A6/D5/F1).
         QShortcut(QKeySequence(Qt.Key.Key_F10), self, self._ativar)
-        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.saida.emit)
-        
+        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self._solicitar_saida)
+        self._definir_ordem_de_foco()
         if self._contrato_b:
             self._campo_cnpj.setFocus()
         else:
             self._campo_chave.setFocus()
 
-    # ------------------------------------------------------------------ helpers
+        # Diagnóstico do servidor local já ao abrir (D3).
+        self._testar()
 
-    def _stepper(self) -> QWidget:
+    # ------------------------------------------------------------ cabeçalho
+
+    @staticmethod
+    def _marca() -> QLabel:
+        pm = QPixmap(44, 44)
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(_MARCA_FUNDO))
+        p.drawRoundedRect(0, 0, 44, 44, 10, 10)
+        fonte = p.font()
+        fonte.setPointSizeF(19)
+        fonte.setBold(True)
+        p.setFont(fonte)
+        p.setPen(QColor(_MARCA_TEXTO))
+        p.drawText(QRect(0, -2, 44, 44), Qt.AlignmentFlag.AlignCenter, "P")
+        p.end()
+        lbl = QLabel()
+        lbl.setPixmap(pm)
+        lbl.setFixedSize(44, 44)
+        lbl.setAccessibleName("")  # decorativa (A7): o leitor de tela ignora
+        return lbl
+
+    @staticmethod
+    def _titulo() -> QLabel:
+        lbl = QLabel("Ativar o PrintGest")
+        lbl.setObjectName("tituloAtivacao")
+        return lbl
+
+    def _subtitulo(self) -> QLabel:
+        lbl = QLabel(
+            "Informe os dados da contratação para liberar este computador."
+        )
+        lbl.setObjectName("subtitulo")
+        lbl.setWordWrap(True)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        return lbl
+
+    def _cabecalho_passo(self) -> QWidget:
         caixa = QWidget()
-        painel = QHBoxLayout(caixa)
-        painel.setContentsMargins(0, 0, 0, 4)
-        painel.setSpacing(8)
-        self._passos_labels: list[QWidget] = []
-        for indice, (titulo, subtitulo) in enumerate(_PASSOS):
-            item = QVBoxLayout()
-            item.setSpacing(2)
-            cab = QHBoxLayout()
-            cab.addWidget(QLabel(str(indice + 1)))
-            titulo_lbl = QLabel(titulo)
-            cab.addWidget(titulo_lbl)
-            cab.addStretch(1)
-            item.addLayout(cab)
-            desc = QLabel(subtitulo)
-            desc.setObjectName("subtitulo")
-            item.addWidget(desc)
-            bloco = QWidget()
-            bloco.setLayout(item)
-            bloco.setObjectName("passo")
-            self._passos_labels.append(bloco)
-            painel.addWidget(bloco, 1)
-            if indice < len(_PASSOS) - 1:
-                barra = QWidget()
-                barra.setFixedHeight(1)
-                barra.setObjectName("divider")
-                painel.addWidget(barra, 0)
-        painel.addItem(QSpacerItem(10, 1, QSizePolicy.Policy.Expanding))
-        self._passo_atual = 0
-        self._marcar_passo(0)
+        linha = QHBoxLayout(caixa)
+        linha.setContentsMargins(0, 6, 0, 0)
+        linha.setSpacing(10)
+        linha.addStretch(1)  # texto + pontos centralizados no bloco
+        self._passo_texto = QLabel()
+        self._passo_texto.setObjectName("subtitulo")
+        linha.addWidget(self._passo_texto)
+        self._dots: list[QLabel] = []
+        for _ in range(3):
+            dot = QLabel()
+            dot.setFixedSize(8, 8)
+            dot.setProperty("passo", "pendente")
+            dot.setAccessibleName("")  # o texto "Passo X de 3" carrega o estado
+            self._dots.append(dot)
+            linha.addWidget(dot, 0, Qt.AlignmentFlag.AlignVCenter)
+        linha.addStretch(1)
+        self._definir_passo(1)
         return caixa
 
-    def _marcar_passo(self, indice: int) -> None:
-        self._passo_atual = indice
-        for i, bloco in enumerate(self._passos_labels):
-            ativo = i <= indice
-            bloco.setProperty("passoAtivo", ativo)
-            aplicar_estilo(bloco)
+    # --------------------------------------------------------- cartão/form
 
-    def _painel_form(self) -> QWidget:
+    def _cartao(self) -> QStackedWidget:
+        self._cartao = QStackedWidget()
+        self._cartao.setMaximumWidth(560)
+        self._cartao.addWidget(self._pagina_form())
+        self._cartao.addWidget(self._pagina_sucesso())
+        return self._cartao
+
+    def _pagina_form(self) -> QWidget:
         card = QWidget()
         card.setObjectName("card")
-        form = QVBoxLayout(card)
-        form.setContentsMargins(32, 32, 32, 32)
-        form.setSpacing(18)
+        corpo = QVBoxLayout(card)
+        corpo.setContentsMargins(24, 24, 24, 24)
+        corpo.setSpacing(_GAP_ROTULO_CAMPO)
 
         if self._contrato_b:
-            form.addWidget(self._rotulo("CNPJ da Empresa"))
-            self._campo_cnpj = QLineEdit()
-            self._campo_cnpj.setPlaceholderText("00.000.000/0000-00")
+            corpo.addWidget(self._rotulo("CNPJ da empresa"))
+            self._campo_cnpj = self._campo("CNPJ da empresa", "00.000.000/0000-00")
             self._campo_cnpj.textChanged.connect(self._manter_cnpj_formatado)
-            form.addWidget(self._campo_cnpj)
-
-            form.addWidget(self._rotulo("Código da Licença"))
-            self._campo_codigo = QLineEdit()
-            self._campo_codigo.setProperty("mono", "true")
-            self._campo_codigo.setPlaceholderText("Código enviado pelo RedGest")
-            form.addWidget(self._campo_codigo)
-
-            formato = QLabel(
-                "Para o Contrato B (RedGest v4.0), informe o CNPJ e o código da "
-                "licença. A ativação é online e associa o equipamento à licença."
+            self._campo_cnpj.editingFinished.connect(
+                lambda: self._validar_cnpj(silencioso_se_vazio=True)
             )
-            formato.setObjectName("subtitulo")
-            formato.setWordWrap(True)
-            formato.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            form.addWidget(formato)
+            self._campo_cnpj.returnPressed.connect(self._ativar)
+            self._erro_cnpj = self._rotulo_erro()
+            corpo.addWidget(self._campo_cnpj)
+            corpo.addWidget(self._erro_cnpj)
+
+            corpo.addSpacing(_GAP_ENTRE_GRUPOS)
+            corpo.addWidget(self._rotulo("Código da licença"))
+            self._campo_codigo = self._campo(
+                "Código da licença", "Informe o código da contratação"
+            )
+            self._campo_codigo.returnPressed.connect(self._ativar)
+            self._erro_codigo = self._rotulo_erro()
+            corpo.addWidget(self._campo_codigo)
+            corpo.addWidget(self._erro_codigo)
+            ajuda = "A ativação acontece uma única vez e precisa de internet."
         else:
-            form.addWidget(self._rotulo("Chave de Produto"))
-            self._campo_chave = QLineEdit()
-            self._campo_chave.setMaxLength(19)
-            self._campo_chave.setProperty("mono", "true")
-            self._campo_chave.setPlaceholderText("XXXX-XXXX-XXXX-XXXX")
-            self._campo_chave.textChanged.connect(self._manter_chave_formatada)
-            form.addWidget(self._campo_chave)
-            formato = QLabel(
-                "A chave tem 16 caracteres hexadecimais (4 blocos de 4, separados por "
-                "hífen) e é validada online no servidor de licenças."
+            corpo.addWidget(self._rotulo("Chave de produto"))
+            self._campo_chave = self._campo(
+                "Chave de produto", "XXXX-XXXX-XXXX-XXXX", mono=True, maximo=19
             )
-            formato.setObjectName("subtitulo")
-            formato.setWordWrap(True)
-            formato.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            form.addWidget(formato)
+            self._campo_chave.textChanged.connect(self._manter_chave_formatada)
+            self._campo_chave.returnPressed.connect(self._ativar)
+            self._erro_chave = self._rotulo_erro()
+            corpo.addWidget(self._campo_chave)
+            corpo.addWidget(self._erro_chave)
+            ajuda = "Cole a chave com 4 blocos enviada na contratação."
 
+        corpo.addSpacing(_GAP_ENTRE_GRUPOS)
+        lbl_ajuda = QLabel(ajuda)
+        lbl_ajuda.setObjectName("ajudaCampo")
+        lbl_ajuda.setWordWrap(True)
+        lbl_ajuda.setAccessibleName(f"Ajuda: {ajuda}")
+        corpo.addWidget(lbl_ajuda)
+
+        # Erro geral (mensagem do servidor) — junto dos campos (C6).
         self._erro = QLabel("")
-        self._erro.setProperty("role", "error")
+        self._erro.setObjectName("erroCampo")
         self._erro.setWordWrap(True)
-        self._erro.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        form.addWidget(self._erro)
+        corpo.addWidget(self._erro)
 
-        form.addStretch(1)
+        self._linha_validando = self._linha_de_validacao()
+        self._linha_validando.setVisible(False)
+        corpo.addWidget(self._linha_validando)
 
-        # Ações principais com hierarquia clara
-        btn_ativar = botao_com_atalho("Validar e Ativar Licença", "F10", "primary")
-        btn_ativar[1].clicked.connect(self._ativar)
-        form.addWidget(btn_ativar[0])
+        corpo.addStretch(1)
 
-        btn_testar = botao_com_atalho("Testar Local API Service", None, "secondary")
-        btn_testar[1].clicked.connect(self._testar)
-        form.addWidget(btn_testar[0])
-
-        btn_sair = botao_com_atalho("Sair", "Esc", "muted")
-        btn_sair[1].clicked.connect(self.saida.emit)
-        form.addWidget(btn_sair[0])
-
-        self._botao_ativar = btn_ativar[1]
-        self._botao_testar = btn_testar[1]
+        # Ações (A1/B2): Sair à esquerda, primário à direita, altura >= 40 px.
+        acoes = QHBoxLayout()
+        acoes.setSpacing(8)
+        self._botao_sair = self._botao("Sair (Esc)", plano="flat")
+        self._botao_sair.clicked.connect(self._solicitar_saida)
+        acoes.addWidget(self._botao_sair)
+        acoes.addStretch(1)
+        self._botao_testar = self._botao("Testar conexão", plano="secondary")
+        self._botao_testar.clicked.connect(self._testar)
+        acoes.addWidget(self._botao_testar)
+        self._botao_ativar = self._botao("Ativar licença (F10)", plano="primary")
+        self._botao_ativar.clicked.connect(self._ativar)
+        acoes.addWidget(self._botao_ativar)
+        corpo.addLayout(acoes)
         return card
 
-    def _painel_info(self) -> QWidget:
-        painel = QVBoxLayout()
-        painel.setSpacing(12)
+    def _linha_de_validacao(self) -> QWidget:
+        """Indicador indeterminado + texto + Cancelar (D2)."""
+        caixa = QWidget()
+        linha = QHBoxLayout(caixa)
+        linha.setContentsMargins(0, 8, 0, 0)
+        linha.setSpacing(10)
+        barra = QProgressBar()
+        barra.setObjectName("barraAtiva")
+        barra.setRange(0, 0)
+        barra.setFixedHeight(4)
+        barra.setFixedWidth(90)
+        barra.setAccessibleName("Validando com o servidor de licenças")
+        linha.addWidget(barra)
+        texto = QLabel("Validando com o servidor de licenças…")
+        texto.setObjectName("ajudaCampo")
+        linha.addWidget(texto, 1)
+        self._botao_cancelar = self._botao("Cancelar", plano="flat")
+        self._botao_cancelar.clicked.connect(self._cancelar_validacao)
+        linha.addWidget(self._botao_cancelar)
+        return caixa
 
-        nodo = QWidget()
-        nodo.setObjectName("cardLow")
-        nodo_l = QVBoxLayout(nodo)
-        nodo_l.setContentsMargins(16, 14, 16, 14)
-        nodo_l.setSpacing(6)
-        cab = QHBoxLayout()
-        nodo_titulo = QLabel("Função de Nó da Estação de Trabalho")
-        nodo_titulo.setStyleSheet("font-weight: 700;")
-        cab.addWidget(nodo_titulo)
-        cab.addWidget(badge("HOST PRINCIPAL", "primary"))
-        cab.addStretch(1)
-        nodo_l.addLayout(cab)
-        texto_nodo = QPlainTextEdit()
-        texto_nodo.setProperty("role", "muted")
-        texto_nodo.setPlainText(
-            "Esta máquina atuará como Servidor Local "
-            "(Local API Service + PostgreSQL embarcado) atendendo até 5 estações "
-            "locais simultâneas de balcão e produção."
+    # -------------------------------------------------------- página sucesso
+
+    def _pagina_sucesso(self) -> QWidget:
+        card = QWidget()
+        card.setObjectName("card")
+        corpo = QVBoxLayout(card)
+        corpo.setContentsMargins(24, 28, 24, 24)
+        corpo.setSpacing(8)
+
+        self._sucesso_titulo = QLabel("Licença ativada neste computador.")
+        self._sucesso_titulo.setObjectName("tituloSucesso")
+        self._sucesso_titulo.setWordWrap(True)
+        corpo.addWidget(self._sucesso_titulo)
+
+        self._sucesso_resumo = QLabel("")
+        self._sucesso_resumo.setObjectName("subtitulo")
+        self._sucesso_resumo.setWordWrap(True)
+        corpo.addWidget(self._sucesso_resumo)
+
+        nota = QLabel("Este computador agora é o servidor da sua gráfica.")
+        nota.setObjectName("ajudaCampo")
+        nota.setWordWrap(True)
+        corpo.addWidget(nota)
+
+        corpo.addStretch(1)
+        self._botao_entrar = self._botao("Entrar", plano="primary")
+        self._botao_entrar.setMinimumWidth(180)
+        self._botao_entrar.clicked.connect(self.ativada.emit)
+        linha = QHBoxLayout()
+        linha.addStretch(1)
+        linha.addWidget(self._botao_entrar)
+        corpo.addLayout(linha)
+        return card
+
+    # ------------------------------------------------ detalhes técnicos (C2)
+
+    def _painel_detalhes(self) -> QWidget:
+        self._painel_detalhes = QWidget()
+        self._painel_detalhes.setObjectName("card")
+        self._painel_detalhes.setMaximumWidth(560)
+        corpo = QVBoxLayout(self._painel_detalhes)
+        corpo.setContentsMargins(20, 18, 20, 18)
+        corpo.setSpacing(8)
+
+        c1 = QLabel("Este computador")
+        c1.setObjectName("rotuloCampo")
+        corpo.addWidget(c1)
+        t1 = QLabel(
+            "Este computador será o servidor da sua gráfica: guarda o banco de "
+            "dados e atende até 5 estações de trabalho do balcão e da produção."
         )
-        texto_nodo.setReadOnly(True)
-        texto_nodo.setMaximumHeight(84)
-        nodo_l.addWidget(texto_nodo)
-        painel.addWidget(nodo)
+        t1.setObjectName("ajudaCampo")
+        t1.setWordWrap(True)
+        corpo.addWidget(t1)
 
-        modelo = QWidget()
-        modelo.setObjectName("card")
-        modelo_l = QVBoxLayout(modelo)
-        modelo_l.setContentsMargins(16, 14, 16, 14)
-        modelo_l.setSpacing(8)
-        cab_m = QHBoxLayout()
-        titulo_m = QLabel("Como funciona o Licenciamento por Chave de Produto")
-        titulo_m.setStyleSheet("font-weight: 700;")
-        cab_m.addWidget(titulo_m)
-        cab_m.addStretch(1)
-        modelo_l.addLayout(cab_m)
-        modelo_l.addWidget(badge("Tolerância Offline: 72 Horas", "atencao"))
-        texto_m = QPlainTextEdit()
-        texto_m.setProperty("role", "muted")
-        texto_m.setPlainText(
-            "A ativação é 100% online: o Local API Service confirma a chave no "
-            "servidor de licenças e guarda a licença nesta máquina. A revalidação "
-            "roda em segundo plano. Em caso de oscilação ou queda temporária de "
-            "internet, o sistema opera normalmente por até 72 horas em tolerância "
-            "offline, sem travar vendas no balcão ou emissão de cupons."
+        c2 = QLabel("Sobre a licença")
+        c2.setObjectName("rotuloCampo")
+        corpo.addWidget(c2)
+        t2 = QLabel(
+            "A licença é validada pela internet, uma única vez. O sistema "
+            "confere periodicamente a situação do contrato com o servidor de "
+            "licenças do fabricante."
         )
-        texto_m.setReadOnly(True)
-        texto_m.setMaximumHeight(132)
-        modelo_l.addWidget(texto_m)
-        painel.addWidget(modelo)
+        t2.setObjectName("ajudaCampo")
+        t2.setWordWrap(True)
+        corpo.addWidget(t2)
+        self._painel_detalhes.setVisible(False)
+        return self._painel_detalhes
 
-        ping = QWidget()
-        ping.setObjectName("cardLow")
-        ping_l = QHBoxLayout(ping)
-        ping_l.setContentsMargins(16, 10, 16, 10)
-        self._status = QLabel("Endpoint: 127.0.0.1:8000/health (não testado)")
-        self._status.setProperty("role", "muted")
-        ping_l.addWidget(self._status)
-        ping_l.addStretch(1)
-        painel.addWidget(ping)
+    # -------------------------------------------------------------- rodapé
 
-        painel.addStretch(1)
-        wrapper = QWidget()
-        wrapper.setLayout(painel)
-        return wrapper
+    def _rodape(self) -> QHBoxLayout:
+        rodape = QHBoxLayout()
+        rodape.setContentsMargins(4, 12, 4, 0)
+        rodape.setSpacing(10)
+        self._status = QLabel("Servidor local: testando…")
+        self._status.setObjectName("statusServidor")
+        rodape.addWidget(self._status)
+        self._botao_tentar = self._botao("Tentar novamente", plano="flat")
+        self._botao_tentar.clicked.connect(self._testar)
+        rodape.addWidget(self._botao_tentar)
+        rodape.addStretch(1)
+        self._botao_detalhes = self._botao("Detalhes técnicos ▸", plano="flat")
+        self._botao_detalhes.setCheckable(True)
+        self._botao_detalhes.toggled.connect(self._alternar_detalhes)
+        rodape.addWidget(self._botao_detalhes)
+        return rodape
+
+    def _alternar_detalhes(self, aberto: bool) -> None:
+        self._painel_detalhes.setVisible(aberto)
+        self._botao_detalhes.setText("Detalhes técnicos ▾" if aberto else "Detalhes técnicos ▸")
+
+    @staticmethod
+    def _linha_tolerancia() -> QLabel:
+        # C8: texto neutro — a tolerância offline é uma garantia, não alerta.
+        lbl = QLabel(
+            "Se a internet cair, o sistema continua funcionando por até 72 horas."
+        )
+        lbl.setObjectName("ajudaCampo")
+        lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        return lbl
+
+    # ------------------------------------------------------- helpers visuais
 
     @staticmethod
     def _rotulo(texto: str) -> QLabel:
-        label = QLabel(texto.upper())
-        label.setObjectName("labelForm")
-        return label
+        lbl = QLabel(texto)  # sentence case, 13 px/600 (A4)
+        lbl.setObjectName("rotuloCampo")
+        return lbl
+
+    @staticmethod
+    def _rotulo_erro() -> QLabel:
+        lbl = QLabel("")
+        lbl.setObjectName("erroCampo")
+        lbl.setWordWrap(True)
+        lbl.hide()
+        return lbl
+
+    @staticmethod
+    def _campo(rotulo: str, placeholder: str, mono: bool = False, maximo: int = 200) -> QLineEdit:
+        ed = QLineEdit()
+        ed.setPlaceholderText(placeholder)
+        ed.setProperty("formAtivacao", "true")
+        if mono:
+            ed.setProperty("mono", "true")
+        ed.setMaxLength(maximo)
+        ed.setMinimumHeight(40)
+        ed.setAccessibleName(rotulo)
+        # Placeholder no cinza secundário (A3): 5,1:1 sobre branco.
+        paleta = ed.palette()
+        paleta.setColor(QPalette.ColorRole.PlaceholderText, QColor("#6E6E73"))
+        ed.setPalette(paleta)
+        return ed
+
+    @staticmethod
+    def _botao(texto: str, plano: str = "") -> QPushButton:
+        b = QPushButton(texto)
+        b.setMinimumHeight(40)  # A1: alvo de toque >= 40 px
+        b.setAccessibleName(texto)
+        if plano == "primary":
+            b.setProperty("role", "primary")
+        elif plano == "secondary":
+            b.setProperty("role", "secondary")
+        else:
+            b.setObjectName("botaoFlat")
+        return b
+
+    def _definir_ordem_de_foco(self) -> None:
+        if self._contrato_b:
+            self.setTabOrder(self._campo_cnpj, self._campo_codigo)
+            self.setTabOrder(self._campo_codigo, self._botao_ativar)
+        else:
+            self.setTabOrder(self._campo_chave, self._botao_ativar)
+        self.setTabOrder(self._botao_ativar, self._botao_testar)
+        self.setTabOrder(self._botao_testar, self._botao_sair)
+        self.setTabOrder(self._botao_sair, self._botao_detalhes)
+        self.setTabOrder(self._botao_detalhes, self._botao_tentar)
+
+    # --------------------------------------------------------------- passos
+
+    def _definir_passo(self, passo: int) -> None:
+        self._passo = passo
+        nomes = _PASSOS_B if self._contrato_b else _PASSOS_C
+        self._passo_texto.setText(f"Passo {passo} de 3 · {nomes[passo - 1]}")
+        for i, dot in enumerate(self._dots):
+            estado = "feito" if i < passo - 1 else ("atual" if i == passo - 1 else "pendente")
+            if dot.property("passo") != estado:
+                dot.setProperty("passo", estado)
+                aplicar_estilo(dot)
+
+    # --------------------------------------------------------- máscaras (D4)
 
     @staticmethod
     def _formatar_cnpj(texto: str) -> str:
-        """Aplica máscara de CNPJ: 00.000.000/0000-00."""
         bruto = "".join(c for c in texto if c.isdigit())[:14]
         if len(bruto) <= 2:
             return bruto
@@ -330,12 +463,11 @@ class AtivacaoWindow(QMainWindow):
         return f"{bruto[:2]}.{bruto[2:5]}.{bruto[5:8]}/{bruto[8:12]}-{bruto[12:]}"
 
     def _manter_cnpj_formatado(self, texto: str) -> None:
-        """Mantém o CNPJ formatado sem roubar o cursor."""
         formatado = self._formatar_cnpj(texto)
+        self._limpar_erro_campo(self._campo_cnpj, self._erro_cnpj)
         if formatado == texto:
             return
         posicao = self._campo_cnpj.cursorPosition()
-        # Cálculo simplificado de deslocamento para máscara
         self._campo_cnpj.blockSignals(True)
         self._campo_cnpj.setText(formatado)
         self._campo_cnpj.blockSignals(False)
@@ -343,16 +475,12 @@ class AtivacaoWindow(QMainWindow):
 
     @staticmethod
     def _formatar_chave(texto: str) -> str:
-
-        """Normaliza para hexadecimais maiúsculos com hífens a cada 4 caracteres."""
         bruto = "".join(c for c in texto.upper() if c in "0123456789ABCDEF")[:16]
         return "-".join(bruto[i : i + 4] for i in range(0, len(bruto), 4))
 
     def _manter_chave_formatada(self, texto: str) -> None:
-        """Mantém a chave em XXXX-XXXX-XXXX-XXXX sem roubar o cursor (P5)."""
-        if not hasattr(self, "_campo_chave"):
-            return
         formatado = self._formatar_chave(texto)
+        self._limpar_erro_campo(self._campo_chave, self._erro_chave)
         if formatado == texto:
             return
         posicao = self._campo_chave.cursorPosition()
@@ -364,98 +492,214 @@ class AtivacaoWindow(QMainWindow):
             max(0, min(len(formatado), posicao + deslocamento))
         )
 
-    # --------------------------------------------------------------- ações
+    # ------------------------------------------------------- validação (C6)
+
+    @staticmethod
+    def _cnpj_valido(cnpj: str) -> bool:
+        """Dígito verificador do CNPJ (D4) — rejeita sequências repetidas."""
+        digitos = "".join(c for c in cnpj if c.isdigit())
+        if len(digitos) != 14 or len(set(digitos)) == 1:
+            return False
+        pesos = (5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)
+
+        def digito(base: str, pesos_base: tuple) -> str:
+            soma = sum(int(d) * p for d, p in zip(base, pesos_base))
+            resto = soma % 11
+            return "0" if resto < 2 else str(11 - resto)
+
+        d1 = digito(digitos[:12], pesos)
+        d2 = digito(digitos[:12] + d1, (6,) + pesos)
+        return digitos[12:] == d1 + d2
+
+    @staticmethod
+    def _limpar_erro_campo(campo: QLineEdit, rotulo: QLabel) -> None:
+        rotulo.setText("")
+        rotulo.hide()
+        if campo.property("estado") == "erro":
+            campo.setProperty("estado", "")
+            aplicar_estilo(campo)
+
+    @staticmethod
+    def _marcar_erro_campo(campo: QLineEdit, rotulo: QLabel, msg: str) -> None:
+        rotulo.setText(msg)
+        rotulo.show()
+        campo.setProperty("estado", "erro")
+        aplicar_estilo(campo)
+        campo.setFocus()
+
+    def _validar_cnpj(self, silencioso_se_vazio: bool = False) -> bool:
+        digitos = "".join(c for c in self._campo_cnpj.text() if c.isdigit())
+        if not digitos:
+            if silencioso_se_vazio:
+                self._limpar_erro_campo(self._campo_cnpj, self._erro_cnpj)
+                return False
+            self._marcar_erro_campo(
+                self._campo_cnpj, self._erro_cnpj, "Informe o CNPJ da empresa."
+            )
+            return False
+        if not self._cnpj_valido(self._campo_cnpj.text()):
+            self._marcar_erro_campo(
+                self._campo_cnpj,
+                self._erro_cnpj,
+                "CNPJ inválido — confira os 14 dígitos.",
+            )
+            return False
+        self._limpar_erro_campo(self._campo_cnpj, self._erro_cnpj)
+        return True
+
+    # -------------------------------------------------------- conexão (D3)
 
     def _testar(self) -> None:
         self._botao_testar.setEnabled(False)
-        self._status.setText("Testando Local API Service…")
+        self._status.setText("Servidor local: testando…")
+        self._status.setProperty("role", "")
+        aplicar_estilo(self._status)
 
         def ok(resultado) -> None:
             self._botao_testar.setEnabled(True)
             if resultado:
-                self._status.setText("● Local API Service respondendo — HTTP 200 OK")
+                self._status.setText("Servidor local: conectado")
                 self._status.setProperty("role", "success")
             else:
-                self._status.setText("● Sem resposta do Local API Service — verifique o daemon")
+                self._status.setText("Servidor local: sem resposta")
                 self._status.setProperty("role", "error")
             aplicar_estilo(self._status)
 
         def erro(_) -> None:
             self._botao_testar.setEnabled(True)
-            self._status.setText("● Sem resposta do Local API Service — verifique o daemon")
+            self._status.setText("Servidor local: sem resposta")
             self._status.setProperty("role", "error")
             aplicar_estilo(self._status)
 
         rodar(self._api.testar_comunicacao, ok, erro)
 
-    def _ativar(self) -> None:
+    # --------------------------------------------------------- saída (D5)
+
+    def _solicitar_saida(self) -> None:
+        if self._validando:
+            return  # durante a validação, Esc não abandona o fluxo sem querer
+        resposta = QMessageBox.question(
+            self,
+            "Sair do PrintGest",
+            "Sair do PrintGest? A licença ainda não foi ativada neste computador.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if resposta == QMessageBox.StandardButton.Yes:
+            self.saida.emit()
+
+    # ------------------------------------------------------ validação (D2)
+
+    def _entrar_em_validacao(self) -> None:
+        self._validando = True
+        self._cancelado = False
+        self._erro.setText("")
+        self._linha_validando.setVisible(True)
+        self._botao_ativar.setEnabled(False)
+        self._botao_ativar.setText("Validando…")
+        for campo in self._campos_do_contrato():
+            campo.setEnabled(False)
+
+    def _sair_da_validacao(self) -> None:
+        self._validando = False
+        self._linha_validando.setVisible(False)
+        self._botao_ativar.setEnabled(True)
+        self._botao_ativar.setText("Ativar licença (F10)")
+        for campo in self._campos_do_contrato():
+            campo.setEnabled(True)
+
+    def _cancelar_validacao(self) -> None:
+        """Devolve o formulário ao usuário; o resultado ainda é aplicado.
+
+        O pedido HTTP não é abortado (a thread do `rodar` não expõe cancelamento
+        cooperativo) — se a ativação chegar com sucesso, ela é válida e entra.
+        Cancelar devolve apenas o controle da janela (limitação documentada).
+        """
+        if not self._validando:
+            return
+        self._cancelado = True
+        self._sair_da_validacao()
+
+    def _campos_do_contrato(self) -> list[QLineEdit]:
         if self._contrato_b:
-            cnpj = self._campo_cnpj.text().strip()
-            codigo = self._campo_codigo.text().strip()
-            if not cnpj:
-                self._erro.setText("Informe o CNPJ da empresa.")
+            return [self._campo_cnpj, self._campo_codigo]
+        return [self._campo_chave]
+
+    # --------------------------------------------------------- ativar (F1)
+
+    def _ativar(self) -> None:
+        if self._validando:
+            return
+        if self._contrato_b:
+            if not self._validar_cnpj():
                 return
+            codigo = re.sub(r"\s+", "", self._campo_codigo.text().strip())
             if not codigo:
-                self._erro.setText("Informe o código da licença.")
+                self._marcar_erro_campo(
+                    self._campo_codigo, self._erro_codigo, "Informe o código da licença."
+                )
                 return
-            self._erro.setText("")
-            self._marcar_passo(1)
-            self._botao_ativar.setEnabled(False)
-            self._botao_ativar.setText("Validando online…")
+            self._limpar_erro_campo(self._campo_codigo, self._erro_codigo)
+            # Capturados na thread da UI: nada de tocar em widget fora dela.
+            cnpj = "".join(c for c in self._campo_cnpj.text() if c.isdigit())
+            self._entrar_em_validacao()
 
             def chamada():
                 return self._api.ativar_licenca(self._token, cnpj=cnpj, codigo=codigo)
 
-            def ok(_) -> None:
-                self._botao_ativar.setEnabled(True)
-                self._botao_ativar.setText("Validar e Ativar Licença Online")
-                self._marcar_passo(2)
-                self._erro.setProperty("role", "success")
-                self._erro.setText("Licença ativada! Carregando o sistema…")
-                aplicar_estilo(self._erro)
-                self.ativada.emit()
-
-            def erro(msg: str) -> None:
-                self._botao_ativar.setEnabled(True)
-                self._botao_ativar.setText("Validar e Ativar Licença Online")
-                self._marcar_passo(0)
-                self._erro.setProperty("role", "error")
-                self._erro.setText(msg)
-                aplicar_estilo(self._erro)
-
-            rodar(chamada, ok, erro)
+            self._disparar(chamada)
             return
 
         chave = self._campo_chave.text().strip().upper()
         if not _FORMATO_CHAVE.match(chave):
-            self._erro.setText(
-                "Informe a chave de produto completa (XXXX-XXXX-XXXX-XXXX)."
+            self._marcar_erro_campo(
+                self._campo_chave,
+                self._erro_chave,
+                "Informe a chave completa (XXXX-XXXX-XXXX-XXXX).",
             )
             return
-
-        self._erro.setText("")
-        self._marcar_passo(1)
-        self._botao_ativar.setEnabled(False)
-        self._botao_ativar.setText("Validando online…")
+        self._limpar_erro_campo(self._campo_chave, self._erro_chave)
+        self._entrar_em_validacao()
 
         def chamada():
             return self._api.ativar_licenca(self._token, chave)
 
-        def ok(_) -> None:
-            self._botao_ativar.setEnabled(True)
-            self._botao_ativar.setText("Validar e Ativar Licença Online")
-            self._marcar_passo(2)
-            self._erro.setProperty("role", "success")
-            self._erro.setText("Licença ativada! Carregando o sistema…")
-            aplicar_estilo(self._erro)
-            self.ativada.emit()
+        self._disparar(chamada)
+
+    def _disparar(self, chamada) -> None:
+        def ok(situacao) -> None:
+            # Licença ativada é fato consumado: aplica mesmo se o usuário
+            # tiver cancelado a espera (o pedido seguiu e teve sucesso).
+            self._sair_da_validacao()
+            self._definir_passo(3)
+            self._preencher_sucesso(situacao if isinstance(situacao, dict) else {})
+            self._cartao.setCurrentIndex(1)
 
         def erro(msg: str) -> None:
-            self._botao_ativar.setEnabled(True)
-            self._botao_ativar.setText("Validar e Ativar Licença Online")
-            self._marcar_passo(0)
-            self._erro.setProperty("role", "error")
+            self._sair_da_validacao()
+            self._definir_passo(1)
             self._erro.setText(msg)
-            aplicar_estilo(self._erro)
+            campo = self._campo_do_erro(msg)
+            if campo is not None:
+                campo.setFocus()
 
         rodar(chamada, ok, erro)
+
+    def _campo_do_erro(self, msg: str) -> QLineEdit | None:
+        """Foca o campo relacionado à mensagem do servidor, quando houver (C6)."""
+        m = msg.lower()
+        if "cnpj" in m:
+            return self._campo_cnpj
+        if "código" in m or "codigo" in m:
+            return self._campo_codigo if self._contrato_b else None
+        return None
+
+    def _preencher_sucesso(self, situacao: dict) -> None:
+        plano = str(situacao.get("plano") or "").strip()
+        validade = formatar_datahora(situacao.get("expira_em"))
+        partes = []
+        if plano:
+            partes.append(f"Plano {plano}")
+        if validade:
+            partes.append(f"válido até {validade}")
+        self._sucesso_resumo.setText(" · ".join(partes))
