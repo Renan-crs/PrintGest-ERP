@@ -476,6 +476,31 @@ class AtivacaoWindow(QMainWindow):
     # --------------------------------------------------------- máscaras (D4)
 
     @staticmethod
+    def _ancorar_cursor(
+        campo: QLineEdit, posicao: int, antigo: str, formatado: str
+    ) -> None:
+        """Posiciona o cursor após os mesmos caracteres de CONTEÚDO de antes.
+
+        Separadores (`.`, `/`, `-`) não são conteúdo: inseri-los não pode
+        mover o ponto de digitação — era isso que embaralhava o CNPJ
+        (32.667.694/0001-01 virava 32.676.400/1010-96). Serve também para a
+        chave (letras A–F contam como conteúdo). `posicao` é capturada ANTES
+        do `setText`, senão a posição original já se perdeu.
+        """
+        conteudo_antes = sum(1 for c in antigo[:posicao] if c not in "./-")
+        if conteudo_antes <= 0:
+            campo.setCursorPosition(0)
+            return
+        contador = 0
+        for i, caractere in enumerate(formatado):
+            if caractere not in "./-":
+                contador += 1
+                if contador == conteudo_antes:
+                    campo.setCursorPosition(i + 1)
+                    return
+        campo.setCursorPosition(len(formatado))  # além do conteúdo: fim do texto
+
+    @staticmethod
     def _formatar_cnpj(texto: str) -> str:
         bruto = "".join(c for c in texto if c.isdigit())[:14]
         if len(bruto) <= 2:
@@ -493,11 +518,11 @@ class AtivacaoWindow(QMainWindow):
         self._limpar_erro_campo(self._campo_cnpj, self._erro_cnpj)
         if formatado == texto:
             return
-        posicao = self._campo_cnpj.cursorPosition()
+        posicao = self._campo_cnpj.cursorPosition()  # antes do setText (âncora)
         self._campo_cnpj.blockSignals(True)
         self._campo_cnpj.setText(formatado)
         self._campo_cnpj.blockSignals(False)
-        self._campo_cnpj.setCursorPosition(posicao)
+        self._ancorar_cursor(self._campo_cnpj, posicao, texto, formatado)
 
     @staticmethod
     def _formatar_chave(texto: str) -> str:
@@ -509,14 +534,11 @@ class AtivacaoWindow(QMainWindow):
         self._limpar_erro_campo(self._campo_chave, self._erro_chave)
         if formatado == texto:
             return
-        posicao = self._campo_chave.cursorPosition()
-        deslocamento = formatado.count("-") - texto.count("-")
+        posicao = self._campo_chave.cursorPosition()  # antes do setText (âncora)
         self._campo_chave.blockSignals(True)
         self._campo_chave.setText(formatado)
         self._campo_chave.blockSignals(False)
-        self._campo_chave.setCursorPosition(
-            max(0, min(len(formatado), posicao + deslocamento))
-        )
+        self._ancorar_cursor(self._campo_chave, posicao, texto, formatado)
 
     # ------------------------------------------------------- validação (C6)
 

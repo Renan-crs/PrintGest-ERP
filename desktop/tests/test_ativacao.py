@@ -71,6 +71,16 @@ def test_digitacao_formata_a_chave(app):
     assert janela._campo_chave.text() == _CHAVE
 
 
+def test_chave_digitada_caracter_a_caracter_nao_embaralha(app):
+    """Mesma âncora de dígitos na máscara da chave (regressão do CNPJ)."""
+    janela = _janela(lambda r: httpx.Response(200, json={"data": _RESPOSTA_ATIVA}))
+    campo = janela._campo_chave
+    for caractere in "a3f19c2b77de1045":
+        campo.insert(caractere)
+    assert campo.text() == _CHAVE
+    assert campo.cursorPosition() == len(_CHAVE)
+
+
 def test_chave_incompleta_nao_chama_api(app):
     chamadas = []
 
@@ -164,6 +174,41 @@ def test_cnpj_formatado_ao_digitar(app):
     janela = _janela(lambda r: httpx.Response(200), contrato="b")
     janela._campo_cnpj.setText("11222333000181")
     assert janela._campo_cnpj.text() == _CNPJ_VALIDO
+
+
+def test_cnpj_digitado_caracter_a_caracter_nao_embaralha(app):
+    """Regressão da máscara (relatada em campo): 32.667.694/0001-01.
+
+    Devolver a posição antiga do cursor deixava-o entre o separador recém
+    inserido e o dígito digitado — o CNPJ 32.667.694/0001-01 virava
+    32.676.400/1010-96. A digitação agora é sempre "no fim".
+    """
+    janela = _janela(lambda r: httpx.Response(200), contrato="b")
+    campo = janela._campo_cnpj
+    for digito in "32667694000101":  # 32.667.694/0001-01
+        campo.insert(digito)
+    assert campo.text() == "32.667.694/0001-01"
+    assert campo.cursorPosition() == len("32.667.694/0001-01")
+    assert janela._cnpj_valido(campo.text())
+
+
+def test_cnpj_cursor_fica_apos_o_digito_e_nao_antes_do_ponto(app):
+    """Momento exato do bug: '326' → '32.6' com o cursor após o '6'."""
+    janela = _janela(lambda r: httpx.Response(200), contrato="b")
+    campo = janela._campo_cnpj
+    campo.insert("3")
+    campo.insert("2")
+    campo.insert("6")  # insere o primeiro separador
+    assert campo.text() == "32.6"
+    assert campo.cursorPosition() == 4  # após o '6'; 3 ficaria "entre . e 6"
+
+
+def test_cnpj_colado_de_qualquer_formato_normaliza(app):
+    janela = _janela(lambda r: httpx.Response(200), contrato="b")
+    for colado in ("32667694000101", "32.667.694/0001-01", "32 667 694 0001 01"):
+        janela._campo_cnpj.clear()
+        janela._campo_cnpj.setText(colado)
+        assert janela._campo_cnpj.text() == "32.667.694/0001-01", colado
 
 
 def test_cnpj_com_digito_invalido_e_rejeitado_em_linha(app):
