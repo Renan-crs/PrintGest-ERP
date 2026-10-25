@@ -24,6 +24,7 @@ def pytest_sessionstart(session):
     import printgest.ui.modulos.fiscal as fiscal_mod
     import printgest.ui.modulos.estoque as est_mod
     import printgest.ui.ativacao as ativacao_mod
+    import printgest.ui.conexao as conexao_mod
 
     def _rodar_sync(fn, on_ok, on_erro):
         try:
@@ -31,7 +32,10 @@ def pytest_sessionstart(session):
         except Exception as exc:
             on_erro(str(exc))
 
-    for mod in (tarefas_mod, agendamento_mod, config_mod, os_mod, fin_mod, fiscal_mod, est_mod, ativacao_mod):
+    for mod in (
+        tarefas_mod, agendamento_mod, config_mod, os_mod, fin_mod,
+        fiscal_mod, est_mod, ativacao_mod, conexao_mod,
+    ):
         if hasattr(mod, "rodar"):
             mod.rodar = _rodar_sync
             print(f"  [CONFTEST] Patched {mod.__name__}.rodar", flush=True)

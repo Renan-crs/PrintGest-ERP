@@ -29,7 +29,7 @@ validade) e botão **Entrar**.
 | ID | Status | Correção aplicada |
 | --- | --- | --- |
 | A1 | ✅ | Botões "Ativar licença (F10)", "Testar conexão" e "Sair (Esc)" com rótulo visível, `minimumHeight(40)`, atalho no próprio rótulo e `accessibleName` (testado) |
-| A2 | ✅ | Sem alturas fixas; textos por conteúdo com quebra automática. Bug de corte confirmado por probe (subtítulo/título renderizavam menos que o `heightForWidth`) e resolvido centralizando o **bloco** — alinhamento por item desliga o `heightForWidth` do QLabel no Qt |
+| A2 | ✅ | Sem alturas fixas; textos por conteúdo com quebra automática. **Dois bugs** confirmados por probe e corrigidos: (1) alinhamento por item desliga o `heightForWidth` do QLabel — resolvido centralizando o **bloco** de 560 px; (2) mesmo sem alinhamento, layouts comprimem labels de múltiplas linhas abaixo da altura necessária — resolvido com `EtiquetaQuebra` (`ui/widgets.py`), que impõe `minimumHeight = heightForWidth(largura)` a cada resize. Probe nas 3 resoluções, incluindo detalhes abertos: zero cortes |
 | A3 | ✅ | Contraste medido (15 pares, todos ≥ mínimo — tabela abaixo); placeholder no cinza secundário (5,07:1); borda de campo da ativação `#8E8E93` (3,26:1); tarja laranja removida (C8) |
 | A4 | ✅ | Rótulos em sentence case, 13 px/600, cor de texto (`#rotuloCampo`) |
 | A5 | ✅ | Corpo 12–13 px nos auxiliares (herda 13 px do QSS); escalas 125/150 % renderizadas em screenshot |
@@ -45,20 +45,20 @@ validade) e botão **Entrar**.
 | C1 | ✅ | Passos e formulário seguem o contrato ativo: B = "Dados da licença" (CNPJ + código), C = "Chave de produto" (XXXX-XXXX-XXXX-XXXX) — testado |
 | C2 | ✅ | Jargão fora da superfície: "Nó", "Host principal", "Local API Service", "Contrato B", "hexadecimais", "Tolerância Offline" removidos; conteúdo técnico em Detalhes técnicos, em linguagem simples (testado com varredura de termos proibidos) |
 | C3 | ✅ | PT-BR revisado ("às estações" não ocorre mais — subtítulo reescrito sem o trecho) |
-| C4 | ⚠️ P4 | "enviados pelo RedGest" → "da contratação"/"enviada na contratação". **Pendente**: confirmar o canal real (e-mail/WhatsApp/portal) — texto fácil de trocar depois |
+| C4 | ✅ (24/10) | Canal confirmado pelo responsável: **portal + e-mail**. Placeholder "Informe o código enviado por e-mail"; Detalhes técnicos: "O código é enviado por e-mail e também fica disponível no portal de licenças do fabricante" |
 | C5 | ✅ | Superfície reduzida a: uma frase de subtítulo, uma linha de ajuda, rodapé de diagnóstico, uma linha de garantia |
 | C6 | ✅ | Erro por campo (rótulo vermelho + borda 2 px + foco) e erro geral junto dos campos; mensagens do servidor já vêm em PT-BR do backend (409/502/503/limite/chave inválida); foco vai ao campo relacionado quando a mensagem o menciona |
 | C7 | ✅ | Sentence case em títulos ("Sobre a licença", "Este computador") |
 | C8 | ✅ | "Se a internet cair, o sistema continua funcionando por até 72 horas." — texto neutro, sem tarja de alerta |
 | D1 | ✅ | Progresso não interativo: "Passo X de 3" + pontos (feito/atual/pendente); passo 3 mostra resumo (plano, validade) e "Entrar" |
-| D2 | ⚠️ | Espera com barra indeterminada, campos travados, "Validando com o servidor de licenças…" e **Cancelar** — que devolve o formulário, mas **não aborta o HTTP** (a thread do `rodar` não tem cancelamento cooperativo); resultado que chega depois do cancelar é aplicado (licença ativada é fato consumado). Timeout do cliente ≥ 90 s: `Api.TIMEOUT_ATIVACAO_SEGUNDOS = 95` |
+| D2 | ✅ | **Cancelamento real (24/10)**: a ativação roda num cliente `httpx` dedicado (`Api.cliente_para_ativacao`, timeout 95 s) e Cancelar **fecha o cliente — a requisição em pleno voo é interrompida** — e invalida o token da tentativa: qualquer resposta já em curso é descartada, e uma nova tentativa nunca recebe resultado de outra. Se o servidor já tinha ativado, uma nova tentativa devolve a situação atual |
 | D3 | ✅ | "Servidor local: conectado/sem resposta" testado automaticamente ao abrir + "Tentar novamente" |
 | D4 | ✅ | Máscara de CNPJ + dígito verificador em linha (blur e envio), vazio não grita; código normalizado sem espaços ao colar; chave cola/formata sozinha |
 | D5 | ✅ | Esc pede "Sair do PrintGest?" (default Não); durante a validação, Esc não abandona |
-| D6 | ⚠️ P5 | Modo Estação não implementado nesta tela (fora do escopo atual) — confirmar responsável |
-| D7 | ⚠️ | Sem movimento decorativo (ok); transições hover/foco são trocas de estado imediatas — QSS não tem transições animadas sem código extra (QPropertyAnimation). Fica como pendência de acabamento |
+| D6 | ✅ (24/10) | Modo Estação implementado: `PRINTGEST_API_URL` liga o modo; a tela inicial é **Conectar ao servidor** (`ui/conexao.py` — endereço + teste + conectar, sem serial: a licença pertence ao servidor). Endereço persistido (QSettings) |
+| D7 | ✅ | Painel "Detalhes técnicos" expande/recolhe com 160 ms (OutCubic), **respeitando a preferência do Windows** ("animar controles" lida via SPI_GETCLIENTAREAANIMATION); estados hover/foco permanecem trocas imediatas (QSS não suporta transição) |
 | E1 | ✅ | Tokens consolidados em `docs/design_tokens.md` (claro/escuro/uso) + mapeamento WPF; sem hex cru em componentes (QSS por token) |
-| E2 | ⚠️ | Marca provisória: "P" azul desenhado em código (sem emoji, sem SVG externo). **Pendente**: logotipo vetorial do produto |
+| E2 | ✅ (24/10) | Marca vetorial `ui/assets/marca-printgest.svg` (monograma "P" em traço, sem fonte do sistema no desenho), carregada via QIcon com **fallback desenhado em código** quando o plugin de SVG não existe; decorativa (A7). O arquivo pode ser trocado pelo logotipo final sem tocar em código |
 | E3 | ✅ (P2) | Sem filete CMYK (decisão P2: não incluir). Visual ancorado no design system existente (cartões claros, hairline), sem pílulas coloridas na superfície |
 | F1 | ✅ | F10/Esc preservados; 3 passos; formulário dinâmico por contrato |
 | F2 | ✅ | Timeout ≥ 90 s no cliente (95 s); mensagens de indisponibilidade vêm do backend (503 nunca revoga lá) |
@@ -94,36 +94,53 @@ ficaria para uma revisão própria).
 ## Validação executada
 
 - **Testes**: 28 na tela (`desktop/tests/test_ativacao.py` — estados, máscaras,
-  CNPJ, confirmação de saída, acessibilidade, textos, layout) e suíte completa
-  **295 passed / 0 failed** (sem regressão em Login, Modo leitura, Início, PDV,
-  Projetos e Cadastros).
-- **Probe de layout** (ofscreen, 1280x720, 1366x768, 1920x1080): nenhum widget
-  fora da janela, nenhum label com quebra cortado, botões ≥ 40 px, cartão ≤ 560 px,
-  coluna (609 px) cabe em 720 px.
-- **Screenshots** (`desktop/tools/render_ativacao.py` — gitignored):
-  `ativacao_b_inicial_1280x720@100/125/150`, `_1366x768@100`,
-  `_1920x1080@100`, `erro`, `validando`, `sucesso` @100, e `c_inicial@100`.
+  CNPJ, confirmação de saída, acessibilidade, textos, layout, cancelamento
+  real), 9 na tela de conexão (`test_conexao.py`), 1 no roteador de estação
+  (`test_main.py`); suíte completa **311 passed / 0 failed** (sem regressão em
+  Login, Modo leitura, Início, PDV, Projetos e Cadastros).
+- **Probe de layout** (ofscreen, 1280x720, 1366x768, 1920x1080, nas DUAS telas
+  e com detalhes abertos): nenhum widget fora da janela, nenhum label cortado,
+  botões ≥ 40 px, cartão ≤ 560 px.
+- **Screenshots** (`desktop/tools/render_ativacao.py` + `render_conexao.py` —
+  gitignored, 12 arquivos): estados inicial/erro/validando/sucesso/detalhes do
+  Contrato B, inicial do Contrato C, nas três resoluções e escalas 100/125/150,
+  mais inicial/erro da tela de conexão.
 
-## Decisões (P1–P6)
+## Decisões (P1–P6) — fechadas em 25/10/2026
 
-- **P1 Layout**: coluna única (padrão adotado). Alternativa de duas colunas descartada.
-- **P2 Filete CMYK**: não incluir (padrão adotado).
-- **P3 Rótulos**: "Ativar licença", "Testar conexão", "Sair" — confirmados
-  implicitamente pelos critérios de aceite; fáceis de trocar.
-- **P4 Canal do código**: texto genérico "contratação" — confirmar canal real.
-- **P5 Modo Estação**: pendente (fora do escopo).
+- **P1 Layout**: coluna única (adotada). Alternativa de duas colunas descartada.
+- **P2 Filete CMYK**: não incluir (adotado).
+- **P3 Rótulos**: "Ativar licença", "Testar conexão", "Sair" — confirmados.
+- **P4 Canal do código**: **portal + e-mail** (confirmado pelo responsável).
+- **P5 Modo Estação**: **implementado** — `ui/conexao.py` + `PRINTGEST_API_URL`
+  (endereço + teste + conectar; serial não é pedido; endereço persistido em
+  QSettings; `_Roteador(estacao=True)` abre o login direto).
 - **P6 Tema escuro**: só tokens (proposta medida em `docs/design_tokens.md`),
-  sem implementação.
+  sem implementação — segue a decisão do brief.
 
 ## Pendências e limitações
 
-1. **D2**: Cancelar não aborta o pedido HTTP (limitação do modelo de thread do
-   `rodar`); o resultado é aplicado quando chega. Cancelamento cooperativo
-   exige refactor do `tarefas.py` (justificável só se o cancelamento real for exigido).
-2. **D7**: sem transições animadas (QSS não suporta; exigiria QPropertyAnimation).
-3. **P4**: canal de entrega do código da licença; **P5**: tela do modo Estação;
-   **E2**: logotipo vetorial (marca "P" provisória).
-4. Narrador: `accessibleName`/ordem de Tab implementados; validação assistida
+1. Hover/foco continuam trocas de estado sem animação (limite do QSS); o
+   movimento do painel "Detalhes técnicos" cobre o D7 com 160 ms e respeita a
+   preferência do Windows de reduzir animações.
+2. Narrador: `accessibleName`/ordem de Tab implementados; validação assistida
    com leitor de tela fica como passo manual de QA (não automatizável aqui).
+3. O instalador ainda só empacota o **modo Servidor**; a instalação de uma
+   estação (definir `PRINTGEST_API_URL` no `.env` dela) é operação manual por
+   enquanto — empacotar a estação fica para a fase de rede (PRD).
+4. Logotipo: `marca-printgest.svg` é o monograma aprovado para agora; o
+   arquivo pode ser substituído pela marca final sem alterar código.
 5. Os screenshots são para inspeção humana — o modelo não lê imagens; a
    verificação de corte/regressão foi programática (probe + testes).
+
+## Tela do modo Estação (D6/P5, adicionada em 25/10)
+
+`ConexaoWindow` (`ui/conexao.py`): mesma linguagem visual da ativação —
+coluna única de 560 px, marca, "Conectar ao servidor", campo "Endereço do
+servidor" (normaliza `192.168.0.10:8000/` → `http://192.168.0.10:8000`),
+erro junto do campo, botões **Conectar (F10)** / **Testar conexão** / **Sair
+(Esc)** ≥ 40 px, status "Servidor: conectado/sem resposta", confirmação ao
+sair. O endereço usado com sucesso é persistido (QSettings) e volta
+preenchido. No `main.py`, `PRINTGEST_API_URL` liga o modo: a tela de conexão
+abre no lugar do gate de serial e o login vai direto ao servidor da gráfica
+(a licença pertence ao servidor; modo leitura continua sendo aplicado lá).

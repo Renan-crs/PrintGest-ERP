@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+  <!-- Marca PrintGest: monograma "P" vetorial — quadrado arredondado no azul
+       de ação (token `primary`), sem dependência de fonte do sistema. -->
+  <rect width="44" height="44" rx="10" fill="#0071E3"/>
+  <path d="M14.5 33 V11 h6.5 a7 7 0 0 1 0 14 H14.5"
+        fill="none" stroke="#FFFFFF" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

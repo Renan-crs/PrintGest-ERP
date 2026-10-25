@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
-from PySide6.QtCore import QPoint, QRect, QSize, Qt
-from PySide6.QtGui import QPainter
+from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -14,6 +15,51 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QWidget,
 )
+
+_ASSETS = Path(__file__).resolve().parent / "assets"
+
+# Marca vetorial (E2): o SVG em assets/ é a fonte; o mesmo traço abaixo é o
+# fallback desenhado em código quando o plugin de SVG não está disponível.
+_MARCA_FUNDO = "#0071E3"
+_MARCA_TEXTO = "#FFFFFF"
+
+_MARCA_TRACO = QPainterPath()
+_MARCA_TRACO.moveTo(14.5, 33)
+_MARCA_TRACO.lineTo(14.5, 11)
+_MARCA_TRACO.lineTo(21.0, 11.0)
+_MARCA_TRACO.arcTo(QRectF(14.0, 11.0, 14.0, 14.0), 270.0, -180.0)
+_MARCA_TRACO.lineTo(14.5, 25.0)
+
+
+def marca_printgest(tamanho: int = 44) -> QLabel:
+    """Marca do produto (SVG vetorial, fallback desenhada em código).
+
+    Decorativa (A7): `accessibleName` vazio — leitores de tela ignoram.
+    """
+    caminho = _ASSETS / "marca-printgest.svg"
+    pm = QIcon(str(caminho)).pixmap(tamanho, tamanho)
+    if pm.isNull():  # plugin de SVG ausente: desenha o mesmo traço em código
+        pm = QPixmap(tamanho, tamanho)
+        escala = tamanho / 44.0
+        pm.fill(Qt.GlobalColor.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.scale(escala, escala)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(_MARCA_FUNDO))
+        p.drawRoundedRect(0, 0, 44, 44, 10, 10)
+        caneta = QPen(QColor(_MARCA_TEXTO), 5)
+        caneta.setCapStyle(Qt.PenCapStyle.RoundCap)
+        caneta.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(caneta)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawPath(_MARCA_TRACO)
+        p.end()
+    lbl = QLabel()
+    lbl.setPixmap(pm)
+    lbl.setFixedSize(tamanho, tamanho)
+    lbl.setAccessibleName("")
+    return lbl
 
 
 def aplicar_estilo(widget: QWidget) -> None:
@@ -68,6 +114,30 @@ def formatar_datahora(valor: object) -> str:
     except ValueError:
         return str(valor)
     return momento.strftime("%d/%m/%Y %H:%M")
+
+
+class EtiquetaQuebra(QLabel):
+    """QLabel com quebra que nunca é comprimida abaixo do texto (A2).
+
+    O `heightForWidth` do QLabel é ignorado por alguns arranjos de layout —
+    o resultado é texto cortado na vertical. Aqui o `minimumHeight` vira o
+    piso real da altura necessária, recalculado a cada redimensionamento.
+    """
+
+    def __init__(self, texto: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(texto, parent)
+        self.setWordWrap(True)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+        )
+
+    def resizeEvent(self, evento) -> None:  # noqa: N802 (API Qt)
+        super().resizeEvent(evento)
+        largura = max(self.width(), 1)
+        necessaria = self.heightForWidth(largura)
+        if necessaria <= 0:
+            necessaria = self.sizeHint().height()
+        self.setMinimumHeight(max(necessaria, self.sizeHint().height()))
 
 
 class ElideLabel(QLabel):
