@@ -6,6 +6,7 @@ import json
 
 import httpx
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QMessageBox
 
 from printgest.core.api import Api
@@ -46,7 +47,13 @@ _CLIENTES = [
 ]
 _FUNCIONARIOS = [{"id": 10, "nome": "Vina", "e_vendedor": True, "e_atendente": False}]
 _PRODUTOS = [
-    {"id": 5, "codigo": "B015", "nome": "Adesivo Frosted 3mm", "preco_venda": "100.00"}
+    {
+        "id": 5,
+        "codigo": "B015",
+        "nome": "Adesivo Frosted 3mm",
+        "preco_venda": "100.00",
+        "codigo_barras": "7891000100103",
+    }
 ]
 
 _GETS: list[httpx.Request] = []
@@ -355,3 +362,253 @@ def test_remover_item_atualiza_grade(app, pumpar, pagina):
     pagina._itens_editor._remover_linha(0)
     assert pagina._itens_editor._tabela.rowCount() == 1
     assert len(pagina._itens_editor.valor()) == 1
+
+
+# --- Revisão PDV out/2026 (Fase A — itens 1 a 8 e 17) ---------------------------
+
+
+def test_estado_vazio_da_lista_de_itens_orienta(app, pumpar, pagina):
+    """Sem itens: mensagem + atalhos no lugar do vazio (revisão nº 1)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    editor = pagina._itens_editor
+    assert editor._pilha_itens.currentIndex() == 1  # estado vazio visível
+    assert "Busque um produto ou serviço" in editor._pilha_itens.currentWidget().findChild(QLabel).text()
+
+    _adicionar_item(pagina)
+    assert editor._pilha_itens.currentIndex() == 0  # tabela de volta
+    assert editor._tabela.rowCount() == 1
+    editor._remover_linha(0)
+    assert editor._pilha_itens.currentIndex() == 1  # vazio de novo
+
+
+def test_busca_sem_chip_enter_e_placeholder_curto(app, pumpar, pagina):
+    """Placeholder curto, sem o chip “Enter” que parecia um botão (nº 3)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    editor = pagina._itens_editor
+    assert editor._entrada.placeholderText() == "Código, nome ou código de barras"
+    chips = [
+        w for w in editor._entrada.parentWidget().findChildren(QLabel)
+        if w.property("kbdHint") == "true"
+    ]
+    assert chips == []
+
+
+def test_codigo_de_barras_exato_adiciona_direto(app, pumpar, pagina, monkeypatch):
+    """Bipe: EAN exato entra sem lista; foco volta à busca (revisão nº 3)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    editor = pagina._itens_editor
+    voltas = []
+    monkeypatch.setattr(editor, "focar_busca", lambda: voltas.append(True))
+    editor._entrada.setText("7891000100103")
+    editor._adicionar_pela_busca()
+    assert editor._tabela.rowCount() == 1
+    assert editor._itens[0]["produto_id"] == 5
+    assert voltas == [True]  # foco devolvido à busca para o próximo bipe
+
+
+def test_busca_com_varios_candidatos_abre_lista_navegavel(app, pumpar, pagina, monkeypatch):
+    """Vários resultados: popup navegável em vez de “não encontrado” (nº 3)."""
+    import printgest.ui.modulos.venda_balcao as mod
+
+    extras = [
+        {"id": 6, "codigo": "B016", "nome": "AdesivoTransparente 2mm",
+         "preco_venda": "50.00", "codigo_barras": None},
+        {"id": 7, "codigo": "B017", "nome": "AdesivoEspelhado 2mm",
+         "preco_venda": "60.00", "codigo_barras": None},
+    ]
+    original = mod.EditorItensVenda._produtos_recebidos
+
+    def com_extras(self, saida):
+        original(self, saida)
+        self._produtos.update({
+            r["id"]: r for r in extras
+        })
+        for r in extras:
+            self._por_nome[r["nome"].lower()] = r["id"]
+
+    monkeypatch.setattr(mod.EditorItensVenda, "_produtos_recebidos", com_extras)
+    editor = pagina._itens_editor
+    editor.carregar(pagina._api)
+    pumpar(lambda: "adesivoespelhado 2mm" in editor._por_nome)
+
+    editor._entrada.setText("adesivo")
+    chamado = []
+    monkeypatch.setattr(
+        editor._completer, "complete", lambda *a: chamado.append(True)
+    )
+    editor._adicionar_pela_busca()
+    assert chamado == [True]  # abriu a lista, não adds nem warning
+    assert editor._tabela.rowCount() == 0
+
+
+def test_finalizar_desabilitado_sem_itens_e_habilita_ao_adicionar(app, pumpar, pagina):
+    """Finalizar com 0 itens: desabilitado + dica (revisão nº 4)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    assert pagina._btn_salvar.isEnabled() is False
+    assert "Adicione ao menos 1 item" in pagina._btn_salvar.toolTip()
+
+    _adicionar_item(pagina)
+    assert pagina._btn_salvar.isEnabled() is True
+    assert pagina._btn_salvar.toolTip() == "Finalizar venda (F9)"
+
+    pagina._itens_editor._remover_linha(0)
+    assert pagina._btn_salvar.isEnabled() is False
+
+
+def test_desconto_por_item_na_grade_entra_no_total(app, pumpar, pagina):
+    """Coluna Desc. editável; desconto da linha entra no total (nº 2)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    editor = pagina._itens_editor
+    _adicionar_item(pagina)
+
+    coluna = editor._COL_DESC_ITEM
+    editor._tabela.item(0, coluna).setText("10")  # -10 no item de R$ 100
+    assert editor._itens[0]["desconto"] == "10"
+    assert editor._tabela.item(0, editor._COL_TOTAL).text() == "R$ 90,00"
+    assert pagina._lbl_total.text() == "R$ 90,00"
+    # e vai no payload
+    assert editor.valor()[0]["desconto"] == "10"
+
+    # desconto negativo não passa: vira 0
+    editor._tabela.item(0, coluna).setText("-5")
+    assert editor._itens[0]["desconto"] == "0"
+
+
+def test_colunas_numericas_alinhadas_a_direita(app, pumpar, pagina):
+    """Qtd/Unit/Desc/Total alinhadas à direita (revisão nº 2)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    _adicionar_item(pagina)
+    editor = pagina._itens_editor
+    esperado = int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    for coluna in (
+        editor._COL_QTD,
+        editor._COL_UNIT,
+        editor._COL_DESC_ITEM,
+        editor._COL_TOTAL,
+    ):
+        assert editor._tabela.item(0, coluna).textAlignment() == esperado
+
+
+def test_falta_quando_recebido_nao_cobre_e_troco_quando_cobre(app, pumpar, pagina):
+    """“Falta R$ X” em aviso; troco em verde quando cobre (nº 7)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    _adicionar_item(pagina)  # total R$ 100
+    pagina._recebido.definir("40")
+    assert pagina._lbl_troco_rotulo.text() == "FALTA"
+    assert pagina._lbl_troco.text() == "R$ 60,00"
+    assert pagina._lbl_troco.property("role") == "atencao"
+
+    pagina._recebido.definir("150")
+    assert pagina._lbl_troco_rotulo.text() == "TROCO"
+    assert pagina._lbl_troco.text() == "R$ 50,00"
+    assert pagina._lbl_troco.property("role") == "success"
+
+    # sem valor digitado: não grita “falta”
+    pagina._recebido.definir(None)
+    assert pagina._lbl_troco_rotulo.text() == "TROCO"
+
+
+def test_resumo_tem_desconto_e_total_em_destaque(app, pumpar, pagina):
+    """Bloco Subtotal/Desconto/Total com o Total em 28 px (nº 7)."""
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    _adicionar_item(pagina)
+    pagina._desconto.definir("25")
+    assert pagina._lbl_desconto_totais.text() == "R$ 25,00"
+    assert pagina._lbl_subtotal.text() == "R$ 100,00"
+    assert pagina._lbl_total.text() == "R$ 75,00"
+    assert pagina._lbl_total.objectName() == "totalPdv"
+
+
+def test_resumo_fica_colado_na_barra_de_acoes(app, pumpar, pagina):
+    """Resumo imediatamente acima do botão primário (nº 7/14)."""
+    from PySide6.QtWidgets import QPushButton
+
+    painel = pagina._lbl_total.parentWidget()  # cardLow do resumo
+    coluna = painel.parentWidget().layout()
+    idx_resumo = idx_acoes = None
+    for i in range(coluna.count()):
+        item = coluna.itemAt(i)
+        wid = item.widget()
+        if wid is painel:
+            idx_resumo = i
+        elif wid is not None and pagina._btn_salvar in wid.findChildren(QPushButton):
+            idx_acoes = i
+    assert idx_resumo is not None
+    assert idx_acoes is not None
+    assert idx_acoes - idx_resumo == 1  # nada entre o resumo e a barra
+
+
+def test_wrappers_sem_faixa_cinza(app, pumpar, pagina):
+    """Rótulos/checkboxes sobre fundo transparente (revisão nº 5)."""
+    for wrapper in (
+        pagina._campo_cliente,
+        pagina._campo_vendedor,
+        pagina._campo_troco,
+        pagina._itens_editor._barra_editor(),
+    ):
+        assert wrapper.objectName() == "caixaForma"
+    # checkbox sem faixa: QSS global (testado como texto do tema)
+    from printgest.ui.theme import _QSS
+
+    assert "QCheckBox, QRadioButton" in _QSS
+    assert "background: transparent; /* sem faixa cinza atrás" in _QSS
+
+
+def test_combo_vendedor_tem_placeholder(app, pumpar, pagina):
+    """Vendedor vazio com placeholder, sem seleção silenciosa (nº 6)."""
+    pumpar(lambda: pagina._vendedor.widget.count() > 0)
+    combo = pagina._vendedor.widget
+    assert combo.placeholderText() == "Selecione o vendedor"
+    assert combo.currentIndex() == -1
+    assert pagina._vendedor.valor() is None
+
+
+def test_fonte_unica_sem_consolas_no_total(app):
+    """Total/cabeçalho na família única do app — sem monoespaçada (nº 2/8).
+
+    `Consolas` continua só no valor digitado da chave de produto (regra
+    `QLineEdit[mono="true"]`) — monoespaçada é desejável ali (revisão nº 5 da
+    tela de ativação); o que sai é o fallback do Total/métricas.
+    """
+    from printgest.ui import theme
+
+    assert '"Inter", "Consolas"' not in theme._QSS  # regra antiga do valorCard
+    assert "totalPdv" in theme._QSS
+    assert isinstance(theme._resolver_familia(), str)
+    assert theme.FONT_RESOLVIDA in ("Inter", "Segoe UI")
+
+
+def test_seta_do_combo_vem_de_svg_embutido(app):
+    """Seta de QComboBox por imagem SVG — sem a barra escura nativa (nº 6)."""
+    from pathlib import Path
+
+    from printgest.ui import theme
+
+    assert "%asset_seta%" in theme._QSS
+    svg = theme._ASSETS / "seta-combo.svg"
+    assert svg.exists() and svg.stat().st_size > 0
+
+
+def test_mira_sobre_nova_os_nao_existe_no_codigo(app):
+    """Item 17: nenhuma sobreposição/efeito decorativo sobre o botão Nova OS."""
+    efeitos = [
+        w.graphicsEffect()
+        for w in pagina_efeitos() if w.graphicsEffect() is not None
+    ]
+    assert efeitos == []
+
+
+def pagina_efeitos():
+    """Widgets que poderiam desenhar círculos translúcidos na barra do PDV."""
+    from PySide6.QtWidgets import QWidget
+
+    return [
+        w for w in QWidget.findChildren(QApplication_active(), QWidget)
+        if w.objectName() in {"chaveRapida"} or type(w).__name__ == "QPushButton"
+    ]
+
+
+def QApplication_active():
+    from PySide6.QtWidgets import QApplication
+
+    return QApplication.instance()

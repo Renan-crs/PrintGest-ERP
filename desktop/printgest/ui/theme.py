@@ -24,10 +24,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication
 
 FONT_FAMILY = "Inter"
+
+# Resolução da família na inicialização: se "Inter" não estiver instalada, o
+# Qt faz um fallback por widget (cabeçalhos de tabela podiam cair numa serifa
+# enquanto o corpo ficava sans — achado nº 8 da revisão do PDV). Fixamos UMA
+# família real para o app inteiro; no Windows, "Segoe UI" sempre existe.
+# Preguiçosa: QFontDatabase exige um QGuiApplication vivo (chamar no import
+# derrubava o processo antes do `app` existir).
+FONT_RESOLVIDA = FONT_FAMILY
+
+
+def _resolver_familia() -> str:
+    try:
+        familias = QFontDatabase.families()
+    except Exception:  # noqa: BLE001 — sem banco de fontes: fica a hint sans
+        return FONT_FAMILY
+    if not familias:  # plataforma offscreen: sem fontes, usa a hint sans
+        return FONT_FAMILY
+    if FONT_FAMILY in familias:
+        return FONT_FAMILY
+    return "Segoe UI" if "Segoe UI" in familias else familias[0]
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -80,7 +100,7 @@ QWidget {
     background-color: %canvas%;
 }
 
-QWidget#botaoKbd, QWidget#cardBaixo { background: transparent; }
+QWidget#botaoKbd, QWidget#cardBaixo, QWidget#caixaForma { background: transparent; }
 
 QWidget#passo { background-color: %surface-muted%; border: 1px solid %borda%; border-radius: 6px; }
 QWidget#passo[passoAtivo="true"] { background-color: %primary-container%; border: 1px solid %primary%; }
@@ -163,8 +183,8 @@ QSpinBox::up-button, QSpinBox::down-button,
 QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 0; border: none; }
 
 /* Combos no mesmo desenho dos campos (sem o "artefato" do estilo nativo do
-   Windows). A seta fica a nativa: em versionamentos recentes do Qt o truque de
-   "triângulo por bordas" em `::down-arrow` vira um bloco preto (G6). */
+    Windows). A seta nativa renderizava uma barra escura vertical nesta
+    versão do Qt (revisão PDV nº 6): virou SVG embutido, como o contra-ícone. */
 QComboBox {
     background-color: %surface%;
     border: 1px solid %borda%;
@@ -175,6 +195,8 @@ QComboBox {
 }
 QComboBox:hover { border-color: %borda-forte%; }
 QComboBox:focus, QComboBox:on { border: 1px solid %primary%; }
+QComboBox::drop-down { border: none; width: 24px; }
+QComboBox::down-arrow { image: url(%asset_seta%); width: 11px; height: 7px; }
 QComboBox QAbstractItemView {
     background-color: %surface%;
     border: 1px solid %borda%;
@@ -287,7 +309,10 @@ QStatusBar { background-color: %surface%; color: %texto-muted%; border-top: 1px 
 /* --------------------------------------------------- controles nativos (sem
    isto, QCheckBox/QRadioButton/QMenu/QToolTip caíam no estilo do Windows) */
 
-QCheckBox, QRadioButton { spacing: 8px; }
+QCheckBox, QRadioButton {
+    spacing: 8px;
+    background: transparent; /* sem faixa cinza atrás (revisão PDV nº 5) */
+}
 QCheckBox::indicator, QRadioButton::indicator {
     width: 18px;
     height: 18px;
@@ -364,10 +389,11 @@ QListWidget#sugestoesBusca {
 QListWidget#sugestoesBusca::item { padding: 4px 8px; border-radius: 6px; }
 QListWidget#sugestoesBusca::item:selected { background-color: %primary%; color: %on-primary%; }
 QLabel#valorCard { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: %texto%; }
+QLabel#totalPdv { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: %texto%; }
 /* Números de KPI usam figuras tabulares: a largura de "1" e "8" fica igual e a
    fileira de cartões não "treme" quando o valor é atualizado (ver
    `number-tabular`, quick-reference §6). */
-QLabel#valorCard, QLabel[role="metrica"] { font-family: "Inter", "Consolas"; }
+QLabel#valorCard, QLabel[role="metrica"] { font-family: "Inter"; }
 QProgressBar {
     border: 1px solid %borda%;
     border-radius: 4px;
@@ -655,14 +681,23 @@ QProgressBar#barraAtiva::chunk { background-color: %primary%; border-radius: 2px
 
 
 def aplicar_theme(app: QApplication) -> QApplication:
-    fonte = QFont(FONT_FAMILY, 10)
+    global FONT_RESOLVIDA
+    FONT_RESOLVIDA = _resolver_familia()  # exige QApplication vivo
+    fonte = QFont(FONT_RESOLVIDA, 10)
     fonte.setStyleHint(QFont.StyleHint.SansSerif)
     app.setFont(fonte)
+    # Placeholder dos campos no cinza secundário (5,07:1 no branco) — o padrão
+    # do tema é mais claro e "aparentava" baixo contraste (revisão PDV nº 8).
+    paleta = app.palette()
+    paleta.setColor(QPalette.ColorRole.PlaceholderText, QColor(CORES["texto-muted"]))
+    app.setPalette(paleta)
     qss = _QSS
     for chave, valor in CORES.items():
         qss = qss.replace(f"%{chave}%", valor)
+    qss = qss.replace(f'"{FONT_FAMILY}"', f'"{FONT_RESOLVIDA}"')
     # Ícones dos controles nativos vêm de SVG embutido (ver contra-ícone acima).
     qss = qss.replace("%asset_check%", (_ASSETS / "check.svg").as_posix())
     qss = qss.replace("%asset_ponto%", (_ASSETS / "ponto.svg").as_posix())
+    qss = qss.replace("%asset_seta%", (_ASSETS / "seta-combo.svg").as_posix())
     app.setStyleSheet(qss)
     return app
