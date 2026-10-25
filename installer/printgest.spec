@@ -12,6 +12,7 @@ import os
 
 RAIZ = os.path.abspath(os.path.join(SPECPATH, ".."))
 DESKTOP = os.path.join(RAIZ, "desktop")
+ICONE = os.path.join(DESKTOP, "printgest", "ui", "assets", "printgest.ico")
 
 a = Analysis(
     [os.path.join(DESKTOP, "main.py")],
@@ -48,6 +49,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=ICONE,
 )
 coll = COLLECT(
     exe,

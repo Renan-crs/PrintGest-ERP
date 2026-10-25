@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -20,6 +21,31 @@ from printgest.ui.login import LoginWindow
 from printgest.ui.modoleitura import ModoLeituraWindow
 from printgest.ui.tela_principal import TelaPrincipal
 from printgest.ui.theme import aplicar_theme
+from printgest.ui.widgets import icone_printgest
+
+
+def _carregar_env_do_executavel(caminho: Path | None = None) -> None:
+    """Instalação empacotada (estação): `.env` ao lado do exe define o servidor.
+
+    O instalador da estação pergunta o endereço durante a instalação e grava
+    `PRINTGEST_API_URL` (e `PRINTGEST_MODO_ESTACAO`) num `.env` junto ao
+    `PrintGest.exe` — variável de sistema não seria lugar de configuração por
+    instalação. Variáveis de ambiente reais continuam vencendo o arquivo
+    (`setdefault`), útil para diagnóstico.
+    """
+    if caminho is None:
+        if not getattr(sys, "frozen", False):
+            return
+        caminho = Path(sys.executable).resolve().parent / ".env"
+    try:
+        linhas = caminho.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return
+    for linha in linhas:
+        chave, separador, valor = linha.strip().partition("=")
+        chave = chave.strip()
+        if separador and chave and not chave.startswith("#"):
+            os.environ.setdefault(chave, valor.strip())
 
 
 def _licenca_desabilitada() -> bool:
@@ -241,9 +267,11 @@ def _preparar_daemon(app: QApplication) -> None:
 
 def main() -> None:
     sys.excepthook = _erro_inesperado
+    _carregar_env_do_executavel()  # estação: endereço do servidor (antes de tudo)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(__version__)
+    app.setWindowIcon(icone_printgest())  # taskbar/barra de título (dev e pacote)
     aplicar_theme(app)
 
     if modo_estacao():
@@ -260,6 +288,13 @@ def main() -> None:
     sys.exit(app.exec())
 
 
+# Referências fortes da fase de estação: janela, Api e roteador precisam
+# sobreviver ao retorno das funções que os criam. `app.setProperty` NÃO serve
+# (QVariant guarda o ponteiro C++ sem manter a referência Python — o GC
+# destrói a janela e o Qt encerra a app quando a última fecha).
+_ESTACAO: dict = {}
+
+
 def _iniciar_modo_estacao(app: QApplication) -> None:
     """Estação: primeiro conecta ao servidor, depois login (sem serial)."""
     janela = ConexaoWindow()
@@ -267,11 +302,15 @@ def _iniciar_modo_estacao(app: QApplication) -> None:
     def conectar(endereco: str) -> None:
         api = Api(base_url=endereco)
         app.aboutToQuit.connect(api.fechar)
-        _Roteador(api, estacao=True).iniciar()
+        roteador = _Roteador(api, estacao=True)
+        roteador.iniciar()
+        _ESTACAO["roteador"] = roteador
+        _ESTACAO["api"] = api
 
     janela.conectado.connect(conectar)
     janela.saida.connect(app.quit)
     janela.show()
+    _ESTACAO["janela"] = janela  # referência Python viva durante o exec()
 
 
 if __name__ == "__main__":

@@ -372,19 +372,32 @@ def test_canal_do_codigo_e_portal_e_email(app):
 
 
 def test_marca_vetorial_existe_e_e_decorativa(app):
-    """E2: SVG da marca no bundle; label decorativo (accessibleName vazio)."""
+    """E2: símbolo oficial no bundle; label decorativo (accessibleName vazio)."""
     import printgest.ui.ativacao as mod_ativacao
 
     svg = (
         Path(mod_ativacao.__file__).resolve().parent
         / "assets"
-        / "marca-printgest.svg"
+        / "printgest-simbolo.svg"
     )
     janela = _janela(lambda r: httpx.Response(200), contrato="b")
     marca = janela._marca()
     assert svg.exists() and svg.stat().st_size > 0
     assert marca.pixmap() is not None
     assert marca.accessibleName() == ""
+
+
+def test_icone_do_produto_disponivel():
+    """Ícone oficial (quadrado azul) para janelas, exe e instalador."""
+    from printgest.ui.widgets import icone_printgest
+
+    icone = icone_printgest()
+    assert not icone.isNull()
+    ico = (
+        Path(__file__).resolve().parents[1]
+        / "printgest" / "ui" / "assets" / "printgest.ico"
+    )
+    assert ico.exists() and ico.stat().st_size > 0
 
 
 def test_detalhes_tecnicos_abrem_e_fecha(app, monkeypatch):

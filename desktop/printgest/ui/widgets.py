@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -18,48 +18,49 @@ from PySide6.QtWidgets import (
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
 
-# Marca vetorial (E2): o SVG em assets/ é a fonte; o mesmo traço abaixo é o
-# fallback desenhado em código quando o plugin de SVG não está disponível.
-_MARCA_FUNDO = "#0071E3"
-_MARCA_TEXTO = "#FFFFFF"
-
-_MARCA_TRACO = QPainterPath()
-_MARCA_TRACO.moveTo(14.5, 33)
-_MARCA_TRACO.lineTo(14.5, 11)
-_MARCA_TRACO.lineTo(21.0, 11.0)
-_MARCA_TRACO.arcTo(QRectF(14.0, 11.0, 14.0, 14.0), 270.0, -180.0)
-_MARCA_TRACO.lineTo(14.5, 25.0)
+# Marca oficial (out/2026): símbolo "mira" em vetorial. O SVG em assets/ é a
+# fonte; o mesmo traço abaixo é o fallback desenhado em código quando o plugin
+# de SVG não está disponível.
+_MARCA_TRACO = "#0F1B2D"   # navy do símbolo
+_MARCA_PONTO = "#1166D6"   # azul do ponto central
 
 
 def marca_printgest(tamanho: int = 44) -> QLabel:
-    """Marca do produto (SVG vetorial, fallback desenhada em código).
+    """Símbolo oficial do produto (SVG vetorial, fallback desenhada em código).
 
     Decorativa (A7): `accessibleName` vazio — leitores de tela ignoram.
     """
-    caminho = _ASSETS / "marca-printgest.svg"
+    caminho = _ASSETS / "printgest-simbolo.svg"
     pm = QIcon(str(caminho)).pixmap(tamanho, tamanho)
-    if pm.isNull():  # plugin de SVG ausente: desenha o mesmo traço em código
+    if pm.isNull():  # plugin de SVG ausente: desenha a mira em código
         pm = QPixmap(tamanho, tamanho)
-        escala = tamanho / 44.0
+        escala = tamanho / 64.0
         pm.fill(Qt.GlobalColor.transparent)
         p = QPainter(pm)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.scale(escala, escala)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(_MARCA_FUNDO))
-        p.drawRoundedRect(0, 0, 44, 44, 10, 10)
-        caneta = QPen(QColor(_MARCA_TEXTO), 5)
+        caneta = QPen(QColor(_MARCA_TRACO), 4)
         caneta.setCapStyle(Qt.PenCapStyle.RoundCap)
-        caneta.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         p.setPen(caneta)
         p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawPath(_MARCA_TRACO)
+        p.drawEllipse(17, 17, 30, 30)  # círculo (centro 32,32 r15)
+        for linha in (QRectF(30, 4, 4, 18), QRectF(30, 42, 4, 18),
+                      QRectF(4, 30, 18, 4), QRectF(42, 30, 18, 4)):
+            p.drawRoundedRect(linha, 2, 2)  # retículas com pontas arredondadas
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(_MARCA_PONTO))
+        p.drawEllipse(28, 28, 8, 8)  # ponto central
         p.end()
     lbl = QLabel()
     lbl.setPixmap(pm)
     lbl.setFixedSize(tamanho, tamanho)
     lbl.setAccessibleName("")
     return lbl
+
+
+def icone_printgest() -> QIcon:
+    """Ícone das janelas (quadrado azul): taskbar/barra de título."""
+    return QIcon(str(_ASSETS / "printgest-icone.svg"))
 
 
 def aplicar_estilo(widget: QWidget) -> None:

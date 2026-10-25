@@ -58,7 +58,7 @@ validade) e botão **Entrar**.
 | D6 | ✅ (24/10) | Modo Estação implementado: `PRINTGEST_API_URL` liga o modo; a tela inicial é **Conectar ao servidor** (`ui/conexao.py` — endereço + teste + conectar, sem serial: a licença pertence ao servidor). Endereço persistido (QSettings) |
 | D7 | ✅ | Painel "Detalhes técnicos" expande/recolhe com 160 ms (OutCubic), **respeitando a preferência do Windows** ("animar controles" lida via SPI_GETCLIENTAREAANIMATION); estados hover/foco permanecem trocas imediatas (QSS não suporta transição) |
 | E1 | ✅ | Tokens consolidados em `docs/design_tokens.md` (claro/escuro/uso) + mapeamento WPF; sem hex cru em componentes (QSS por token) |
-| E2 | ✅ (24/10) | Marca vetorial `ui/assets/marca-printgest.svg` (monograma "P" em traço, sem fonte do sistema no desenho), carregada via QIcon com **fallback desenhado em código** quando o plugin de SVG não existe; decorativa (A7). O arquivo pode ser trocado pelo logotipo final sem tocar em código |
+| E2 | ✅ (25/10) | **Marca oficial do cliente** (`printgest_logo`): símbolo "mira" (`printgest-simbolo.svg`) nas telas de ativação/conexão, ícone do produto (`printgest-icone.svg` → `printgest.ico` 16–256 px) no exe, no instalador e na taskbar (`app.setWindowIcon`). Fallback desenhado em código quando o plugin de SVG não existe. Logotipos horizontal/mono/negativo também em `ui/assets` para uso futuro (login/tema escuro) |
 | E3 | ✅ (P2) | Sem filete CMYK (decisão P2: não incluir). Visual ancorado no design system existente (cartões claros, hairline), sem pílulas coloridas na superfície |
 | F1 | ✅ | F10/Esc preservados; 3 passos; formulário dinâmico por contrato |
 | F2 | ✅ | Timeout ≥ 90 s no cliente (95 s); mensagens de indisponibilidade vêm do backend (503 nunca revoga lá) |
@@ -128,8 +128,9 @@ ficaria para uma revisão própria).
 3. O instalador ainda só empacota o **modo Servidor**; a instalação de uma
    estação (definir `PRINTGEST_API_URL` no `.env` dela) é operação manual por
    enquanto — empacotar a estação fica para a fase de rede (PRD).
-4. Logotipo: `marca-printgest.svg` é o monograma aprovado para agora; o
-   arquivo pode ser substituído pela marca final sem alterar código.
+4. Logotipo: marca oficial do cliente aplicada (símbolo + ícone); os
+   logotipos horizontal/mono/negativo ficam em `ui/assets` para o login e o
+   tema escuro.
 5. Os screenshots são para inspeção humana — o modelo não lê imagens; a
    verificação de corte/regressão foi programática (probe + testes).
 
