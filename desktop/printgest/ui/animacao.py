@@ -33,6 +33,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QWidget
+from shiboken6 import Shiboken
 
 # ----------------------------------------------------------------- parâmetros
 # Apple: response do drawer/sheet ~0.3 s; reposicionamento ~0.4 s. Em desktop
@@ -123,10 +124,20 @@ def animar_largura(
     ``QWidget`` não expõe a largura como propriedade animável, então usamos uma
     ``QVariantAnimation`` que fixa ``minimum``/``maximum`` a cada passo — o layout
     continua refluindo junto (nada de "salto").
+
+    A anterior é interrompida quando ainda corre; o slot ``_anim_largura`` é
+    LIMPO ao finalizar — ``DeleteWhenStopped`` apaga o objeto C++ e um wrapper
+    morto esquecido derrubava o próximo colapso com
+    ``RuntimeError: Internal C++ object already deleted``.
     """
     anterior = getattr(widget, "_anim_largura", None)
-    if anterior is not None and anterior.state() == QAbstractAnimation.State.Running:
-        anterior.stop()
+    if anterior is not None:
+        if (
+            Shiboken.isValid(anterior)
+            and anterior.state() == QAbstractAnimation.State.Running
+        ):
+            anterior.stop()
+        widget._anim_largura = None  # wrapper morto/parado não serve mais
 
     if not animacoes_habilitadas():
         widget.setFixedWidth(para)
@@ -143,7 +154,13 @@ def animar_largura(
     def _passo(valor) -> None:
         widget.setFixedWidth(int(valor))
 
+    def _limpar() -> None:
+        # Roda antes da deleção (finished precede DeleteWhenStopped).
+        if getattr(widget, "_anim_largura", None) is anim:
+            widget._anim_largura = None
+
     anim.valueChanged.connect(_passo)
+    anim.finished.connect(_limpar)
     if ao_fim:
         anim.finished.connect(lambda: ao_fim())
     widget._anim_largura = anim
