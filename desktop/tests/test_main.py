@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import httpx
 
 from printgest.core.api import Api
@@ -159,3 +161,70 @@ def test_modo_estacao_pula_o_serial_e_vai_ao_login(app):
     assert isinstance(roteador._janela, LoginWindow)
     # Nenhuma chamada de LICENÇA no modo Estação (o /health é do LoginWindow).
     assert all(c == "/health" for c in _REQUISICOES)
+
+
+# ------------------------------------------------- .env da estação (P5)
+
+
+def test_env_do_executavel_define_o_endereco(app, monkeypatch, tmp_path):
+    """Instalador de estação grava o .env ao lado do exe (D6/P5)."""
+    from printgest import main as mod
+
+    monkeypatch.delenv("PRINTGEST_API_URL", raising=False)
+    monkeypatch.delenv("PRINTGEST_MODO_ESTACAO", raising=False)
+    ini = tmp_path / ".env"
+    ini.write_text(
+        "# Instalação de estação\n"
+        "PRINTGEST_API_URL=192.168.0.10:8000\n"
+        "PRINTGEST_MODO_ESTACAO=sim\n",
+        encoding="utf-8",
+    )
+
+    mod._carregar_env_do_executavel(ini)
+
+    assert os.environ["PRINTGEST_API_URL"] == "192.168.0.10:8000"
+    assert os.environ["PRINTGEST_MODO_ESTACAO"] == "sim"
+
+
+def test_env_do_executavel_nao_sobrescreve_variavel_real(app, monkeypatch, tmp_path):
+    from printgest import main as mod
+
+    monkeypatch.setenv("PRINTGEST_API_URL", "http://real:8000")
+    ini = tmp_path / ".env"
+    ini.write_text("PRINTGEST_API_URL=http://arquivo:8000\n", encoding="utf-8")
+
+    mod._carregar_env_do_executavel(ini)
+
+    assert os.environ["PRINTGEST_API_URL"] == "http://real:8000"
+
+
+def test_env_do_executavel_tolerante(app, tmp_path):
+    """Arquivo ausente, linhas inválidas e comentários não derrubam a app."""
+    from printgest import main as mod
+
+    mod._carregar_env_do_executavel(tmp_path / "inexistente.env")  # não explode
+    ini = tmp_path / ".env"
+    ini.write_text("sem igual\n=bloco\n# comentario=ignorado\n", encoding="utf-8")
+    mod._carregar_env_do_executavel(ini)
+    assert "sem igual" not in os.environ
+    assert "comentario" not in os.environ
+
+
+def test_janela_da_estacao_sobrevive_a_funcao_que_a_criou(app):
+    """Regressão do GC: a ConexaoWindow precisa viver após `_iniciar_modo_estacao`.
+
+    Referências locais (e `app.setProperty`, que não segura o wrapper Python)
+    deixavam o objeto ser coletado — a janela C++ era destruída, o Qt via
+    "última janela fechada" e o `exec()` saía com a tela piscando em branco.
+    """
+    from shiboken6 import Shiboken
+
+    from printgest import main as mod
+
+    mod._ESTACAO.clear()
+    mod._iniciar_modo_estacao(app)
+
+    janela = mod._ESTACAO["janela"]
+    assert janela is not None
+    assert janela.isVisibleTo(janela) or janela.isVisible()
+    assert Shiboken.isValid(janela)  # objeto C++ vivo, não coletado

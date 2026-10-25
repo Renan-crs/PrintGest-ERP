@@ -1,19 +1,14 @@
-# Empacota o PrintGest ERP em um instalador unico (Inno Setup) com desinstalador.
+# Empacota o PrintGest ERP em instaladores Inno Setup (com desinstalador).
 #
-# Etapas:
-#   1. PrintGestAPI.exe  - backend FastAPI/uvicorn (PyInstaller onedir)
-#   2. PrintGest.exe     - desktop PySide6 (PyInstaller onedir)
-#   3. PostgreSQL 16     - binarios podados (sem pgAdmin/doc/include)
-#   4. .env da instalacao - gerado de installer/env.instalacao(.example),
-#                          SEM ler o backend/.env de dev (nao vaza segredos)
-#   5. PrintGest-Setup-<versao>.exe - instalador Inno Setup (unins000.exe incluso)
-#
-# Uso:
+# Modo SERVIDOR (padrao) - desktop + Local API Service + PostgreSQL embarcado:
 #   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
 #
+# Modo ESTACAO - apenas o desktop; o assistente pergunta o endereco do
+# servidor (PRINTGEST_API_URL gravado em .env ao lado do exe):
+#   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Modo estacao
+#
 # Assinatura digital (opcional - exige certificado de code signing):
-#   powershell ... -File scripts\empacotar.ps1 -Assinar <thumbprint-ou-arquivo.pfx>
-#   Senha do .pfx: variavel de ambiente PRINTGEST_SIGN_SENHA.
+#   ... -Assinar <thumbprint-ou-arquivo.pfx>  (senha em PRINTGEST_SIGN_SENHA)
 #
 # Requisitos: venvs de backend/desktop com PyInstaller, PostgreSQL de dev em
 # .dev\postgres\pgsql (scripts\setup_postgres.ps1) e Inno Setup 6.
@@ -22,7 +17,9 @@ param(
     [string]$Saida = "dist_installer",
     # Thumbprint do certificado em Cert:\CurrentUser\My OU caminho de um .pfx.
     # Vazio = nao assina (o Windows pode mostrar SmartScreen no Setup).
-    [string]$Assinar = ""
+    [string]$Assinar = "",
+    [ValidateSet("servidor", "estacao")]
+    [string]$Modo = "servidor"
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,16 +33,16 @@ $pyApi     = Join-Path $raiz "backend\.venv\Scripts\pyinstaller.exe"
 $pyDesktop = Join-Path $raiz "desktop\.venv\Scripts\pyinstaller.exe"
 $iscc      = Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"
 
-foreach ($ferramenta in @($pyApi, $pyDesktop, $iscc)) {
-    if (-not (Test-Path $ferramenta)) {
-        throw "Ferramenta nao encontrada: $ferramenta"
-    }
-}
+$ehServidor = ($Modo -eq "servidor")
+$sufixo = if ($ehServidor) { "" } else { "Estacao" }
+
+foreach ($ferramenta in @($pyDesktop, $iscc)) { if (-not (Test-Path $ferramenta)) { throw "Ferramenta nao encontrada: $ferramenta" } }
+if ($ehServidor -and -not (Test-Path $pyApi)) { throw "Ferramenta nao encontrada: $pyApi" }
 
 # Versao do pacote sai do proprio desktop (fonte unica da verdade).
 $versao = (Select-String -Path (Join-Path $raiz "desktop\printgest\__init__.py") `
     -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
-Write-Host "== PrintGest ERP $versao =="
+Write-Host "== PrintGest ERP $versao (modo: $Modo) =="
 
 # ------------------------------------------- 0) .env da instalacao (validado
 # ANTES de qualquer build: um contrato c sem api_key nao pode gastar 4 min de
@@ -57,34 +54,37 @@ function Ler-Chave([string[]]$conteudo, [string]$chave) {
     return ""
 }
 
-# Fonte: installer/env.instalacao quando existir (credenciais por cliente, fora
-# do git); senao o template versionado. NUNCA o backend/.env de dev.
-$envLocal = Join-Path $installer "env.instalacao"
-$envExemplo = Join-Path $installer "env.instalacao.example"
-$envBase = if (Test-Path $envLocal) { $envLocal } else { $envExemplo }
-if ($envBase -eq $envLocal) {
-    Write-Host "  base do .env: env.instalacao (credenciais locais, fora do git)"
-} else {
-    Write-Host "  base do .env: env.instalacao.example (template publico)"
-}
-$linhas = @(Get-Content $envBase | Where-Object {
-    $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV)\s*='
-})
+$linhas = $null
+if ($ehServidor) {
+    # Fonte: installer/env.instalacao quando existir (credenciais por cliente,
+    # fora do git); senao o template versionado. NUNCA o backend/.env de dev.
+    $envLocal = Join-Path $installer "env.instalacao"
+    $envExemplo = Join-Path $installer "env.instalacao.example"
+    $envBase = if (Test-Path $envLocal) { $envLocal } else { $envExemplo }
+    if ($envBase -eq $envLocal) {
+        Write-Host "  base do .env: env.instalacao (credenciais locais, fora do git)"
+    } else {
+        Write-Host "  base do .env: env.instalacao.example (template publico)"
+    }
+    $linhas = @(Get-Content $envBase | Where-Object {
+        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV)\s*='
+    })
 
-$contrato = Ler-Chave $linhas "PRINTGEST_REDGEST_CONTRATO"
-$apiChave = Ler-Chave $linhas "PRINTGEST_REDGEST_API_KEY"
-if ($contrato -eq "c" -and -not $apiChave) {
-    throw @"
+    $contrato = Ler-Chave $linhas "PRINTGEST_REDGEST_CONTRATO"
+    $apiChave = Ler-Chave $linhas "PRINTGEST_REDGEST_API_KEY"
+    if ($contrato -eq "c" -and -not $apiChave) {
+        throw @"
 Contrato C exige PRINTGEST_REDGEST_API_KEY, e ela esta vazia.
 Preencha em installer\env.instalacao (copie do .example; esse nome e ignorado
 pelo git) - a validacao da chave de produto e assinada com essa credencial.
 Contrato B (CNPJ + codigo) NAO usa api_key e pode seguir sem ela.
 "@
-}
-if ($apiChave) {
-    Write-Host ("  ATENCAO: o pacote carrega a api_key do RedGest ({0}...{1})." -f $apiChave.Substring(0,5), $apiChave.Substring($apiChave.Length-3))
-} else {
-    Write-Host "  api_key: AUSENTE do pacote (Contrato B nao precisa)."
+    }
+    if ($apiChave) {
+        Write-Host ("  ATENCAO: o pacote carrega a api_key do RedGest ({0}...{1})." -f $apiChave.Substring(0,5), $apiChave.Substring($apiChave.Length-3))
+    } else {
+        Write-Host "  api_key: AUSENTE do pacote (Contrato B nao precisa)."
+    }
 }
 
 # ------------------------------------------------------------ 1) limpeza
@@ -92,58 +92,59 @@ foreach ($alvo in @((Join-Path $dist "PrintGest"), (Join-Path $dist "PrintGestAP
     if (Test-Path $alvo) { Remove-Item -Recurse -Force $alvo }
 }
 
-# --------------------------------------------------- 2) backend (PrintGestAPI)
-Write-Host "[1/5] PyInstaller: PrintGestAPI.exe (backend)..."
-Push-Location $installer
-try {
-    & $pyApi "printgestapi.spec" --clean --noconfirm --distpath (Join-Path $dist "") --workpath (Join-Path $build "work_api")
-    if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no backend." }
-} finally { Pop-Location }
-
-# ---------------------------------------------------- 3) desktop (PrintGest)
-Write-Host "[2/5] PyInstaller: PrintGest.exe (desktop)..."
+# ---------------------------------------------------- 2) desktop (PrintGest)
+Write-Host "[1/4] PyInstaller: PrintGest.exe (desktop)..."
 Push-Location $installer
 try {
     & $pyDesktop "printgest.spec" --clean --noconfirm --distpath (Join-Path $dist "") --workpath (Join-Path $build "work_desktop")
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no desktop." }
 } finally { Pop-Location }
 
-# ------------------------------------------- 4) PostgreSQL embarcado (podado)
-Write-Host "[3/5] PostgreSQL embarcado (bin, lib, share)..."
-$pgOrigem = Join-Path $raiz ".dev\postgres\pgsql"
-$pgDestino = Join-Path $pacote "postgres\pgsql"
-if (-not (Test-Path (Join-Path $pgOrigem "bin\pg_ctl.exe"))) {
-    throw "PostgreSQL de dev nao encontrado em $pgOrigem (rode scripts\setup_postgres.ps1)."
+# ------------------------------------- 3) backend + PostgreSQL (so servidor)
+if ($ehServidor) {
+    Write-Host "[2/4] PyInstaller: PrintGestAPI.exe (backend)..."
+    Push-Location $installer
+    try {
+        & $pyApi "printgestapi.spec" --clean --noconfirm --distpath (Join-Path $dist "") --workpath (Join-Path $build "work_api")
+        if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no backend." }
+    } finally { Pop-Location }
+
+    Write-Host "[3/4] PostgreSQL embarcado (bin, lib, share)..."
+    $pgOrigem = Join-Path $raiz ".dev\postgres\pgsql"
+    $pgDestino = Join-Path $pacote "postgres\pgsql"
+    if (-not (Test-Path (Join-Path $pgOrigem "bin\pg_ctl.exe"))) {
+        throw "PostgreSQL de dev nao encontrado em $pgOrigem (rode scripts\setup_postgres.ps1)."
+    }
+    # pgAdmin 4 (~673 MB), doc, include e StackBuilder nao sao usados em runtime;
+    # wx*.dll/ecpg pertencem a ferramentas fora do fluxo servidor.
+    robocopy $pgOrigem $pgDestino /E /NFL /NDL /NJH /NJS /NP `
+        /XD "pgAdmin 4" "doc" "include" "StackBuilder" "symbols" `
+        /XF "wx*.dll" "ecpg.exe" | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "robocopy do PostgreSQL falhou (codigo $LASTEXITCODE)." }
+    $LASTEXITCODE = 0
+
+    # .env da instalacao (chaves fixas impostas pelo build):
+    #   PG_EMBARCADO -> o daemon prepara o cluster na primeira execucao
+    #   API_HOST     -> 127.0.0.1: sem prompt de firewall, sem exposicao
+    #   ENV          -> "local" passa na checagem anti-defaults (P17)
+    $forcadas = @{
+        "PRINTGEST_PG_EMBARCADO" = "true"
+        "PRINTGEST_API_HOST"     = "127.0.0.1"
+        "PRINTGEST_ENV"          = "local"
+    }
+    $conteudo = @($linhas) + @(
+        "",
+        "# Instalacao empacotada (gerado por scripts/empacotar.ps1)"
+    ) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
+    $conteudo | Set-Content -Path (Join-Path $dist "PrintGestAPI\.env") -Encoding utf8
+} else {
+    Write-Host "[2/4] modo estacao: sem backend/PostgreSQL no pacote."
+    Write-Host "[3/4] modo estacao: .env com o endereco sera gravado pelo assistente."
 }
-# pgAdmin 4 (~673 MB), doc, include e StackBuilder nao sao usados em runtime;
-# wx*.dll/ecpg pertencem a ferramentas fora do fluxo servidor.
-robocopy $pgOrigem $pgDestino /E /NFL /NDL /NJH /NJS /NP `
-    /XD "pgAdmin 4" "doc" "include" "StackBuilder" "symbols" `
-    /XF "wx*.dll" "ecpg.exe" | Out-Null
-if ($LASTEXITCODE -ge 8) { throw "robocopy do PostgreSQL falhou (codigo $LASTEXITCODE)." }
-$LASTEXITCODE = 0
 
-# ------------------------------------------------------ 5) .env da instalacao
-Write-Host "[4/5] Gerando o .env da instalacao..."
-
-# Chaves fixas da instalacao empacotada (as demais vem do template carregado):
-#   PG_EMBARCADO  -> o daemon prepara o cluster na primeira execucao
-#   API_HOST      -> 127.0.0.1: sem prompt de firewall, sem expor a API
-#   ENV           -> "local" passa na checagem anti-defaults de producao
-$forcadas = @{
-    "PRINTGEST_PG_EMBARCADO" = "true"
-    "PRINTGEST_API_HOST"     = "127.0.0.1"
-    "PRINTGEST_ENV"          = "local"
-}
-$conteudo = @($linhas) + @(
-    "",
-    "# Instalacao empacotada (gerado por scripts/empacotar.ps1)"
-) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
-$conteudo | Set-Content -Path (Join-Path $dist "PrintGestAPI\.env") -Encoding utf8
-
-# ------------------------------------------------------------- 6) LEIA-ME
-$leiaMe = @"
-PrintGest ERP $versao
+# ------------------------------------------------------------- 4) LEIA-ME
+$leiaMe = if ($ehServidor) { @"
+PrintGest ERP $versao (Servidor)
 
 PRIMEIRA EXECUCAO
   1. Abra o PrintGest ERP (atalho da area de trabalho / menu Iniciar).
@@ -164,10 +165,30 @@ DESINSTALACAO
   banco local. Os dados do sistema saem junto - exporte antes, se precisar.
 
 Suporte: veja docs/empacotamento.md no repositorio.
-"@
+"@ } else { @"
+PrintGest ERP $versao (Estacao)
+
+ESTA MAQUINA E UMA ESTACAO
+  O sistema e o banco de dados ficam no SERVIDOR da grafica. Este pacote
+  instala apenas o programa; o endereco do servidor foi pedido na instalacao
+  (e pode ser trocado dentro do programa, na tela Conectar ao Servidor).
+
+PRIMEIRA EXECUCAO
+  1. Abra o PrintGest ERP (atalho da area de trabalho / menu Iniciar).
+  2. Se o endereco ainda nao estiver configurado, a tela Conectar ao
+     Servidor pede - use algo como 192.168.0.10:8000.
+  3. Faca login com o usuario criado no servidor (a licenca e a senha
+     sao gerenciadas la).
+
+DESINSTALACAO
+  Use "Desinstalar PrintGest ERP Estacao" no menu Iniciar ou Aplicativos
+  do Windows. Nenhum dado e removido - tudo vive no servidor.
+
+Suporte: veja docs/empacotamento.md no repositorio.
+"@ }
 $leiaMe | Set-Content -Path (Join-Path $pacote "LEIA-ME.txt") -Encoding utf8
 
-# ------------------------------------------- 8) assinatura digital (opcional)
+# ------------------------------------------- 5) assinatura digital (opcional)
 function Resolve-Signtool {
     $candidatos = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" `
         -Recurse -Filter "signtool.exe" -ErrorAction SilentlyContinue |
@@ -178,7 +199,6 @@ function Resolve-Signtool {
 }
 
 function Assinar-Exe([string]$exe, [string]$signtool, [string]$modo) {
-    # $modo: thumbprint (store) ou caminho .pfx
     $carimbo = "http://timestamp.digicert.com"
     if ($env:PRINTGEST_SIGN_CARIMBO) { $carimbo = $env:PRINTGEST_SIGN_CARIMBO }
     $argumentos = @("sign", "/fd", "SHA256", "/tr", $carimbo, "/td", "SHA256")
@@ -199,25 +219,25 @@ function Assinar-Exe([string]$exe, [string]$signtool, [string]$modo) {
 if ($Assinar -ne "") {
     Write-Host "[+] Assinando os executaveis (signtool)..."
     $signtool = Resolve-Signtool
-    foreach ($exe in @(
-        (Join-Path $dist "PrintGest\PrintGest.exe"),
-        (Join-Path $dist "PrintGestAPI\PrintGestAPI.exe")
-    )) {
-        Assinar-Exe $exe $signtool $Assinar
-    }
+    $alvos = @((Join-Path $dist "PrintGest\PrintGest.exe"))
+    if ($ehServidor) { $alvos += (Join-Path $dist "PrintGestAPI\PrintGestAPI.exe") }
+    foreach ($exe in $alvos) { Assinar-Exe $exe $signtool $Assinar }
 } else {
     Write-Host "[i] Sem assinatura digital (-Assinar <thumbprint-ou-.pfx> para assinar)."
     Write-Host "    O Windows pode avisar sobre o SmartScreen na primeira execucao do Setup."
 }
 
-# --------------------------------------------------- 7) instalador Inno Setup
-Write-Host "[5/5] Compilando o instalador Inno Setup..."
+# --------------------------------------------------- 6) instalador Inno Setup
+Write-Host "[4/4] Compilando o instalador Inno Setup (modo: $Modo)..."
 $saidaAbs = Join-Path $raiz $Saida
 if (-not (Test-Path $saidaAbs)) { New-Item -ItemType Directory -Force -Path $saidaAbs | Out-Null }
-& $iscc "/O$saidaAbs" "/DVersaoApp=$versao" (Join-Path $installer "PrintGest.iss")
+$defines = @("/O$saidaAbs", "/DVersaoApp=$versao")
+if (-not $ehServidor) { $defines += "/DModoEstacao" }
+& $iscc $defines (Join-Path $installer "PrintGest.iss")
 if ($LASTEXITCODE -ne 0) { throw "ISCC falhou." }
 
-$setup = Join-Path $saidaAbs "PrintGest-Setup-$versao.exe"
+$setup = Join-Path $saidaAbs "PrintGest-Setup-$versao$sufixo.exe"
+if (-not (Test-Path $setup)) { throw "Setup nao encontrado em $setup (verifique OutputBaseFilename do .iss)." }
 
 # O proprio Setup tambem e assinado (e o que dispara/dispensa o SmartScreen).
 if ($Assinar -ne "") {
@@ -227,4 +247,8 @@ if ($Assinar -ne "") {
 $mb = [math]::Round((Get-Item $setup).Length / 1MB, 1)
 Write-Host ""
 Write-Host "OK: $setup ($mb MB)"
-Write-Host "Instale em outra maquina: execucao dupla, sem UAC (instalacao por usuario)."
+if ($ehServidor) {
+    Write-Host "Maquina SERVIDORA da grafica: duplo clique, sem UAC (instalacao por usuario)."
+} else {
+    Write-Host "Maquina de ESTACAO: duplo clique - o assistente pede o endereco do servidor."
+}

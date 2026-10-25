@@ -17,6 +17,7 @@ import os
 
 RAIZ = os.path.abspath(os.path.join(SPECPATH, ".."))
 BACKEND = os.path.join(RAIZ, "backend")
+ICONE = os.path.join(RAIZ, "desktop", "printgest", "ui", "assets", "printgest.ico")
 
 a = Analysis(
     [os.path.join(BACKEND, "run_server.py")],
@@ -73,6 +74,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=ICONE,
 )
 coll = COLLECT(
     exe,

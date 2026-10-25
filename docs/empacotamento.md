@@ -1,21 +1,29 @@
 # Empacotamento e instalador do PrintGest ERP
 
 Como o sistema vira um pacote instalável em uma máquina sem Python, sem Git e
-sem PostgreSQL pré-instalado: **um instalador único, com desinstalador**, que
-na primeira execução prepara o banco local e pede o serial do RedGest antes do
-login.
+sem PostgreSQL pré-instalado: **instaladores únicos, com desinstalador** — no
+**modo Servidor** (desktop + Local API Service + PostgreSQL embarcado) e no
+**modo Estação** (só o desktop, conectando ao servidor da gráfica).
 
 Tudo aqui é gerado por **um comando**:
 
 ```powershell
+# Servidor (máquina que guarda banco e licença)
 powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
+
+# Estação (usa o servidor da gráfica)
+powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Modo estacao
 ```
 
-Saída: `dist_installer\PrintGest-Setup-<versão>.exe`.
+Saídas: `dist_installer\PrintGest-Setup-<versão>.exe` (Servidor) e
+`PrintGest-Setup-<versão>Estacao.exe` (Estação). Os dois convivem na mesma
+máquina (AppIds e pastas distintas).
 
 ---
 
 ## 1. Arquitetura da instalação
+
+### Modo Servidor (a máquina que guarda banco e licença)
 
 ```
 {localappdata}\Programs\PrintGest        (instalação por usuário, sem UAC)
@@ -29,6 +37,24 @@ Saída: `dist_installer\PrintGest-Setup-<versão>.exe`.
 │   └── data\                            cluster — criado pelo initdb na 1ª execução
 └── unins000.exe                          desinstalador (gerado pelo Inno Setup)
 ```
+
+### Modo Estação (usa o servidor da gráfica)
+
+```
+{localappdata}\Programs\PrintGestEstacao
+├── PrintGest\
+│   ├── PrintGest.exe
+│   └── .env                              PRINTGEST_API_URL=<servidor> + MODO_ESTACAO=sim
+└── unins000.exe
+```
+
+Sem backend e sem PostgreSQL: o assistente de instalação **pergunta o endereço
+do servidor** (ex.: `192.168.0.10:8000`) e grava no `.env` ao lado do exe — o
+desktop lê esse arquivo ao iniciar (`main._carregar_env_do_executavel`).
+Instalação silenciona usa endereço vazio e o usuário informa na tela
+**Conectar ao Servidor** (D6). O gate de serial não existe na estação: a
+licença pertence ao servidor, que aplica o modo de leitura quando algo não
+está em ordem.
 
 **Ciclo de vida**
 
@@ -48,6 +74,11 @@ Saída: `dist_installer\PrintGest-Setup-<versão>.exe`.
 
 ## 2. Por que essas decisões
 
+- **Ícones do produto**: `ui/assets/printgest.ico` (16–256 px, gerado de
+  `printgest-icone.svg` por `desktop/tools/gerar_ico.py` — Qt rasteriza,
+  Pillow empacota) vai no exe (PyInstaller `icon=`), no Setup e na
+  desinstalação (Inno `SetupIconFile`/`UninstallDisplayIcon`) e na taskbar
+  (`app.setWindowIcon`). Regenerar quando o logo mudar.
 - **Instalação por usuário (`PrivilegesRequired=lowest`)**: o cluster do
   PostgreSQL é gravado dentro da pasta do app — em `Program Files` o usuário
   comum não teria permissão de escrita. Bônus: zero prompt de UAC.
