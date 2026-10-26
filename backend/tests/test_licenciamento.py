@@ -668,6 +668,65 @@ def test_ativacao_define_janela_de_tolerancia(client, monkeypatch):
     assert janela.total_seconds() == settings.licenca_tolerancia_horas * 3600
 
 
+# --- M0 (PRD v3.0 §2): módulos do plano chegam pelo RedGest -----------------------
+
+
+def test_modulos_do_plano_sao_persistidos_no_entitlements(client, monkeypatch):
+    """Com `modulos` no payload (topo ou dentro de entitlements): gravados."""
+    modulos = ["cadastros", "caixa", "movimento", "fiscal"]
+    _mock(monkeypatch, _resposta_ok(modulos=modulos))
+    resp = _ativar(client)
+    assert resp.status_code == 200, resp.text
+
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        lic = licensa_service._licenca_local(db)
+        assert lic.entitlements["modulos"] == sorted(modulos)
+        assert licensa_service.MODULOS_HABILITADOS == set(modulos)
+    finally:
+        db.close()
+
+
+def test_modulos_dentro_do_entitlements_do_payload_tambem_valem(client, monkeypatch):
+    """Formato alternativo: `{"entitlements": {"modulos": [...]}}` no payload."""
+    modulos = ["projetos"]
+    resposta = _resposta_ok()
+    corpo = json.loads(resposta.read())
+    corpo["entitlements"] = {"modulos": modulos}
+    _mock(monkeypatch, httpx.Response(200, json=corpo))
+    resp = _ativar(client)
+    assert resp.status_code == 200, resp.text
+
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        lic = licensa_service._licenca_local(db)
+        assert lic.entitlements["modulos"] == modulos
+        assert licensa_service.MODULOS_HABILITADOS == {"projetos"}
+    finally:
+        db.close()
+
+
+def test_payload_sem_modulos_deixa_a_chave_fora(client, monkeypatch):
+    """Sem a lista: nada libera (regra do PRD) — a chave nem existe."""
+    _mock(monkeypatch, _resposta_ok())
+    resp = _ativar(client)
+    assert resp.status_code == 200, resp.text
+
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        lic = licensa_service._licenca_local(db)
+        assert "modulos" not in (lic.entitlements or {})
+        assert licensa_service.MODULOS_HABILITADOS == set()
+    finally:
+        db.close()
+
+
 def test_vigencia_vencida_dentro_da_tolerancia_opera_normal(
     client, admin_token, monkeypatch
 ):

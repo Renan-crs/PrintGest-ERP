@@ -217,6 +217,12 @@ def _persistir(db: Session, dados: dict, *, codigo: str, cnpj: str) -> Licenca:
     _atualizar_credenciais(lic, dados)
     entitlements = dict(lic.entitlements or {})
     entitlements.pop("motivo_codigo", None)
+    # M0 (PRD v3.0 §2): o payload é autoritativo quanto aos módulos — sem a
+    # lista, o valor antigo sai (a chave é recopiada ao topo para o gating).
+    modulos = svc._modulos_do_payload(dados)
+    entitlements.pop("modulos", None)
+    if modulos is not None:
+        entitlements["modulos"] = modulos
     entitlements["contrato"] = "b"
     entitlements["cnpj"] = cnpj
     if dados.get("licenca_id"):
