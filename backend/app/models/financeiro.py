@@ -28,6 +28,8 @@ from app.models.enums import (
 )
 
 
+from decimal import Decimal
+
 class PlanoContas(Base):
     __tablename__ = "plano_contas"
 
@@ -79,8 +81,8 @@ class ContaReceber(Base):
     parcela: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     total_parcelas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     vencimento: Mapped[date] = mapped_column(Date, nullable=False)
-    valor: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
-    valor_pago: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    valor_pago: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     status: Mapped[StatusConta] = mapped_column(
         pg_enum(StatusConta), nullable=False, server_default=StatusConta.ABERTA.value
     )
@@ -127,8 +129,8 @@ class ContaPagar(Base):
     parcela: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     total_parcelas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     vencimento: Mapped[date] = mapped_column(Date, nullable=False)
-    valor: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
-    valor_pago: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    valor_pago: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     status: Mapped[StatusConta] = mapped_column(
         pg_enum(StatusConta), nullable=False, server_default=StatusConta.ABERTA.value
     )
@@ -174,7 +176,7 @@ class Caixa(Base):
     data_abertura: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    valor_abertura: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_abertura: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     data_fechamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     valor_esperado: Mapped[float | None] = mapped_column(Numeric(14, 2))
     valor_informado: Mapped[float | None] = mapped_column(Numeric(14, 2))
@@ -208,7 +210,7 @@ class MovimentoCaixa(Base):
         BigInteger, ForeignKey("conta_pagar.id")
     )
     descricao: Mapped[str | None] = mapped_column(String(255))
-    valor: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     usuario_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

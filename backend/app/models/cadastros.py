@@ -29,6 +29,8 @@ from app.models.enums import (
 )
 
 
+from decimal import Decimal
+
 class Cliente(Base):
     __tablename__ = "cliente"
     __table_args__ = (
@@ -79,7 +81,7 @@ class Cliente(Base):
     sinal: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
-    sinal_pct: Mapped[float] = mapped_column(
+    sinal_pct: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False, server_default="50"
     )
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
@@ -155,7 +157,7 @@ class Funcionario(Base):
     e_producao: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
-    comissao_pct: Mapped[float] = mapped_column(Numeric(6, 3), server_default="0")
+    comissao_pct: Mapped[Decimal] = mapped_column(Numeric(6, 3), server_default="0")
     observacoes: Mapped[str | None] = mapped_column(Text)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
@@ -219,13 +221,13 @@ class Produto(Base):
     controla_estoque: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )
-    preco_custo: Mapped[float] = mapped_column(
+    preco_custo: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default="0"
     )
-    preco_venda: Mapped[float] = mapped_column(
+    preco_venda: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default="0"
     )
-    estoque_minimo: Mapped[float] = mapped_column(
+    estoque_minimo: Mapped[Decimal] = mapped_column(
         Numeric(12, 3), nullable=False, server_default="0"
     )
     dimensoes: Mapped[str | None] = mapped_column(String(40))
@@ -259,10 +261,10 @@ class ProdutoEstoque(Base):
     produto_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("produto.id"), nullable=False
     )
-    saldo: Mapped[float] = mapped_column(
+    saldo: Mapped[Decimal] = mapped_column(
         Numeric(12, 3), nullable=False, server_default="0"
     )
-    reservado: Mapped[float] = mapped_column(
+    reservado: Mapped[Decimal] = mapped_column(
         Numeric(12, 3), nullable=False, server_default="0"
     )
     atualizado_em: Mapped[datetime] = mapped_column(
@@ -287,9 +289,9 @@ class MovimentoEstoque(Base):
     tipo: Mapped[TipoMovEstoque] = mapped_column(pg_enum(TipoMovEstoque), nullable=False)
     origem: Mapped[OrigemMov] = mapped_column(pg_enum(OrigemMov), nullable=False)
     documento_id: Mapped[int | None] = mapped_column(BigInteger)
-    quantidade: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
-    saldo_anterior: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
-    saldo_posterior: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    saldo_anterior: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    saldo_posterior: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     motivo: Mapped[str | None] = mapped_column(String(255))
     usuario_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(
