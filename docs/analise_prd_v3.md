@@ -52,11 +52,12 @@ Recomendação: trocar "equivale" por "aproximadamente" e declarar que **a
 fórmula normativa é a sequencial** (CP arredondado antes do VO), com o teste de
 paridade rodando sobre a sequencial.
 
-**Q-01 (markup × margem):** se os 6% fossem **margem sobre o preço final**, a
-fórmula seria `VO = CP ÷ 0,94` → 244,68 (≠ 243,80) e 213,73 (≠ 212,96).
-Diferença de ~0,4% que compõe ao longo do mês. A interpretação assumida
-(acréscimo/markup) é a mais comum em gráfica — **confirmar com o responsável
-com esses dois números na mesa** antes de implementar.
+**Q-01 (markup × margem):** **RESOLVIDO (26/10/2026) — confirmado pelo
+responsável: markup** ("VF + 130% é custo; custo + 6% é markup"), ou seja
+`VO = CP × 1,06`. A alternativa `VO = CP ÷ 0,94` está descartada. Consequência
+aplicada no PRD: parâmetro renomeado de `margem_orcamento_pct` para
+`markup_orcamento_pct` (o nome antigo reintroduziria exatamente a ambiguidade
+resolvida).
 
 ## 3. A lacuna central: gating por plano não existe no servidor
 
@@ -96,10 +97,12 @@ persistido nem possui a chave. Consequências para o plano:
   `ver_custo_terceiro` perca o VF após salvar é a parte mais sutil — exige
   schema próprio e vale um teste dedicado.
 - **Auditoria append-only** (`log_campo_sensivel`): nova tabela; nada contra.
-- **D-03 (links públicos)**: coerente com "Local API Service nunca exposto".
-  Dependência externa de hospedagem (relay no RedGest ou serviço dedicado) —
-  sugerir **fallback de aprovação presencial** (cliente assina na tela do
-  atendente) para o M3 caso o relay atrase, para não bloquear o módulo `arte`.
+- **D-03 (links públicos)**: **decidido (26/10/2026): relay hospedado com
+  token de uso único, implementado no M3 junto ao módulo `arte`** — coerente
+  com "Local API Service nunca exposto". Dependência externa de hospedagem
+  (relay no RedGest ou serviço dedicado) — manter o **fallback de aprovação
+  presencial** (cliente assina na tela do atendente) como guarda, para o caso
+  de o relay atrasar e não bloquear o módulo `arte`.
 - **Roadmap — M0 × M1**: "M1 antes de qualquer outra entrega" contradiz o M0
   listado antes. Recomendo a redação: "M0 é pré-requisito imediato de M1 e
   pequeno (matriz + gating + integração caixa); M1 é a primeira entrega de
@@ -162,11 +165,11 @@ convite à ação, motion deliberado de 160 ms, microcopy PT-BR). Aplicação à
 
 ## 7. Q-02 a Q-04 e D-02/D-04/D-05 — recomendações rápidas
 
-| Item | Recomendação |
+| Item | Recomendação / Situação |
 | --- | --- |
 | **Q-02** (VF inclui frete/impostos?) | Manter **campo único** (assumido) + observação livre no lançamento da cotação registrando a composição. Se houver registro recorrente de divergência, promover a campo no M2 |
 | **Q-03** (cliente vê só total) | Manter — coerente com a confidencialidade; o documento do cliente é "proposta" (descrição + total), nunca orçamento interno |
-| **Q-04** (% por fornecedor/serviço) | Prevista como sobrescrita — **escopo M1: global apenas**; sobrescrita no M2 (evita inflar o núcleo) |
+| **Q-04** (% por fornecedor/serviço) | **Decidido (26/10/2026): sobrescrita opcional no M2** — fora do escopo do M1, como recomendado |
 | **D-02** (licença C++) | Concordo com o PRD: opcional, sem evidência de pirataria; o modo leitura + DPAPI já responde |
 | **D-04** (apontamento) | QR na OS impressa + tela desktop simples no M4 (como proposto); touch web só após D-01 |
 | **D-05** (produto × serviço) | Confirmado: **bloqueia modelagem** — validar com contador antes do M5, não antes do M1 (não trava o orçamento com fornecedor) |
@@ -190,12 +193,11 @@ convite à ação, motion deliberado de 160 ms, microcopy PT-BR). Aplicação à
 
 ## 9. Checklist de validação para o responsável
 
-1. **Q-01**: 130% + 6% são markup sobre a base? (mostrar 243,80 vs 244,68).
+1. ~~**Q-01**: 130% + 6% são markup sobre a base?~~ **✅ Decidido (26/10/2026): markup.**
 2. **Q-02**: VF inclui frete/impostos? (assumido sim).
-3. **Q-04**: sobrescrita de % por fornecedor/serviço entra no M1 ou M2?
-   (recomendo M2).
+3. ~~**Q-04**: sobrescrita de % por fornecedor/serviço entra no M1 ou M2?~~ **✅ Decidido (26/10/2026): M2.**
 4. **D-01**: aceitar M0–M2 em Python com critério de decisão ao fim de M2?
-5. **D-03**: relay no RedGest × serviço dedicado × fallback presencial no M3?
+5. ~~**D-03**: relay no RedGest × serviço dedicado × fallback presencial no M3?~~ **✅ Decidido (26/10/2026): relay com token de uso único, implementado no M3 junto ao módulo `arte`.**
 6. Matriz de planos: fiscal no Profissional e caixa no Essencial confirmados?
 7. Piso de preço e permissão de Gerente (3.1): limite padrão inicial?
 
