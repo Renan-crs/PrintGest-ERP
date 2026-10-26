@@ -35,6 +35,8 @@ _HOST = "127.0.0.1:5432"
 BASE_URL = f"postgresql+psycopg://printgest:printgest@{_HOST}"
 TEST_DB_URL = f"{BASE_URL}/{TEST_DB}"
 
+from app.core.config import settings  # noqa: E402 — depois das chaves de env acima
+
 
 def _criar_banco() -> None:
     with psycopg.connect(f"host=127.0.0.1 port=5432 dbname=postgres user=printgest") as conn:
@@ -122,6 +124,52 @@ def admin_token(client):
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["token"]
+
+
+@ pytest.fixture
+def caixa_admin(_banco_teste):
+    """Caixa aberto para o usuário admin — vendas de balcão o exigem (M0).
+
+    Abre no início e remove as linhas no fim (movimentos + caixa) para não
+    vazar estado entre testes — o índice único (filial, usuário | status
+    'aberto') impediria uma segunda abertura.
+    """
+    from app.db import SessionLocal
+    from app.models.core import Usuario
+    from app.models.enums import StatusCaixa
+    from app.models.financeiro import Caixa, MovimentoCaixa
+    from app.services import financeiro_service
+
+    db = SessionLocal()
+    try:
+        admin = (
+            db.query(Usuario)
+            .filter(Usuario.login == settings.admin_inicial_login)
+            .first()
+        )
+        caixa = financeiro_service.caixa_aberto(
+            db, filial_id=admin.filial_id, usuario_id=admin.id
+        )
+        criado = False
+        if caixa is None:
+            from app.schemas.financeiro import AbrirCaixaIn
+
+            caixa = financeiro_service.abrir_caixa(
+                db,
+                filial_id=admin.filial_id,
+                usuario_id=admin.id,
+                dados=AbrirCaixaIn(valor_abertura=0, observacoes="caixa do teste"),
+            )
+            criado = True
+        yield caixa
+        if criado:
+            db.query(MovimentoCaixa).filter(
+                MovimentoCaixa.caixa_id == caixa.id
+            ).delete()
+            db.query(Caixa).filter(Caixa.id == caixa.id).delete()
+            db.commit()
+    finally:
+        db.close()
 
 
 def auth(client, token):

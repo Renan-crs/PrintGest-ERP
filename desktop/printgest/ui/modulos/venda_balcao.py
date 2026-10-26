@@ -615,6 +615,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         layout.setSpacing(12)
         layout.addWidget(self._barra_titulo())
 
+        # M0 (PRD v3.0 §2): o PDV não opera com caixa fechado — o banner orienta
+        # e leva direto à tela de abertura; o servidor continua sendo quem
+        # bloqueia (409 "Caixa fechado").
+        layout.addWidget(self._montar_banner_caixa())
+
         self._vistas = QStackedWidget()
         self._vista_venda = self._montar_vista_venda()
         self._vista_historico = self._montar_vista_historico()
@@ -995,6 +1000,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._vistas.setCurrentIndex(0)
         self._botao_venda.setChecked(True)
         self._botao_historico.setChecked(False)
+        self._verificar_caixa()
         if not self._modo_leitura:
             self._itens_editor.focar_busca()
 
@@ -1245,7 +1251,43 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             [(r["id"], r["nome"]) for r in vendedores]
         )
 
+    def _montar_banner_caixa(self) -> QWidget:
+        self._banner_caixa = QWidget()
+        self._banner_caixa.setObjectName("bannerAviso")
+        linha = QHBoxLayout(self._banner_caixa)
+        linha.setContentsMargins(12, 8, 12, 8)
+        linha.setSpacing(10)
+        rotulo = QLabel("Caixa fechado — abra o caixa antes de registrar vendas.")
+        rotulo.setProperty("role", "atencao")
+        linha.addWidget(rotulo, 1)
+        botao = QPushButton("Abrir caixa")
+        botao.setObjectName("acaoLinha")
+        botao.clicked.connect(self._abrir_tela_caixa)
+        linha.addWidget(botao)
+        self._banner_caixa.setVisible(False)
+        return self._banner_caixa
+
+    def _abrir_tela_caixa(self) -> None:
+        alvo = "caixa" if pode_abrir(self._nivel, "caixa") else "financeiro"
+        self.navegar.emit(alvo)
+
+    def _verificar_caixa(self) -> None:
+        """Consulta o caixa do vendedor logado; `None` = fechado → banner."""
+        if self._modo_leitura or not self._api.autenticado:
+            return
+
+        def ok(caixa) -> None:
+            self._banner_caixa.setVisible(caixa is None)
+
+        def erro(_msg) -> None:
+            # Sem resposta do daemon: o banner fica como está — quem bloqueia
+            # é o servidor (409 com a mensagem clara no Finalizar).
+            pass
+
+        tarefas.rodar(self._api.caixa_atual, ok, erro)
+
     def showEvent(self, evento) -> None:  # noqa: N802 (API do Qt)
         super().showEvent(evento)
+        self._verificar_caixa()
         if self._vistas.currentIndex() == 0 and not self._modo_leitura:
             self._itens_editor.focar_busca()

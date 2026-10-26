@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QMessageBox
+from PySide6.QtWidgets import QLabel, QMessageBox, QPushButton
 
 from printgest.core.api import Api
 from printgest.ui.modulos.venda_balcao import PaginaVendaBalcao
@@ -58,9 +58,26 @@ _PRODUTOS = [
 
 _GETS: list[httpx.Request] = []
 _ESCRITAS: list[tuple[str, str, str]] = []
+_CAIXA_ABERTO: dict = {"valor": True}
 
 
 def _handler(request: httpx.Request) -> httpx.Response:
+    if request.method == "GET" and request.url.path == "/v1/financeiro/caixa/atual":
+        # M0: o PDV consulta o caixa do vendedor logado. O estado vem da
+        # variável global _CAIXA_ABERTO controlada por cada teste.
+        dado = (
+            {
+                "id": 7,
+                "status": "aberto",
+                "data_abertura": "2026-10-26T08:00:00",
+                "valor_abertura": "0",
+                "saldo": "0",
+                "usuario_id": 1,
+            }
+            if _CAIXA_ABERTO["valor"]
+            else None
+        )
+        return httpx.Response(200, json={"data": dado})
     if request.method == "GET" and request.url.path == "/v1/vendas":
         _GETS.append(request)
         status = request.url.params.get("status_venda")
@@ -100,6 +117,7 @@ def _api() -> Api:
 def pagina():
     _GETS.clear()
     _ESCRITAS.clear()
+    _CAIXA_ABERTO["valor"] = True
     return PaginaVendaBalcao(_api())
 
 
@@ -362,6 +380,44 @@ def test_remover_item_atualiza_grade(app, pumpar, pagina):
     pagina._itens_editor._remover_linha(0)
     assert pagina._itens_editor._tabela.rowCount() == 1
     assert len(pagina._itens_editor.valor()) == 1
+
+
+# --- M0 (PRD v3.0 §2): PDV não opera com caixa fechado ------------------------
+
+
+def test_banner_de_caixa_fechado_orienta_e_leva_a_tela_de_abertura(app, pumpar, monkeypatch):
+    """Caixa fechado: banner visível + botão navega para abrir o caixa."""
+    _CAIXA_ABERTO["valor"] = False
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    api.autenticar({"token": "t", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
+    pagina = PaginaVendaBalcao(api, nivel="admin")
+    pumpar(lambda: not pagina._banner_caixa.isHidden())
+
+    alvo = []
+    pagina.navegar.connect(alvo.append)
+    pagina._banner_caixa.findChild(QPushButton).click()
+    assert alvo == ["caixa"]  # admin pode abrir a tela de caixa direto
+
+
+def test_banner_de_caixa_sumindo_quando_o_caixa_esta_aberto(app, pumpar):
+    _CAIXA_ABERTO["valor"] = True  # teste anterior pode ter fechado
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    api.autenticar({"token": "t", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
+    pagina = PaginaVendaBalcao(api, nivel="admin")
+    pumpar(lambda: pagina._banner_caixa.isHidden())
+
+
+def test_banner_reaparece_ao_voltar_para_a_venda(app, pumpar, monkeypatch):
+    """Voltar do Financeiro (caixa reaberto/fechado) reconfere o estado."""
+    _CAIXA_ABERTO["valor"] = True
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    api.autenticar({"token": "t", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
+    pagina = PaginaVendaBalcao(api, nivel="admin")
+    pumpar(lambda: pagina._banner_caixa.isHidden())
+
+    _CAIXA_ABERTO["valor"] = False
+    pagina._ir_para_venda()
+    pumpar(lambda: not pagina._banner_caixa.isHidden())
 
 
 # --- Revisão PDV out/2026 (Fase A — itens 1 a 8 e 17) ---------------------------

@@ -5,6 +5,10 @@ sem PostgreSQL pré-instalado: **instaladores únicos, com desinstalador** — n
 **modo Servidor** (desktop + Local API Service + PostgreSQL embarcado) e no
 **modo Estação** (só o desktop, conectando ao servidor da gráfica).
 
+> **M0/PRD v3.0:** o PDV agora exige **caixa aberto** para o vendedor logado
+> (`409 "Caixa fechado"` no servidor + banner na tela). Primeira coisa a fazer
+> em uma instalação nova: Financeiro → **Caixa** → *Abrir caixa*.
+
 Tudo aqui é gerado por **um comando**:
 
 ```powershell

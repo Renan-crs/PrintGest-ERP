@@ -72,7 +72,7 @@ def _saldo(client, admin_token, produto_id) -> Decimal:
     return Decimal(linha["saldo"])
 
 
-def test_venda_baixa_estoque_e_registra_kardex(client, admin_token):
+def test_venda_baixa_estoque_e_registra_kardex(client, admin_token, caixa_admin):
     produto = _criar_produto(client, admin_token)
     _entrada(client, admin_token, produto["id"], 10)
 
@@ -94,7 +94,31 @@ def test_venda_baixa_estoque_e_registra_kardex(client, admin_token):
     assert Decimal(mov["quantidade"]) == Decimal("3")
 
 
-def test_venda_estoque_insuficiente_409(client, admin_token):
+# --- M0 (PRD v3.0 §2): o PDV não opera com caixa fechado --------------------------
+
+
+def test_venda_com_caixa_fechado_e_recusada(client, admin_token):
+    """Sem caixa aberto para o vendedor logado: 409 com orientação clara."""
+    produto = _criar_produto(client, admin_token)
+    _entrada(client, admin_token, produto["id"], 10)
+
+    resp = _vender(client, admin_token, produto["id"])
+    assert resp.status_code == 409, resp.text
+    assert "Caixa fechado" in resp.json()["detail"]
+    # Nada foi persistido: o estoque segue intacto.
+    assert _saldo(client, admin_token, produto["id"]) == Decimal("10")
+
+
+def test_venda_com_caixa_aberto_passa(client, admin_token, caixa_admin):
+    produto = _criar_produto(client, admin_token)
+    _entrada(client, admin_token, produto["id"], 10)
+
+    resp = _vender(client, admin_token, produto["id"])
+    assert resp.status_code == 200, resp.text
+    assert str(caixa_admin.status.value) == "aberto"
+
+
+def test_venda_estoque_insuficiente_409(client, admin_token, caixa_admin):
     produto = _criar_produto(client, admin_token)
     _entrada(client, admin_token, produto["id"], 1)
 
@@ -105,7 +129,7 @@ def test_venda_estoque_insuficiente_409(client, admin_token):
     assert _saldo(client, admin_token, produto["id"]) == Decimal("1")
 
 
-def test_cancelar_venda_estorna_estoque(client, admin_token):
+def test_cancelar_venda_estorna_estoque(client, admin_token, caixa_admin):
     produto = _criar_produto(client, admin_token)
     _entrada(client, admin_token, produto["id"], 10)
     venda = _vender(client, admin_token, produto["id"], quantidade=4).json()["data"]
@@ -116,7 +140,7 @@ def test_cancelar_venda_estorna_estoque(client, admin_token):
     assert _saldo(client, admin_token, produto["id"]) == Decimal("10")
 
 
-def test_venda_busca_por_cliente_e_numero(client, admin_token):
+def test_venda_busca_por_cliente_e_numero(client, admin_token, caixa_admin):
     """Regressão: `GET /v1/vendas?q=` estourava NameError (String/cliente_nome)."""
     cliente = _criar_cliente(client, admin_token, nome=f"Gráfica Rápida {_u()}")
     produto = _criar_produto(client, admin_token)
@@ -142,7 +166,7 @@ def test_venda_busca_por_cliente_e_numero(client, admin_token):
     assert venda["id"] in [v["id"] for v in por_numero.json()["data"]]
 
 
-def test_venda_cliente_inexistente_409(client, admin_token):
+def test_venda_cliente_inexistente_409(client, admin_token, caixa_admin):
     produto = _criar_produto(client, admin_token)
     _entrada(client, admin_token, produto["id"], 3)
     resp = _vender(client, admin_token, produto["id"], cliente_id=999999)
