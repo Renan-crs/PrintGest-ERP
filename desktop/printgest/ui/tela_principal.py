@@ -1102,7 +1102,7 @@ class TelaPrincipal(QMainWindow):
 
     def _definir_filial(self, nome: str) -> None:
         self._lbl_filial.setText(nome)
-        self._lbl_filial.setToolTip("Filial do resumo carregado")
+        self._lbl_filial.setToolTip("Unidade em uso (matriz ou filial)")
 
     def _rodape(self) -> QWidget:
         rodape = QWidget()

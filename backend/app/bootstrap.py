@@ -31,7 +31,9 @@ def _empresa() -> Empresa:
             db.flush()
         filial = db.query(Filial).filter(Filial.empresa_id == empresa.id).first()
         if not filial:
-            filial = Filial(empresa_id=empresa.id, nome="Filial Matriz")
+            # A primeira unidade é a MATRIZ, não uma filial — o nome "Filial
+            # Matriz" era contraditório na top bar (ou é matriz, ou é filial).
+            filial = Filial(empresa_id=empresa.id, nome="Matriz")
             db.add(filial)
             db.flush()
         admin = db.query(Usuario).filter(Usuario.login == settings.admin_inicial_login).first()

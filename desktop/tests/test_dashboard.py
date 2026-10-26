@@ -26,7 +26,7 @@ from printgest.ui.tela_principal import TelaPrincipal
 _HOJE = date.today()
 
 
-def _resumo(dias: int = 7, filial: str = "Filial Matriz") -> dict:
+def _resumo(dias: int = 7, filial: str = "Matriz") -> dict:
     realizado = [
         {"data": (_HOJE - timedelta(days=i)).isoformat(), "valor": f"{i * 10 + 5}.00"}
         for i in range(dias)
@@ -136,7 +136,7 @@ def test_admin_ve_cards_reais_e_filial_no_cabecalho(app, pumpar):
     assert len(inicio._barras_previsto) == 7
 
     # filial chega no cabeçalho pelo signal do resumo
-    assert principal._lbl_filial.text() == "Filial Matriz"
+    assert principal._lbl_filial.text() == "Matriz"
 
 
 def test_kpis_pluralizam_corretamente(app, pumpar):

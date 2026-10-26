@@ -106,7 +106,7 @@ def test_resumo_dashboard_envia_token_e_parse():
         assert request.headers["authorization"] == "Bearer tok"
         return _resposta(
             {
-                "filial_nome": "Filial Matriz",
+                "filial_nome": "Matriz",
                 "vendas_hoje_qtd": 3,
                 "vendas_hoje_valor": "184.70",
                 "os_abertas": 2,
@@ -119,7 +119,7 @@ def test_resumo_dashboard_envia_token_e_parse():
     api = _api(handler)
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
     dados = api.resumo_dashboard()
-    assert dados["filial_nome"] == "Filial Matriz"
+    assert dados["filial_nome"] == "Matriz"
     assert dados["vendas_hoje_qtd"] == 3
     assert dados["os_prontas"] == 1
 

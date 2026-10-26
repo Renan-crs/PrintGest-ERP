@@ -175,7 +175,7 @@ def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token):
 
     dados = _resumo(client, admin_token)
 
-    assert dados["filial_nome"] == "Filial Matriz"
+    assert dados["filial_nome"] == "Matriz"
     assert dados["vendas_hoje_qtd"] == base["vendas_hoje_qtd"] + 1
     assert Decimal(dados["vendas_hoje_valor"]) == Decimal(base["vendas_hoje_valor"]) + Decimal("25.00")
     # compare com ontem
@@ -253,7 +253,7 @@ def test_resumo_dashboard_caixa_esconde_campos_operacionais_e_gerenciais(
     token_caixa = _criar_usuario(client, admin_token, NivelAcesso.CAIXA)
     dados = _resumo(client, token_caixa)
 
-    assert dados["filial_nome"] == "Filial Matriz"
+    assert dados["filial_nome"] == "Matriz"
     assert dados["vendas_hoje_qtd"] == base_admin["vendas_hoje_qtd"] + 1
     # RBAC server-side: caixa não vê operacional nem gerencial.
     assert dados["projetos_em_producao"] is None
