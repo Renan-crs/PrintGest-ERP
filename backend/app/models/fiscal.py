@@ -21,6 +21,8 @@ from app.db import Base
 from app.models.enums import ModeloFiscal, StatusFiscal, pg_enum
 
 
+from decimal import Decimal
+
 class DocumentoFiscal(Base):
     __tablename__ = "documento_fiscal"
     __table_args__ = (
@@ -59,7 +61,7 @@ class DocumentoFiscal(Base):
         BigInteger, ForeignKey("ordem_servico.id")
     )
     cliente_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("cliente.id"))
-    valor_nota: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_nota: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     xml_path: Mapped[str | None] = mapped_column(String(500))
     danfe_path: Mapped[str | None] = mapped_column(String(500))
     protocolo: Mapped[str | None] = mapped_column(String(30))

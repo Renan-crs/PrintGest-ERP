@@ -18,6 +18,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
 
+from decimal import Decimal
+
 class PrecoReajusteHistorico(Base):
     __tablename__ = "preco_reajuste_historico"
     __table_args__ = (
@@ -36,7 +38,7 @@ class PrecoReajusteHistorico(Base):
         BigInteger, ForeignKey("usuario.id"), nullable=False
     )
     tipo_reajuste: Mapped[str] = mapped_column(String(12), nullable=False)
-    valor_reajuste: Mapped[float] = mapped_column(Numeric(14, 4), nullable=False)
+    valor_reajuste: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     criterio: Mapped[str] = mapped_column(Text, nullable=False)
     itens_afetados: Mapped[int] = mapped_column(Integer, nullable=False)
     detalhes: Mapped[list] = mapped_column(JSONB, nullable=False)

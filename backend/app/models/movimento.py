@@ -34,6 +34,8 @@ from app.models.enums import (
 )
 
 
+from decimal import Decimal
+
 class OrdemServico(Base):
     __tablename__ = "ordem_servico"
     __table_args__ = (
@@ -85,9 +87,9 @@ class OrdemServico(Base):
     data_previsao_entrega: Mapped[date | None] = mapped_column(Date)
     data_conclusao: Mapped[date | None] = mapped_column(Date)
     data_entrega: Mapped[date | None] = mapped_column(Date)
-    desconto: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    valor_itens: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    valor_total: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    desconto: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_itens: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     forma_pagamento: Mapped[FormaPagamento | None] = mapped_column(
         pg_enum(FormaPagamento)
     )
@@ -138,11 +140,11 @@ class OrdemServicoItem(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     produto_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("produto.id"))
     descricao_avulsa: Mapped[str | None] = mapped_column(String(255))
-    quantidade: Mapped[float] = mapped_column(Numeric(12, 3), server_default="1")
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="1")
     dimensoes: Mapped[str | None] = mapped_column(String(40))
-    valor_unitario: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    desconto: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    valor_total: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    desconto: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     executado: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     os: Mapped[OrdemServico] = relationship(back_populates="itens")
@@ -190,9 +192,9 @@ class VendaBalcao(Base):
     data_venda: Mapped[date] = mapped_column(
         Date, nullable=False, server_default=func.current_date()
     )
-    valor_itens: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    desconto: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    valor_total: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_itens: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    desconto: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     forma_pagamento: Mapped[FormaPagamento] = mapped_column(
         pg_enum(FormaPagamento), nullable=False
     )
@@ -238,10 +240,10 @@ class VendaBalcaoItem(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     produto_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("produto.id"))
     descricao_avulsa: Mapped[str | None] = mapped_column(String(255))
-    quantidade: Mapped[float] = mapped_column(Numeric(12, 3), server_default="1")
-    valor_unitario: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    desconto: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    valor_total: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="1")
+    valor_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    desconto: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
 
     venda: Mapped[VendaBalcao] = relationship(back_populates="itens")
 
@@ -274,7 +276,7 @@ class PedidoCompra(Base):
     )
     previsao_entrega: Mapped[date | None] = mapped_column(Date)
     data_recebimento: Mapped[date | None] = mapped_column(Date)
-    valor_total: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     observacoes: Mapped[str | None] = mapped_column(Text)
     solicitante_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("usuario.id")
@@ -316,10 +318,10 @@ class PedidoCompraItem(Base):
         BigInteger, ForeignKey("produto.id"), nullable=False
     )
     descricao_avulsa: Mapped[str | None] = mapped_column(String(255))
-    quantidade: Mapped[float] = mapped_column(Numeric(12, 3), server_default="1")
-    quantidade_recebida: Mapped[float] = mapped_column(Numeric(12, 3), server_default="0")
-    valor_unitario: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
-    valor_total: Mapped[float] = mapped_column(Numeric(14, 2), server_default="0")
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="1")
+    quantidade_recebida: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="0")
+    valor_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
 
     pedido: Mapped[PedidoCompra] = relationship(back_populates="itens")
 
