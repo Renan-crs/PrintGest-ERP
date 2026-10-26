@@ -102,11 +102,11 @@ Pequenas gráficas dependem de fornecedores para parte dos serviços (acabamento
 | --- | --- | --- |
 | **VF** | Valor do fornecedor | Valor total cobrado pelo fornecedor pelo serviço cotado |
 | **CP** | Custo de produção | `CP = VF + 130% de VF = VF × 2,30` |
-| **VO** | Valor do orçamento | `VO = CP + 6% de CP = CP × 1,06` (equivale a `VF × 2,438`) |
+| **VO** | Valor do orçamento | `VO = CP + 6% de CP = CP × 1,06` (≈ `VF × 2,438`; a fórmula normativa é a sequencial, com CP arredondado antes do VO) |
 
-- Os dois percentuais são **acréscimos sobre a base anterior** (markup), não margem sobre o preço final. *Premissa a confirmar (seção 9).*
-- Os percentuais são **parâmetros** (Configurações > Precificação, somente Admin): `acrescimo_fornecedor_pct = 130` e `margem_orcamento_pct = 6`. Podem ter sobrescrita por fornecedor ou por categoria de serviço terceirizado.
-- **Arredondamento** (modo único, meio para cima, 2 casas): primeiro `CP` é arredondado; `VO` é calculado a partir do `CP` já arredondado.
+- Os dois percentuais são **acréscimos sobre a base anterior** (markup), não margem sobre o preço final. **Decidido com o responsável em 26/10/2026 (Q-01): confirmado** — "VF + 130% é custo; custo + 6% é markup". O parâmetro foi renomeado de `margem_orcamento_pct` para **`markup_orcamento_pct`** justamente para não reintroduzir a confusão.
+- Os percentuais são **parâmetros** (Configurações > Precificação, somente Admin): `acrescimo_fornecedor_pct = 130` e `markup_orcamento_pct = 6`. A sobrescrita por fornecedor ou por categoria de serviço terceirizado é **opcional e planejada para o M2** (decisão Q-04, 26/10/2026).
+- **Arredondamento** (modo único, meio para cima — `ROUND_HALF_UP` explícito, 2 casas; o padrão *banker's* do `Decimal` daria 200,90 no exemplo de VF 87,35): primeiro `CP` é arredondado; `VO` é calculado a partir do `CP` já arredondado. **A fórmula normativa é a sequencial** — o atalho `VF × 2,438` é aproximação e diverge em casos de borda (ex.: VF 0,05 → sequencial 0,13; direto 0,12).
 - **Snapshot**: cada item terceirizado grava VF, os percentuais aplicados, CP e VO. Alterar o parâmetro global **não** altera orçamentos existentes; o recálculo é uma ação explícita, com registro em log.
 
 **Exemplos**
@@ -176,7 +176,7 @@ VF, CP, percentuais, nome do fornecedor e a composição do cálculo são **info
 - **Prova**: envio da versão ao cliente por link; o cliente **aprova ou solicita ajuste** com comentário. A decisão registra data, hora e IP, e vincula-se à versão aprovada.
 - **Status da OS** incorpora “Aguardando arte” e “Aguardando aprovação”; não inicia produção sem arte aprovada (regra configurável por produto).
 - **Aprovação de orçamento por link**: o cliente abre o link, vê o documento “seguro para cliente” (3.2.3) e aprova com um clique; a aprovação converte o orçamento (opcionalmente) em OS.
-- **Requisito de arquitetura**: links públicos exigem um ponto de entrada acessível pela internet. O desenho (relay hospedado no RedGest ou serviço dedicado, com token de uso único e expiração) é a **decisão D-03** (seção 9). O Local API Service nunca é exposto diretamente.
+- **Requisito de arquitetura**: links públicos exigem um ponto de entrada acessível pela internet. **Decidido (D-03, 26/10/2026): relay hospedado com token de uso único e expiração, implementado no M3 junto ao módulo `arte`**; o Local API Service nunca é exposto diretamente. (Fallback de aprovação presencial, registrado na análise, se o relay atrasar.)
 
 ### 3.6 Produção por Etapas e Terceirizados (`producao`)
 
@@ -245,7 +245,7 @@ VF, CP, percentuais, nome do fornecedor e a composição do cálculo são **info
 ## 5. Modelo de Dados (acréscimos)
 
 - **Precificação:** `preco_parametro`, `preco_faixa`, `preco_cliente`, `produto_ficha_tecnica`, `produto_ficha_item`.
-- **Orçamento/OS:** `orcamento_item` ganha `tipo` (próprio/fornecedor), `snapshot_preco` (JSONB); `orcamento_item_cotacao` (`fornecedor_id`, `vf`, `validade`, `prazo_dias`, `selecionada`, `anexo`); campos de snapshot `cp`, `vo`, `acrescimo_fornecedor_pct`, `margem_orcamento_pct`, `valor_ajustado`, `ajuste_motivo`, `ajuste_usuario`.
+- **Orçamento/OS:** `orcamento_item` ganha `tipo` (próprio/fornecedor), `snapshot_preco` (JSONB); `orcamento_item_cotacao` (`fornecedor_id`, `vf`, `validade`, `prazo_dias`, `selecionada`, `anexo`); campos de snapshot `cp`, `vo`, `acrescimo_fornecedor_pct`, `markup_orcamento_pct`, `valor_ajustado`, `ajuste_motivo`, `ajuste_usuario`. *(Nota da análise: a tabela real hoje chama-se `ordem_servico_item` — mapear nomes antes de modelar.)*
 - **Custos:** `os_custo` (material, terceiro, mão de obra, perdas), `terceiro_desembolso`.
 - **Estoque:** `unidade_conversao`, `estoque_lote`, `sobra_retalho`.
 - **Arte:** `arte_arquivo`, `arte_versao`, `arte_aprovacao`, `link_publico` (token, expiração, uso).
@@ -308,8 +308,8 @@ Mantém os níveis Admin, Gerente, Operador e Caixa, com o acréscimo das **perm
 | --- | --- | --- |
 | **M0** | Correção da matriz de planos; caixa e contas a receber simples no Essencial; validação de dependências entre módulos | Essencial |
 | **M1** | Motor de precificação (3.1); orçamento com fornecedor e confidencialidade (3.2); permissões por campo | Essencial |
-| **M2** | Custo real e margem (3.3); estoque por consumo (3.4); compras e cotação (3.7) | Profissional |
-| **M3** | Arte, prova e aprovação por link (3.5); repetir pedido e refação (3.10) | Profissional |
+| **M2** | Custo real e margem (3.3); estoque por consumo (3.4); compras e cotação (3.7); **sobrescrita de percentuais por fornecedor/serviço (Q-04)** | Profissional |
+| **M3** | Arte, prova e aprovação por link (3.5) — **com relay público D-03**; repetir pedido e refação (3.10) | Profissional |
 | **M4** | Produção por etapas, apontamento e terceirizados (3.6) | Profissional |
 | **M5** | Fiscal completo (3.9); financeiro completo (3.8) | Profissional |
 | **M6** | Multi-filial; API de integração; integrações (WhatsApp, loja online) | Enterprise |
@@ -320,17 +320,17 @@ Ordem de prioridade: **M1 antes de qualquer outra entrega**, por ser o núcleo c
 
 ## 9. Decisões e Perguntas em Aberto
 
-| # | Item | Proposta |
+| # | Item | Situação |
 | --- | --- | --- |
-| **D-01** | Plataforma: manter Python (v2.2) ou migrar para C#/.NET 10 (v2.3) | Entregar M0–M2 na plataforma atual e decidir a migração depois, pois o v2.3 congela funcionalidade nova durante a migração |
-| **D-02** | Módulo nativo de licença em C++ (v2.3) | Tratar como opcional; o próprio PRD v2.3 registra ausência de evidência de pirataria |
-| **D-03** | Ponto de entrada público para links de aprovação | Relay hospedado com token de uso único; Local API Service não exposto |
-| **D-04** | Chão de fábrica (tablet/QR) | Tela de apontamento simples no desktop via QR na OS; web leve fica para avaliação |
-| **D-05** | Classificação fiscal produto × serviço | Validar com o contador antes de modelar os campos |
-| **Q-01** | Os 130% e os 6% são acréscimos sobre a base anterior (VF × 2,30 × 1,06)? | Assumido como sim; se o 6% for margem sobre o preço final, a fórmula muda para `VO = CP ÷ 0,94` |
+| **D-01** | Plataforma: manter Python (v2.2) ou migrar para C#/.NET 10 (v2.3) | Proposta: entregar M0–M2 na plataforma atual e decidir depois, pois o v2.3 congela funcionalidade nova durante a migração. *Em aberto — com critério de decisão ao fim do M2 (análise §5)* |
+| **D-02** | Módulo nativo de licença em C++ (v2.3) | Proposta: tratar como opcional; o próprio PRD v2.3 registra ausência de evidência de pirataria |
+| **D-03** | Ponto de entrada público para links de aprovação | **✅ Decidido (26/10/2026): relay hospedado com token de uso único, no M3 junto ao módulo `arte`; Local API Service não exposto** |
+| **D-04** | Chão de fábrica (tablet/QR) | Proposta: tela de apontamento simples no desktop via QR na OS; web leve fica para avaliação |
+| **D-05** | Classificação fiscal produto × serviço | Validar com o contador antes de modelar os campos (não trava M1) |
+| **Q-01** | Os 130% e os 6% são acréscimos sobre a base anterior (VF × 2,30 × 1,06)? | **✅ Decidido (26/10/2026): sim, markup** — "VF + 130% é custo; custo + 6% é markup". A alternativa `VO = CP ÷ 0,94` está descartada; parâmetro renomeado para `markup_orcamento_pct` |
 | **Q-02** | O VF informado já inclui frete e impostos do fornecedor? | Assumido como sim; alternativa: campo separado somado ao VF antes da fórmula |
 | **Q-03** | Orçamento misto (itens próprios + fornecedor): itens próprios mostram valor unitário ao cliente? | Assumido: cliente vê descrição e **somente o total geral** |
-| **Q-04** | Os percentuais variam por fornecedor ou por tipo de serviço? | Previsto como sobrescrita opcional |
+| **Q-04** | Os percentuais variam por fornecedor ou por tipo de serviço? | **✅ Decidido (26/10/2026): sobrescrita opcional, no M2** (fora do escopo do M1) |
 
 ---
 
