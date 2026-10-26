@@ -171,6 +171,7 @@ de cada tag está indicado para rastreabilidade.
 
 ### Corrigido
 
+- **Top bar / unidade semeada:** a primeira unidade do bootstrap chamava-se "Filial Matriz" — contraditório (ou a unidade é a matriz, ou é uma filial). Semeia e exibe **"Matriz"**; migração de dados `c4d5e6f7a8b9` (reversível) renomeia a unidade nos bancos já criados; tooltip da top bar explica ("Unidade em uso (matriz ou filial)").
 - `PATCH /v1/projetos/cartoes/{id}`: enviar `null` explicitamente agora **limpa** o
   campo (datas, descrição, lembrete) — antes o `null` era ignorado e não havia
   como remover um prazo pela interface.

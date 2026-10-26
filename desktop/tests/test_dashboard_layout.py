@@ -32,7 +32,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
     if caminho == "/v1/dashboard/resumo":
         dias = int(request.url.params.get("dias", 7))
         return httpx.Response(200, json={"data": {
-            "filial_nome": "Filial Matriz",
+            "filial_nome": "Matriz",
             "vendas_hoje_qtd": 12,
             "vendas_hoje_valor": "123456.78",
             "vendas_ontem_qtd": 9,
@@ -68,7 +68,7 @@ def _principal() -> TelaPrincipal:
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
     api.autenticar({"token": "tok", "usuario": {
         "id": 1, "nome": "Maria Silva", "login": "maria",
-        "nivel_acesso": "admin", "filial_nome": "Filial Matriz",
+        "nivel_acesso": "admin", "filial_nome": "Matriz",
     }})
     return TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
 
