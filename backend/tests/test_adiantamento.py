@@ -202,7 +202,7 @@ def test_converter_orcamento_exige_pagamento(client, admin_token, db_teste):
 # --- Venda de balcão ------------------------------------------------------------
 
 
-def test_venda_sinal_bloqueia_e_confirmada_cria_conta(client, admin_token, db_teste):
+def test_venda_sinal_bloqueia_e_confirmada_cria_conta(client, admin_token, db_teste, caixa_admin):
     cliente = _criar_cliente(client, admin_token, sinal=True, sinal_pct=50)
     produto_id = _produto_com_estoque(client, admin_token, 5)
     payload = {

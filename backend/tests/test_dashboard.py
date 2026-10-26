@@ -158,7 +158,7 @@ def _criar_usuario(client, admin_token, nivel: NivelAcesso):
     return resp.json()["data"]["token"]
 
 
-def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token):
+def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token, caixa_admin):
     hoje = date.today()
     base = _resumo(client, admin_token)
     cliente = _criar_cliente(client, admin_token)
@@ -245,7 +245,7 @@ def test_resumo_dashboard_operador_ve_operacional_mas_nao_gerencial(client, admi
 
 
 def test_resumo_dashboard_caixa_esconde_campos_operacionais_e_gerenciais(
-    client, admin_token
+    client, admin_token, caixa_admin
 ):
     base_admin = _resumo(client, admin_token)
     _criar_venda(client, admin_token)

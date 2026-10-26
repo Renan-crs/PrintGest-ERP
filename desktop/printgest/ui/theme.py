@@ -640,6 +640,13 @@ QPushButton[role="ghost"]:hover { color: %erro%; background-color: %erro-contain
 
 QWidget#rodape { background-color: %surface%; border-top: 1px solid %borda%; }
 
+/* Banner de aviso em página (ex.: PDV com caixa fechado, M0). */
+QWidget#bannerAviso {
+    background-color: %atencao-container%;
+    border: 1px solid %atencao-borda%;
+    border-radius: 8px;
+}
+
 /* ============== Tela de Ativação (revisão out/2026) =====================
    Escopo por objectName/property: nada aqui alcança as demais telas.
    Tipografia: título 24/700, rótulo 13/600 (sentence case), auxiliar 12/400. */

@@ -5,7 +5,7 @@ de balcão e movimentação de caixa apenas" (PRD §5 RBAC), logo PODE registrar
 cancelar vendas de balcão; o cancelamento estorna o estoque automaticamente.
 """
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
 from app.models.enums import (
@@ -16,7 +16,7 @@ from app.models.enums import (
 from app.models.movimento import VendaBalcao
 from app.schemas.common import ItemResponse, ListaResponse, MetaPaginacao
 from app.schemas.venda import VendaCreate, VendaOut
-from app.services import venda_service
+from app.services import financeiro_service, venda_service
 
 router = APIRouter(
     prefix="/vendas",
@@ -60,6 +60,15 @@ def criar(
     filial: FilialDep,
     usuario: UsuarioDep,
 ) -> ItemResponse[VendaOut]:
+    # M0 (PRD v3.0 §2): o PDV não opera com caixa fechado — o vendedor logado
+    # precisa do próprio caixa aberto antes de registrar vendas.
+    if financeiro_service.caixa_aberto(
+        db, filial_id=filial, usuario_id=usuario.id
+    ) is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Caixa fechado — abra o caixa antes de registrar vendas.",
+        )
     return ItemResponse(data=venda_service.criar(
         db, filial_id=filial, usuario_id=usuario.id, dados=payload
     ))
