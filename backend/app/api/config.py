@@ -13,13 +13,15 @@ from app.schemas.common import ItemResponse, ListaResponse, MetaPaginacao
 from app.schemas.config import (
     EmpresaOut,
     EmpresaUpdate,
+    PrecoParametrosIn,
+    PrecoParametrosOut,
     ReajusteAplicarIn,
     ReajusteHistoricoOut,
     ReajusteResultadoOut,
     ReajusteSimulacaoIn,
     ReajusteSimulacaoOut,
 )
-from app.services import config_service
+from app.services import config_service, precificacao
 
 router = APIRouter(
     prefix="/config",
@@ -86,6 +88,32 @@ def aplicar(
             tipo_reajuste=payload.tipo_reajuste,
             valor=payload.valor,
             senha=payload.senha,
+        )
+    )
+
+
+# ------------------------------------------- precificação (M1, PRD v3.0 §3.2.1)
+# Permissão `alterar_parametros_precificacao` = Admin: garantida pela
+# dependência do router inteiro (`require_nivel(ADMIN)`).
+
+
+@router.get("/precificacao", response_model=ItemResponse[PrecoParametrosOut])
+def parametros_precificacao(db: DbDep, filial: FilialDep):
+    return ItemResponse(data=PrecoParametrosOut(**precificacao.parametros(db, filial_id=filial)))
+
+
+@router.put("/precificacao", response_model=ItemResponse[PrecoParametrosOut])
+def alterar_parametros_precificacao(
+    payload: PrecoParametrosIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
+    return ItemResponse(
+        data=PrecoParametrosOut(
+            **precificacao.definir_parametros(
+                db,
+                filial_id=filial,
+                usuario_id=usuario.id,
+                dados=payload.model_dump(),
+            )
         )
     )
 

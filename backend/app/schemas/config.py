@@ -115,6 +115,22 @@ class ReajusteResultadoOut(BaseModel):
     executado_em: datetime
 
 
+class PrecoParametrosOut(BaseModel):
+    """Parâmetros vigentes de precificação (Configurações > Precificação)."""
+
+    acrescimo_fornecedor_pct: Decimal
+    markup_orcamento_pct: Decimal
+
+
+class PrecoParametrosIn(BaseModel):
+    """Alteração parcial: só o que vier diferente é gravado (Admin)."""
+
+    acrescimo_fornecedor_pct: Decimal | None = Field(
+        default=None, ge=0, le=100000
+    )
+    markup_orcamento_pct: Decimal | None = Field(default=None, ge=0, le=100000)
+
+
 class ReajusteHistoricoOut(ORMModel):
     id: int
     usuario_id: int

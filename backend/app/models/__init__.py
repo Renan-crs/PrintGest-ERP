@@ -8,7 +8,7 @@ from app.models.cadastros import (
     ProdutoCategoria,
     ProdutoEstoque,
 )
-from app.models.config import PrecoReajusteHistorico
+from app.models.config import PrecoParametro, PrecoReajusteHistorico
 from app.models.core import Empresa, Filial, Usuario, UsuarioSessao
 from app.models.enums import (
     FormaPagamento,
@@ -52,6 +52,7 @@ __all__ = [
     "Produto",
     "ProdutoCategoria",
     "ProdutoEstoque",
+    "PrecoParametro",
     "PrecoReajusteHistorico",
     "Empresa",
     "Filial",
