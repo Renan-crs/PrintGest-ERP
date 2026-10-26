@@ -503,7 +503,9 @@ def _modulos_do_entitlements(entitlements: dict | None) -> set[str]:
 
     Aceita apenas lista de strings (ex.: `{"modulos": ["cadastros", "caixa"]}`);
     qualquer outro formato (ausente, string, dicionário, itens não-string) vira
-    conjunto vazio — regra do PRD v3.0 §2.
+    conjunto vazio — regra do PRD v3.0 §2. O Contrato B guarda o payload
+    original em `entitlements["redgest"]` — a lista válida é sempre copiada
+    para o topo (fonte única do middleware).
     """
     if not isinstance(entitlements, dict):
         return set()
@@ -511,6 +513,25 @@ def _modulos_do_entitlements(entitlements: dict | None) -> set[str]:
     if not isinstance(brutos, list):
         return set()
     return {m.strip() for m in brutos if isinstance(m, str) and m.strip()}
+
+
+def _modulos_do_payload(dados: dict | None) -> list[str] | None:
+    """`modulos` do payload do RedGest, validado; `None` quando ausente/vazio.
+
+    Aceita a lista no topo (`dados["modulos"]`) ou dentro do `entitlements`
+    do payload — os dois formatos combinados com o RedGest. A lista devolvida
+    já vem normalizada (sem vazios/duplicatas); `None` significa "payload sem
+    módulos" e apaga o que houber antes (o payload é autoritativo).
+    """
+    if not isinstance(dados, dict):
+        return None
+    brutos = dados.get("modulos")
+    if not isinstance(brutos, list) and isinstance(dados.get("entitlements"), dict):
+        brutos = dados["entitlements"].get("modulos")
+    if not isinstance(brutos, list):
+        return None
+    limpos = {m.strip() for m in brutos if isinstance(m, str) and m.strip()}
+    return sorted(limpos) if limpos else None
 
 
 def _recalcular_estado(lic: Licenca | None) -> None:
@@ -582,6 +603,12 @@ def _persistir_ok(
         "limite_ativacoes": lic.limite_ativacoes,
         "ativacoes_realizadas": lic.ativacoes_realizadas,
     }
+    # M0 (PRD v3.0 §2): os módulos do plano vêm do RedGest. O payload é
+    # autoritativo — sem a lista, a chave não existe e o gating (quando armado)
+    # não libera nenhum módulo.
+    modulos = _modulos_do_payload(dados)
+    if modulos is not None:
+        lic.entitlements["modulos"] = modulos
     lic.ultima_validacao = _agora()
     lic.ultima_tentativa_em = _agora()
     lic.ultimo_erro = None

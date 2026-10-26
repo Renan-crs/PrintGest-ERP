@@ -456,6 +456,58 @@ def test_entitlements_do_redgest_ficam_guardados(client, monkeypatch):
     assert lic.entitlements["contrato"] == "b"
 
 
+# --- M0 (PRD v3.0 §2): módulos do plano chegam pelo RedGest -----------------------
+
+
+def test_modulos_do_plano_sao_persistidos_e_publicados(client, monkeypatch):
+    """Com `modulos` no payload: topo do entitlements + `MODULOS_HABILITADOS`."""
+    modulos = ["cadastros", "movimento", "caixa", "projetos", "fiscal"]
+    _mock(
+        monkeypatch,
+        _resposta_ativacao(
+            entitlements={"cnpj_vinculado": CNPJ, "max_estacoes": 5, "modulos": modulos},
+        ),
+    )
+    _ativar(client)
+
+    lic = _licenca()
+    assert lic.entitlements["modulos"] == sorted(modulos)
+    assert licensa_service.MODULOS_HABILITADOS == set(modulos)
+    # o payload original segue guardado para proveniência
+    assert lic.entitlements["redgest"]["modulos"] == modulos
+
+
+def test_payload_sem_modulos_apaga_o_valor_anterior(client, monkeypatch):
+    """O payload é autoritativo: sem `modulos`, nada libera (regra do PRD)."""
+    modulos = ["cadastros", "movimento"]
+    _mock(
+        monkeypatch,
+        _resposta_ativacao(
+            entitlements={"cnpj_vinculado": CNPJ, "max_estacoes": 5, "modulos": modulos},
+        ),
+    )
+    _ativar(client)
+    assert "modulos" in _licenca().entitlements
+
+    # revalidação SEM a lista: a chave some e o conjunto zera.
+    _mock(
+        monkeypatch,
+        _resposta_validacao(
+            entitlements={"cnpj_vinculado": CNPJ, "max_estacoes": 5},
+        ),
+    )
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        contrato_b.revalidar(db)
+    finally:
+        db.close()
+    lic = _licenca()
+    assert "modulos" not in lic.entitlements
+    assert licensa_service.MODULOS_HABILITADOS == set()
+
+
 def test_perfil_de_hardware_traduz_chaves_do_manual(monkeypatch):
     monkeypatch.setattr(
         licensa_service,
