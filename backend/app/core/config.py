@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # calcula pelo hardware (BIOS UUID / CPU ID / serial da placa-mãe / do disco).
     # Defina para fixar um valor (VMs com SMBIOS ausente, testes ou suporte).
     maquina_fingerprint: str = ""
+    # Gating de módulos por plano (PRD v3.0 §2, M0): o middleware `controle_modulos`
+    # responde 403 para rotas de módulo fora do `entitlements.modulos`. Desligado
+    # por padrão: arma quando o RedGest passar a emitir `modulos` — ligar antes
+    # disso bloquearia projetos/financeiro/fiscal do piloto (lição da api_key).
+    gating_modulos: bool = False
     # PostgreSQL embarcado (instalador): `true` faz o Local API Service preparar
     # e subir o banco que acompanha a instalação no primeiro uso — initdb, pg_ctl
     # start e CREATE DATABASE (docs/empacotamento.md). Em dev o fluxo continua

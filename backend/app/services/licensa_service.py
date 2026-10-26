@@ -104,6 +104,11 @@ _BLOQUEIO_ESPECIFICO = "[RedGest]"
 
 ESTADO: dict[str, bool] = {"modo_leitura": not settings.licenca_desabilitada}
 
+# Módulos habilitados pelo plano (`entitlements.modulos`, PRD v3.0 §2).
+# Recalculado junto com o estado da licença; vazio quando o entitlements não
+# traz uma lista válida — "ausente ou malformado não libera nenhum módulo".
+MODULOS_HABILITADOS: set[str] = set()
+
 
 def _desabilitada() -> bool:
     return settings.licenca_desabilitada
@@ -493,8 +498,27 @@ def _motivo(lic: Licenca | None, estado: str) -> str:
     )
 
 
+def _modulos_do_entitlements(entitlements: dict | None) -> set[str]:
+    """Ids de módulo do `entitlements.modulos` — malformado não libera nada.
+
+    Aceita apenas lista de strings (ex.: `{"modulos": ["cadastros", "caixa"]}`);
+    qualquer outro formato (ausente, string, dicionário, itens não-string) vira
+    conjunto vazio — regra do PRD v3.0 §2.
+    """
+    if not isinstance(entitlements, dict):
+        return set()
+    brutos = entitlements.get("modulos")
+    if not isinstance(brutos, list):
+        return set()
+    return {m.strip() for m in brutos if isinstance(m, str) and m.strip()}
+
+
 def _recalcular_estado(lic: Licenca | None) -> None:
+    global MODULOS_HABILITADOS
     ESTADO["modo_leitura"] = _modo_leitura(_estado(lic))
+    MODULOS_HABILITADOS = _modulos_do_entitlements(
+        getattr(lic, "entitlements", None) if lic else None
+    )
 
 
 def _mascarar(chave: str | None) -> str | None:

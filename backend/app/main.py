@@ -23,7 +23,7 @@ from app.api import api
 from app.bootstrap import rodar_bootstrap
 from app.core.config import settings
 from app.core.migrations import aplicar_migrations
-from app.services import licensa_service
+from app.services import gating, licensa_service
 
 logger = logging.getLogger("printgest")
 
@@ -119,6 +119,14 @@ async def _erro_nao_tratado(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=500, content={"detail": "Erro interno do servidor."}
     )
+
+
+# Gating por módulo ANTES do modo leitura no código: o modo leitura é a
+# trava mais fundamental (licença) e, na pilha do Starlette, o ÚLTIMO
+# middleware registrado é o mais externo — aqui ele roda primeiro.
+@app.middleware("http")
+async def _gating_modulos(request: Request, call_next):
+    return await gating.controle_modulos(request, call_next)
 
 
 @app.middleware("http")
