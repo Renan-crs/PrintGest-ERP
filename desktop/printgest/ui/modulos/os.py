@@ -35,6 +35,91 @@ from printgest.ui.paginador import LOTE
 from printgest.ui.widgets import botao_com_atalho
 
 
+# ------------------------------------------------------- diálogo de cotações
+
+
+class DialogoCotacoes(QMessageBox):
+    """Comparativo de cotações de um item de fornecedor (M1, §3.2.2).
+
+    Lista as cotações com VF/prazo/validade e o estado do item
+    (Aguardando/Cotado). VF e snapshot só aparecem se o servidor os
+    mandar (Admin/Gerente — a API OMITE para Operador, não oculta).
+    """
+
+    def __init__(self, parent, api, os_id: int, item: dict) -> None:
+        super().__init__(parent)
+        self._api = api
+        self._os_id = os_id
+        self._item = item
+        self.setWindowTitle("Cotações de Fornecedor")
+        descricao = item.get("descricao_avulsa") or "item selecionado"
+        self.setText(f"Item: {descricao}")
+        self.setStandardButtons(
+            QMessageBox.StandardButton.Close | QMessageBox.StandardButton.Ok
+        )
+        self.button(QMessageBox.StandardButton.Ok).setText("Atualizar")
+        self.button(QMessageBox.StandardButton.Ok).clicked.connect(self._carregar)
+        self._carregar()
+
+    def _carregar(self) -> None:
+        item_id = self._item.get("id")
+        if not item_id:
+            self.setInformativeText("Salve o orçamento antes de gerenciar cotações.")
+            return
+        os_id = self._os_id
+        from printgest.core import tarefas
+
+        def _chamar():
+            """Lê a resposta COMPLETA (data/estado/selecionado), não só `data`."""
+            resp = self._api._cliente.get(
+                f"/v1/os/{os_id}/itens/{item_id}/cotacoes",
+                headers=self._api._headers(self._api.token),
+            )
+            return resp.json()
+
+        tarefas.rodar(
+            _chamar,
+            on_ok=self._preencher,
+            on_erro=lambda msg: self.setInformativeText(f"Erro ao carregar: {msg}"),
+        )
+
+    def _preencher(self, resposta: dict) -> None:
+        data = resposta.get("data") or []
+        selecionado = resposta.get("selecionado") or {}
+        estado = resposta.get("estado_cotacao")
+
+        if not data:
+            self.setInformativeText(
+                "Nenhuma cotação lançada ainda.\n"
+                "Lance a cotação do fornecedor pelo formulário da O.S."
+            )
+            return
+
+        linhas = []
+        for c in data:
+            marcador = "✓ " if c.get("selecionada") else "  "
+            vf = c.get("vf")
+            vf_txt = f"  VF: R$ {vf}" if vf is not None else "  VF: (restrito)"
+            prazo = c.get("prazo_dias")
+            prazo_txt = f"  Prazo: {prazo} dias" if prazo is not None else ""
+            linhas.append(
+                f"{marcador}{c.get('fornecedor_nome', '?')}{vf_txt}{prazo_txt}"
+            )
+
+        cabeca = "\n".join(linhas)
+        if estado == "cotado" and selecionado:
+            cabeca += (
+                f"\n\n─── Cotação selecionada ───\n"
+                f"VF: R$ {selecionado.get('vf', '?')}\n"
+                f"CP: R$ {selecionado.get('cp', '?')} (interno)\n"
+                f"VO: R$ {selecionado.get('vo', '?')}  ← valor do item"
+            )
+        elif estado == "aguardando":
+            cabeca += "\n\n⚠ Item aguardando cotação — selecione uma para aprovar."
+
+        self.setInformativeText(cabeca)
+
+
 class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "os"
     TIPO = "os"
@@ -261,9 +346,35 @@ class PaginaOrcamento(PaginaOS):
             "Converter em O.S.", "F9", "primary"
         )
         self._btn_converter.clicked.connect(self._converter_em_os)
+        cotacoes, self._btn_cotacoes = botao_com_atalho("Cotações", "F10")
+        self._btn_cotacoes.clicked.connect(self._abrir_cotacoes)
         cancelar, self._btn_cancelar_os = botao_com_atalho("Cancelar Orçamento", "F8")
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
-        return [converter, cancelar]
+        return [converter, cotacoes, cancelar]
+
+    def _abrir_cotacoes(self) -> None:
+        """Diálogo de cotações para o item de fornecedor selecionado na grade."""
+        if self._editando_id is None:
+            QMessageBox.information(
+                self, "Cotações", "Salve o orçamento antes de gerenciar cotações."
+            )
+            return
+        item = self._itens.item_selecionado
+        if not item:
+            QMessageBox.information(
+                self, "Cotações", "Selecione um item na grade de itens."
+            )
+            return
+        if (item.get("tipo") or "proprio") != "fornecedor":
+            QMessageBox.information(
+                self,
+                "Cotações",
+                "Cotações existem apenas para itens de fornecedor.\n"
+                "Marque “Fornecedor” ao adicionar o item.",
+            )
+            return
+        dialogo = DialogoCotacoes(self, self._api, self._editando_id, item)
+        dialogo.exec()
 
     def _converter_em_os(self) -> None:
         dado = self._selecionado_ou_aviso(

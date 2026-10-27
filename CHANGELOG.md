@@ -11,6 +11,9 @@ de cada tag está indicado para rastreabilidade.
 
 ## [Não lançado]
 
+### Adicionado
+- **M1 — tela desktop do orçamento com item de fornecedor (PRD v3.0 §3.2.2):** `GradeItens` ganha **coluna "Tipo"** ("Próprio" / "Fornecedor • Aguardando" / "Fornecedor • Cotado") + checkbox **"Fornecedor"** na barra de edição; `item_selecionado` expõe os dados internos. `PaginaOrcamento` ganha botão **"Cotações" (F10)** que abre o `DialogoCotacoes` — comparativo com VF/prazo/validade, ✓ na selecionada, bloco "Cotação selecionada" com VF/CP/VO (para Operador, VF mostra "(restrito)" — a API omite, não oculta). Api do desktop: `listar_cotacoes`, `lancar_cotacao`, `selecionar_cotacao`. Desktop 351 passed (+9).
+
 ### Documentação
 - **Análise do PRD v3.0** (`docs/analise_prd_v3.md`): verificação das alegações de existência contra o código (caixa/contas/pedido_compra existem; gating por plano **não** existe — dependência RedGest a incluir no M0), validação da matemática VF→CP→VO com `ROUND_HALF_UP` (exemplos do PRD fecham exato; "VF × 2,438" diverge em borda e passa a "≈"), mapeamento `orcamento_item`→`ordem_servico_item`, saneamento `Mapped[float]`, 409 em orçamento/OS, recomendações D-01..D-05/Q-01..Q-04 e lente de design para as telas novas.
 - **Decisões do PRD v3.0 registradas (26/10/2026)**: **Q-01 = markup** ("VF + 130% é custo; custo + 6% é markup" — `VO = CP × 1,06`; alternativa `CP ÷ 0,94` descartada; parâmetro renomeado para `markup_orcamento_pct`), **Q-04 = sobrescrita no M2**, **D-03 = relay com token de uso único no M3**. PRD atualizado nas seções 3.2.1, 3.5, 5, 8.3 e 9.

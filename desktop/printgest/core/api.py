@@ -535,6 +535,36 @@ class Api:
         """KPIs da Tela Inicial: `GET /v1/dashboard/resumo?dias=`."""
         return self._get("/v1/dashboard/resumo", self._token, params={"dias": dias})
 
+    # ------------------------------------------------------------- cotações (M1)
+    # Item de fornecedor: o comparativo e o lançamento são rotas de OS.
+
+    def listar_cotacoes(self, os_id: int, item_id: int) -> dict:
+        """`GET /v1/os/{os_id}/itens/{item_id}/cotacoes` — comparativo interno.
+
+        VF/snapshot **omitidos** pelo servidor para Operador/Caixa.
+        """
+        return self._get(
+            f"/v1/os/{os_id}/itens/{item_id}/cotacoes", self._token
+        )
+
+    def lancar_cotacao(
+        self, os_id: int, item_id: int, corpo: dict
+    ) -> dict:
+        """`POST /v1/os/{os_id}/itens/{item_id}/cotacoes` — Gerente/Admin."""
+        return self._post(
+            f"/v1/os/{os_id}/itens/{item_id}/cotacoes", corpo, self._token
+        )
+
+    def selecionar_cotacao(
+        self, os_id: int, item_id: int, cotacao_id: int
+    ) -> dict:
+        """`PUT .../cotacoes/{cotacao_id}/selecionar` — marca a escolhida."""
+        resp = self._cliente.put(
+            f"/v1/os/{os_id}/itens/{item_id}/cotacoes/{cotacao_id}/selecionar",
+            headers=self._headers(self._token),
+        )
+        return self._tratar(resp)
+
     def _get(
         self, path: str, token: str | None = None, params: dict | None = None
     ) -> dict:
