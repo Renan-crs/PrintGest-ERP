@@ -156,6 +156,111 @@ def test_calcular_item_usa_parametros_da_filial(db_teste, _filial):
     assert snap["vo"] == "253.00"  # 230 × 1,10
 
 
+# --------------------------------- M2: sobrescrita por fornecedor (Q-04)
+
+
+def _fornecedor(db_teste, filial_id: int) -> int:
+    from sqlalchemy import text
+
+    row = db_teste.execute(
+        text(
+            "INSERT INTO fornecedor (filial_id, nome_razao, tipo_pessoa) "
+            "VALUES (:filial, 'Fornecedor M2', 'pj') RETURNING id"
+        ),
+        {"filial": filial_id},
+    ).fetchone()
+    db_teste.commit()
+    return row[0]
+
+
+def test_sobrescrita_por_fornecedor_tem_precedencia(db_teste, _filial):
+    """Fornecedor > global > default (M2, Q-04)."""
+    fid = _fornecedor(db_teste, _filial)
+
+    # global = 130/6 (default); sem sobrescrita: igual ao global
+    pcts = precificacao.parametros(db_teste, filial_id=_filial, fornecedor_id=fid)
+    assert pcts["acrescimo_fornecedor_pct"] == Decimal("130")
+
+    # sobrescrita do fornecedor: acrescimo 150
+    precificacao.definir_parametros(
+        db_teste, filial_id=_filial, usuario_id=1,
+        dados={"acrescimo_fornecedor_pct": Decimal("150")},
+        fornecedor_id=fid,
+    )
+    # para ESTE fornecedor: 150 aplica; markup segue o global (6)
+    pcts_forn = precificacao.parametros(db_teste, filial_id=_filial, fornecedor_id=fid)
+    assert pcts_forn["acrescimo_fornecedor_pct"] == Decimal("150")
+    assert pcts_forn["markup_orcamento_pct"] == Decimal("6")
+
+    # para OUTRO fornecedor (ou sem fornecedor): global intacto (130)
+    pcts_global = precificacao.parametros(db_teste, filial_id=_filial)
+    assert pcts_global["acrescimo_fornecedor_pct"] == Decimal("130")
+
+
+def test_calcular_item_com_sobrescrita_do_fornecedor(db_teste, _filial):
+    """O snapshot usa os percentuais do FORNECEDOR da cotação selecionada."""
+    fid = _fornecedor(db_teste, _filial)
+    precificacao.definir_parametros(
+        db_teste, filial_id=_filial, usuario_id=1,
+        dados={"acrescimo_fornecedor_pct": Decimal("100"), "markup_orcamento_pct": Decimal("10")},
+        fornecedor_id=fid,
+    )
+    snap = precificacao.calcular_item_terceirizado(
+        db_teste, filial_id=_filial, vf=Decimal("100.00"), fornecedor_id=fid
+    )
+    # 100 + 100% = 200 (CP); 200 + 10% = 220 (VO)
+    assert snap["cp"] == "200.00"
+    assert snap["vo"] == "220.00"
+    assert snap["acrescimo_fornecedor_pct"] == "100"
+    assert snap["markup_orcamento_pct"] == "10"
+
+    # sem o fornecedor: global (130/6) — 100 × 2,30 × 1,06 = 243,80
+    snap_global = precificacao.calcular_item_terceirizado(
+        db_teste, filial_id=_filial, vf=Decimal("100.00")
+    )
+    assert snap_global["vo"] == "243.80"
+
+
+def test_endpoint_sobrescrita_por_fornecedor(client, admin_token):
+    """GET/PUT /v1/config/precificacao?fornecedor_id=X — Admin."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import Session
+    from tests.conftest import TEST_DB_URL
+
+    engine = create_engine(TEST_DB_URL)
+    with Session(engine) as db:
+        row = db.execute(
+            text("INSERT INTO fornecedor (filial_id, nome_razao, tipo_pessoa) "
+                 "VALUES (1, 'Forn Endpoint', 'pj') RETURNING id")
+        ).fetchone()
+        db.commit()
+        fid = row[0]
+    engine.dispose()
+
+    # global sem sobrescrita
+    resp = client.get(
+        f"/v1/config/precificacao?fornecedor_id={fid}",
+        headers=auth(client, admin_token),
+    )
+    assert resp.status_code == 200
+    assert Decimal(resp.json()["data"]["acrescimo_fornecedor_pct"]) == Decimal("130")
+
+    # define a sobrescrita
+    resp = client.put(
+        f"/v1/config/precificacao?fornecedor_id={fid}",
+        headers=auth(client, admin_token),
+        json={"acrescimo_fornecedor_pct": "120"},
+    )
+    assert resp.status_code == 200
+    assert Decimal(resp.json()["data"]["acrescimo_fornecedor_pct"]) == Decimal("120")
+
+    # global continua intacto
+    resp = client.get(
+        "/v1/config/precificacao", headers=auth(client, admin_token)
+    )
+    assert Decimal(resp.json()["data"]["acrescimo_fornecedor_pct"]) == Decimal("130")
+
+
 # --------------------------------------------------------------- endpoint
 
 

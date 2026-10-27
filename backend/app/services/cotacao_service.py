@@ -105,7 +105,8 @@ def _aplicar_selecao(
     cotacao.selecionada = True
 
     snapshot = precificacao.calcular_item_terceirizado(
-        db, filial_id=filial_id, vf=cotacao.vf
+        db, filial_id=filial_id, vf=cotacao.vf,
+        fornecedor_id=cotacao.fornecedor_id,  # M2: sobrescrita do fornecedor
     )
     item.snapshot_preco = snapshot
     item.valor_unitario = Decimal(snapshot["vo"])

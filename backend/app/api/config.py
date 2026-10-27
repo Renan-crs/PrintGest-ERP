@@ -98,14 +98,23 @@ def aplicar(
 
 
 @router.get("/precificacao", response_model=ItemResponse[PrecoParametrosOut])
-def parametros_precificacao(db: DbDep, filial: FilialDep):
-    return ItemResponse(data=PrecoParametrosOut(**precificacao.parametros(db, filial_id=filial)))
+def parametros_precificacao(
+    db: DbDep, filial: FilialDep, fornecedor_id: int | None = None
+):
+    """Parâmetros vigentes — com sobrescrita do fornecedor quando informado."""
+    pcts = precificacao.parametros(db, filial_id=filial, fornecedor_id=fornecedor_id)
+    return ItemResponse(data=PrecoParametrosOut(**pcts))
 
 
 @router.put("/precificacao", response_model=ItemResponse[PrecoParametrosOut])
 def alterar_parametros_precificacao(
-    payload: PrecoParametrosIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+    payload: PrecoParametrosIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    fornecedor_id: int | None = None,
 ):
+    """Altera globais (sem fornecedor_id) ou sobrescrita do fornecedor (M2)."""
     return ItemResponse(
         data=PrecoParametrosOut(
             **precificacao.definir_parametros(
@@ -113,6 +122,7 @@ def alterar_parametros_precificacao(
                 filial_id=filial,
                 usuario_id=usuario.id,
                 dados=payload.model_dump(),
+                fornecedor_id=fornecedor_id,
             )
         )
     )
