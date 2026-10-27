@@ -8,7 +8,17 @@ O avanço de status usa `PATCH /{id}/status` e o cancelamento `DELETE /{id}`.
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from printgest.core import catalogos
 from printgest.core.dominio import FORMAS_PAGAMENTO
@@ -22,28 +32,39 @@ from printgest.ui.formulario import (
     CampoCheck,
     CampoCombo,
     CampoData,
+    CampoTexto,
     CampoValor,
     data_iso,
     formatar_data_iso,
     formatar_moeda,
     limpo,
+    para_decimal,
 )
 from printgest.ui.grade_itens import GradeItens
 from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
-from printgest.ui.widgets import botao_com_atalho
+from printgest.ui.tabela import TabelaDensa
+from printgest.ui.widgets import aplicar_estilo, botao_com_atalho
 
 
 # ------------------------------------------------------- diálogo de cotações
 
+_COTACAO_CHAVES = ["fornecedor_nome", "vf", "prazo_dias", "validade", "selecionada"]
+_COTACAO_ROTULOS = ["Fornecedor", "VF", "Prazo (dias)", "Validade", "✓"]
 
-class DialogoCotacoes(QMessageBox):
-    """Comparativo de cotações de um item de fornecedor (M1, §3.2.2).
 
-    Lista as cotações com VF/prazo/validade e o estado do item
-    (Aguardando/Cotado). VF e snapshot só aparecem se o servidor os
-    mandar (Admin/Gerente — a API OMITE para Operador, não oculta).
+class DialogoCotacoes(QDialog):
+    """Comparativo + lançamento + seleção de cotações (M1, §3.2.2/§3.2.3).
+
+    Três zonas:
+    - **Comparativo** em tabela (VF/prazo/validade por linha, ✓ na selecionada);
+    - **Formulário** de lançamento (fornecedor, VF, prazo, validade, observações,
+      marcar como selecionada);
+    - **Bloco de cálculo** com VF/CP/VO quando o servidor os manda (Admin/Gerente).
+
+    VF/snapshot são **omitidos** pelo servidor para Operador — o diálogo mostra
+    "(restrito)" em vez do valor (a chave nem existe na resposta, §3.2.3).
     """
 
     def __init__(self, parent, api, os_id: int, item: dict) -> None:
@@ -51,26 +72,115 @@ class DialogoCotacoes(QMessageBox):
         self._api = api
         self._os_id = os_id
         self._item = item
+        self._cotacoes: list[dict] = []
+        self._pode_ver_custo: bool = False
+
         self.setWindowTitle("Cotações de Fornecedor")
+        self.setMinimumSize(620, 520)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
+
         descricao = item.get("descricao_avulsa") or "item selecionado"
-        self.setText(f"Item: {descricao}")
-        self.setStandardButtons(
-            QMessageBox.StandardButton.Close | QMessageBox.StandardButton.Ok
-        )
-        self.button(QMessageBox.StandardButton.Ok).setText("Atualizar")
-        self.button(QMessageBox.StandardButton.Ok).clicked.connect(self._carregar)
+        titulo = QLabel(f"Item: {descricao}")
+        titulo.setObjectName("subtitulo")
+        root.addWidget(titulo)
+
+        # --- comparativo
+        self._lbl_estado = QLabel("Carregando…")
+        self._lbl_estado.setProperty("role", "muted")
+        root.addWidget(self._lbl_estado)
+
+        self._tabela = TabelaDensa(_COTACAO_CHAVES, _COTACAO_ROTULOS)
+        self._tabela.setMinimumHeight(120)
+        root.addWidget(self._tabela, 1)
+
+        # --- snapshot do cálculo (visível só com permissão)
+        self._lbl_snapshot = QLabel("")
+        self._lbl_snapshot.setWordWrap(True)
+        self._lbl_snapshot.setProperty("role", "muted")
+        root.addWidget(self._lbl_snapshot)
+
+        # --- formulário de lançamento
+        card = QWidget()
+        card.setObjectName("card")
+        form = QGridLayout(card)
+        form.setContentsMargins(16, 12, 16, 12)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(8)
+
+        rotulo_form = QLabel("Lançar cotação")
+        rotulo_form.setObjectName("secaoForm")
+        form.addWidget(rotulo_form, 0, 0, 1, 2)
+
+        self._campo_fornecedor = CampoCombo("Fornecedor", [])
+        self._campo_vf = CampoValor("VF (valor do fornecedor)")
+        self._campo_prazo = CampoTexto("Prazo (dias)", maximo=4)
+        self._campo_validade = CampoData("Validade da cotação")
+        self._campo_obs = CampoTexto("Observações", maximo=200)
+        self._check_selecionar = CampoCheck("Selecionar esta cotação")
+
+        form.addWidget(self._campo_fornecedor.rotulo_widget, 1, 0)
+        form.addWidget(self._campo_fornecedor.widget, 1, 0)
+        form.addWidget(self._campo_vf.rotulo_widget, 1, 1)
+        form.addWidget(self._campo_vf.widget, 1, 1)
+        form.addWidget(self._campo_prazo.rotulo_widget, 2, 0)
+        form.addWidget(self._campo_prazo.widget, 2, 0)
+        form.addWidget(self._campo_validade.rotulo_widget, 2, 1)
+        form.addWidget(self._campo_validade.widget, 2, 1)
+        form.addWidget(self._campo_obs.rotulo_widget, 3, 0)
+        form.addWidget(self._campo_obs.widget, 3, 0)
+        form.addWidget(self._check_selecionar.widget, 3, 1)
+        root.addWidget(card)
+
+        # --- botões
+        botoes = QHBoxLayout()
+        botoes.setSpacing(8)
+        self._btn_lancar = QPushButton("Lançar cotação")
+        self._btn_lancar.setProperty("role", "primary")
+        self._btn_lancar.clicked.connect(self._lancar)
+        botoes.addWidget(self._btn_lancar)
+
+        self._btn_selecionar = QPushButton("Selecionar marcada")
+        self._btn_selecionar.clicked.connect(self._selecionar)
+        botoes.addWidget(self._btn_selecionar)
+
+        fechar = QPushButton("Fechar")
+        fechar.clicked.connect(self.accept)
+        botoes.addStretch(1)
+        botoes.addWidget(fechar)
+        root.addLayout(botoes)
+
+        self._carregar_fornecedores()
         self._carregar()
+
+    # ------------------------------------------------------------- dados
+
+    def _carregar_fornecedores(self) -> None:
+        catalogos.carregar(
+            "fornecedores",
+            lambda: self._api.listar("fornecedores", limit=1000),
+            on_ok=self._fornecedores_recebidos,
+        )
+
+    def _fornecedores_recebidos(self, saida: dict) -> None:
+        self._campo_fornecedor.alterar_opcoes(
+            [(r["id"], r["nome_razao"]) for r in saida.get("data", [])]
+        )
 
     def _carregar(self) -> None:
         item_id = self._item.get("id")
         if not item_id:
-            self.setInformativeText("Salve o orçamento antes de gerenciar cotações.")
+            self._lbl_estado.setText("Salve o orçamento antes de gerenciar cotações.")
+            self._tabela.setEnabled(False)
+            self._btn_lancar.setEnabled(False)
+            self._btn_selecionar.setEnabled(False)
             return
         os_id = self._os_id
-        from printgest.core import tarefas
 
         def _chamar():
-            """Lê a resposta COMPLETA (data/estado/selecionado), não só `data`."""
+            """Lê a resposta COMPLETA (data/estado/selecionado)."""
             resp = self._api._cliente.get(
                 f"/v1/os/{os_id}/itens/{item_id}/cotacoes",
                 headers=self._api._headers(self._api.token),
@@ -80,44 +190,135 @@ class DialogoCotacoes(QMessageBox):
         tarefas.rodar(
             _chamar,
             on_ok=self._preencher,
-            on_erro=lambda msg: self.setInformativeText(f"Erro ao carregar: {msg}"),
+            on_erro=lambda msg: self._lbl_estado.setText(f"Erro ao carregar: {msg}"),
         )
 
     def _preencher(self, resposta: dict) -> None:
-        data = resposta.get("data") or []
+        self._cotacoes = resposta.get("data") or []
         selecionado = resposta.get("selecionado") or {}
         estado = resposta.get("estado_cotacao")
+        self._pode_ver_custo = bool(selecionado)  # servidor mandou o snapshot
 
-        if not data:
-            self.setInformativeText(
-                "Nenhuma cotação lançada ainda.\n"
-                "Lance a cotação do fornecedor pelo formulário da O.S."
-            )
-            return
+        # estado do item
+        if estado == "cotado":
+            self._lbl_estado.setText("✓ Item cotado — cotação selecionada define o valor.")
+            self._lbl_estado.setProperty("role", "success")
+        elif estado == "aguardando":
+            self._lbl_estado.setText("⚠ Item aguardando cotação — selecione uma para aprovar.")
+            self._lbl_estado.setProperty("role", "atencao")
+        else:
+            self._lbl_estado.setText("")
+        aplicar_estilo(self._lbl_estado)
 
+        # tabela
         linhas = []
-        for c in data:
-            marcador = "✓ " if c.get("selecionada") else "  "
+        for c in self._cotacoes:
             vf = c.get("vf")
-            vf_txt = f"  VF: R$ {vf}" if vf is not None else "  VF: (restrito)"
-            prazo = c.get("prazo_dias")
-            prazo_txt = f"  Prazo: {prazo} dias" if prazo is not None else ""
-            linhas.append(
-                f"{marcador}{c.get('fornecedor_nome', '?')}{vf_txt}{prazo_txt}"
-            )
+            linhas.append({
+                "fornecedor_nome": c.get("fornecedor_nome", "?"),
+                "vf": f"R$ {vf}" if vf is not None else "(restrito)",
+                "prazo_dias": str(c.get("prazo_dias") or "—"),
+                "validade": str(c.get("validade") or "—"),
+                "selecionada": "✓" if c.get("selecionada") else "",
+            })
+        self._tabela.preencher(linhas)
+        self._tabela.setEnabled(True)
 
-        cabeca = "\n".join(linhas)
-        if estado == "cotado" and selecionado:
-            cabeca += (
-                f"\n\n─── Cotação selecionada ───\n"
-                f"VF: R$ {selecionado.get('vf', '?')}\n"
-                f"CP: R$ {selecionado.get('cp', '?')} (interno)\n"
+        # snapshot
+        if selecionado:
+            self._lbl_snapshot.setText(
+                f"VF: R$ {selecionado.get('vf', '?')}  ·  "
+                f"CP: R$ {selecionado.get('cp', '?')} (interno)  ·  "
                 f"VO: R$ {selecionado.get('vo', '?')}  ← valor do item"
             )
-        elif estado == "aguardando":
-            cabeca += "\n\n⚠ Item aguardando cotação — selecione uma para aprovar."
+            self._lbl_snapshot.setProperty("role", "muted")
+        else:
+            self._lbl_snapshot.setText("")
+        aplicar_estilo(self._lbl_snapshot)
 
-        self.setInformativeText(cabeca)
+        self._btn_selecionar.setEnabled(bool(self._cotacoes))
+
+    # ------------------------------------------------------------- ações
+
+    def _lancar(self) -> None:
+        fornecedor_id = self._campo_fornecedor.valor()
+        if not fornecedor_id:
+            QMessageBox.warning(self, "Cotação", "Selecione o fornecedor.")
+            return
+        vf = self._campo_vf.valor()
+        if vf is None or vf <= 0:
+            QMessageBox.warning(self, "Cotação", "Informe o VF (valor do fornecedor).")
+            return
+
+        corpo = {
+            "fornecedor_id": fornecedor_id,
+            "vf": str(vf),
+            "prazo_dias": int(self._campo_prazo.valor() or 0) or None,
+            "observacoes": limpo(self._campo_obs.valor()),
+            "selecionada": self._check_selecionar.valor(),
+        }
+        validade = self._campo_validade.valor()
+        if validade:
+            corpo["validade"] = data_iso(validade)
+
+        item_id = self._item.get("id")
+        os_id = self._os_id
+        self._btn_lancar.setEnabled(False)
+        self._btn_lancar.setText("Lançando…")
+
+        def ok(_resultado) -> None:
+            self._btn_lancar.setEnabled(True)
+            self._btn_lancar.setText("Lançar cotação")
+            self._campo_vf.definir(None)
+            self._campo_prazo.definir("")
+            self._campo_obs.definir(None)
+            self._check_selecionar.definir(False)
+            self._carregar()
+
+        def erro(msg: str) -> None:
+            self._btn_lancar.setEnabled(True)
+            self._btn_lancar.setText("Lançar cotação")
+            QMessageBox.critical(self, "Cotação", msg)
+
+        tarefas.rodar(
+            lambda: self._api.lancar_cotacao(os_id, item_id, corpo),
+            on_ok=ok,
+            on_erro=erro,
+        )
+
+    def _selecionar(self) -> None:
+        linha = self._tabela.currentRow()
+        if linha < 0 or linha >= len(self._cotacoes):
+            QMessageBox.information(self, "Cotação", "Selecione uma cotação na tabela.")
+            return
+        cotacao = self._cotacoes[linha]
+        cotacao_id = cotacao.get("id")
+        if not cotacao_id:
+            return
+        if cotacao.get("selecionada"):
+            QMessageBox.information(self, "Cotação", "Esta cotação já está selecionada.")
+            return
+
+        item_id = self._item.get("id")
+        os_id = self._os_id
+        self._btn_selecionar.setEnabled(False)
+        self._btn_selecionar.setText("Selecionando…")
+
+        def ok(_resultado) -> None:
+            self._btn_selecionar.setEnabled(True)
+            self._btn_selecionar.setText("Selecionar marcada")
+            self._carregar()
+
+        def erro(msg: str) -> None:
+            self._btn_selecionar.setEnabled(True)
+            self._btn_selecionar.setText("Selecionar marcada")
+            QMessageBox.critical(self, "Cotação", msg)
+
+        tarefas.rodar(
+            lambda: self._api.selecionar_cotacao(os_id, item_id, cotacao_id),
+            on_ok=ok,
+            on_erro=erro,
+        )
 
 
 class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
