@@ -23,6 +23,7 @@ from app.db import Base
 from app.models.cadastros import Cliente, Fornecedor, Funcionario
 from app.models.core import Usuario
 from app.models.enums import (
+    ConferenciaTerceirizado,
     FormaPagamento,
     StatusAgenda,
     StatusOs,
@@ -216,6 +217,62 @@ class OrdemServicoItemCotacao(Base):
 
     item: Mapped[OrdemServicoItem] = relationship(back_populates="cotacoes")
     fornecedor: Mapped["Fornecedor"] = relationship(lazy="joined")
+
+
+class OsTerceirizado(Base):
+    """Rastreio do item terceirizado dentro da OS (M4, PRD v3.0 §3.6).
+
+    Ciclo: **enviado** ao fornecedor (data_envio) → previsão de retorno →
+    **recebido** (data_retorno) → **conferência** de qualidade (ok / refação).
+    Atraso = previsão vencida sem retorno → alerta no dashboard.
+    """
+
+    __tablename__ = "os_terceirizado"
+    __table_args__ = (
+        CheckConstraint(
+            "data_retorno IS NULL OR data_retorno >= data_envio",
+            name="ck_os_terceirizado_retorno_apos_envio",
+        ),
+        CheckConstraint(
+            "previsao_retorno IS NULL OR previsao_retorno >= data_envio",
+            name="ck_os_terceirizado_previsao_apos_envio",
+        ),
+        Index("idx_os_terceirizado_os", "os_id"),
+        Index("idx_os_terceirizado_item", "item_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    filial_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    os_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ordem_servico.id", ondelete="CASCADE"), nullable=False
+    )
+    item_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("ordem_servico_item.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    cotacao_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("os_item_cotacao.id")
+    )
+    pedido_compra_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("pedido_compra.id")
+    )
+    data_envio: Mapped[date] = mapped_column(Date, nullable=False)
+    previsao_retorno: Mapped[date | None] = mapped_column(Date, nullable=True)
+    data_retorno: Mapped[date | None] = mapped_column(Date, nullable=True)
+    conferencia: Mapped[ConferenciaTerceirizado] = mapped_column(
+        pg_enum(ConferenciaTerceirizado), nullable=False,
+        server_default=ConferenciaTerceirizado.PENDENTE.value,
+    )
+    observacoes: Mapped[str | None] = mapped_column(Text)
+    criado_por: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("usuario.id")
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class VendaBalcao(Base):

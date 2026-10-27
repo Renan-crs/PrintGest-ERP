@@ -8,6 +8,8 @@ orçamento via `orcamento_origem_id` e marca o original como `convertido`.
 from datetime import date, datetime
 from decimal import Decimal
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import (
@@ -93,6 +95,19 @@ class OsItemOut(ORMModel):
     # NÃO expõe VF/CP/snapshot — isso é informação interna (§3.2.3), disponível
     # apenas nas rotas de cotação para quem tem `ver_custo_terceiro`.
     estado_cotacao: str | None = None
+
+
+class ConferenciaTerceirizadoIn(BaseModel):
+    """Conferência de qualidade do item terceirizado (§3.6)."""
+
+    conferencia: Literal["ok", "refacao"]
+    observacoes: str | None = None
+
+
+class RecebimentoTerceirizadoIn(BaseModel):
+    """Retorno do fornecedor (§3.6). Data vazia = hoje."""
+
+    data_retorno: date | None = None
 
 
 class CotacaoIn(BaseModel):

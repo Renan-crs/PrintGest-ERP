@@ -17,6 +17,7 @@ from app.models.movimento import OrdemServico, OrdemServicoItem
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
 from app.schemas.movimento import (
+    ConferenciaTerceirizadoIn,
     CotacaoIn,
     CotacaoOut,
     OsConverterIn,
@@ -24,6 +25,7 @@ from app.schemas.movimento import (
     OsOut,
     OsStatusIn,
     OsUpdate,
+    RecebimentoTerceirizadoIn,
 )
 from app.services import cotacao_service, os_service
 
@@ -190,6 +192,68 @@ def selecionar_cotacao(
         data=cotacao_service.selecionar(
             db, item_id=item_id, cotacao_id=cotacao_id, filial_id=filial, usuario=usuario
         )
+    )
+
+
+# --------------------------- rastreio de terceirizados (M4, §3.6)
+
+
+@router.get("/{os_id}/itens/{item_id}/terceirizado")
+def ver_terceirizado(
+    os_id: int, item_id: int, db: DbDep, filial: FilialDep
+):
+    """Situação do envio ao fornecedor (envio, previsão, retorno, conferência)."""
+    from app.services import terceirizado_service
+
+    envio = terceirizado_service._obter(db, item_id, filial_id=filial)
+    item = db.get(OrdemServicoItem, item_id)
+    return ItemResponse(
+        data=terceirizado_service.para_out(envio, item=item)
+    )
+
+
+@router.put("/{os_id}/itens/{item_id}/terceirizado/receber")
+def receber_terceirizado(
+    os_id: int,
+    item_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    body: RecebimentoTerceirizadoIn | None = None,
+):
+    """Marca o retorno do fornecedor (§3.6: "recebido (data)")."""
+    from app.services import terceirizado_service
+
+    data_retorno = body.data_retorno if body else None
+    envio = terceirizado_service.marcar_retorno(
+        db, item_id=item_id, filial_id=filial, data_retorno=data_retorno
+    )
+    item = db.get(OrdemServicoItem, item_id)
+    return ItemResponse(
+        data=terceirizado_service.para_out(envio, item=item)
+    )
+
+
+@router.put("/{os_id}/itens/{item_id}/terceirizado/conferir")
+def conferir_terceirizado(
+    os_id: int,
+    item_id: int,
+    body: ConferenciaTerceirizadoIn,
+    db: DbDep,
+    filial: FilialDep,
+):
+    """Conferência de qualidade: ok / refação (§3.6)."""
+    from app.services import terceirizado_service
+
+    envio = terceirizado_service.marcar_conferencia(
+        db,
+        item_id=item_id,
+        filial_id=filial,
+        conferencia=body.conferencia,
+        observacoes=body.observacoes,
+    )
+    item = db.get(OrdemServicoItem, item_id)
+    return ItemResponse(
+        data=terceirizado_service.para_out(envio, item=item)
     )
 
 
