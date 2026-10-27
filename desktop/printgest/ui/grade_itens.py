@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -26,8 +27,8 @@ from printgest.core.api import Api
 from printgest.ui.formulario import CampoValor, formatar_moeda, para_decimal
 from printgest.ui.tabela import TabelaDensa
 
-_CHAVES = ["seq", "descricao", "quantidade", "dimensoes", "valor_unitario", "desconto", "valor_total"]
-_ROTULOS = ["#", "Especificação", "Quant.", "Dimensões", "Unit.", "Desc.", "Total"]
+_CHAVES = ["seq", "descricao", "tipo", "quantidade", "dimensoes", "valor_unitario", "desconto", "valor_total"]
+_ROTULOS = ["#", "Especificação", "Tipo", "Quant.", "Dimensões", "Unit.", "Desc.", "Total"]
 
 _AVULSO = None  # data do combo de produtos: "descrever serviço avulso"
 
@@ -79,19 +80,26 @@ class GradeItens(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(8)
 
-        # Linha 1: Produto + Descrição
+        # Linha 1: Produto + Descrição + checkbox Fornecedor
         linha1 = QHBoxLayout()
         linha1.setSpacing(8)
 
         self._combo_produto = QComboBox()
-        self._combo_produto.setMinimumWidth(220)
+        self._combo_produto.setMinimumWidth(200)
         self._combo_produto.currentIndexChanged.connect(self._produto_selecionado)
         linha1.addWidget(self._combo_produto, 2)
 
         self._descricao = QLineEdit()
         self._descricao.setPlaceholderText("Descrição avulsa (sem produto)")
-        self._descricao.setMinimumWidth(150)
+        self._descricao.setMinimumWidth(140)
         linha1.addWidget(self._descricao, 1)
+
+        self._check_fornecedor = QCheckBox("Fornecedor")
+        self._check_fornecedor.setToolTip(
+            "Item terceirizado: entra como “Aguardando cotação” até alguém "
+            "com permissão lançar e selecionar a cotação do fornecedor."
+        )
+        linha1.addWidget(self._check_fornecedor)
         layout.addLayout(linha1)
 
         # Linha 2: Qtd + Dimensões + Unit. + Desc. + Adicionar
@@ -187,6 +195,7 @@ class GradeItens(QWidget):
             "dimensoes": self._dimensoes.text().strip() or None,
             "valor_unitario": str(_dec(self._unit.text())),
             "desconto": str(_dec(self._desconto.text())),
+            "tipo": "fornecedor" if self._check_fornecedor.isChecked() else "proprio",
         }
         self._itens.append(novo)
         self._descricao.clear()
@@ -194,6 +203,7 @@ class GradeItens(QWidget):
         self._unit.clear()
         self._desconto.clear()
         self._qtd.setText("1")
+        self._check_fornecedor.setChecked(False)
         self._atualizar()
 
     def _remover(self) -> None:
@@ -223,10 +233,18 @@ class GradeItens(QWidget):
                 or item.get("descricao_avulsa")
                 or "—"
             )
+            # M1: coluna Tipo com o estado da cotação (§3.2.2)
+            tipo = item.get("tipo") or "proprio"
+            if tipo == "fornecedor":
+                estado = item.get("estado_cotacao")
+                tipo_texto = "Fornecedor • Aguardando" if estado != "cotado" else "Fornecedor • Cotado"
+            else:
+                tipo_texto = "Próprio"
             linhas.append(
                 {
                     "seq": f"{seq:02d}",
                     "descricao": descricao,
+                    "tipo": tipo_texto,
                     "quantidade": str(item.get("quantidade") or ""),
                     "dimensoes": item.get("dimensoes") or "",
                     "valor_unitario": formatar_moeda(item.get("valor_unitario")),
@@ -241,6 +259,14 @@ class GradeItens(QWidget):
                 }
             )
         return linhas
+
+    @property
+    def item_selecionado(self) -> dict | None:
+        """Item da linha selecionada (com dados internos, não display)."""
+        linha = self._tabela.currentRow()
+        if 0 <= linha < len(self._itens):
+            return dict(self._itens[linha])
+        return None
 
     # ---------------------------------------------------------- formulário
 
@@ -267,6 +293,7 @@ class GradeItens(QWidget):
             self._dimensoes,
             self._unit,
             self._desconto,
+            self._check_fornecedor,
         ):
             widget.setEnabled(ligado)
         for botao in self.findChildren(QPushButton):
