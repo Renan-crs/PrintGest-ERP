@@ -55,6 +55,15 @@ class TipoOs(StrEnum):
     OS = "os"
 
 
+class TipoItemOs(StrEnum):
+    """M1 (PRD v3.0 §3.2.2): item próprio é produzido internamente; item de
+    fornecedor é terceirizado — entra como "Aguardando cotação" até alguém
+    com permissão lançar a cotação que define o valor (VO)."""
+
+    PROPRIO = "proprio"
+    FORNECEDOR = "fornecedor"
+
+
 class StatusOs(StrEnum):
     ABERTO = "aberto"
     APROVADO = "aprovado"

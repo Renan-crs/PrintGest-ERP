@@ -13,11 +13,19 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
 from app.models.cadastros import Cliente
 from app.models.enums import NivelAcesso, StatusOs, TipoOs
-from app.models.movimento import OrdemServico
+from app.models.movimento import OrdemServico, OrdemServicoItem
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
-from app.schemas.movimento import OsConverterIn, OsCreate, OsOut, OsStatusIn, OsUpdate
-from app.services import os_service
+from app.schemas.movimento import (
+    CotacaoIn,
+    CotacaoOut,
+    OsConverterIn,
+    OsCreate,
+    OsOut,
+    OsStatusIn,
+    OsUpdate,
+)
+from app.services import cotacao_service, os_service
 
 router = APIRouter(
     prefix="/os",
@@ -32,6 +40,7 @@ def _opções_carga():
         joinedload(OrdemServico.vendedor),
         joinedload(OrdemServico.atendente),
         selectinload(OrdemServico.itens),
+    selectinload(OrdemServico.itens).selectinload(OrdemServicoItem.cotacoes),
     )
 
 
@@ -128,6 +137,59 @@ def alterar_status(
 ) -> ItemResponse[OsOut]:
     return ItemResponse(
         data=os_service.mudar_status(db, filial_id=filial, os_id=os_id, novo=body.status)
+    )
+
+
+# ------------------------------------------- cotações de itens de fornecedor (M1)
+# `lancar_cotacao`/`ajustar` = Admin/Gerente (§3.2.3); o comparativo é de quem
+# vê a OS (Operador), com os campos sensíveis OMITIDOS no serviço.
+
+
+@router.get(
+    "/{os_id}/itens/{item_id}/cotacoes",
+)
+def listar_cotacoes(
+    os_id: int, item_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
+    return cotacao_service.listar(db, item_id=item_id, filial_id=filial, usuario=usuario)
+
+
+@router.post(
+    "/{os_id}/itens/{item_id}/cotacoes",
+    status_code=201,
+    dependencies=[Depends(require_nivel(NivelAcesso.GERENTE))],
+)
+def lancar_cotacao(
+    os_id: int,
+    item_id: int,
+    body: CotacaoIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+):
+    return ItemResponse(
+        data=cotacao_service.lancar(
+            db, item_id=item_id, filial_id=filial, usuario=usuario, dados=body
+        )
+    )
+
+
+@router.put(
+    "/{os_id}/itens/{item_id}/cotacoes/{cotacao_id}/selecionar",
+    dependencies=[Depends(require_nivel(NivelAcesso.GERENTE))],
+)
+def selecionar_cotacao(
+    os_id: int,
+    item_id: int,
+    cotacao_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+):
+    return ItemResponse(
+        data=cotacao_service.selecionar(
+            db, item_id=item_id, cotacao_id=cotacao_id, filial_id=filial, usuario=usuario
+        )
     )
 
 
