@@ -49,23 +49,37 @@ class PrecoReajusteHistorico(Base):
 
 
 class PrecoParametro(Base):
-    """Parâmetro global de precificação da filial (M1, PRD v3.0 §3.2.1).
+    """Parâmetro de precificação (M1 global / M2 sobrescrita por fornecedor).
 
     Chaves previstas: `acrescimo_fornecedor_pct` (130) e `markup_orcamento_pct`
-    (6) — os valores default moram em `precificacao.PARAMETROS_PADRAO`; a linha
-    só existe quando alguém altera. `usuario_id` registra quem mudou e
-    `atualizado_em` quando (NFR de rastreabilidade).
+    (6) — os valores default moram em `precificacao.PARAMETROS_PADRAO`.
+
+    **Escopo (M2, Q-04):** `fornecedor_id = NULL` = parâmetro global da filial;
+    `fornecedor_id = X` = sobrescrita que vale apenas para cotações daquele
+    fornecedor (precedência: fornecedor > global > default). `usuario_id`
+    registra quem mudou e `atualizado_em` quando (NFR de rastreabilidade).
     """
 
     __tablename__ = "preco_parametro"
     __table_args__ = (
-        UniqueConstraint("filial_id", "chave", name="uq_preco_parametro_filial_chave"),
+        # Uma linha por (filial, chave) quando global; por (filial, fornecedor,
+        # chave) quando é sobrescrita — o índice parcial permite os dois.
+        Index(
+            "uq_preco_parametro_escopo",
+            "filial_id",
+            "fornecedor_id",
+            "chave",
+            unique=True,
+        ),
         CheckConstraint("valor >= 0", name="ck_preco_parametro_valor"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    fornecedor_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("fornecedor.id"), nullable=True
     )
     chave: Mapped[str] = mapped_column(String(40), nullable=False)
     valor: Mapped[Decimal] = mapped_column(Numeric(7, 3), nullable=False)

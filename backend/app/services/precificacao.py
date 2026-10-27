@@ -74,6 +74,14 @@ def calcular_vo(cp, markup_orcamento_pct) -> Decimal:
     ).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
 
 
+def _pct_texto(pct: Decimal) -> str:
+    """Percentual como texto limpo: 100.000 → '100'; 33.500 → '33.5'."""
+    texto = str(pct)
+    if "." in texto:
+        texto = texto.rstrip("0").rstrip(".")
+    return texto or "0"
+
+
 def snapshot_item_terceirizado(
     vf, acrescimo_fornecedor_pct, markup_orcamento_pct
 ) -> dict:
@@ -86,8 +94,8 @@ def snapshot_item_terceirizado(
     vo = calcular_vo(cp, markup)
     return {
         "vf": f"{vf_dec:.2f}",
-        "acrescimo_fornecedor_pct": str(acrescimo),
-        "markup_orcamento_pct": str(markup),
+        "acrescimo_fornecedor_pct": _pct_texto(acrescimo),
+        "markup_orcamento_pct": _pct_texto(markup),
         "cp": f"{cp:.2f}",
         "vo": f"{vo:.2f}",
     }
@@ -96,29 +104,51 @@ def snapshot_item_terceirizado(
 # ------------------------------------------------- parâmetros (por filial)
 
 
-def parametros(db: Session, *, filial_id: int) -> dict[str, Decimal]:
-    """Parâmetros vigentes: defaults sobrepostos pelas linhas da filial."""
+def parametros(
+    db: Session, *, filial_id: int, fornecedor_id: int | None = None
+) -> dict[str, Decimal]:
+    """Parâmetros vigentes: default ← global ← sobrescrita do fornecedor.
+
+    Quando `fornecedor_id` é informado, linhas com aquele fornecedor
+    **sobrescrevem** as globais (precedência M2, Q-04). Sem o parâmetro,
+    devolve só as globais (comportamento M1 preservado).
+    """
     valores = dict(PARAMETROS_PADRAO)
     linhas = (
         db.query(PrecoParametro)
         .filter(PrecoParametro.filial_id == filial_id)
+        .filter(
+            PrecoParametro.fornecedor_id.is_(None)
+            if fornecedor_id is None
+            else (
+                (PrecoParametro.fornecedor_id.is_(None))
+                | (PrecoParametro.fornecedor_id == fornecedor_id)
+            )
+        )
         .all()
     )
-    for linha in linhas:
+    # aplica na ordem: global primeiro, sobrescrita depois
+    for linha in sorted(linhas, key=lambda l: l.fornecedor_id is not None):
         if linha.chave in valores:
             valores[linha.chave] = Decimal(linha.valor)
     return valores
 
 
 def definir_parametros(
-    db: Session, *, filial_id: int, usuario_id: int, dados: dict
+    db: Session,
+    *,
+    filial_id: int,
+    usuario_id: int,
+    dados: dict,
+    fornecedor_id: int | None = None,
 ) -> dict[str, Decimal]:
     """Upsert dos parâmetros informados; devolve os vigentes depois da mudança.
 
-    Registra quem alterou e quando (NFR de rastreabilidade do PRD v3.0: alterar
-    percentual sempre fica registrado).
+    Sem `fornecedor_id`: altera os globais da filial (M1). Com: altera a
+    **sobrescrita** daquele fornecedor (M2, Q-04) — o global fica intacto.
+    Registra quem alterou e quando (NFR de rastreabilidade do PRD v3.0).
     """
-    atuais = parametros(db, filial_id=filial_id)
+    atuais = parametros(db, filial_id=filial_id, fornecedor_id=fornecedor_id)
     recebidos = {}
     for chave in PARAMETROS_PADRAO:
         if chave in dados and dados[chave] is not None:
@@ -132,25 +162,28 @@ def definir_parametros(
             .filter(
                 PrecoParametro.filial_id == filial_id,
                 PrecoParametro.chave == chave,
+                PrecoParametro.fornecedor_id == fornecedor_id,
             )
             .first()
         )
         if linha is None:
-            linha = PrecoParametro(filial_id=filial_id, chave=chave)
+            linha = PrecoParametro(
+                filial_id=filial_id, chave=chave, fornecedor_id=fornecedor_id
+            )
             db.add(linha)
         linha.valor = pct
         linha.usuario_id = usuario_id
         db.flush()
     db.commit()
-    return parametros(db, filial_id=filial_id)
+    return parametros(db, filial_id=filial_id, fornecedor_id=fornecedor_id)
 
 
 def calcular_item_terceirizado(
-    db: Session, *, filial_id: int, vf
+    db: Session, *, filial_id: int, vf, fornecedor_id: int | None = None
 ) -> dict:
-    """Conveniência para o fluxo do M1: lê os parâmetros da filial e devolve o
-    snapshot do item (VF → CP → VO)."""
-    pcts = parametros(db, filial_id=filial_id)
+    """Conveniência para o fluxo do M1/M2: lê os parâmetros (com sobrescrita
+    do fornecedor, quando informado) e devolve o snapshot do item."""
+    pcts = parametros(db, filial_id=filial_id, fornecedor_id=fornecedor_id)
     return snapshot_item_terceirizado(
         vf,
         pcts["acrescimo_fornecedor_pct"],
