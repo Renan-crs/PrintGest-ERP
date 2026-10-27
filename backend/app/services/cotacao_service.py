@@ -118,6 +118,20 @@ def _aplicar_selecao(
 
     _recalcular_totais_os(db, item.os)
 
+    # M4 (§3.6): a etapa "Terceirizado" nasce junto com a seleção —
+    # data_envio = hoje, previsão de retorno = prazo da cotação.
+    from app.services import terceirizado_service
+
+    terceirizado_service.registrar_envio(
+        db,
+        os_id=item.os.id,
+        filial_id=item.os.filial_id,
+        item_id=item.id,
+        cotacao_id=cotacao.id,
+        prazo_dias=cotacao.prazo_dias,
+        usuario_id=getattr(cotacao, "criado_por", None),
+    )
+
 
 def _recalcular_totais_os(db: Session, os_obj: OrdemServico) -> None:
     """Totais da OS a partir dos itens (mantém a invariável itens − desconto)."""

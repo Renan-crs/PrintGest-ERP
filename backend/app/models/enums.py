@@ -64,6 +64,14 @@ class TipoItemOs(StrEnum):
     FORNECEDOR = "fornecedor"
 
 
+class ConferenciaTerceirizado(StrEnum):
+    """M4 (PRD v3.0 §3.6): conferência de qualidade do item terceirizado."""
+
+    PENDENTE = "pendente"
+    OK = "ok"
+    REFACAO = "refacao"
+
+
 class StatusOs(StrEnum):
     ABERTO = "aberto"
     APROVADO = "aprovado"
