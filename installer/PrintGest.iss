@@ -84,6 +84,8 @@ Filename: "{app}\postgres\pgsql\bin\pg_ctl.exe"; Parameters: "stop -D ""{app}\po
 Type: filesandordirs; Name: "{app}\postgres\data"
 Type: filesandordirs; Name: "{app}\PrintGestAPI\logs"
 Type: files; Name: "{app}\postgres\postgres.log"
+; O daemon pode demorar a liberar handles mesmo apos o taskkill — forca.
+Type: filesandordirs; Name: "{app}\PrintGestAPI"
 #else
 [UninstallDelete]
 ; Estacao: o .env com o endereco do servidor e gravado pelo assistente.
