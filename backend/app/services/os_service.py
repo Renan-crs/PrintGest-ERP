@@ -6,7 +6,7 @@ Regra central: orçamento e OS são registros de `ordem_servico` distinguidos po
 `convertido`. Todos os valores monetários são `Decimal` (nunca float).
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
@@ -14,8 +14,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.cadastros import Cliente
-from app.models.movimento import OrdemServico, OrdemServicoItem
-from app.models.enums import StatusOs, TipoItemOs, TipoOs
+from app.models.movimento import (
+    OrdemServico,
+    OrdemServicoItem,
+    PedidoCompra,
+    PedidoCompraItem,
+)
+from app.models.enums import StatusOs, StatusPedido, TipoItemOs, TipoOs
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
 from app.services import adiantamento_service
 
@@ -73,10 +78,10 @@ def _para_out(os: OrdemServico) -> OsOut:
     for item in os.itens:
         saida = OsItemOut.model_validate(item)
         if item.tipo == TipoItemOs.FORNECEDOR:
-            # Estado derivado (PRD §3.2.2): sem cotação selecionada, o item
-            # está "aguardando" e não pode ir ao cliente com valor 0.
-            selecionada = any(c.selecionada for c in item.cotacoes)
-            saida.estado_cotacao = "cotado" if selecionada else "aguardando"
+            # Estado derivado (PRD §3.2.2): sem snapshot, o item está
+            # "aguardando" (cotações ficam no orçamento — aqui o snapshot é a
+            # prova de que foi cotado e selecionado).
+            saida.estado_cotacao = "cotado" if item.snapshot_preco else "aguardando"
         itens_out.append(saida)
     dados["itens"] = itens_out
     return OsOut.model_validate(dados)
@@ -252,6 +257,24 @@ def converter_em_os(
             detail="Orçamento deve estar aberto para ser convertido em OS.",
         )
 
+    # M1 (§3.2.2): item de fornecedor SEM cotação selecionada não pode virar
+    # OS — iria ao cliente com valor 0. Bloqueia a aprovação com orientação.
+    pendentes = [
+        (i.descricao_avulsa or f"item {i.seq}").strip()
+        for i in orcamento.itens
+        if i.tipo == TipoItemOs.FORNECEDOR
+        and not any(c.selecionada for c in i.cotacoes)
+    ]
+    if pendentes:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "O orçamento tem item de fornecedor sem cotação selecionada: "
+                + "; ".join(pendentes)
+                + ". Lance e selecione a cotação antes de aprovar."
+            ),
+        )
+
     nova = OrdemServico(
         filial_id=filial_id,
         tipo=TipoOs.OS,
@@ -278,6 +301,8 @@ def converter_em_os(
                 desconto=i.desconto,
                 valor_total=i.valor_total,
                 executado=i.executado,
+                tipo=i.tipo,
+                snapshot_preco=i.snapshot_preco,
             )
             for i in orcamento.itens
         ],
@@ -286,6 +311,13 @@ def converter_em_os(
     db.add(nova)
     try:
         db.flush()  # garante nova.id para o lançamento de adiantamento
+        # M1 (§3.2.2 item 7): a aprovação gera pedido de compra em rascunho
+        # por fornecedor, com o VF cotado (ver §3.7). As cotações ficam nos
+        # itens do ORÇAMENTO (histórico/auditoria) — é de lá que se lê.
+        _gerar_pedidos_de_compra(
+            db, filial_id=filial_id, usuario_id=usuario_id,
+            os_nova=nova, orcamento=orcamento,
+        )
         adiantamento_service.exigir_e_registrar(
             db,
             filial_id=filial_id,
@@ -305,6 +337,73 @@ def converter_em_os(
         raise _erro_integridade() from exc
     db.refresh(nova)
     return _para_out(nova)
+
+
+def _gerar_pedidos_de_compra(
+    db: Session,
+    *,
+    filial_id: int,
+    usuario_id: int,
+    os_nova: OrdemServico,
+    orcamento: OrdemServico,
+) -> None:
+    """Pedido de compra em rascunho por fornecedor (M1, §3.2.2 item 7).
+
+    Cada cotação selecionada do ORÇAMENTO vira um item de pedido ao fornecedor
+    com o **VF cotado** (o valor interno — nunca vai ao cliente); o pedido fica
+    ABERTO/rascunho, ligado à OS por `os_origem_id`, e a cotação recebe
+    `pedido_item_id` (o recebimento fecha o ciclo em §3.7).
+    """
+    por_fornecedor: dict[int, list[tuple[OrdemServicoItem, object]]] = {}
+    for item in orcamento.itens:
+        if item.tipo != TipoItemOs.FORNECEDOR:
+            continue
+        selecionada = next(
+            (c for c in item.cotacoes if c.selecionada), None
+        )
+        if selecionada is None:
+            continue  # bloqueado antes; aqui é só defesa
+        por_fornecedor.setdefault(selecionada.fornecedor_id, []).append(
+            (item, selecionada)
+        )
+
+    for fornecedor_id, pares in por_fornecedor.items():
+        valor_total = sum(
+            (c.vf for _, c in pares), Decimal("0")
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        prazo = min(
+            (c.prazo_dias for _, c in pares if c.prazo_dias is not None),
+            default=None,
+        )
+        pedido = PedidoCompra(
+            filial_id=filial_id,
+            fornecedor_id=fornecedor_id,
+            valor_total=valor_total,
+            observacoes=f"Gerado da aprovação da O.S. #{os_nova.id} (item de fornecedor).",
+            solicitante_id=usuario_id,
+            os_origem_id=os_nova.id,
+            status=StatusPedido.ABERTO,
+            itens=[],
+        )
+        db.add(pedido)
+        db.flush()  # id para os itens
+        for seq, (item, cotacao) in enumerate(pares, start=1):
+            item_pedido = PedidoCompraItem(
+                pedido_compra_id=pedido.id,
+                seq=seq,
+                produto_id=None,  # serviço terceirizado: descrição avulsa
+                descricao_avulsa=(
+                    f"{item.descricao_avulsa or f'item {item.seq}'} — serviço de fornecedor"
+                ),
+                quantidade=Decimal("1"),
+                valor_unitario=cotacao.vf,
+                valor_total=cotacao.vf,
+            )
+            db.add(item_pedido)
+            db.flush()
+            cotacao.pedido_item_id = item_pedido.id
+        if prazo is not None:
+            pedido.previsao_entrega = date.today() + timedelta(days=prazo)
 
 
 def cancelar(db: Session, *, filial_id: int, os_id: int) -> None:
