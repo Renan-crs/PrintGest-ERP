@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.cadastros import Cliente
 from app.models.movimento import OrdemServico, OrdemServicoItem
-from app.models.enums import StatusOs, TipoOs
+from app.models.enums import StatusOs, TipoItemOs, TipoOs
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
 from app.services import adiantamento_service
 
@@ -46,6 +46,7 @@ def _montar_item(payload: OsItemIn, seq: int) -> OrdemServicoItem:
         valor_unitario=payload.valor_unitario,
         desconto=payload.desconto,
         valor_total=total,
+        tipo=payload.tipo,
     )
 
 
@@ -68,7 +69,16 @@ def _para_out(os: OrdemServico) -> OsOut:
     dados["cliente_nome"] = os.cliente.nome_razao if os.cliente else None
     dados["vendedor_nome"] = os.vendedor.nome if os.vendedor else None
     dados["atendente_nome"] = os.atendente.nome if os.atendente else None
-    dados["itens"] = [OsItemOut.model_validate(i) for i in os.itens]
+    itens_out = []
+    for item in os.itens:
+        saida = OsItemOut.model_validate(item)
+        if item.tipo == TipoItemOs.FORNECEDOR:
+            # Estado derivado (PRD §3.2.2): sem cotação selecionada, o item
+            # está "aguardando" e não pode ir ao cliente com valor 0.
+            selecionada = any(c.selecionada for c in item.cotacoes)
+            saida.estado_cotacao = "cotado" if selecionada else "aguardando"
+        itens_out.append(saida)
+    dados["itens"] = itens_out
     return OsOut.model_validate(dados)
 
 
@@ -80,6 +90,7 @@ def buscar(db: Session, os_id: int, *, filial_id: int) -> OrdemServico:
             joinedload(OrdemServico.vendedor),
             joinedload(OrdemServico.atendente),
             selectinload(OrdemServico.itens),
+            selectinload(OrdemServico.itens).selectinload(OrdemServicoItem.cotacoes),
         )
         .filter(OrdemServico.id == os_id, OrdemServico.filial_id == filial_id)
         .first()

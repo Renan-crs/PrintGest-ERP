@@ -20,7 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-from app.models.cadastros import Cliente, Funcionario
+from app.models.cadastros import Cliente, Fornecedor, Funcionario
 from app.models.core import Usuario
 from app.models.enums import (
     FormaPagamento,
@@ -29,9 +29,11 @@ from app.models.enums import (
     StatusPedido,
     StatusVenda,
     TipoAgenda,
+    TipoItemOs,
     TipoOs,
     pg_enum,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 from decimal import Decimal
@@ -146,8 +148,69 @@ class OrdemServicoItem(Base):
     desconto: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     executado: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # M1 (PRD v3.0 §3.2.2): item de fornecedor terceirizado + snapshot do cálculo
+    # aplicado (VF, percentuais, CP, VO) — gravado quando a cotação é selecionada;
+    # mudar os parâmetros globais depois não altera este item (§3.2.1).
+    tipo: Mapped[TipoItemOs] = mapped_column(
+        pg_enum(TipoItemOs), nullable=False, server_default=TipoItemOs.PROPRIO.value
+    )
+    snapshot_preco: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     os: Mapped[OrdemServico] = relationship(back_populates="itens")
+    cotacoes: Mapped[list["OrdemServicoItemCotacao"]] = relationship(
+        back_populates="item",
+        order_by="OrdemServicoItemCotacao.criado_em",
+        cascade="all, delete-orphan",
+    )
+
+
+class OrdemServicoItemCotacao(Base):
+    """Cotação de fornecedor para um item terceirizado (PRD v3.0 §3.2.2).
+
+    Várias cotações podem existir; **uma** é marcada `selecionada` e só ela
+    compõe o orçamento (o `valor_unitario` do item assume o VO calculado).
+    VF/cálculo são informação interna: a API omite esses campos para perfis
+    sem `ver_custo_terceiro` (Admin/Gerente — §3.2.3).
+    """
+
+    __tablename__ = "os_item_cotacao"
+    __table_args__ = (
+        CheckConstraint("vf >= 0", name="ck_os_item_cotacao_vf"),
+        CheckConstraint(
+            "prazo_dias IS NULL OR prazo_dias >= 0", name="ck_os_item_cotacao_prazo"
+        ),
+        Index("idx_os_item_cotacao_item", "item_id"),
+        # Só UMA cotação selecionada por item (PRD §3.2.2 item 5).
+        Index(
+            "uq_os_item_cotacao_selecionada",
+            "item_id",
+            unique=True,
+            postgresql_where=text("selecionada"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    item_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("ordem_servico_item.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fornecedor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("fornecedor.id"), nullable=False
+    )
+    vf: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    validade: Mapped[date | None] = mapped_column(Date, nullable=True)
+    prazo_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    observacoes: Mapped[str | None] = mapped_column(Text)
+    anexo_path: Mapped[str | None] = mapped_column(String(500))
+    selecionada: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    item: Mapped[OrdemServicoItem] = relationship(back_populates="cotacoes")
+    fornecedor: Mapped["Fornecedor"] = relationship(lazy="joined")
 
 
 class VendaBalcao(Base):
