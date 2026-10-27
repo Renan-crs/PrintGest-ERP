@@ -204,6 +204,11 @@ class OrdemServicoItemCotacao(Base):
     observacoes: Mapped[str | None] = mapped_column(Text)
     anexo_path: Mapped[str | None] = mapped_column(String(500))
     selecionada: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # M1 (§3.2.2 item 7): item do pedido de compra gerado na aprovação do
+    # orçamento — carrega o VF cotado para este fornecedor.
+    pedido_item_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("pedido_compra_item.id")
+    )
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -344,6 +349,10 @@ class PedidoCompra(Base):
     solicitante_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("usuario.id")
     )
+    # M1 (§3.2.2 item 7): OS que gerou este pedido na aprovação do orçamento.
+    os_origem_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("ordem_servico.id")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -377,8 +386,10 @@ class PedidoCompraItem(Base):
         nullable=False,
     )
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
-    produto_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("produto.id"), nullable=False
+    # M1 (§3.2.2): serviço terceirizado não tem produto no catálogo — a
+    # descrição vive em `descricao_avulsa` (produto NULO nesses casos).
+    produto_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("produto.id")
     )
     descricao_avulsa: Mapped[str | None] = mapped_column(String(255))
     quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="1")

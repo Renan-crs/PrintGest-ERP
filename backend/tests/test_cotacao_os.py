@@ -229,6 +229,154 @@ def test_operador_ve_comparativo_sem_vf_nem_snapshot(client, admin_token, _token
     assert "snapshot" not in str(os_operador).lower()
 
 
+# ------------------------------------------ aprovação → pedido de compra (§3.2.2 item 7)
+
+
+def test_converter_com_item_sem_cotacao_selecionada_e_bloqueado(client, admin_token):
+    cliente = _criar_cliente(client, admin_token)
+    _criar_fornecedor(client, admin_token, "Fornecedor X")
+    os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
+    # nenhuma cotação lançada
+
+    resp = client.post(
+        f"/v1/os/{os_criada['id']}/converter", headers=auth(client, admin_token)
+    )
+    assert resp.status_code == 409, resp.text
+    assert "sem cotação selecionada" in resp.json()["detail"]
+    # o orçamento segue aberto
+    atual = client.get(
+        f"/v1/os/{os_criada['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert atual["status"] == "aberto"
+
+
+def test_converter_gera_pedido_de_compra_rascunho_com_vf(client, admin_token):
+    """Item 7: a aprovação gera pedido ABERTO por fornecedor com o VF cotado."""
+    cliente = _criar_cliente(client, admin_token)
+    fornecedor = _criar_fornecedor(client, admin_token, "Laminadora Prime")
+    os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
+    resp = _lancar(
+        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "87.35",
+        selecionada=True, prazo_dias=7,
+    )
+    assert resp.status_code == 201
+
+    resp = client.post(
+        f"/v1/os/{os_criada['id']}/converter", headers=auth(client, admin_token)
+    )
+    assert resp.status_code == 200, resp.text
+    os_nova = resp.json()["data"]
+    assert os_nova["tipo"] == "os"
+    # item copiado mantém tipo/snapshot
+    assert os_nova["itens"][0]["tipo"] == "fornecedor"
+    assert os_nova["itens"][0]["estado_cotacao"] == "cotado"
+    assert Decimal(str(os_nova["itens"][0]["valor_unitario"])) == Decimal("212.96")
+
+    # O pedido de compra em rascunho existe, com o VF (87,35 — valor interno).
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import Session
+    from tests.conftest import TEST_DB_URL
+
+    engine = create_engine(TEST_DB_URL)
+    with Session(engine) as db:
+        pedidos = db.execute(
+            text(
+                "SELECT id, fornecedor_id, status, valor_total, os_origem_id "
+                "FROM pedido_compra WHERE os_origem_id = :os"
+            ),
+            {"os": os_nova["id"]},
+        ).fetchall()
+        assert len(pedidos) == 1
+        pedido = pedidos[0]
+        assert pedido.fornecedor_id == fornecedor["id"]
+        assert pedido.status == "aberto"
+        assert Decimal(str(pedido.valor_total)) == Decimal("87.35")
+
+        itens = db.execute(
+            text(
+                "SELECT pc.produto_id, pc.descricao_avulsa, pc.valor_unitario, "
+                "       c.vf AS vf_cotacao, c.pedido_item_id "
+                "FROM pedido_compra_item pc "
+                "JOIN os_item_cotacao c ON c.pedido_item_id = pc.id "
+                "WHERE pc.pedido_compra_id = :pid"
+            ),
+            {"pid": pedido.id},
+        ).fetchall()
+        assert len(itens) == 1
+        assert itens[0].produto_id is None  # serviço: sem produto
+        assert Decimal(str(itens[0].valor_unitario)) == Decimal("87.35")
+        assert Decimal(str(itens[0].vf_cotacao)) == Decimal("87.35")
+        assert "Hot stamping" in itens[0].descricao_avulsa
+    engine.dispose()
+
+
+def test_converter_agrupa_um_pedido_por_fornecedor(client, admin_token):
+    """Dois itens para o MESMO fornecedor: um pedido, dois itens (§3.7)."""
+    cliente = _criar_cliente(client, admin_token)
+    fornecedor = _criar_fornecedor(client, admin_token, "Fornecedora Única")
+    resp = client.post(
+        "/v1/os",
+        headers=auth(client, admin_token),
+        json={
+            "tipo": "orcamento",
+            "cliente_id": cliente["id"],
+            "itens": [
+                {
+                    "produto_id": None,
+                    "descricao_avulsa": "Hot stamping fosco",
+                    "quantidade": 1,
+                    "valor_unitario": 0,
+                    "tipo": "fornecedor",
+                },
+                {
+                    "produto_id": None,
+                    "descricao_avulsa": "Corte e vinco especial",
+                    "quantidade": 1,
+                    "valor_unitario": 0,
+                    "tipo": "fornecedor",
+                },
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    os_criada = resp.json()["data"]
+    for item in os_criada["itens"]:
+        r = _lancar(
+            client, admin_token, os_criada["id"], item["id"], fornecedor["id"],
+            "50.00", selecionada=True,
+        )
+        assert r.status_code == 201
+
+    resp = client.post(
+        f"/v1/os/{os_criada['id']}/converter", headers=auth(client, admin_token)
+    )
+    assert resp.status_code == 200, resp.text
+    os_nova = resp.json()["data"]
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import Session
+    from tests.conftest import TEST_DB_URL
+
+    engine = create_engine(TEST_DB_URL)
+    with Session(engine) as db:
+        pedidos = db.execute(
+            text(
+                "SELECT id, valor_total FROM pedido_compra WHERE os_origem_id = :os"
+            ),
+            {"os": os_nova["id"]},
+        ).fetchall()
+        assert len(pedidos) == 1  # um pedido por fornecedor
+        assert Decimal(str(pedidos[0].valor_total)) == Decimal("100.00")  # 2 × VF 50
+        itens = db.execute(
+            text(
+                "SELECT count(*) FROM pedido_compra_item WHERE pedido_compra_id = :pid"
+            ),
+            {"pid": pedidos[0].id},
+        ).scalar_one()
+        assert itens == 2
+    engine.dispose()
+
+
 def test_operador_e_caixa_nao_lancam_nem_selecionam(client, admin_token, _tokens_por_nivel):
     cliente = _criar_cliente(client, admin_token)
     fornecedor = _criar_fornecedor(client, admin_token)
