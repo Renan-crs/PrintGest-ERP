@@ -9,7 +9,7 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
-## [Não lançado]
+## [0.3.0] - 2026-10-27 · PRD v3.0 — M0 (planos e caixa) + M1 (motor de precificação e orçamento com fornecedor)
 
 ### Adicionado
 - **M1 — tela desktop do orçamento com item de fornecedor (PRD v3.0 §3.2.2):** `GradeItens` ganha **coluna "Tipo"** ("Próprio" / "Fornecedor • Aguardando" / "Fornecedor • Cotado") + checkbox **"Fornecedor"** na barra de edição; `item_selecionado` expõe os dados internos. `PaginaOrcamento` ganha botão **"Cotações" (F10)** que abre o `DialogoCotacoes` — QDialog completo com **comparativo em tabela** (VF/prazo/validade por linha, ✓ na selecionada), **formulário de lançamento** (fornecedor combo, VF, prazo, validade, observações, "Selecionar esta cotação"), botão **"Selecionar marcada"** para a linha da tabela, e bloco de cálculo **VF/CP/VO** (para Operador, VF mostra "(restrito)" — a API omite, não oculta). Api do desktop: `listar_cotacoes`, `lancar_cotacao`, `selecionar_cotacao`. Desktop 356 passed (+14).
