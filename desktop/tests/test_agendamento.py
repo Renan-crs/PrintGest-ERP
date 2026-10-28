@@ -235,7 +235,6 @@ def test_calendario_navega_mes(app, pumpar):
     assert pagina._calendario._rotulo.text() == "outubro de 2026"
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_calendario_preenche_compromissos(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -289,7 +288,6 @@ def test_lista_filtra_por_tipo(app, pumpar):
 
 
 # -------------------------------------------------------------------- ações
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_criar_compromisso(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -316,7 +314,6 @@ def test_abrir_compromisso_preenche_form(app, pumpar):
     assert pagina._btn_excluir.isVisible()
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_editar_compromisso(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -345,7 +342,6 @@ def test_concluir_compromisso(app, pumpar):
     assert _AGENDAMENTOS[0]["status"] == "concluido"
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_excluir_compromisso(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -359,7 +355,6 @@ def test_excluir_compromisso(app, pumpar):
     assert _AGENDAMENTOS == []
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_valida_titulo_obrigatorio(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -371,7 +366,6 @@ def test_valida_titulo_obrigatorio(app, pumpar):
     assert _AGENDAMENTOS == []
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_valida_fim_apos_inicio(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -384,7 +378,6 @@ def test_valida_fim_apos_inicio(app, pumpar):
     assert _AGENDAMENTOS == []
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_modo_leitura_bloqueia_escrita(app, pumpar):
     pagina = _pagina(modo_leitura=True)
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
@@ -393,7 +386,6 @@ def test_modo_leitura_bloqueia_escrita(app, pumpar):
     assert not pagina._titulo.widget.isEnabled()
 
 
-@pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_novo_limpa_form(app, pumpar):
     pagina = _pagina()
     pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
