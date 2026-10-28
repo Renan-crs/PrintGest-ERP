@@ -71,7 +71,12 @@ class Paginador(QWidget):
         self._ultima.setEnabled(fim < total)
 
     def _ir(self, offset: int) -> None:
-        offset = max(0, min(offset, max(self._total - LOTE, 0)))
+        # Páginas são alinhadas a LOTE (a última pode ser parcial): o clamp
+        # precisa conter o offset na página e alinhar ao início dela — usar
+        # apenas `total - LOTE` desalinha o salto para a última parcial
+        # (ex.: total=120, LOTE=50 → última página começa em 100, não em 70).
+        offset = max(0, min(offset, max(self._total - 1, 0)))
+        offset = (offset // LOTE) * LOTE
         if offset != self._offset:
             self.mudou.emit(offset)
 
