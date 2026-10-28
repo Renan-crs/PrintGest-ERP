@@ -25,6 +25,8 @@ dist/
 dist_installer/
 # Log em arquivo do backend empacotado (run_server.py)
 backend/logs/
+# Arquivos de arte enviados em runtime (arte_versao.caminho aponta para cá)
+backend/uploads/
 # Credenciais por cliente para o .env da instalação (o .example é versionado)
 installer/env.instalacao
 # Specs do instalador são versionados (build/ continua ignorado)
