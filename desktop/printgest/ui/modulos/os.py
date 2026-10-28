@@ -622,6 +622,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     FILTROS = [
         ("", "Todas"),
         ("aberto", "Abertas"),
+        ("aguardando_arte", "Aguardando arte"),  # M3 (§3.5)
+        ("aguardando_aprovacao", "Aguardando aprovação"),  # M3 (§3.5)
         ("producao", "Em Produção"),
         ("pronta", "Prontas"),
         ("entregue", "Entregues"),

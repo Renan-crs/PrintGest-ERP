@@ -2,7 +2,9 @@
 
 Cobre: upload de versões (v1, v2…), decisão do cliente (aprovada / ajuste
 com comentários), estado derivado da arte, link público com token/expiração,
-e validações (extensão bloqueada, arquivo vazio, ajuste sem comentários).
+validações (extensão bloqueada, arquivo vazio, ajuste sem comentários) e a
+incorporação no status da OS ("Aguardando arte"/"Aguardando aprovação" +
+gate: produção não inicia sem arte aprovada).
 """
 
 from __future__ import annotations
@@ -10,36 +12,14 @@ from __future__ import annotations
 import io
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import httpx
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session
 
 from app.main import app
-from app.models.movimento import ArteAprovacao, ArteVersao, LinkPublico
-from app.models.enums import DecisaoArte
-from app.db import SessionLocal
-from tests.conftest import TEST_DB_URL, auth
+from tests.conftest import arte_aprovada, auth
 
 client = TestClient(app)
-
-
-@pytest.fixture()
-def db_teste():
-    engine = create_engine(TEST_DB_URL)
-    with Session(engine) as sessao:
-        yield sessao
-    engine.dispose()
-
-
-@pytest.fixture()
-def _filial(db_teste) -> int:
-    return int(
-        db_teste.execute(text("SELECT id FROM filial ORDER BY id LIMIT 1")).scalar_one()
-    )
 
 
 def _u() -> str:
@@ -232,3 +212,111 @@ def test_hash_sha256_consistente(client, admin_token):
     )
     data = resp.json()["data"]
     assert data["hash_sha256"] == hashlib.sha256(conteudo).hexdigest()
+
+
+# ------------------------------------------- status da OS incorpora a arte (§3.5)
+
+
+def test_upload_muda_status_para_aguardando_aprovacao(client, admin_token):
+    """OS aberta + upload → "Aguardando aprovação" (§3.5)."""
+    os_criada = _criar_os(client, admin_token)
+    assert os_criada["status"] == "aberto"
+    _upload(client, admin_token, os_criada["id"])
+    atual = client.get(
+        f"/v1/os/{os_criada['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert atual["status"] == "aguardando_aprovacao"
+
+
+def test_decisao_ajuste_volta_status_para_aguardando_arte(client, admin_token):
+    """Cliente pede ajuste → OS volta a "Aguardando arte" (§3.5)."""
+    os_criada = _criar_os(client, admin_token)
+    versao = _upload(client, admin_token, os_criada["id"]).json()["data"]
+    resp = client.post(
+        f"/v1/os/{os_criada['id']}/arte/{versao['id']}/decisao",
+        headers=auth(client, admin_token),
+        json={"decisao": "ajuste", "comentarios": "Fonte maior"},
+    )
+    assert resp.status_code == 201, resp.text
+    atual = client.get(
+        f"/v1/os/{os_criada['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert atual["status"] == "aguardando_arte"
+
+    # reenvio da arte corrigida: volta a aguardar a aprovação
+    _upload(client, admin_token, os_criada["id"])
+    atual = client.get(
+        f"/v1/os/{os_criada['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert atual["status"] == "aguardando_aprovacao"
+
+
+def test_decisao_aprovada_muda_status_para_aprovado(client, admin_token):
+    os_criada = _criar_os(client, admin_token)
+    versao = _upload(client, admin_token, os_criada["id"]).json()["data"]
+    resp = client.post(
+        f"/v1/os/{os_criada['id']}/arte/{versao['id']}/decisao",
+        headers=auth(client, admin_token),
+        json={"decisao": "aprovada"},
+    )
+    assert resp.status_code == 201, resp.text
+    atual = client.get(
+        f"/v1/os/{os_criada['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert atual["status"] == "aprovado"
+
+
+def test_status_manual_aguardando_arte(client, admin_token):
+    """O operador pode sinalizar "aguardando arte do cliente" manualmente."""
+    os_criada = _criar_os(client, admin_token)
+    resp = client.patch(
+        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        json={"status": "aguardando_arte"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "aguardando_arte"
+
+
+def test_producao_sem_arte_aprovada_409(client, admin_token):
+    """§3.5: não inicia produção sem arte aprovada."""
+    os_criada = _criar_os(client, admin_token)
+    resp = client.patch(
+        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        json={"status": "producao"},
+    )
+    assert resp.status_code == 409, resp.text
+    assert "arte aprovada" in resp.json()["detail"].lower()
+
+    # arte pendente (sem decisão) também bloqueia
+    _upload(client, admin_token, os_criada["id"])
+    resp = client.patch(
+        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        json={"status": "producao"},
+    )
+    assert resp.status_code == 409, resp.text
+
+
+def test_producao_com_arte_aprovada_200(client, admin_token):
+    os_criada = _criar_os(client, admin_token)
+    arte_aprovada(client, admin_token, os_criada["id"])
+    resp = client.patch(
+        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        json={"status": "producao"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "producao"
+
+
+def test_reenvio_nao_regrede_status_avancado(client, admin_token):
+    """OS já em produção não volta a "aguardando" em reenvios de arte."""
+    os_criada = _criar_os(client, admin_token)
+    arte_aprovada(client, admin_token, os_criada["id"])
+    client.patch(
+        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        json={"status": "producao"},
+    )
+    _upload(client, admin_token, os_criada["id"])  # ajuste tardio
+    atual = client.get(
+        f"/v1/os/{os_criada['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert atual["status"] == "producao"

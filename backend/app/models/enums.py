@@ -88,6 +88,10 @@ class TipoLinkPublico(StrEnum):
 
 class StatusOs(StrEnum):
     ABERTO = "aberto"
+    AGUARDANDO_ARTE = "aguardando_arte"  # M3 (§3.5): aguardando arte do cliente
+    AGUARDANDO_APROVACAO = (
+        "aguardando_aprovacao"  # M3 (§3.5): prova enviada, aguardando decisão
+    )
     APROVADO = "aprovado"
     PRODUCAO = "producao"
     PRONTA = "pronta"

@@ -19,8 +19,7 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.models.enums import DecisaoArte, TipoLinkPublico
+from app.models.enums import DecisaoArte, StatusOs, TipoLinkPublico, TipoOs
 from app.models.movimento import (
     ArteAprovacao,
     ArteVersao,
@@ -34,8 +33,7 @@ _MAX_TAMANHO = 50 * 1024 * 1024  # 50 MB
 
 
 def _pasta_uploads(os_id: int) -> Path:
-    pasta = Path(settings.database_url.split("@")[-1].split("/")[0])  # fallback
-    # Usa o diretório do projeto em dev; em produção, virá do settings
+    """Arquivos ficam em `<raiz>/uploads/{os_id}/` (caminho em `arte_versao`)."""
     base = Path(__file__).resolve().parents[2] / "uploads" / str(os_id)
     base.mkdir(parents=True, exist_ok=True)
     return base
@@ -103,9 +101,37 @@ def enviar_versao(
         criado_por=usuario_id,
     )
     db.add(versao)
+    db.flush()  # estado_arte precisa ver a versão nova na mesma transação
+    _avancar_status_por_arte(db, os_obj)
     db.commit()
     db.refresh(versao)
     return versao
+
+
+def _avancar_status_por_arte(db: Session, os_obj: OrdemServico) -> None:
+    """M3 (§3.5): o status da OS incorpora o estado da arte.
+
+    Só age em OS (orçamento tem fluxo próprio) e apenas nos estados
+    pré-aprovação — depois que a OS avançou (aprovado, produção…),
+    reenvios e decisões não regredim o status. O chamador deve dar
+    `flush()` na alteração da arte antes: `estado_arte` consulta o banco.
+    """
+    if os_obj.tipo != TipoOs.OS:
+        return
+    if os_obj.status not in (
+        StatusOs.ABERTO,
+        StatusOs.AGUARDANDO_ARTE,
+        StatusOs.AGUARDANDO_APROVACAO,
+    ):
+        return
+    estado = estado_arte(db, os_id=os_obj.id)
+    if estado == "aprovada":
+        os_obj.status = StatusOs.APROVADO
+    elif estado == "aguardando_aprovacao":
+        os_obj.status = StatusOs.AGUARDANDO_APROVACAO
+    elif estado == "ajuste_solicitado":
+        os_obj.status = StatusOs.AGUARDANDO_ARTE
+    # "sem_arte" não muda status: nada foi enviado ainda.
 
 
 def listar_versoes(db: Session, *, os_id: int, filial_id: int) -> list[ArteVersao]:
@@ -152,6 +178,8 @@ def registrar_decisao(
         criado_por=usuario_id,
     )
     db.add(aprovacao)
+    db.flush()  # estado_arte precisa ver a decisão na mesma transação
+    _avancar_status_por_arte(db, versao.os)
     db.commit()
     db.refresh(aprovacao)
     return aprovacao

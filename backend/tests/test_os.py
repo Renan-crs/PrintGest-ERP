@@ -3,7 +3,7 @@
 import uuid
 from decimal import Decimal
 
-from tests.conftest import auth  # helper de headers + fixtures do conftest
+from tests.conftest import arte_aprovada, auth  # helpers/headers + fixtures do conftest
 
 
 def _u() -> str:
@@ -153,6 +153,9 @@ def test_transicoes_status_com_datas(client, admin_token):
                           json=_min_payload(cliente)).json()["data"]
     os_id = os_data["id"]
 
+    # M3 (§3.5): produção exige arte aprovada — sobe a arte antes.
+    arte_aprovada(client, admin_token, os_id)
+
     resp = client.patch(f"/v1/os/{os_id}/status", headers=auth(client, admin_token),
                         json={"status": "producao"})
     assert resp.status_code == 200, resp.text
@@ -205,6 +208,7 @@ def test_entregue_nao_cancela_400(client, admin_token):
     cliente = _criar_cliente(client, admin_token)
     os_data = client.post("/v1/os", headers=auth(client, admin_token),
                           json=_min_payload(cliente)).json()["data"]
+    arte_aprovada(client, admin_token, os_data["id"])  # gate de produção (M3)
     for s in ("producao", "pronta", "entregue"):
         resp = client.patch(f"/v1/os/{os_data['id']}/status",
                             headers=auth(client, admin_token),
@@ -218,6 +222,7 @@ def test_os_lista_filtro_status(client, admin_token):
     cliente = _criar_cliente(client, admin_token)
     a = client.post("/v1/os", headers=auth(client, admin_token),
                     json=_min_payload(cliente)).json()["data"]
+    arte_aprovada(client, admin_token, a["id"])  # gate de produção (M3)
     client.patch(f"/v1/os/{a['id']}/status", headers=auth(client, admin_token),
                  json={"status": "producao"})
     b = client.post("/v1/os", headers=auth(client, admin_token),

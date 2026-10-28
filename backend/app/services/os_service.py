@@ -196,7 +196,23 @@ def atualizar(
 
 
 _TRANSICOES: dict[StatusOs, set[StatusOs]] = {
-    StatusOs.ABERTO: {StatusOs.APROVADO, StatusOs.PRODUCAO, StatusOs.PRONTA, StatusOs.ENTREGUE, StatusOs.CANCELADO},
+    StatusOs.ABERTO: {
+        StatusOs.AGUARDANDO_ARTE, StatusOs.AGUARDANDO_APROVACAO,
+        StatusOs.APROVADO, StatusOs.PRODUCAO, StatusOs.PRONTA,
+        StatusOs.ENTREGUE, StatusOs.CANCELADO,
+    },
+    # M3 (§3.5): a arte chegou e aguarda o cliente decidir; o cancelamento
+    # continua possível enquanto a produção não começou. PRODUCAO entra no
+    # conjunto para o GATE responder (409 "sem arte aprovada") em vez de um
+    # "transição inválida" menos instrutivo — produção só passa com arte
+    # aprovada, e arte aprovada move o status para APROVADO antes.
+    StatusOs.AGUARDANDO_ARTE: {
+        StatusOs.AGUARDANDO_APROVACAO, StatusOs.PRODUCAO, StatusOs.CANCELADO,
+    },
+    StatusOs.AGUARDANDO_APROVACAO: {
+        StatusOs.APROVADO, StatusOs.AGUARDANDO_ARTE, StatusOs.PRODUCAO,
+        StatusOs.CANCELADO,
+    },
     StatusOs.APROVADO: {StatusOs.PRODUCAO, StatusOs.PRONTA, StatusOs.ENTREGUE, StatusOs.CANCELADO},
     StatusOs.PRODUCAO: {StatusOs.PRONTA, StatusOs.ENTREGUE, StatusOs.CANCELADO},
     StatusOs.PRONTA: {StatusOs.ENTREGUE, StatusOs.CANCELADO},
@@ -225,6 +241,21 @@ def mudar_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Transição de status inválida: {os_obj.status.value} → {novo.value}.",
         )
+
+    # M3 (§3.5): não inicia produção sem arte aprovada.
+    if novo == StatusOs.PRODUCAO:
+        from app.services import arte_service
+
+        estado = arte_service.estado_arte(db, os_id=os_id)
+        if estado != "aprovada":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Produção não inicia sem arte aprovada pelo cliente "
+                    f"(estado da arte: {estado}). Envie a versão e registre a "
+                    "aprovação na tela de Arte."
+                ),
+            )
 
     os_obj.status = novo
     hoje = date.today()
