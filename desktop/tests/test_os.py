@@ -9,6 +9,7 @@ import pytest
 from PySide6.QtWidgets import QLabel, QMessageBox, QPushButton
 
 from printgest.core.api import Api
+from printgest.core.dominio import ordem_servico as dominio_os
 from printgest.ui.modulos.os import PaginaOS, PaginaOrcamento
 
 _OSS = [
@@ -356,3 +357,34 @@ def test_os_confirmada_envia_pagamento_confirmado(app, pumpar, pagina):
     enviado = json.loads(_ESCRITAS[-1][2])
     assert enviado["cliente_id"] == 2
     assert enviado["pagamento_confirmado"] is True
+
+
+# --------------------------------------- status da OS incorpora a arte (M3, §3.5)
+
+
+def test_rotulos_dos_status_da_arte():
+    assert dominio_os.rotulo_status("aguardando_arte") == "Aguardando arte"
+    assert (
+        dominio_os.rotulo_status("aguardando_aprovacao")
+        == "Aguardando aprovação"
+    )
+
+
+def test_proximo_status_encadeia_a_arte():
+    """aberto → (arte) aguardando_arte → aguardando_aprovacao → aprovado."""
+    assert dominio_os.proximo_status("aguardando_arte") == "aguardando_aprovacao"
+    assert dominio_os.proximo_status("aguardando_aprovacao") == "aprovado"
+    assert dominio_os.proximo_status("aprovado") == "producao"
+
+
+def test_quadro_agrupa_aguardando_arte_e_aprovacao():
+    """Coluna "Aguardando" do quadro cobre os dois estados novos."""
+    coluna = next(c for c in dominio_os._COLUNAS_QUADRO if c[0] == "aguardando")
+    assert "aguardando_arte" in coluna[2]
+    assert "aguardando_aprovacao" in coluna[2]
+
+
+def test_filtros_da_pagina_incluem_estados_da_arte(app):
+    codigos = [c for c, _ in PaginaOS.FILTROS]
+    assert "aguardando_arte" in codigos
+    assert "aguardando_aprovacao" in codigos

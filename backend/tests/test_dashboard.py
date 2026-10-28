@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from app.models.enums import NivelAcesso
-from tests.conftest import auth
+from tests.conftest import arte_aprovada, auth
 
 
 def _u() -> str:
@@ -82,6 +82,9 @@ def _criar_os(client, token, cliente, previsao: date | None = None):
 
 
 def _avancar_os(client, token, os_id, statuses):
+    if "producao" in statuses:
+        # M3 (§3.5): produção não inicia sem arte aprovada.
+        arte_aprovada(client, token, os_id)
     for status in statuses:
         resp = client.patch(
             f"/v1/os/{os_id}/status",

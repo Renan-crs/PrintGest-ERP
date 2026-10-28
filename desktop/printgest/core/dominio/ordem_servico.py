@@ -24,6 +24,8 @@ FORMAS_PAGAMENTO = [
 
 class StatusOs(StrEnum):
     ABERTO = "aberto"
+    AGUARDANDO_ARTE = "aguardando_arte"  # M3 (§3.5)
+    AGUARDANDO_APROVACAO = "aguardando_aprovacao"  # M3 (§3.5)
     APROVADO = "aprovado"
     PRODUCAO = "producao"
     PRONTA = "pronta"
@@ -38,11 +40,14 @@ class TipoOs(StrEnum):
 
 
 # Transições válidas de status (regra de negócio centralizada)
-# Ordem: aberto → aprovado → producao → pronta → entregue
+# Ordem: aberto → aguardando_arte → aguardando_aprovacao → aprovado →
+# producao → pronta → entregue (M3, §3.5: a arte incorpora dois estados)
 # Cancelado pode vir de qualquer estado (exceto convertido)
 # Convertido é terminal (orçamento virou OS)
 _PROXIMO_STATUS: dict[str, str] = {
     "aberto": "aprovado",
+    "aguardando_arte": "aguardando_aprovacao",
+    "aguardando_aprovacao": "aprovado",
     "aprovado": "producao",
     "producao": "pronta",
     "pronta": "entregue",
@@ -51,6 +56,8 @@ _PROXIMO_STATUS: dict[str, str] = {
 # Mapeamento código → rótulo amigável
 _ROTULO_STATUS = {
     "aberto": "Aberto",
+    "aguardando_arte": "Aguardando arte",
+    "aguardando_aprovacao": "Aguardando aprovação",
     "aprovado": "Aprovado",
     "producao": "Em produção",
     "pronta": "Pronta",
@@ -73,7 +80,7 @@ _STATUS_DESTINO = {
 # Etapas do quadro de Projetos. "Aguardando" agrupa `aberto` e `aprovado` — o
 # orçamento aprovado ainda não entrou em produção (ver docs/revisao_projetos.md).
 _COLUNAS_QUADRO = [
-    ("aguardando", "Aguardando", ("aberto", "aprovado")),
+    ("aguardando", "Aguardando", ("aberto", "aguardando_arte", "aguardando_aprovacao", "aprovado")),
     ("producao", "Em produção", ("producao",)),
     ("pronta", "Prontas", ("pronta",)),
     ("entregue", "Entregues", ("entregue",)),
@@ -168,6 +175,8 @@ TIPOS_OS = [t.value for t in TipoOs]
 # Mapeamento status -> cor/classe CSS para UI
 STATUS_CLASSE = {
     "aberto": "primary",
+    "aguardando_arte": "warning",
+    "aguardando_aprovacao": "warning",
     "aprovado": "info",
     "producao": "warning",
     "pronta": "success",
@@ -179,12 +188,14 @@ STATUS_CLASSE = {
 # Ordem dos status para ordenação
 STATUS_ORDEM = {
     "aberto": 1,
-    "aprovado": 2,
-    "producao": 3,
-    "pronta": 4,
-    "entregue": 5,
-    "cancelado": 6,
-    "convertido": 7,
+    "aguardando_arte": 2,
+    "aguardando_aprovacao": 3,
+    "aprovado": 4,
+    "producao": 5,
+    "pronta": 6,
+    "entregue": 7,
+    "cancelado": 8,
+    "convertido": 9,
 }
 
 

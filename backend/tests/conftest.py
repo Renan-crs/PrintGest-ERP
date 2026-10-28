@@ -174,3 +174,26 @@ def caixa_admin(_banco_teste):
 
 def auth(client, token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def arte_aprovada(client, token, os_id: int) -> None:
+    """Envia e aprova a arte da OS — libera a produção (M3, §3.5 gate).
+
+    O status da OS passa a `aguardando_aprovacao` no upload e `aprovado`
+    na decisão; usar antes de avançar para `producao` nos testes.
+    """
+    import io as _io
+
+    resp = client.post(
+        f"/v1/os/{os_id}/arte",
+        headers=auth(client, token),
+        files={"arquivo": ("arte.png", _io.BytesIO(b"PNG teste"), "image/png")},
+    )
+    assert resp.status_code == 201, resp.text
+    versao_id = resp.json()["data"]["id"]
+    resp = client.post(
+        f"/v1/os/{os_id}/arte/{versao_id}/decisao",
+        headers=auth(client, token),
+        json={"decisao": "aprovada"},
+    )
+    assert resp.status_code == 201, resp.text

@@ -392,13 +392,10 @@ def main() -> None:
                          json={"observacoes": f"obs {_u()}"}, timeout=T)
         teste("atualizar OS", resp.status_code == 200, f"PUT -> {resp.status_code}")
 
-    # status transitions
-    if os_d:
-        resp = httpx.patch(f"{BASE}/v1/os/{os_d['id']}/status", headers=h, json={"status": "producao"}, timeout=T)
-        teste("status -> producao", resp.status_code == 200 and resp.json()["data"]["status"] == "producao",
-              f"PATCH -> {resp.status_code}: {resp.text[:120]}")
-        resp = httpx.patch(f"{BASE}/v1/os/{os_d['id']}/status", headers=h, json={"status": "entregue"}, timeout=T)
-        teste("status -> entregue", resp.status_code == 200, f"PATCH -> {resp.status_code}")
+        # M3 (3.5): producao nao inicia sem arte aprovada
+        resp = httpx.patch(f"{BASE}/v1/os/{os_d['id']}/status", headers=h,
+                           json={"status": "producao"}, timeout=T)
+        teste("gate: producao sem arte 409", resp.status_code == 409, f"PATCH -> {resp.status_code}: {resp.text[:120]}")
 
     # converter orcamento
     if orc:
@@ -502,6 +499,9 @@ def main() -> None:
             resp = httpx.get(f"{BASE}/v1/os/{os_d['id']}/arte", headers=h, timeout=T)
             teste("estado ajuste_solicitado", resp.json().get("estado") == "ajuste_solicitado",
                   f"estado={resp.json().get('estado')}")
+            resp = httpx.get(f"{BASE}/v1/os/{os_d['id']}", headers=h, timeout=T)
+            teste("status OS = aguardando_arte", resp.json()["data"]["status"] == "aguardando_arte",
+                  f"status={resp.json()['data'].get('status')}")
 
         # designer reenvia: v2 passa a ser a ultima, sem decisao
         resp = httpx.post(f"{BASE}/v1/os/{os_d['id']}/arte", headers=h,
@@ -514,12 +514,26 @@ def main() -> None:
             resp = httpx.get(f"{BASE}/v1/os/{os_d['id']}/arte", headers=h, timeout=T)
             teste("estado aguardando_aprovacao (v2)", resp.json().get("estado") == "aguardando_aprovacao",
                   f"estado={resp.json().get('estado')}")
+            resp = httpx.get(f"{BASE}/v1/os/{os_d['id']}", headers=h, timeout=T)
+            teste("status OS = aguardando_aprovacao", resp.json()["data"]["status"] == "aguardando_aprovacao",
+                  f"status={resp.json()['data'].get('status')}")
             resp = httpx.post(f"{BASE}/v1/os/{os_d['id']}/arte/{v2['id']}/decisao", headers=h,
                               json={"decisao": "aprovada"}, timeout=T)
             teste("decisao aprovada", resp.status_code == 201, f"POST -> {resp.status_code}")
 
         resp = httpx.get(f"{BASE}/v1/os/{os_d['id']}/arte", headers=h, timeout=T)
         teste("estado aprovada", resp.json().get("estado") == "aprovada", f"estado={resp.json().get('estado')}")
+
+        # status da OS incorpora a arte (M3, 3.5): aprovada -> aprovado,
+        # entao producao passa pelo gate e a OS segue o fluxo ate entregue
+        resp = httpx.get(f"{BASE}/v1/os/{os_d['id']}", headers=h, timeout=T)
+        teste("status OS = aprovado (arte)", resp.json()["data"]["status"] == "aprovado",
+              f"status={resp.json()['data'].get('status')}")
+        resp = httpx.patch(f"{BASE}/v1/os/{os_d['id']}/status", headers=h, json={"status": "producao"}, timeout=T)
+        teste("status -> producao (arte aprovada)", resp.status_code == 200,
+              f"PATCH -> {resp.status_code}: {resp.text[:120]}")
+        resp = httpx.patch(f"{BASE}/v1/os/{os_d['id']}/status", headers=h, json={"status": "entregue"}, timeout=T)
+        teste("status -> entregue", resp.status_code == 200, f"PATCH -> {resp.status_code}")
 
         resp = httpx.post(f"{BASE}/v1/os/{os_d['id']}/arte/link", headers=h, timeout=T)
         teste("gerar link de prova", resp.status_code == 200 and len(resp.json()["data"]["token"]) > 20,
