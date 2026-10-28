@@ -565,6 +565,58 @@ class Api:
         )
         return self._tratar(resp)
 
+    # ------------------------------------------------------------- arte (M3, §3.5)
+    # Versões da arte, decisão do cliente (aprovada/ajuste) e link público.
+
+    def arte(self, os_id: int) -> dict:
+        """`GET /v1/os/{os_id}/arte` — resposta COMPLETA (data + estado derivado).
+
+        O estado (`sem_arte` / `aguardando_aprovacao` / `ajuste_solicitado` /
+        `aprovada`) olha a decisão sobre a última versão enviada (§3.5).
+        """
+        resp = self._cliente.get(
+            f"/v1/os/{os_id}/arte", headers=self._headers(self._token)
+        )
+        return self._resposta_completa(resp)
+
+    def enviar_arte(self, os_id: int, caminho: str) -> dict:
+        """`POST /v1/os/{os_id}/arte` — upload multipart de nova versão (v1, v2…)."""
+        from mimetypes import guess_type
+        from pathlib import Path
+
+        arquivo = Path(caminho)
+        mime = guess_type(arquivo.name)[0] or "application/octet-stream"
+        with arquivo.open("rb") as f:
+            resp = self._cliente.post(
+                f"/v1/os/{os_id}/arte",
+                files={"arquivo": (arquivo.name, f, mime)},
+                headers=self._headers(self._token),
+                timeout=120.0,
+            )
+        return self._tratar(resp)
+
+    def decidir_arte(
+        self, os_id: int, versao_id: int, decisao: str, comentarios: str | None = None
+    ) -> dict:
+        """`POST /v1/os/{os_id}/arte/{versao_id}/decisao` — aprovada/ajuste (§3.5).
+
+        `ajuste` exige comentários (o servidor responde 400 sem eles).
+        """
+        corpo: dict = {"decisao": decisao}
+        if comentarios:
+            corpo["comentarios"] = comentarios
+        return self._post(
+            f"/v1/os/{os_id}/arte/{versao_id}/decisao", corpo, self._token
+        )
+
+    def link_arte(self, os_id: int) -> dict:
+        """`POST /v1/os/{os_id}/arte/link` — token público da prova (uso único).
+
+        O relay hospedado (decisão D-03) resolve o token; a expiração vem do
+        servidor (72 h por padrão).
+        """
+        return self._post(f"/v1/os/{os_id}/arte/link", {}, self._token)
+
     def _get(
         self, path: str, token: str | None = None, params: dict | None = None
     ) -> dict:

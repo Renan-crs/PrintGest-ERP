@@ -8,8 +8,12 @@ O avanço de status usa `PATCH /{id}/status` e o cancelamento `DELETE /{id}`.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QFileDialog,
+    QInputDialog,
     QDialog,
     QGridLayout,
     QHBoxLayout,
@@ -45,7 +49,7 @@ from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, botao_com_atalho
+from printgest.ui.widgets import aplicar_estilo, botao_com_atalho, formatar_datahora
 
 
 # ------------------------------------------------------- diálogo de cotações
@@ -321,6 +325,289 @@ class DialogoCotacoes(QDialog):
         )
 
 
+# ------------------------------------------------------- diálogo de arte (M3)
+
+_ARTE_CHAVES = ["versao", "nome_arquivo", "tamanho_bytes", "criado_em"]
+_ARTE_ROTULOS = ["Versão", "Arquivo", "Tamanho", "Enviada em"]
+
+# Espelha o backend (NFR de arquivos): extensões executáveis bloqueadas.
+_ARTE_EXTENSOES_BLOQUEADAS = {
+    ".exe", ".bat", ".cmd", ".sh", ".ps1", ".msi", ".dll",
+    ".com", ".scr", ".vbs", ".js",
+}
+_ARTE_MAX_MB = 50  # o servidor rejeita acima disso (400) — antecipamos o aviso
+
+_ARTE_ESTADOS = {
+    "sem_arte": ("Nenhuma arte enviada — envie a primeira versão.", "muted"),
+    "aguardando_aprovacao": (
+        "⚠ Aguardando aprovação do cliente.", "atencao",
+    ),
+    "ajuste_solicitado": (
+        "⚠ Ajuste solicitado pelo cliente — reenvie a arte corrigida.", "atencao",
+    ),
+    "aprovada": ("✓ Arte aprovada pelo cliente.", "success"),
+}
+
+
+def _arte_quando(iso: str | None) -> str:
+    """`2026-10-27T14:23:45` → `27/10/2026 14:23` (vazio → `—`)."""
+    return formatar_datahora(iso) or "—"
+
+
+def _arte_tamanho(bytes_: object) -> str:
+    try:
+        n = int(bytes_)
+    except (TypeError, ValueError):
+        return "—"
+    if n >= 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    if n >= 1024:
+        return f"{n / 1024:.0f} KB"
+    return f"{n} B"
+
+
+class DialogoArte(QDialog):
+    """Arte, prova e aprovação da O.S. (M3, PRD v3.0 §3.5).
+
+    Quatro zonas:
+    - **Estado** derivado da última versão (sem arte / aguardando aprovação /
+      ajuste solicitado / aprovada);
+    - **Versões** em tabela (v1, v2… — a mais recente primeiro);
+    - **Ações**: enviar nova versão (upload), aprovar marcada, solicitar
+      ajuste (com comentário obrigatório) e gerar link de prova (token de uso
+      único com expiração — o relay da decisão D-03 resolve no futuro).
+    """
+
+    def __init__(self, parent, api, os_id: int) -> None:
+        super().__init__(parent)
+        self._api = api
+        self._os_id = os_id
+        self._versoes: list[dict] = []
+
+        self.setWindowTitle("Arte, Prova e Aprovação")
+        self.setMinimumSize(640, 520)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
+
+        titulo = QLabel(f"O.S. #{os_id} — versões da arte")
+        titulo.setObjectName("subtitulo")
+        root.addWidget(titulo)
+
+        # --- estado derivado (§3.5)
+        self._lbl_estado = QLabel("Carregando…")
+        self._lbl_estado.setProperty("role", "muted")
+        root.addWidget(self._lbl_estado)
+
+        # --- versões
+        self._tabela = TabelaDensa(_ARTE_CHAVES, _ARTE_ROTULOS)
+        self._tabela.setMinimumHeight(160)
+        root.addWidget(self._tabela, 1)
+
+        # --- botões
+        botoes = QHBoxLayout()
+        botoes.setSpacing(8)
+
+        self._btn_enviar = QPushButton("Enviar nova versão…")
+        self._btn_enviar.setProperty("role", "primary")
+        self._btn_enviar.clicked.connect(self._enviar)
+        botoes.addWidget(self._btn_enviar)
+
+        self._btn_aprovar = QPushButton("Aprovar marcada")
+        self._btn_aprovar.clicked.connect(self._aprovar)
+        botoes.addWidget(self._btn_aprovar)
+
+        self._btn_ajuste = QPushButton("Solicitar ajuste…")
+        self._btn_ajuste.clicked.connect(self._ajuste)
+        botoes.addWidget(self._btn_ajuste)
+
+        self._btn_link = QPushButton("Gerar link de prova")
+        self._btn_link.clicked.connect(self._link)
+        botoes.addWidget(self._btn_link)
+
+        fechar = QPushButton("Fechar")
+        fechar.clicked.connect(self.accept)
+        botoes.addStretch(1)
+        botoes.addWidget(fechar)
+        root.addLayout(botoes)
+
+        self._carregar()
+
+    # ------------------------------------------------------------- dados
+
+    def _carregar(self) -> None:
+        os_id = self._os_id
+        tarefas.rodar(
+            lambda: self._api.arte(os_id),
+            on_ok=self._preencher,
+            on_erro=lambda msg: self._lbl_estado.setText(f"Erro ao carregar: {msg}"),
+        )
+
+    def _preencher(self, resposta: dict) -> None:
+        self._versoes = resposta.get("data") or []
+        estado = resposta.get("estado") or "sem_arte"
+
+        texto, role = _ARTE_ESTADOS.get(estado, (estado, "muted"))
+        self._lbl_estado.setText(texto)
+        self._lbl_estado.setProperty("role", role)
+        aplicar_estilo(self._lbl_estado)
+
+        linhas = []
+        for v in self._versoes:
+            linhas.append({
+                "versao": f"v{v.get('versao', '?')}",
+                "nome_arquivo": v.get("nome_arquivo", "?"),
+                "tamanho_bytes": _arte_tamanho(v.get("tamanho_bytes")),
+                "criado_em": _arte_quando(v.get("criado_em")),
+            })
+        self._tabela.preencher(linhas)
+        tem = bool(self._versoes)
+        self._btn_aprovar.setEnabled(tem)
+        self._btn_ajuste.setEnabled(tem)
+
+    # ------------------------------------------------------------- ações
+
+    def _enviar(self) -> None:
+        caminho, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar arquivo de arte",
+            "",
+            "Arquivos de arte (*.png *.jpg *.jpeg *.pdf *.svg *.tif *.tiff "
+            "*.psd *.ai *.cdr *.zip);;Todos os arquivos (*)",
+        )
+        if not caminho:
+            return
+
+        ext = Path(caminho).suffix.lower()
+        if ext in _ARTE_EXTENSOES_BLOQUEADAS:
+            QMessageBox.warning(
+                self, "Arte", f"Extensão {ext} não é permitida para arte."
+            )
+            return
+        tamanho = Path(caminho).stat().st_size
+        if tamanho <= 0:
+            QMessageBox.warning(self, "Arte", "O arquivo está vazio.")
+            return
+        if tamanho > _ARTE_MAX_MB * 1024 * 1024:
+            QMessageBox.warning(
+                self, "Arte", f"Arquivo maior que {_ARTE_MAX_MB} MB."
+            )
+            return
+
+        os_id = self._os_id
+        self._btn_enviar.setEnabled(False)
+        self._btn_enviar.setText("Enviando…")
+
+        def ok(_resultado) -> None:
+            self._btn_enviar.setEnabled(True)
+            self._btn_enviar.setText("Enviar nova versão…")
+            self._carregar()
+
+        def erro(msg: str) -> None:
+            self._btn_enviar.setEnabled(True)
+            self._btn_enviar.setText("Enviar nova versão…")
+            QMessageBox.critical(self, "Arte", msg)
+
+        tarefas.rodar(
+            lambda: self._api.enviar_arte(os_id, caminho),
+            on_ok=ok,
+            on_erro=erro,
+        )
+
+    def _versao_marcada(self) -> dict | None:
+        linha = self._tabela.currentRow()
+        if linha < 0 or linha >= len(self._versoes):
+            QMessageBox.information(
+                self, "Arte", "Selecione uma versão na tabela."
+            )
+            return None
+        return self._versoes[linha]
+
+    def _aprovar(self) -> None:
+        versao = self._versao_marcada()
+        if not versao:
+            return
+        os_id, versao_id = self._os_id, versao.get("id")
+        self._btn_aprovar.setEnabled(False)
+
+        def ok(_resultado) -> None:
+            self._btn_aprovar.setEnabled(True)
+            self._carregar()
+
+        def erro(msg: str) -> None:
+            self._btn_aprovar.setEnabled(True)
+            QMessageBox.critical(self, "Arte", msg)
+
+        tarefas.rodar(
+            lambda: self._api.decidir_arte(os_id, versao_id, "aprovada"),
+            on_ok=ok,
+            on_erro=erro,
+        )
+
+    def _ajuste(self) -> None:
+        versao = self._versao_marcada()
+        if not versao:
+            return
+        comentario, confirmado = QInputDialog.getMultiLineText(
+            self,
+            "Solicitar ajuste",
+            "O que o cliente pediu para ajustar nesta versão?",
+        )
+        comentario = (comentario or "").strip()
+        if not confirmado or not comentario:
+            if confirmado:
+                QMessageBox.warning(
+                    self, "Arte", "Descreva o ajuste solicitado pelo cliente."
+                )
+            return
+
+        os_id, versao_id = self._os_id, versao.get("id")
+        self._btn_ajuste.setEnabled(False)
+
+        def ok(_resultado) -> None:
+            self._btn_ajuste.setEnabled(True)
+            self._carregar()
+
+        def erro(msg: str) -> None:
+            self._btn_ajuste.setEnabled(True)
+            QMessageBox.critical(self, "Arte", msg)
+
+        tarefas.rodar(
+            lambda: self._api.decidir_arte(os_id, versao_id, "ajuste", comentario),
+            on_ok=ok,
+            on_erro=erro,
+        )
+
+    def _link(self) -> None:
+        os_id = self._os_id
+        self._btn_link.setEnabled(False)
+
+        def ok(link: dict) -> None:
+            self._btn_link.setEnabled(True)
+            token = link.get("token", "?")
+            expira = _arte_quando(link.get("expira_em"))
+            from PySide6.QtWidgets import QApplication
+
+            QApplication.clipboard().setText(token)
+            QMessageBox.information(
+                self,
+                "Link de prova",
+                f"Token: {token}\n\nExpira em {expira} (uso único).\n"
+                "O token já foi copiado — cole no envio ao cliente.",
+            )
+
+        def erro(msg: str) -> None:
+            self._btn_link.setEnabled(True)
+            QMessageBox.critical(self, "Arte", msg)
+
+        tarefas.rodar(
+            lambda: self._api.link_arte(os_id),
+            on_ok=ok,
+            on_erro=erro,
+        )
+
+
 class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "os"
     TIPO = "os"
@@ -463,9 +750,21 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     def _acao_extra(self):
         avancar, self._btn_avancar = botao_com_atalho("Avançar Status", "F7")
         self._btn_avancar.clicked.connect(self._avancar_status)
+        arte, self._btn_arte = botao_com_atalho("Arte", "F11")
+        self._btn_arte.clicked.connect(self._abrir_arte)
         cancelar, self._btn_cancelar_os = botao_com_atalho("Cancelar Projeto", "F8", "danger")
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
-        return [avancar, cancelar]
+        return [avancar, arte, cancelar]
+
+    def _abrir_arte(self) -> None:
+        """Diálogo de arte, prova e aprovação da O.S. selecionada (M3, §3.5)."""
+        if self._editando_id is None:
+            QMessageBox.information(
+                self, "Arte", "Selecione uma O.S. na lista para gerenciar a arte."
+            )
+            return
+        dialogo = DialogoArte(self, self._api, self._editando_id)
+        dialogo.exec()
 
     def _selecionado_ou_aviso(self, titulo: str, msg: str) -> dict | None:
         dado = self._tabela.objeto_selecionado()
