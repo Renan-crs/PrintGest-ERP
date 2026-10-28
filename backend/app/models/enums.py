@@ -72,6 +72,20 @@ class ConferenciaTerceirizado(StrEnum):
     REFACAO = "refacao"
 
 
+class DecisaoArte(StrEnum):
+    """M3 (PRD v3.0 §3.5): decisão do cliente sobre a prova da arte."""
+
+    APROVADA = "aprovada"
+    AJUSTE = "ajuste"
+
+
+class TipoLinkPublico(StrEnum):
+    """M3 (PRD v3.0 §3.5): para que serve o link público."""
+
+    PROVA = "prova"
+    ORCAMENTO = "orcamento"
+
+
 class StatusOs(StrEnum):
     ABERTO = "aberto"
     APROVADO = "aprovado"

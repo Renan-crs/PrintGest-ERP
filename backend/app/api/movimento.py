@@ -6,7 +6,7 @@ transições de status (fluxo PRD v2.0 §2.1) e conversão de orçamento em OS.
 Nível mínimo de acesso: OPERADOR ("cadastros e movimento" — RBAC §5).
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -17,6 +17,7 @@ from app.models.movimento import OrdemServico, OrdemServicoItem
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
 from app.schemas.movimento import (
+    ArteDecisaoIn,
     ConferenciaTerceirizadoIn,
     CotacaoIn,
     CotacaoOut,
@@ -254,6 +255,87 @@ def conferir_terceirizado(
     item = db.get(OrdemServicoItem, item_id)
     return ItemResponse(
         data=terceirizado_service.para_out(envio, item=item)
+    )
+
+
+# --------------------------- arte, prova e aprovação (M3, §3.5)
+
+
+@router.post("/{os_id}/arte", status_code=201)
+async def enviar_arte(
+    os_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    arquivo: UploadFile = File(...),
+):
+    """Upload de nova versão da arte (v1, v2… — auto-incremento)."""
+    from app.services import arte_service
+
+    versao = arte_service.enviar_versao(
+        db,
+        os_id=os_id,
+        filial_id=filial,
+        usuario_id=usuario.id,
+        arquivo=arquivo,
+    )
+    return ItemResponse(data=arte_service.para_out_versao(versao))
+
+
+@router.get("/{os_id}/arte")
+def listar_arte(
+    os_id: int, db: DbDep, filial: FilialDep
+):
+    """Versões da arte + estado derivado (sem_arte / aguardando / aprovada / ajuste)."""
+    from app.services import arte_service
+
+    versoes = arte_service.listar_versoes(db, os_id=os_id, filial_id=filial)
+    return {
+        "data": [arte_service.para_out_versao(v) for v in versoes],
+        "estado": arte_service.estado_arte(db, os_id=os_id),
+    }
+
+
+@router.post("/{os_id}/arte/{versao_id}/decisao", status_code=201)
+def decidir_arte(
+    os_id: int,
+    versao_id: int,
+    body: ArteDecisaoIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    request: Request,
+):
+    """Registra a decisão do cliente: aprovada ou ajuste (§3.5)."""
+    from app.services import arte_service
+    from app.models.enums import DecisaoArte
+
+    ip = request.client.host if request.client else None
+    aprovacao = arte_service.registrar_decisao(
+        db,
+        versao_id=versao_id,
+        filial_id=filial,
+        decisao=DecisaoArte(body.decisao),
+        comentarios=body.comentarios,
+        ip=ip,
+        usuario_id=usuario.id,
+    )
+    return ItemResponse(data=arte_service.para_out_aprovacao(aprovacao))
+
+
+@router.post("/{os_id}/arte/link")
+def gerar_link_prova(
+    os_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+):
+    """Gera link público para envio da prova ao cliente (token, expiração)."""
+    from app.services import arte_service
+
+    link = arte_service.gerar_link(db, os_id=os_id, filial_id=filial)
+    return ItemResponse(
+        data={"token": link.token, "tipo": link.tipo, "expira_em": link.expira_em}
     )
 
 

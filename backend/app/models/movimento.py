@@ -24,6 +24,7 @@ from app.models.cadastros import Cliente, Fornecedor, Funcionario
 from app.models.core import Usuario
 from app.models.enums import (
     ConferenciaTerceirizado,
+    DecisaoArte,
     FormaPagamento,
     StatusAgenda,
     StatusOs,
@@ -31,6 +32,7 @@ from app.models.enums import (
     StatusVenda,
     TipoAgenda,
     TipoItemOs,
+    TipoLinkPublico,
     TipoOs,
     pg_enum,
 )
@@ -270,6 +272,107 @@ class OsTerceirizado(Base):
     criado_por: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("usuario.id")
     )
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ArteVersao(Base):
+    """Versão do arquivo de arte da OS (M3, PRD v3.0 §3.5).
+
+    Versionamento v1, v2… com autor e data; extensões executáveis bloqueadas
+    na camada de serviço (NFR de arquivos). O hash permite verificação de
+    integridade.
+    """
+
+    __tablename__ = "arte_versao"
+    __table_args__ = (
+        UniqueConstraint("os_id", "versao", name="uq_arte_versao_os_versao"),
+        CheckConstraint("versao > 0", name="ck_arte_versao_positiva"),
+        CheckConstraint("tamanho_bytes > 0", name="ck_arte_versao_tamanho"),
+        Index("idx_arte_versao_os", "os_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    filial_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    os_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ordem_servico.id", ondelete="CASCADE"), nullable=False
+    )
+    versao: Mapped[int] = mapped_column(Integer, nullable=False)
+    nome_arquivo: Mapped[str] = mapped_column(String(255), nullable=False)
+    caminho: Mapped[str] = mapped_column(String(500), nullable=False)
+    hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    tamanho_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    os: Mapped[OrdemServico] = relationship()
+    aprovacoes: Mapped[list["ArteAprovacao"]] = relationship(
+        back_populates="versao", cascade="all, delete-orphan"
+    )
+
+
+class ArteAprovacao(Base):
+    """Decisão do cliente sobre uma versão da arte (M3, §3.5).
+
+    `decisao`: aprovada ou ajuste; `comentarios` quando ajuste; `ip` do
+    cliente (§3.5: "a decisão registra data, hora e IP").
+    """
+
+    __tablename__ = "arte_aprovacao"
+    __table_args__ = (
+        Index("idx_arte_aprovacao_versao", "versao_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    filial_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    versao_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("arte_versao.id", ondelete="CASCADE"), nullable=False
+    )
+    decisao: Mapped[str] = mapped_column(
+        pg_enum(DecisaoArte), nullable=False
+    )
+    comentarios: Mapped[str | None] = mapped_column(Text)
+    ip: Mapped[str | None] = mapped_column(String(45))
+    criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    versao: Mapped[ArteVersao] = relationship(back_populates="aprovacoes")
+
+
+class LinkPublico(Base):
+    """Token para acesso externo (M3, §3.5; relay D-03 no futuro).
+
+    Token aleatório, expiração, uso único. O relay hospedado resolve o
+    token para a OS/versão — o Local API Service nunca é exposto.
+    """
+
+    __tablename__ = "link_publico"
+    __table_args__ = (
+        Index("idx_link_publico_os", "os_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    filial_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    os_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ordem_servico.id", ondelete="CASCADE"), nullable=False
+    )
+    token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    tipo: Mapped[str] = mapped_column(
+        pg_enum(TipoLinkPublico), nullable=False
+    )
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    usado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
