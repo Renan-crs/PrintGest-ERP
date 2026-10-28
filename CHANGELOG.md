@@ -9,6 +9,22 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.3.1] - 2026-10-28 · Validação de campo de M2/M4, fix do paginador e backend do M3 (arte)
+
+### Adicionado
+- **M3 — backend de arte, prova e aprovação (PRD v3.0 §3.5):** upload de arte com **versionamento** (v1, v2… por O.S., auto-incremento), **decisão do cliente** (`aprovada`/`ajuste` com comentários obrigatórios — registra data, hora e IP), **estados derivados** (`sem_arte` → `aguardando_aprovacao` → `aprovada`/`ajuste_solicitado`) e **link público** com token aleatório e expiração (uso único; o relay hospedado da decisão D-03 resolve o token no futuro). Tabelas `arte_versao`, `arte_aprovacao`, `link_publico` (migração `b0c1d2e3f4a5`, aditiva e reversível). NFR de arquivos: extensões executáveis bloqueadas (`.exe`, `.bat`, `.dll`, `.js`…), máximo 50 MB, arquivo vazio rejeitado, hash SHA-256 gravado para integridade. A **tela desktop** do módulo vem na v0.4.0. Backend 329 passed (+12).
+
+### Corrigido
+- **Paginador das telas de listagem (›| desalinhado na última página parcial):** o clamp usava `total − lote`, que só vale para página cheia — com 120 registros e lote 50, "última página" saltava para offset 70 (desalinhado) em vez de 100: a grade mostrava as linhas 71–120 rotuladas "Pág 2 de 3" e a navegação ‹/› seguinte andava de 20 em 20. O offset agora é contido à última posição válida e **alinhado ao múltiplo do lote**. Encontrado pela navegação sistemática exigida na validação de listagem/paginação.
+- **Dependência do upload de arte:** `python-multipart` pinado em `requirements.txt` — sem ele, qualquer instalação limpa **não sobe** o serviço (o FastAPI falha no import das rotas com `File`). O pacote já existia no venv de dev; faltava o registro da dependência.
+
+### Testes
+- **Fumaça sistemática contra o servidor real** (`backend/scripts_fumaca.py`, **134 verificações** verdes em `:8000`): auth (401 sem/com token inválido), CRUD + busca + **paginação** (limit/offset/meta.total) de todos os cadastros, ciclo do caixa (abrir → suprimento → sangria → extrato → fechar; **venda bloqueada 409 com caixa fechado**), estorno de venda **restaurando estoque**, 409 de estoque insuficiente e cliente inexistente, O.S. (status, converter, 400 na re-conversão), cotações (lançar → selecionar → **snapshot VF/CP/VO** → estado `cotado`), **VF omitido para Operador** (§3.2.3) e 403 em config/precificação, terceirizado (auto-criado → receber → conferir), arte (upload v1 → `.exe` bloqueado → ajuste → reenvio v2 → aprovação → estados → link → 404), quadro de projetos (listas, cartões com controle otimista de versão, mover, comentários, checklists, etiquetas, atividade). **M2 e M4 validados em campo**.
+- **Desktop:** 8 testes de Agendamento promovidos de `xfail` (a refatoração síncrona do `rodar` resolveu a limitação offscreen; 4 genuínos seguem marcados) e **7 testes novos de paginação** (`test_paginador.py`: primeira página 50 de 120, › busca offset 50 e troca as linhas, ›| parcial desabilita ›, |‹ volta, ‹ na primeira não dispara, estados do widget e sinal `mudou`). Desktop **371 passed** (antes 356).
+- Runtime desversionado: `backend/uploads/` (arquivos de arte são dado de runtime, apontado por `arte_versao.caminho`) sai do git e entra no `.gitignore`.
+
+---
+
 ## [0.3.0] - 2026-10-27 · PRD v3.0 — M0 (planos e caixa) + M1 (motor de precificação e orçamento com fornecedor)
 
 ### Adicionado
