@@ -49,6 +49,12 @@ a = Analysis(
         "psycopg",
         "psycopg.pq",
         "sqlalchemy.dialects.postgresql",
+        # Upload de arte (File/multipart): o starlette.formparsers importa
+        # python_multipart em try/except ImportError — o PyInstaller trata
+        # como opcional e nao empacota; sem ele o exe falha nas rotas com
+        # File/Form (e no startup, no registro das rotas).
+        "python_multipart",
+        "python_multipart.multipart",
     ],
     hookspath=[],
     hooksconfig={},
