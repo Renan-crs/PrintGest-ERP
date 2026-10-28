@@ -110,6 +110,13 @@ class RecebimentoTerceirizadoIn(BaseModel):
     data_retorno: date | None = None
 
 
+class ArteDecisaoIn(BaseModel):
+    """Decisão do cliente sobre a prova da arte (§3.5)."""
+
+    decisao: Literal["aprovada", "ajuste"]
+    comentarios: str | None = None
+
+
 class CotacaoIn(BaseModel):
     """Lançamento de cotação de fornecedor para um item terceirizado."""
 
