@@ -9,10 +9,18 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
-## [0.3.1] - 2026-10-28 · Validação de campo de M2/M4, fix do paginador e backend do M3 (arte)
+## [0.3.1] - 2026-10-28 · Validação de campo de M2/M4, fix do paginador, backend do M3 (arte) + M3 §3.10 (repetir/refação), primeiro acesso funcionário
 
 ### Adicionado
+- **M3 §3.10 — repetir pedido e refação:** endpoints `POST /v1/os/{id}/repetir` e `POST /v1/os/{id}/refacao` com integração de status de OS. Repetir duplica itens e arte aprovada (preços calculados do catálogo). Refação cria OS filha com campos `refacao_motivo`, `refacao_responsavel_id`, `refacao_custo`, `refacao_erro` (Grafica ou Cliente). Tabelas `arte_versao`, `arte_aprovacao`, `link_publico` (migração `b0c1d2e3f4a5`, aditiva e reversível). NFR de arquivos: extensões executáveis bloqueadas (`.exe`, `.bat`, `.dll`, `.js`…), máximo 50 MB, arquivo vazio rejeitado, hash SHA-256 gravado para integridade. 
+
+### Corrigido
 - **M3 — backend de arte, prova e aprovação (PRD v3.0 §3.5):** upload de arte com **versionamento** (v1, v2… por O.S., auto-incremento), **decisão do cliente** (`aprovada`/`ajuste` com comentários obrigatórios — registra data, hora e IP), **estados derivados** (`sem_arte` → `aguardando_aprovacao` → `aprovada`/`ajuste_solicitado`) e **link público** com token aleatório e expiração (uso único; o relay hospedado da decisão D-03 resolve o token no futuro). Tabelas `arte_versao`, `arte_aprovacao`, `link_publico` (migração `b0c1d2e3f4a5`, aditiva e reversível). NFR de arquivos: extensões executáveis bloqueadas (`.exe`, `.bat`, `.dll`, `.js`…), máximo 50 MB, arquivo vazio rejeitado, hash SHA-256 gravado para integridade. A **tela desktop** do módulo vem na v0.4.0. Backend 329 passed (+12).
+
+### Novos Recursos
+- **M3 §3.10 — repetir pedido e refação:** endpoints `POST /v1/os/{id}/repetir` e `POST /v1/os/{id}/refacao` com integração de status de OS. Repetir duplica itens e arte aprovada (preços calculados do catálogo). Refação cria OS filha com campos `refacao_motivo`, `refacao_responsavel_id`, `refacao_custo`, `refacao_erro` (Grafica ou Cliente).
+- **Primeiro acesso funcionário:** campo `login` em `FuncionarioCreate` (fornecido pelo admin), flag `primeiro_acesso` em `Usuario`, endpoint `POST /auth/primeiro-acesso` para configuração de senha na primeira visita.
+- **Desktop — rodapé com IP do servidor:** o rodapé agora exibe o IP do servidor extraído de `base_url`, facilitando identificação em redes locais sem IP dedicado.
 
 ### Corrigido
 - **Paginador das telas de listagem (›| desalinhado na última página parcial):** o clamp usava `total − lote`, que só vale para página cheia — com 120 registros e lote 50, "última página" saltava para offset 70 (desalinhado) em vez de 100: a grade mostrava as linhas 71–120 rotuladas "Pág 2 de 3" e a navegação ‹/› seguinte andava de 20 em 20. O offset agora é contido à última posição válida e **alinhado ao múltiplo do lote**. Encontrado pela navegação sistemática exigida na validação de listagem/paginação.
