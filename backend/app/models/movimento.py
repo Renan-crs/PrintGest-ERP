@@ -26,6 +26,7 @@ from app.models.enums import (
     ConferenciaTerceirizado,
     DecisaoArte,
     FormaPagamento,
+    RefacaoErro,
     StatusAgenda,
     StatusOs,
     StatusPedido,
@@ -47,6 +48,10 @@ class OrdemServico(Base):
         CheckConstraint(
             "orcamento_origem_id IS NULL OR orcamento_origem_id <> id",
             name="ck_os_origem_nao_self",
+        ),
+        CheckConstraint(
+            "refacao_origem_id IS NULL OR refacao_origem_id <> id",
+            name="ck_os_refacao_nao_self",
         ),
         CheckConstraint(
             "desconto >= 0 AND valor_itens >= 0 AND valor_total >= 0",
@@ -98,6 +103,17 @@ class OrdemServico(Base):
     forma_pagamento: Mapped[FormaPagamento | None] = mapped_column(
         pg_enum(FormaPagamento)
     )
+    # M3 (PRD v3.0 §3.10): refação — O.S. filha vinculada à original, com
+    # motivo, responsável e custo, separando erro da gráfica de erro do cliente.
+    refacao_origem_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("ordem_servico.id")
+    )
+    refacao_motivo: Mapped[str | None] = mapped_column(Text)
+    refacao_erro: Mapped[str | None] = mapped_column(pg_enum(RefacaoErro))
+    refacao_responsavel_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("funcionario.id")
+    )
+    refacao_custo: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     observacoes: Mapped[str | None] = mapped_column(Text)
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     created_at: Mapped[datetime] = mapped_column(
@@ -121,6 +137,12 @@ class OrdemServico(Base):
         back_populates="os",
         cascade="all, delete-orphan",
         order_by="OrdemServicoItem.seq",
+    )
+    refacao_origem: Mapped["OrdemServico | None"] = relationship(
+        foreign_keys=[refacao_origem_id], remote_side="OrdemServico.id"
+    )
+    refacao_responsavel: Mapped[Funcionario | None] = relationship(
+        foreign_keys=[refacao_responsavel_id]
     )
 
 

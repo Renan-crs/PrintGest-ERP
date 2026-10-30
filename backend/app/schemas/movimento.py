@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import (
     FormaPagamento,
+    RefacaoErro,
     StatusOs,
     StatusVenda,
     TipoItemOs,
@@ -77,6 +78,25 @@ class OsConverterIn(BaseModel):
     """Corpo opcional da conversão de orçamento em O.S."""
 
     pagamento_confirmado: bool = False
+
+
+class RepetirIn(BaseModel):
+    """Corpo opcional de "repetir pedido" (§3.10).
+
+    `tipo` permite repetir como orçamento (para renegociar) mantendo o padrão
+    de repetir no mesmo tipo do original.
+    """
+
+    tipo: TipoOs | None = None
+
+
+class RefacaoIn(BaseModel):
+    """Refação (§3.10): O.S. filha com motivo, responsável e custo."""
+
+    motivo: str = Field(min_length=1, max_length=500)
+    erro: RefacaoErro
+    responsavel_id: int | None = None
+    custo: Decimal | None = Field(default=None, ge=0)
 
 
 class OsItemOut(ORMModel):
@@ -155,6 +175,13 @@ class OsOut(ORMModel):
     tipo: TipoOs
     status: StatusOs
     orcamento_origem_id: int | None = None
+    # M3 (§3.10): refação — O.S. filha vinculada à original
+    refacao_origem_id: int | None = None
+    refacao_motivo: str | None = None
+    refacao_erro: RefacaoErro | None = None
+    refacao_responsavel_id: int | None = None
+    refacao_custo: Decimal | None = None
+    # Cliente / responsáveis (dados denormalizados)
     cliente_id: int | None = None
     cliente_nome: str | None = None
     vendedor_id: int | None = None

@@ -13,14 +13,24 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.cadastros import Cliente
+from app.models.cadastros import Cliente, Produto
 from app.models.movimento import (
+    ArteAprovacao,
+    ArteVersao,
     OrdemServico,
     OrdemServicoItem,
+    OrdemServicoItemCotacao,
     PedidoCompra,
     PedidoCompraItem,
 )
-from app.models.enums import StatusOs, StatusPedido, TipoItemOs, TipoOs
+from app.models.enums import (
+    DecisaoArte,
+    RefacaoErro,
+    StatusOs,
+    StatusPedido,
+    TipoItemOs,
+    TipoOs,
+)
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
 from app.services import adiantamento_service
 
@@ -435,6 +445,247 @@ def _gerar_pedidos_de_compra(
             cotacao.pedido_item_id = item_pedido.id
         if prazo is not None:
             pedido.previsao_entrega = date.today() + timedelta(days=prazo)
+
+
+def _copiar_itens(db: Session, origem: OrdemServico) -> list[OrdemServicoItem]:
+    """Copia os itens recalculando o preço dos produtos (§3.10).
+
+    - **Produto próprio**: usa o `preco_venda` vigente do catálogo (é o
+      "recalculando preços" do PRD);
+    - **Fornecedor**: mantém o snapshot do VO (o VF veio da cotação do
+      fornecedor) e **replica as cotações** com a seleção — sem isso o item
+      nasceria "aguardando" e travaria a aprovação;
+    - **Avulso**: mantém o valor combinado.
+    """
+    novos: list[OrdemServicoItem] = []
+    for seq, item in enumerate(origem.itens, start=1):
+        valor = Decimal(item.valor_unitario)
+        if item.produto_id and item.tipo == TipoItemOs.PROPRIO:
+            produto = db.get(Produto, item.produto_id)
+            if produto is not None and produto.preco_venda is not None:
+                valor = Decimal(produto.preco_venda)
+        total = _q(valor * item.quantidade - item.desconto)
+        if total < 0:
+            total = Decimal("0.00")
+        novo = OrdemServicoItem(
+            seq=seq,
+            produto_id=item.produto_id,
+            descricao_avulsa=item.descricao_avulsa,
+            quantidade=item.quantidade,
+            dimensoes=item.dimensoes,
+            valor_unitario=valor,
+            desconto=item.desconto,
+            valor_total=total,
+            tipo=item.tipo,
+            snapshot_preco=item.snapshot_preco,
+        )
+        for cot in item.cotacoes:
+            novo.cotacoes.append(
+                OrdemServicoItemCotacao(
+                    fornecedor_id=cot.fornecedor_id,
+                    vf=cot.vf,
+                    validade=cot.validade,
+                    prazo_dias=cot.prazo_dias,
+                    observacoes=cot.observacoes,
+                    selecionada=cot.selecionada,
+                    criado_por=cot.criado_por,
+                )
+            )
+        novos.append(novo)
+    return novos
+
+
+def _replicar_arte_aprovada(
+    db: Session, *, origem: OrdemServico, destino: OrdemServico, usuario_id: int
+) -> bool:
+    """Replica a arte **aprovada** para o destino (§3.10).
+
+    "Repetir pedido … com os mesmos itens e arte aprovada": a reimpressão não
+    exige nova aprovação do cliente. A versão aprovada é a última enviada
+    (o estado deriva dela); o arquivo é o mesmo caminho (somente leitura).
+    """
+    from app.services import arte_service
+
+    ultima = (
+        db.query(ArteVersao)
+        .filter(ArteVersao.os_id == origem.id)
+        .order_by(ArteVersao.versao.desc())
+        .first()
+    )
+    if ultima is None:
+        return False
+    if arte_service.estado_arte(db, os_id=origem.id) != "aprovada":
+        return False
+
+    nova = ArteVersao(
+        filial_id=destino.filial_id,
+        os_id=destino.id,
+        versao=1,
+        nome_arquivo=ultima.nome_arquivo,
+        caminho=ultima.caminho,  # mesmo arquivo (somente leitura)
+        hash_sha256=ultima.hash_sha256,
+        tamanho_bytes=ultima.tamanho_bytes,
+        criado_por=usuario_id,
+    )
+    db.add(nova)
+    db.flush()
+    db.add(
+        ArteAprovacao(
+            filial_id=destino.filial_id,
+            versao_id=nova.id,
+            decisao=DecisaoArte.APROVADA.value,
+            comentarios=f"Arte aprovada replicada da O.S. #{origem.numero}.",
+            criado_por=usuario_id,
+        )
+    )
+    return True
+
+
+def repetir_pedido(
+    db: Session,
+    *,
+    filial_id: int,
+    os_id: int,
+    usuario_id: int,
+    tipo: TipoOs | None = None,
+    pagamento_confirmado: bool = False,
+) -> OsOut:
+    """Repete um pedido: nova O.S./orçamento com os mesmos itens (§3.10).
+
+    A arte aprovada é replicada (a reimpressão não passa por nova prova) e os
+    preços dos produtos são recalculados pelo catálogo vigente. A política de
+    sinal do cliente vale como na criação quando o destino é O.S.
+    """
+    origem = buscar(db, os_id, filial_id=filial_id)
+    novo_tipo = tipo or origem.tipo
+
+    itens = _copiar_itens(db, origem)
+    valor_itens, valor_total = _totais(itens, Decimal(origem.desconto))
+    observacoes = f"Repetição da O.S. #{origem.numero}."
+    if origem.observacoes:
+        observacoes += f" {origem.observacoes}"
+
+    novo = OrdemServico(
+        filial_id=filial_id,
+        tipo=novo_tipo,
+        status=StatusOs.ABERTO,
+        cliente_id=origem.cliente_id,
+        vendedor_id=origem.vendedor_id,
+        atendente_id=origem.atendente_id,
+        desconto=origem.desconto,
+        valor_itens=valor_itens,
+        valor_total=valor_total,
+        forma_pagamento=origem.forma_pagamento,
+        observacoes=observacoes,
+        criado_por=usuario_id,
+        itens=itens,
+    )
+    db.add(novo)
+    try:
+        db.flush()
+        if novo_tipo == TipoOs.OS:
+            cliente = db.get(Cliente, origem.cliente_id) if origem.cliente_id else None
+            adiantamento_service.exigir_e_registrar(
+                db,
+                filial_id=filial_id,
+                usuario_id=usuario_id,
+                cliente=cliente,
+                valor_total=valor_total,
+                confirmado=pagamento_confirmado,
+                documento=f"O.S. #{novo.id}",
+                ordem_servico_id=novo.id,
+            )
+        replicou = _replicar_arte_aprovada(
+            db, origem=origem, destino=novo, usuario_id=usuario_id
+        )
+        if replicou:
+            novo.status = StatusOs.APROVADO
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        raise _erro_integridade() from exc
+    db.refresh(novo)
+    return _para_out(novo)
+
+
+def criar_refacao(
+    db: Session,
+    *,
+    filial_id: int,
+    os_id: int,
+    usuario_id: int,
+    motivo: str,
+    erro: RefacaoErro,
+    responsavel_id: int | None = None,
+    custo: Decimal | None = None,
+) -> OsOut:
+    """Cria a O.S. filha de refação (§3.10).
+
+    A refação reexecuta o serviço: herda os itens (preços recalculados) e a
+    arte aprovada, e guarda **motivo**, **responsável**, **custo** e a
+    classificação do erro. Erro da **gráfica** não é cobrado do cliente
+    (desconto de 100%); erro do **cliente** mantém o desconto original.
+    Não aplica a política de sinal — não é uma venda nova.
+    """
+    origem = buscar(db, os_id, filial_id=filial_id)
+    if origem.tipo != TipoOs.OS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Só uma ordem de serviço pode gerar refação.",
+        )
+
+    itens = _copiar_itens(db, origem)
+    desconto = origem.desconto
+    if erro == RefacaoErro.GRAFICA:
+        # Erro da gráfica: o cliente não paga pela refação.
+        valor_itens = _q(sum((i.valor_total for i in itens), Decimal("0")))
+        desconto = valor_itens
+    valor_itens, valor_total = _totais(itens, Decimal(desconto))
+
+    motivo_txt = f"Refação da O.S. #{origem.numero} — {motivo.strip()}"
+    if origem.observacoes:
+        motivo_txt += f". {origem.observacoes}"
+
+    nova = OrdemServico(
+        filial_id=filial_id,
+        tipo=TipoOs.OS,
+        status=StatusOs.ABERTO,
+        cliente_id=origem.cliente_id,
+        vendedor_id=origem.vendedor_id,
+        atendente_id=origem.atendente_id,
+        desconto=desconto,
+        valor_itens=valor_itens,
+        valor_total=valor_total,
+        forma_pagamento=origem.forma_pagamento,
+        observacoes=motivo_txt,
+        criado_por=usuario_id,
+        itens=itens,
+        refacao_origem_id=origem.id,
+        refacao_motivo=motivo.strip(),
+        refacao_erro=erro.value,
+        refacao_responsavel_id=responsavel_id,
+        refacao_custo=_q(Decimal(custo)) if custo is not None else None,
+    )
+    db.add(nova)
+    try:
+        db.flush()
+        replicou = _replicar_arte_aprovada(
+            db, origem=origem, destino=nova, usuario_id=usuario_id
+        )
+        if replicou:
+            nova.status = StatusOs.APROVADO
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        raise _erro_integridade() from exc
+    db.refresh(nova)
+    return _para_out(nova)
 
 
 def cancelar(db: Session, *, filial_id: int, os_id: int) -> None:
