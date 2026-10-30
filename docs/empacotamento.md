@@ -186,8 +186,7 @@ para cliente, só o certificado resolve.
 
 O pipeline já está pronto: `signtool` do Windows SDK é detectado
 automaticamente e assina **os dois exes antes de virarem Setup** e o próprio
-Setup depois, com carimbo de tempo (timestamp) — a assinatura não expira com o
-certificado:
+Setup depois, com carimbo de tempo (timestamp):
 
 ```powershell
 # thumbprint do certificado em Cert:\CurrentUser\My
@@ -197,12 +196,28 @@ powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Assinar <THUMBPR
 powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Assinar C:\cert\printgest.pfx
 ```
 
-Onde conseguir um certificado de *code signing* (preços de out/2026, a
-título de referência):
+### Auto-assinatura (Gratuita, para testes)
+
+Para testes internos ou ambientes controlados, use o script de auto-assinatura:
+
+```powershell
+# Cria certificado + empacota com assinatura auto-assinada
+powershell -ExecutionPolicy Bypass -File scripts\empacotar_autosign.ps1
+```
+
+**Resultado:** O instalador terá assinatura, mas o SmartScreen ainda pode mostrar
+aviso (limitação do auto-assinado). Útil para:
+- Testes internos
+- Ambientes de teste controlados
+- Distribuição limitada com aviso claro
+
+### Certificado de Code Signing Real
+
+Para eliminar completamente o SmartScreen, adquira um certificado:
 
 | Opção | Custo aprox. | Observação |
 | --- | --- | --- |
-| **Azure Trusted Signing** (Microsoft) | US$ 9,99/mês | individuais e empresas; exige `AzureSignTool` no lugar do `signtool` clássico |
+| **Azure Trusted Signing** (Microsoft) | US$ 9,99/mês | individuais e empresas; exige `AzureSignTool` |
 | Certum / SSL.com / GlobalSign (OV) | ~US$ 70–250/ano | `signtool` clássico, pronto no script |
 | Certificado autoassinado (PowerShell) | grátis | **não resolve** o SmartScreen — só prova integridade |
 
@@ -212,13 +227,14 @@ assinado ainda pode aparecer o aviso azul até o arquivo acumular reputação
 
 ## 8. Roadmap
 
-- [x] Assinatura digital no pipeline (`-Assinar` + `signtool`) — falta o certificado.
-- [ ] Certificado de code signing (Azure Trusted Signing ou OV).
+- [x] Assinatura digital no pipeline (`-Assinar` + `signtool`)
+- [x] Script de auto-assinatura (`scripts/empacotar_autosign.ps1`)
+- [ ] Certificado de code signing real (Azure Trusted Signing ou OV).
 - [ ] Atualização in-place (detector de versão + download incremental).
 - [ ] Backup/restauração do cluster via interface (hoje: cópia do `data`).
 - [ ] Serviço do Windows opcional para o daemon (auto-start no boot).
 
-## 9. Validação executada (24/10/2026, máquina de dev)
+## 9. Validação executada (30/10/2026, máquina de dev)
 
 Instalação silenciosa em pasta de teste + primeira execução **fria** (cluster
 zerado), sem tocar nos serviços de dev (PostgreSQL de dev em 5432 e daemon de
