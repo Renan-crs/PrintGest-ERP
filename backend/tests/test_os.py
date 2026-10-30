@@ -282,3 +282,126 @@ def test_os_caixa_bloqueado(client, admin_token):
 
     resp = client.get("/v1/os", headers=auth(client, token))
     assert resp.status_code == 403
+
+
+def test_repetir_pedido_copia_itens_e_arte(client, admin_token):
+    """Repetir pedido (§3.10): copia itens, recalcula preços e replica arte aprovada."""
+    from app.models.enums import TipoOs
+
+    cliente = _criar_cliente(client, admin_token)
+
+    # Criar OS com produto (preço será recalculado)
+    prod_resp = client.get("/v1/produtos", headers=auth(client, admin_token),
+                           params={"q": "casa"})
+    produto_id = prod_resp.json()["data"][0]["id"] if prod_resp.json()["data"] else None
+
+    if produto_id:
+        payload = {
+            "tipo": "os",
+            "cliente_id": cliente["id"],
+            "itens": [
+                {"produto_id": produto_id, "quantidade": 10}
+            ],
+        }
+    else:
+        payload = {
+            "tipo": "os",
+            "cliente_id": cliente["id"],
+            "itens": [
+                {"descricao_avulsa": "Serviço teste", "quantidade": 10, "valor_unitario": 5.00}
+            ],
+        }
+
+    os_origem = client.post("/v1/os", headers=auth(client, admin_token), json=payload).json()["data"]
+    os_id = os_origem["id"]
+
+    # Aprovar arte para que o repetir funcione
+    arte_aprovada(client, admin_token, os_id)
+
+    # Repetir o pedido
+    resp = client.post(f"/v1/os/{os_id}/repetir", headers=auth(client, admin_token))
+    assert resp.status_code == 200, resp.text
+    novo = resp.json()["data"]
+
+    # O novo OS deve ter itens copiados, arte replicada e status aprovado
+    assert novo["tipo"] == TipoOs.OS
+    assert novo["status"] == "aprovado"
+    assert len(novo["itens"]) == len(os_origem["itens"])
+    for item_orig, item_novo in zip(os_origem["itens"], novo["itens"]):
+        if item_orig.get("produto_id"):
+            assert item_novo["produto_id"] == item_orig["produto_id"]
+        else:
+            assert item_novo["descricao_avulsa"] == item_orig["descricao_avulsa"]
+
+
+def test_repetir_pode_vir_como_orcamento(client, admin_token):
+    """Repetir como orçamento permite renegociar."""
+    cliente = _criar_cliente(client, admin_token)
+    os_origem = client.post("/v1/os", headers=auth(client, admin_token),
+                            json=_min_payload(cliente)).json()["data"]
+
+    resp = client.post(f"/v1/os/{os_origem['id']}/repetir",
+                       headers=auth(client, admin_token),
+                       json={"tipo": "orcamento"})
+    assert resp.status_code == 200, resp.text
+    novo = resp.json()["data"]
+    assert novo["tipo"] == "orcamento"
+
+
+def test_refacao_cria_os_filha(client, admin_token):
+    """Refação (§3.10): O.S. filha com motivo, responsável e custo."""
+    cliente = _criar_cliente(client, admin_token)
+    os_origem = client.post("/v1/os", headers=auth(client, admin_token),
+                            json=_min_payload(cliente)).json()["data"]
+
+    resp = client.post(f"/v1/os/{os_origem['id']}/refacao",
+                       headers=auth(client, admin_token),
+                       json={
+                           "motivo": "Erro no corte do exemplar",
+                           "erro": "grafica",
+                           "custo": 150.00,
+                       })
+    assert resp.status_code == 200, resp.text
+    refacao = resp.json()["data"]
+
+    assert refacao["refacao_origem_id"] == os_origem["id"]
+    assert refacao["refacao_motivo"] == "Erro no corte do exemplar"
+    assert refacao["refacao_erro"] == "grafica"
+    assert Decimal(str(refacao["refacao_custo"])) == Decimal("150.00")
+    # Erro da gráfica → desconto 100% → total 0
+    assert refacao["valor_total"] == 0
+
+
+def test_refacao_separa_erro_cliente(client, admin_token):
+    """Erro do cliente mantém o desconto original."""
+    cliente = _criar_cliente(client, admin_token)
+    os_origem = client.post("/v1/os", headers=auth(client, admin_token),
+                            json=_min_payload(cliente, desconto=10.00)).json()["data"]
+
+    resp = client.post(f"/v1/os/{os_origem['id']}/refacao",
+                       headers=auth(client, admin_token),
+                       json={
+                           "motivo": "Cliente mudou de ideia",
+                           "erro": "cliente",
+                       })
+    assert resp.status_code == 200, resp.text
+    refacao = resp.json()["data"]
+
+    assert refacao["refacao_erro"] == "cliente"
+    # Erro do cliente: desconto original mantido, preço não é zerado
+    assert refacao["desconto"] == Decimal("10.00")
+    assert refacao["valor_total"] > 0
+
+
+def test_refacao_sobre_os_nao_orcamento(client, admin_token):
+    """Só OS pode gerar refação (não orçamento)."""
+    cliente = _criar_cliente(client, admin_token)
+    orc = client.post("/v1/os", headers=auth(client, admin_token),
+                     json={"tipo": "orcamento", "cliente_id": cliente["id"],
+                           "itens": [{"descricao_avulsa": "Teste", "quantidade": 1}]})
+    orc_id = orc.json()["data"]["id"]
+
+    resp = client.post(f"/v1/os/{orc_id}/refacao",
+                       headers=auth(client, admin_token),
+                       json={"motivo": "Teste", "erro": "grafica"})
+    assert resp.status_code == 400

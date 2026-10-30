@@ -31,6 +31,13 @@ def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usu
         )
     verificar_bloqueio(usuario, agora)
 
+    # M3 (§3.10): primeiro acesso - usuário sem senha definida precisa completar
+    if usuario.senha_hash is None or usuario.primeiro_acesso:
+        raise HTTPException(
+            status_code=status.HTTP_407_REQUIRED_PASSWORD_REPLAY,
+            detail="Primeiro acesso: cadastre sua senha.",
+        )
+
     if not verify_password(senha, usuario.senha_hash):
         usuario.falhas_login += 1
         if usuario.falhas_login >= settings.login_max_falhas:
@@ -46,6 +53,38 @@ def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usu
     usuario.bloqueado_em = None
     usuario.ultimo_login = agora
 
+    token = gerar_token_sessao()
+    expira = agora + timedelta(minutes=settings.session_ttl_minutes)
+    sessao = UsuarioSessao(
+        usuario_id=usuario.id,
+        token_hash=hash_token(token),
+        expira_em=expira,
+    )
+    db.add(sessao)
+    db.commit()
+    return token, expira, usuario
+
+
+def primeiro_acesso(db: Session, login: str, nova_senha: str, usuario_id: int | None = None) -> tuple[str, datetime, Usuario]:
+    """Completa o primeiro acesso: define senha e devolve token de sessão."""
+    agora = datetime.now(timezone.utc)
+    if usuario_id:
+        usuario = db.get(Usuario, usuario_id)
+    else:
+        usuario = db.query(Usuario).filter(Usuario.login == login).first()
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário não encontrado.",
+        )
+    if not usuario.primeiro_acesso:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este usuário não está em modo primeiro acesso.",
+        )
+    usuario.senha_hash = hash_password(nova_senha)
+    usuario.primeiro_acesso = False
+    
     token = gerar_token_sessao()
     expira = agora + timedelta(minutes=settings.session_ttl_minutes)
     sessao = UsuarioSessao(
