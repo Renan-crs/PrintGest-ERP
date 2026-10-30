@@ -89,13 +89,24 @@ class Filial(Base):
 
 class Usuario(Base):
     __tablename__ = "usuario"
-    __table_args__ = (Index("idx_usuario_nome", "nome"),)
+    __table_args__ = (
+        Index("idx_usuario_nome", "nome"),
+        Index("idx_usuario_funcionario", "funcionario_id"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("filial.id"))
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     login: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
-    senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    senha_hash: Mapped[str] = mapped_column(String(255), nullable=True)
+    # M3 (§3.10): primeiro acesso - quando True, login sem senha válida pede nova senha
+    primeiro_acesso: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    # Link com funcionário (preenchido pelo admin ao cadastrar)
+    funcionario_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("funcionario.id")
+    )
     nivel_acesso: Mapped[NivelAcesso] = mapped_column(
         pg_enum(NivelAcesso),
         nullable=False,
@@ -116,6 +127,7 @@ class Usuario(Base):
     )
 
     sessoes: Mapped[list["UsuarioSessao"]] = relationship(back_populates="usuario")
+    funcionario: Mapped["Funcionario | None"] = relationship(back_populates="usuario")
 
 
 class UsuarioSessao(Base):

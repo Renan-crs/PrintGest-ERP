@@ -100,10 +100,12 @@ class FuncionarioBase(ORMModel):
     e_producao: bool = False
     comissao_pct: Decimal | None = Field(default=Decimal("0"), ge=0, le=100)
     observacoes: str | None = None
+    # M3 (§3.10): login do funcionário (fornecido pelo admin)
+    login: str | None = Field(default=None, min_length=3, max_length=60, pattern=r"^[a-zA-Z0-9_.-]+$")
 
 
 class FuncionarioCreate(FuncionarioBase):
-    pass
+    login: str = Field(min_length=3, max_length=60, pattern=r"^[a-zA-Z0-9_.-]+$")
 
 
 class FuncionarioUpdate(FuncionarioBase):
@@ -114,6 +116,7 @@ class FuncionarioOut(FuncionarioBase):
     id: int
     filial_id: int
     ativo: bool
+    login: str | None = None
     created_at: datetime
     updated_at: datetime
 

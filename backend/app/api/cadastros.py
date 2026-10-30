@@ -5,9 +5,12 @@ Níveis de acesso (PRD v2.0 §5):
   - Usuários/Sistema: ADMIN (configurações de sistema)
 """
 
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.crud_factory import criar_router_crud
+from app.deps import DbDep, UsuarioDep, require_nivel
 from app.models.cadastros import (
     Cliente,
     Fornecedor,
@@ -16,6 +19,7 @@ from app.models.cadastros import (
     ProdutoCategoria,
 )
 from app.models.enums import NivelAcesso
+from app.schemas import ItemResponse
 from app.schemas.cadastros import (
     CategoriaCreate,
     CategoriaOut,
@@ -33,8 +37,18 @@ from app.schemas.cadastros import (
     ProdutoOut,
     ProdutoUpdate,
 )
+from app.services.crud import listar
+from app.services.funcionario_service import criar_com_usuario
 
-clientes = criar_router_crud(
+router = APIRouter(
+    prefix="/cadastros",
+    tags=["cadastros"],
+    dependencies=[Depends(require_nivel(NivelAcesso.OPERADOR))],
+)
+
+
+# Clientes via factory
+clientes_router = criar_router_crud(
     prefix="/clientes",
     model=Cliente,
     schema_in=ClienteCreate,
@@ -44,8 +58,11 @@ clientes = criar_router_crud(
     campos_filtro=["tipo_pessoa"],
     tags=["cadastros"],
 )
+router.include_router(clientes_router)
 
-fornecedores = criar_router_crud(
+
+# Fornecedores via factory
+fornecedores_router = criar_router_crud(
     prefix="/fornecedores",
     model=Fornecedor,
     schema_in=FornecedorCreate,
@@ -54,18 +71,88 @@ fornecedores = criar_router_crud(
     campos_busca=["nome_razao", "cpf_cnpj", "email", "telefone", "celular"],
     tags=["cadastros"],
 )
+router.include_router(fornecedores_router)
 
-funcionarios = criar_router_crud(
-    prefix="/funcionarios",
-    model=Funcionario,
-    schema_in=FuncionarioCreate,
-    schema_update=FuncionarioUpdate,
-    schema_out=FuncionarioOut,
-    campos_busca=["nome", "cpf", "cargo"],
-    tags=["cadastros"],
-)
 
-categorias = criar_router_crud(
+# ----------------------------------------------------------- funcionários (com login)
+# M3 (§3.10): cadastro de funcionário cria usuário com primeiro acesso
+
+@router.get("/funcionarios")
+def listar_funcionarios(
+    db: DbDep,
+    filial: int,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    items, total = listar(
+        db, Funcionario, filial_id=filial, q=q, limit=limit, offset=offset
+    )
+    return {
+        "data": [FuncionarioOut.model_validate(f) for f in items],
+        "meta": {"total": total, "limit": limit, "offset": offset},
+    }
+
+
+@router.post("/funcionarios")
+def criar_funcionario(
+    body: FuncionarioCreate,
+    db: DbDep,
+    filial: int,
+    usuario: Annotated[UsuarioDep, Depends()],
+) -> ItemResponse[FuncionarioOut]:
+    """Cria funcionário com usuário de login (M3 §3.10 - primeiro acesso)."""
+    dados = body.model_dump()
+    dados["filial_id"] = filial
+    funcionario = criar_com_usuario(db, Funcionario, dados)
+    return ItemResponse(data=FuncionarioOut.model_validate(funcionario))
+
+
+@router.put("/funcionarios/{item_id}")
+def atualizar_funcionario(
+    item_id: int,
+    body: FuncionarioUpdate,
+    db: DbDep,
+    filial: int,
+) -> ItemResponse[FuncionarioOut]:
+    dados = body.model_dump(exclude_unset=True)
+    if dados:
+        item = (
+            db.query(Funcionario)
+            .filter(
+                Funcionario.id == item_id,
+                Funcionario.filial_id == filial,
+                Funcionario.ativo.is_(True),
+            )
+            .first()
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
+        for campo, valor in dados.items():
+            setattr(item, campo, valor)
+        db.commit()
+        db.refresh(item)
+    return ItemResponse(data=FuncionarioOut.model_validate(item))
+
+
+@router.delete("/funcionarios/{item_id}", status_code=204)
+def deletar_funcionario(
+    item_id: int,
+    db: DbDep,
+    filial: int,
+) -> None:
+    item = (
+        db.query(Funcionario)
+        .filter(Funcionario.id == item_id, Funcionario.filial_id == filial)
+        .first()
+    )
+    if item:
+        item.ativo = False
+        db.commit()
+
+
+# Categorias via factory
+categorias_router = criar_router_crud(
     prefix="/categorias",
     model=ProdutoCategoria,
     schema_in=CategoriaCreate,
@@ -74,8 +161,11 @@ categorias = criar_router_crud(
     campos_busca=["nome"],
     tags=["cadastros"],
 )
+router.include_router(categorias_router)
 
-produtos = criar_router_crud(
+
+# Produtos via factory
+produtos_router = criar_router_crud(
     prefix="/produtos",
     model=Produto,
     schema_in=ProdutoCreate,
@@ -85,11 +175,8 @@ produtos = criar_router_crud(
     tags=["cadastros"],
     nivel_acesso=NivelAcesso.OPERADOR,
 )
+router.include_router(produtos_router)
 
 
 def registrar(api: APIRouter) -> None:
-    api.include_router(clientes)
-    api.include_router(fornecedores)
-    api.include_router(funcionarios)
-    api.include_router(categorias)
-    api.include_router(produtos)
+    api.include_router(router)

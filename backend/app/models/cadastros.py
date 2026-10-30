@@ -160,12 +160,16 @@ class Funcionario(Base):
     comissao_pct: Mapped[Decimal] = mapped_column(Numeric(6, 3), server_default="0")
     observacoes: Mapped[str | None] = mapped_column(Text)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # M3 (§3.10): link com usuário de login
+    usuario_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+    usuario: Mapped["Usuario | None"] = relationship(back_populates="funcionario")
 
 
 class ProdutoCategoria(Base):
