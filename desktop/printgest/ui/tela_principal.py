@@ -1123,6 +1123,12 @@ class TelaPrincipal(QMainWindow):
         host.setProperty("role", "muted")
         linha.addWidget(host)
 
+        # Servidor: IP/Porta do servidor (extraído de base_url)
+        server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
+        server_label = QLabel(f"  · Servidor: {server_ip}")
+        server_label.setProperty("role", "muted")
+        linha.addWidget(server_label)
+
         self._lbl_conexao = QLabel("● —")
         self._lbl_conexao.setProperty("role", "muted")
         linha.addWidget(self._lbl_conexao)
