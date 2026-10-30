@@ -339,9 +339,9 @@ def test_cabecalho_nao_repete_perfil_igual_ao_nome(app):
 def test_servidor_local_deixa_ip_apenas_no_tooltip(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     pumpar(lambda: "online" in principal._lbl_conexao.text())
-    assert principal._lbl_servidor.text() == "● Servidor local"
+    # Server indicator now shows IP in text (for small print shops on network)
+    assert principal._lbl_servidor.text() == "● 127.0.0.1"
     assert "127.0.0.1:8000" in principal._lbl_servidor.toolTip()
-    assert "127.0.0.1" not in principal._lbl_servidor.text()
 
 
 def test_conteudo_do_inicio_tem_scroll(app):

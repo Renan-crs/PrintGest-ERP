@@ -751,8 +751,10 @@ class TelaPrincipal(QMainWindow):
         self._lbl_filial.setProperty("role", "muted")
         linha.addWidget(self._lbl_filial)
 
-        # Indicador do servidor local — sem IP:porta exposto (só no tooltip).
-        self._lbl_servidor = QLabel("● Servidor local")
+        # Indicador do servidor local — mostra IP no texto (necessário para redes locais
+        # de pequenas gráficas que não têm IP dedicado).
+        server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
+        self._lbl_servidor = QLabel(f"● {server_ip}")
         self._lbl_servidor.setProperty("role", "muted")
         self._lbl_servidor.setToolTip(f"Servidor local: {self._base_url}")
         linha.addWidget(self._lbl_servidor)
