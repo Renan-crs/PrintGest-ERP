@@ -27,6 +27,8 @@ from app.schemas.movimento import (
     OsStatusIn,
     OsUpdate,
     RecebimentoTerceirizadoIn,
+    RepetirIn,
+    RefacaoIn,
 )
 from app.services import cotacao_service, os_service
 
@@ -336,6 +338,55 @@ def gerar_link_prova(
     link = arte_service.gerar_link(db, os_id=os_id, filial_id=filial)
     return ItemResponse(
         data={"token": link.token, "tipo": link.tipo, "expira_em": link.expira_em}
+    )
+
+
+# --------------------------- repetir pedido e refação (M3, §3.10)
+
+
+@router.post("/{os_id}/repetir", status_code=201)
+def repetir_pedido(
+    os_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    body: RepetirIn | None = None,
+) -> ItemResponse[OsOut]:
+    """Repete um pedido: nova O.S./orçamento com os mesmos itens e arte aprovada."""
+    tipo = body.tipo if body else None
+    return ItemResponse(
+        data=os_service.repetir_pedido(
+            db,
+            filial_id=filial,
+            os_id=os_id,
+            usuario_id=usuario.id,
+            tipo=tipo,
+        )
+    )
+
+
+@router.post("/{os_id}/refacao", status_code=201)
+def criar_refacao(
+    os_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    body: RefacaoIn,
+) -> ItemResponse[OsOut]:
+    """Cria a O.S. filha de refação (§3.10)."""
+    from app.models.enums import RefacaoErro
+
+    return ItemResponse(
+        data=os_service.criar_refacao(
+            db,
+            filial_id=filial,
+            os_id=os_id,
+            usuario_id=usuario.id,
+            motivo=body.motivo,
+            erro=RefacaoErro(body.erro),
+            responsavel_id=body.responsavel_id,
+            custo=body.custo,
+        )
     )
 
 

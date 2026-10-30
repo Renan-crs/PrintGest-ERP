@@ -109,6 +109,12 @@ def trocar_senha(
     A sessão que executou a troca (identificada por `token_atual`) permanece
     válida; todas as outras sessões do usuário são encerradas.
     """
+    # M3 (§3.10): usuário com primeiro acesso não pode trocar senha normalmente
+    if usuario.senha_hash is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Usuário precisa completar primeiro acesso.",
+        )
     if not verify_password(senha_atual, usuario.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
