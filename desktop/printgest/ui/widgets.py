@@ -70,6 +70,67 @@ def aplicar_estilo(widget: QWidget) -> None:
     estilo.polish(widget)
 
 
+# =============================================================================
+# Helpers para estados visuais (refatoração de repetição de setProperty)
+# =============================================================================
+
+def aplicar_estado(widget: QWidget, tipo: str) -> None:
+    """Aplica propriedade de estado e recompila o estilo.
+    
+    Tipos comuns: 'success', 'error', 'atencao', 'muted', 'primary', 
+                  'secondary', 'danger', 'ghost', 'subtitulo', 'painelDia'
+    
+    Uso: aplicar_estado(self._lbl_estoque, 'atencao')
+    """
+    widget.setProperty("role", tipo)
+    aplicar_estilo(widget)
+
+
+def estado_sucesso(widget: QWidget) -> None:
+    """Estado verde/sucesso."""
+    aplicar_estado(widget, "success")
+
+
+def estado_erro(widget: QWidget) -> None:
+    """Estado vermelho/erro."""
+    aplicar_estado(widget, "error")
+
+
+def estado_atencao(widget: QWidget) -> None:
+    """Estado amarelo/atencao."""
+    aplicar_estado(widget, "atencao")
+
+
+def estado_muted(widget: QWidget) -> None:
+    """Estado cinza/desativado/talvez."""
+    aplicar_estado(widget, "muted")
+
+
+def estado_danger(widget: QWidget) -> None:
+    """Estado perigo/danger."""
+    aplicar_estado(widget, "danger")
+
+
+def estado_ghost(widget: QWidget) -> None:
+    """Estado ghost (botao secundario/transparente)."""
+    aplicar_estado(widget, "ghost")
+
+
+def estado_subtitulo(widget: QWidget) -> None:
+    """Estado subtitle/label secundario."""
+    aplicar_estado(widget, "subtitulo")
+
+
+def estado_secundario(widget: QWidget) -> None:
+    """Estado secundario (botao/eticheta não primaria)."""
+    aplicar_estado(widget, "secondary")
+
+
+def estado_primario(widget: QWidget) -> None:
+    """Estado primario (botao/eticheta principal)."""
+    aplicar_estado(widget, "primary")
+
+
 def botao_com_atalho(
     texto: str, atalho: str = "", role: str = ""
 ) -> tuple[QWidget, QPushButton]:
