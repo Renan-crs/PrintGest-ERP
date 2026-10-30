@@ -9,7 +9,23 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
-## [0.3.1] - 2026-10-28 · Validação de campo de M2/M4, fix do paginador, backend do M3 (arte) + M3 §3.10 (repetir/refação), primeiro acesso funcionário
+## [0.3.1] - 2026-10-30 · Sistema de atualização, helpers de UI, refatoração
+
+### Novos Recursos
+- **Sistema de notificação de atualização (M3 §3.11):** widget `NotificacaoAtualizacao`
+  com aparência não bloqueante, visível e acessível. Endpoint `POST /v1/atualizacao/verificar`
+  no backend e método `api.verificar_atualizacao()` no cliente desktop.
+- **Auto-assinatura gratuita:** script `scripts/empacotar_autosign.ps1` para gerar certificado
+  auto-assinado e empacotar com assinatura digital. Útil para testes internos, mas
+  o SmartScreen ainda pode mostrar aviso (necessário certificado pago para eliminação completa).
+- **Helper methods para estados visuais:** novos helpers em `widgets.py`:
+  `estado_sucesso()`, `estado_erro()`, `estado_atencao()`, `estado_muted()`,
+  `estado_ghost()`, `estado_secundario()`, `estado_primario()`, `aplicar_estado()`.
+
+### Refatoração
+- **Helpers de UI:** substituições de `setProperty("role", ...)` por helpers em:
+  - `desktop/printgest/ui/tela_principal.py` (22 ocorrências)
+  - Padronização de estados visuais para consistência e manutenibilidade
 
 ### Adicionado
 - **M3 §3.10 — repetir pedido e refação:** endpoints `POST /v1/os/{id}/repetir` e `POST /v1/os/{id}/refacao` com integração de status de OS. Repetir duplica itens e arte aprovada (preços calculados do catálogo). Refação cria OS filha com campos `refacao_motivo`, `refacao_responsavel_id`, `refacao_custo`, `refacao_erro` (Grafica ou Cliente). Tabelas `arte_versao`, `arte_aprovacao`, `link_publico` (migração `b0c1d2e3f4a5`, aditiva e reversível). NFR de arquivos: extensões executáveis bloqueadas (`.exe`, `.bat`, `.dll`, `.js`…), máximo 50 MB, arquivo vazio rejeitado, hash SHA-256 gravado para integridade. 
