@@ -60,6 +60,14 @@ from printgest.ui.widgets import (
     ElideLabel,
     FlowLayout,
     aplicar_estilo,
+    aplicar_estado,
+    estado_sucesso,
+    estado_erro,
+    estado_atencao,
+    estado_muted,
+    estado_ghost,
+    estado_secundario,
+    estado_primario,
     badge,
     formatar_datahora,
 )
@@ -254,7 +262,11 @@ class PaginaInicial(QWidget):
         # secundários, para o olho não disputar quatro pesos iguais.
         for indice, (rotulo, destino) in enumerate(self._atajos_rapidos(nivel)):
             botao = QPushButton(rotulo)
-            botao.setProperty("role", "primary" if indice == 0 else "secondary")
+            # Primeiro atalho é primário, os demais são secundários
+            if indice == 0:
+                estado_primario(botao)
+            else:
+                estado_secundario(botao)
             botao.setAccessibleName(rotulo)
             botao.setMinimumHeight(32)
             botao.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -311,7 +323,7 @@ class PaginaInicial(QWidget):
             gl.addWidget(self._cabecalho_card("Faturamento"))
             topo = QHBoxLayout()
             subtitulo = QLabel("Realizado × previsto")
-            subtitulo.setProperty("role", "muted")
+            estado_muted(subtitulo)
             topo.addWidget(subtitulo)
             topo.addStretch(1)
             self._combo_dias = QComboBox()
@@ -320,12 +332,12 @@ class PaginaInicial(QWidget):
             self._combo_dias.currentIndexChanged.connect(self._mudar_dias)
             topo.addWidget(self._combo_dias)
             ver = QPushButton("Ver relatórios →")
-            ver.setProperty("role", "ghost")
+            estado_ghost(ver)
             ver.clicked.connect(lambda: self.navegar.emit("relatorios"))
             topo.addWidget(ver)
             gl.addLayout(topo)
             self._lbl_grafico = ElideLabel("")
-            self._lbl_grafico.setProperty("role", "muted")
+            estado_muted(self._lbl_grafico)
             gl.addWidget(self._lbl_grafico)
             self._barras_realizado: list[tuple[QProgressBar, QLabel]] = []
             self._barras_previsto: list[tuple[QProgressBar, QLabel]] = []
@@ -355,7 +367,7 @@ class PaginaInicial(QWidget):
             el.setSpacing(6)
             el.addWidget(self._cabecalho_card("Estoque crítico"))
             self._lbl_estoque = ElideLabel("Consultando estoque...")
-            self._lbl_estoque.setProperty("role", "muted")
+            estado_muted(self._lbl_estoque)
             el.addWidget(self._lbl_estoque)
             self._btn_estoque = QPushButton("Ver produtos com estoque baixo")
             self._btn_estoque.setProperty("link", "true")
@@ -448,7 +460,7 @@ class PaginaInicial(QWidget):
     def _aplicar_estoque(self, abaixo) -> None:
         if abaixo is None:
             self._lbl_estoque.setText("Dados de estoque indisponíveis para o seu perfil.")
-            self._lbl_estoque.setProperty("role", "muted")
+            estado_muted(self._lbl_estoque)
             self._btn_estoque.setVisible(False)
         elif self._int(abaixo) > 0:
             n = self._int(abaixo)
@@ -457,14 +469,13 @@ class PaginaInicial(QWidget):
             )
             # Ícone textual junto da cor: o estado não depende só do verde/laranja
             # (quick-reference §1 `color-not-only`).
-            self._lbl_estoque.setProperty("role", "atencao")
+            estado_atencao(self._lbl_estoque)
             self._btn_estoque.setVisible(True)
         else:
             self._lbl_estoque.setText("✓ Nenhum item abaixo do mínimo")
-            self._lbl_estoque.setProperty("role", "success")
+            estado_sucesso(self._lbl_estoque)
             self._btn_estoque.setVisible(False)
         self._lbl_estoque.setAccessibleName(self._lbl_estoque.text())
-        aplicar_estilo(self._lbl_estoque)
 
     def _aplicar_entregas(self, entregas) -> None:
         self._lista_entregas.clear()
@@ -547,7 +558,7 @@ class PaginaInicial(QWidget):
             barra.setAccessibleName(f"{rotulo} {dia_txt}: {valor_txt}")
             barra.setToolTip(f"{rotulo} · {dia_txt} · {valor_txt}")
             dia = QLabel(dia_txt)
-            dia.setProperty("role", "muted")
+            estado_muted(dia)
             dia.setAlignment(Qt.AlignmentFlag.AlignCenter)
             col.addWidget(barra, 1)
             col.addWidget(dia)
@@ -583,10 +594,9 @@ class PaginaInicial(QWidget):
             self._kpi_projetos_valor.setText("—")
             self._kpi_projetos_sub.setText("")
             self._lbl_estoque.setText("Resumo de estoque indisponível no momento.")
-            self._lbl_estoque.setProperty("role", "muted")
+            estado_muted(self._lbl_estoque)
             self._lbl_estoque.setAccessibleName(self._lbl_estoque.text())
             self._btn_estoque.setVisible(False)
-            aplicar_estilo(self._lbl_estoque)
             self._aplicar_entregas([])
 
     # -------------------------------------------------------------- helpers
@@ -748,14 +758,14 @@ class TelaPrincipal(QMainWindow):
         linha.addWidget(marca)
 
         self._lbl_filial = QLabel(self._usuario.get("filial_nome", ""))
-        self._lbl_filial.setProperty("role", "muted")
+        estado_muted(self._lbl_filial)
         linha.addWidget(self._lbl_filial)
 
         # Indicador do servidor local — mostra IP no texto (necessário para redes locais
         # de pequenas gráficas que não têm IP dedicado).
         server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
         self._lbl_servidor = QLabel(f"● {server_ip}")
-        self._lbl_servidor.setProperty("role", "muted")
+        estado_muted(self._lbl_servidor)
         self._lbl_servidor.setToolTip(f"Servidor local: {self._base_url}")
         linha.addWidget(self._lbl_servidor)
         linha.addStretch(1)
@@ -779,7 +789,7 @@ class TelaPrincipal(QMainWindow):
         linha.addWidget(self._btn_prefs)
 
         self._lbl_licenca = QPushButton("● Licença")
-        self._lbl_licenca.setProperty("role", "atencao")
+        estado_atencao(self._lbl_licenca)
         self._lbl_licenca.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lbl_licenca.setToolTip("Situação da licença")
         self._lbl_licenca.clicked.connect(self._abrir_licenca)
@@ -993,7 +1003,7 @@ class TelaPrincipal(QMainWindow):
         linha.addWidget(self._lbl_tol)
 
         self._lbl_tol_restante = QLabel("")
-        self._lbl_tol_restante.setProperty("role", "atencao")
+        estado_atencao(self._lbl_tol_restante)
         linha.addWidget(self._lbl_tol_restante)
 
         self._barra_tol = QProgressBar()
@@ -1114,7 +1124,7 @@ class TelaPrincipal(QMainWindow):
         linha.setSpacing(14)
 
         self._lbl_relogio = QLabel(datetime.now().strftime("%H:%M:%S"))
-        self._lbl_relogio.setProperty("role", "muted")
+        estado_muted(self._lbl_relogio)
         linha.addWidget(self._lbl_relogio)
         self._timer_relogio = QTimer(self)
         self._timer_relogio.setInterval(1000)
@@ -1122,17 +1132,17 @@ class TelaPrincipal(QMainWindow):
         self._timer_relogio.start()
 
         host = QLabel(socket.gethostname())
-        host.setProperty("role", "muted")
+        estado_muted(host)
         linha.addWidget(host)
 
         # Servidor: IP/Porta do servidor (extraído de base_url)
         server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
         server_label = QLabel(f"  · Servidor: {server_ip}")
-        server_label.setProperty("role", "muted")
+        estado_muted(server_label)
         linha.addWidget(server_label)
 
         self._lbl_conexao = QLabel("● —")
-        self._lbl_conexao.setProperty("role", "muted")
+        estado_muted(self._lbl_conexao)
         linha.addWidget(self._lbl_conexao)
         # A Tela Início já consulta /health ao abrir; o rodapé reaproveita o
         # resultado em vez de disparar uma 2ª chamada no arranque.
@@ -1144,11 +1154,11 @@ class TelaPrincipal(QMainWindow):
             ("F5", "PDV"),
         ]:
             hint = QLabel(f"[{kbd}] {texto}")
-            hint.setProperty("role", "muted")
+            estado_muted(hint)
             linha.addWidget(hint)
         linha.addStretch(1)
         versao = QLabel(f"v{__version__}")
-        versao.setProperty("role", "muted")
+        estado_muted(versao)
         linha.addWidget(versao)
 
         self._timer_conexao = QTimer(self)
@@ -1171,10 +1181,12 @@ class TelaPrincipal(QMainWindow):
 
     def _pintar_conexao(self, ok: bool) -> None:
         self._lbl_conexao.setText("● online" if ok else "○ offline")
-        self._lbl_conexao.setProperty("role", "success" if ok else "error")
-        aplicar_estilo(self._lbl_conexao)
-        self._lbl_servidor.setProperty("role", "success" if ok else "error")
-        aplicar_estilo(self._lbl_servidor)
+        if ok:
+            estado_sucesso(self._lbl_conexao)
+            estado_sucesso(self._lbl_servidor)
+        else:
+            estado_erro(self._lbl_conexao)
+            estado_erro(self._lbl_servidor)
 
     # ------------------------------------------------------------ navegação
 

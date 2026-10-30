@@ -531,6 +531,27 @@ class Api:
         except httpx.HTTPError:
             return False
 
+    def verificar_atualizacao(self, versao_atual: str) -> dict | None:
+        """Verifica se existe atualização disponível: `GET /v1/atualizacao/verificar`.
+        
+        Retorna None se estiver atualizado, ou dict com:
+        - versao_nova: str
+        - download_url: str  
+        - revisoes: list[str]
+        - data: str
+        """
+        tipo = "estacao" if modo_estacao() else "servidor"
+        resp = self._cliente.get(
+            f"/v1/atualizacao/verificar?versao={versao_atual}&tipo={tipo}",
+            timeout=5.0,
+        )
+        if resp.status_code != 200:
+            return None
+        dados = resp.json()
+        if dados.get("atualizado"):
+            return None
+        return dados.get("data")
+
     def resumo_dashboard(self, dias: int = 7) -> dict:
         """KPIs da Tela Inicial: `GET /v1/dashboard/resumo?dias=`."""
         return self._get("/v1/dashboard/resumo", self._token, params={"dias": dias})
