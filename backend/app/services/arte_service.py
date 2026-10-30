@@ -77,6 +77,9 @@ def enviar_versao(
     _validar_arquivo(arquivo.filename or "sem-nome", len(conteudo))
     hash_sha256 = hashlib.sha256(conteudo).hexdigest()
 
+    # M3: sanitize filename to prevent path traversal
+    nome_arquivo = Path(arquivo.filename or f"versao_{os_id}").name
+    
     ultima = (
         db.query(ArteVersao)
         .filter(ArteVersao.os_id == os_id)
@@ -85,16 +88,16 @@ def enviar_versao(
     )
     proxima = (ultima.versao + 1) if ultima else 1
 
-    # grava no disco
+    # grava no disco - nome_arquivo sanitized for safety
     pasta = _pasta_uploads(os_id)
-    destino = pasta / f"v{proxima}_{arquivo.filename}"
+    destino = pasta / f"v{proxima}_{nome_arquivo}"
     destino.write_bytes(conteudo)
 
     versao = ArteVersao(
         filial_id=filial_id,
         os_id=os_id,
         versao=proxima,
-        nome_arquivo=arquivo.filename or f"versao_{proxima}",
+        nome_arquivo=nome_arquivo,  # safe filename for display
         caminho=str(destino),
         hash_sha256=hash_sha256,
         tamanho_bytes=len(conteudo),
