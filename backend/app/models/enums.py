@@ -86,6 +86,13 @@ class TipoLinkPublico(StrEnum):
     ORCAMENTO = "orcamento"
 
 
+class RefacaoErro(StrEnum):
+    """M3 (PRD v3.0 §3.10): de quem foi o erro na refação."""
+
+    GRAFICA = "grafica"
+    CLIENTE = "cliente"
+
+
 class StatusOs(StrEnum):
     ABERTO = "aberto"
     AGUARDANDO_ARTE = "aguardando_arte"  # M3 (§3.5): aguardando arte do cliente
