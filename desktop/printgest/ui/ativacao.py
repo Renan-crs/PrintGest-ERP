@@ -46,6 +46,10 @@ from printgest.ui.widgets import (
     aplicar_estilo,
     formatar_datahora,
     marca_printgest,
+    estado_sucesso,
+    estado_erro,
+    estado_muted,
+    estado_secundario,
 )
 
 _FORMATO_CHAVE = re.compile(r"^[0-9A-F]{4}(-[0-9A-F]{4}){3}$")
@@ -443,9 +447,9 @@ class AtivacaoWindow(QMainWindow):
         b.setMinimumHeight(40)  # A1: alvo de toque >= 40 px
         b.setAccessibleName(texto)
         if plano == "primary":
-            b.setProperty("role", "primary")
+            estado_primario(b)
         elif plano == "secondary":
-            b.setProperty("role", "secondary")
+            estado_secundario(b)
         else:
             b.setObjectName("botaoFlat")
         return b
@@ -600,23 +604,22 @@ class AtivacaoWindow(QMainWindow):
     def _testar(self) -> None:
         self._botao_testar.setEnabled(False)
         self._status.setText("Servidor local: testando…")
-        self._status.setProperty("role", "")
         aplicar_estilo(self._status)
 
         def ok(resultado) -> None:
             self._botao_testar.setEnabled(True)
             if resultado:
                 self._status.setText("Servidor local: conectado")
-                self._status.setProperty("role", "success")
+                estado_sucesso(self._status)
             else:
                 self._status.setText("Servidor local: sem resposta")
-                self._status.setProperty("role", "error")
+                estado_erro(self._status)
             aplicar_estilo(self._status)
 
         def erro(_) -> None:
             self._botao_testar.setEnabled(True)
             self._status.setText("Servidor local: sem resposta")
-            self._status.setProperty("role", "error")
+            estado_erro(self._status)
             aplicar_estilo(self._status)
 
         rodar(self._api.testar_comunicacao, ok, erro)
