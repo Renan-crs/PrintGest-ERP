@@ -37,16 +37,16 @@
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor**: `PrintGest-Setup-0.3.2.exe` (80 MB)
-   - **Estação**: `PrintGest-Setup-0.3.2Estacao.exe` (38 MB)
+   - **Servidor**: `PrintGest-Setup-0.3.3.exe` (77.7 MB)
+   - **Estação**: `PrintGest-Setup-0.3.3Estacao.exe` (37.9 MB)
 
 2. Execute o instalador:
    ```powershell
    # Instalação padrão (Servidor)
-   PrintGest-Setup-0.3.2.exe
+   PrintGest-Setup-0.3.3.exe
    
    # Instalação Estação (aponta para servidor existente)
-   PrintGest-Setup-0.3.2Estacao.exe
+   PrintGest-Setup-0.3.3Estacao.exe
    ```
 
 3. Siga o assistente e informe a licença RedGest
@@ -189,6 +189,7 @@ Para questões de licenciamento, entre em contato com o provedor RedGest.
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| **0.3.3** | 31/10/2026 | Sessão persistente, maximização, fix WinError 10061 |
 | **0.3.2** | 31/10/2026 | Refatoração de UI, sistema de atualização |
 | **0.3.1** | 30/10/2026 | Sistema de atualização, helpers de UI |
 | **0.3.0** | 27/10/2026 | Projetos Kanban, PDV, Ativação |
