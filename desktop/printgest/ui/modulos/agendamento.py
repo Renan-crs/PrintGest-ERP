@@ -47,7 +47,16 @@ from printgest.ui.formulario import (
 )
 from printgest.ui.paginador import Paginador
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import ElideLabel, FlowLayout, aplicar_estilo, badge, botao_com_atalho
+from printgest.ui.widgets import (
+    ElideLabel,
+    FlowLayout,
+    aplicar_estilo,
+    badge,
+    botao_com_atalho,
+    estado_sucesso,
+    estado_erro,
+    estado_muted,
+)
 
 _TIPOS = [("producao", "Produção"), ("entrega", "Entrega")]
 _STATUS = [
@@ -95,7 +104,8 @@ class CelulaDia(QWidget):
         linha = QHBoxLayout(topo)
         linha.setContentsMargins(0, 0, 0, 0)
         self._numero = QLabel(str(dia.day()))
-        self._numero.setProperty("role", "muted" if no_mes else "")
+        if no_mes:
+            estado_muted(self._numero)
         linha.addWidget(self._numero, 1)
         layout.addWidget(topo)
 
@@ -120,7 +130,7 @@ class CelulaDia(QWidget):
             self._chips_layout.addWidget(self._chip(dado))
         if len(compromissos) > 2:
             mais = QLabel(f"+{len(compromissos) - 2} mais")
-            mais.setProperty("role", "muted")
+            estado_muted(mais)
             self._chips_layout.addWidget(mais)
 
     def _chip(self, dado: dict) -> QPushButton:
@@ -174,7 +184,7 @@ class CalendarioMes(QWidget):
         self._grade.setVerticalSpacing(2)
         for col, rotulo in enumerate(_DIAS_SEMANA):
             cab = QLabel(rotulo)
-            cab.setProperty("role", "muted")
+            estado_muted(cab)
             cab.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._grade.addWidget(cab, 0, col)
         for i in range(42):
@@ -204,7 +214,7 @@ class CalendarioMes(QWidget):
         self._proximo.setFixedWidth(28)
         self._proximo.clicked.connect(lambda: self._mudar_mes(+1))
         self._rotulo = QLabel("")
-        self._rotulo.setProperty("role", "subtitulo")
+        estado_muted(self._rotulo)
         self._rotulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._rotulo.setMinimumWidth(0)
         hoje = QPushButton("Hoje")
@@ -430,9 +440,9 @@ class PaginaAgendamento(QWidget):
 
     def _painel_dia(self) -> QWidget:
         caixa = QWidget()
-        caixa.setProperty("role", "painelDia")
+        aplicar_estilo(caixa)
         self._rotulo_dia = QLabel("")
-        self._rotulo_dia.setProperty("role", "subtitulo")
+        estado_muted(self._rotulo_dia)
         layout = QVBoxLayout(caixa)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
@@ -489,7 +499,7 @@ class PaginaAgendamento(QWidget):
         compromissos.sort(key=lambda c: c.get("data_hora_inicio") or "")
         if not compromissos:
             vazio = QLabel("Neste dia não há compromissos.")
-            vazio.setProperty("role", "muted")
+            estado_muted(vazio)
             self._lista_dia_layout.addWidget(vazio)
         for dado in compromissos:
             self._lista_dia_layout.addWidget(self._cartao_dia(dado))
@@ -659,10 +669,10 @@ class PaginaAgendamento(QWidget):
         rl.setContentsMargins(16, 10, 16, 10)
         rl.addStretch(1)
         self._btn_concluir = QPushButton("Concluir")
-        self._btn_concluir.setProperty("role", "success")
+        estado_sucesso(self._btn_concluir)
         self._btn_concluir.clicked.connect(self._concluir)
         self._btn_excluir = QPushButton("Excluir")
-        self._btn_excluir.setProperty("role", "erro")
+        estado_erro(self._btn_excluir)
         self._btn_excluir.clicked.connect(self._excluir)
         cancelar, self._btn_cancelar = botao_com_atalho("Cancelar", "Esc")
         salvar, self._btn_salvar = botao_com_atalho("Salvar Alterações", "F10", "primary")

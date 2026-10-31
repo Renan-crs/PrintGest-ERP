@@ -49,7 +49,16 @@ from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, botao_com_atalho, formatar_datahora
+from printgest.ui.widgets import (
+    aplicar_estilo,
+    botao_com_atalho,
+    estado_sucesso,
+    estado_erro,
+    estado_muted,
+    estado_atencao,
+    estado_primario,
+    estado_danger,
+)
 
 
 # ------------------------------------------------------- diálogo de cotações
@@ -93,7 +102,7 @@ class DialogoCotacoes(QDialog):
 
         # --- comparativo
         self._lbl_estado = QLabel("Carregando…")
-        self._lbl_estado.setProperty("role", "muted")
+        estado_muted(self._lbl_estado)
         root.addWidget(self._lbl_estado)
 
         self._tabela = TabelaDensa(_COTACAO_CHAVES, _COTACAO_ROTULOS)
@@ -103,7 +112,7 @@ class DialogoCotacoes(QDialog):
         # --- snapshot do cálculo (visível só com permissão)
         self._lbl_snapshot = QLabel("")
         self._lbl_snapshot.setWordWrap(True)
-        self._lbl_snapshot.setProperty("role", "muted")
+        estado_muted(self._lbl_snapshot)
         root.addWidget(self._lbl_snapshot)
 
         # --- formulário de lançamento
@@ -142,7 +151,7 @@ class DialogoCotacoes(QDialog):
         botoes = QHBoxLayout()
         botoes.setSpacing(8)
         self._btn_lancar = QPushButton("Lançar cotação")
-        self._btn_lancar.setProperty("role", "primary")
+        estado_primario(self._btn_lancar)
         self._btn_lancar.clicked.connect(self._lancar)
         botoes.addWidget(self._btn_lancar)
 
@@ -206,12 +215,13 @@ class DialogoCotacoes(QDialog):
         # estado do item
         if estado == "cotado":
             self._lbl_estado.setText("✓ Item cotado — cotação selecionada define o valor.")
-            self._lbl_estado.setProperty("role", "success")
+            estado_sucesso(self._lbl_estado)
         elif estado == "aguardando":
             self._lbl_estado.setText("⚠ Item aguardando cotação — selecione uma para aprovar.")
-            self._lbl_estado.setProperty("role", "atencao")
+            estado_atencao(self._lbl_estado)
         else:
             self._lbl_estado.setText("")
+            estado_muted(self._lbl_estado)
         aplicar_estilo(self._lbl_estado)
 
         # tabela
@@ -235,9 +245,10 @@ class DialogoCotacoes(QDialog):
                 f"CP: R$ {selecionado.get('cp', '?')} (interno)  ·  "
                 f"VO: R$ {selecionado.get('vo', '?')}  ← valor do item"
             )
-            self._lbl_snapshot.setProperty("role", "muted")
+            estado_muted(self._lbl_snapshot)
         else:
             self._lbl_snapshot.setText("")
+            estado_muted(self._lbl_snapshot)
         aplicar_estilo(self._lbl_snapshot)
 
         self._btn_selecionar.setEnabled(bool(self._cotacoes))
@@ -397,7 +408,7 @@ class DialogoArte(QDialog):
 
         # --- estado derivado (§3.5)
         self._lbl_estado = QLabel("Carregando…")
-        self._lbl_estado.setProperty("role", "muted")
+        estado_muted(self._lbl_estado)
         root.addWidget(self._lbl_estado)
 
         # --- versões
@@ -410,7 +421,7 @@ class DialogoArte(QDialog):
         botoes.setSpacing(8)
 
         self._btn_enviar = QPushButton("Enviar nova versão…")
-        self._btn_enviar.setProperty("role", "primary")
+        estado_primario(self._btn_enviar)
         self._btn_enviar.clicked.connect(self._enviar)
         botoes.addWidget(self._btn_enviar)
 
@@ -450,7 +461,16 @@ class DialogoArte(QDialog):
 
         texto, role = _ARTE_ESTADOS.get(estado, (estado, "muted"))
         self._lbl_estado.setText(texto)
-        self._lbl_estado.setProperty("role", role)
+        if role == "muted":
+            estado_muted(self._lbl_estado)
+        elif role == "success":
+            estado_sucesso(self._lbl_estado)
+        elif role == "atencao":
+            estado_atencao(self._lbl_estado)
+        elif role == "error":
+            estado_erro(self._lbl_estado)
+        else:
+            aplicar_estilo(self._lbl_estado)
         aplicar_estilo(self._lbl_estado)
 
         linhas = []

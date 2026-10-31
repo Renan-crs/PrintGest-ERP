@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from printgest.ui.widgets import ElideLabel
+from printgest.ui.widgets import ElideLabel, estado_muted
 
 LOTE = 50
 
@@ -24,7 +24,7 @@ class Paginador(QWidget):
         layout.setSpacing(12)
 
         self._info = ElideLabel()
-        self._info.setProperty("role", "muted")
+        estado_muted(self._info)
         layout.addWidget(self._info, 1)
 
         self._primeira = self._botao("|‹")
