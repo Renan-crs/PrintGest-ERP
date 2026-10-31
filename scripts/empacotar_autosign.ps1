@@ -1,5 +1,5 @@
 # Empacota o PrintGest ERP com assinatura auto-assinada
-# Útil para testes internos e ambientes sem certificado pago.
+# Util para testes internos e ambientes sem certificado pago.
 #
 # Uso:
 #   powershell -ExecutionPolicy Bypass -File scripts\empacotar_autosign.ps1
@@ -32,12 +32,12 @@ Write-Host "[2/4] Empacotando com assinatura..."
 try {
     & "$raiz/scripts/empacotar.ps1" -Saida $Saida -Modo $Modo -Assinar $thumbprint
     Write-Host ""
-    Write-Host "✓ Instalador criado com assinatura auto-assinada!"
+    Write-Host "OK: Instalador criado com assinatura auto-assinada!"
     Write-Host ""
-    Write-Host "NOTA: O Windows SmartScreen ainda pode mostrar aviso na primeira execução."
-    Write-Host "Isso é normal para certificados auto-assinados."
+    Write-Host "NOTA: O Windows SmartScreen ainda pode mostrar aviso na primeira execucao."
+    Write-Host "Isso e normal para certificados auto-assinados."
     Write-Host ""
-    Write-Host "Para evitar avisos no futuro, adquira um certificado de código real."
+    Write-Host "Para evitar avisos no futuro, adquira um certificado de codigo real."
     Write-Host ""
 } catch {
     Write-Host "ERRO durante o empacotamento: $_" -ForegroundColor Red
