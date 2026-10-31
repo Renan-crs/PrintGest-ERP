@@ -37,7 +37,7 @@
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor**: `PrintGest-Setup-0.3.4.exe` (78.1 MB)
+   - **Servidor**: `PrintGest-Setup-0.3.4.exe` (75.9 MB)
    - **Estação**: `PrintGest-Setup-0.3.4Estacao.exe` (37.9 MB)
 
 2. Execute o instalador:
