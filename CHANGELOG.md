@@ -9,6 +9,18 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.3.4] - 2026-11-01 · Melhorias de sessão e estabilidade
+
+### Novos Recursos
+- **Timeout de sessão:** sessão expira após 8 horas de inatividade
+- **Validação de integridade:** hash SHA-256 protege contra alterações na sessão
+- **Melhor tratamento de WinError 10061:** sessão salva aguarda daemon estar pronto antes de conectar
+
+### Corrigido
+- WinError 10061: sessão persistente aguarda verificação de saúde do daemon antes de restaurar conexão
+
+---
+
 ## [0.3.3] - 2026-11-01 · Sessão persistente e maximização
 
 ### Novos Recursos
