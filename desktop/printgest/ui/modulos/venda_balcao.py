@@ -54,7 +54,7 @@ from printgest.ui.formulario import (
 from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.paginador import LOTE, Paginador
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, botao_com_atalho
+from printgest.ui.widgets import aplicar_estilo, botao_com_atalho, estado_sucesso, estado_erro, estado_muted, estado_atencao, estado_danger
 
 # Formas que aceitam parcelamento (mostram o campo "Parcelas").
 _FORMAS_PARCELAVEIS = {"cartao_credito", "boleto", "fiado"}
@@ -177,7 +177,7 @@ class EditorItensVenda(QWidget):
         linha.addWidget(self._qtd_add)
 
         self._btn_adicionar = QPushButton("Adicionar")
-        self._btn_adicionar.setProperty("role", "primary")
+        estado_primario(self._btn_adicionar)
         self._btn_adicionar.clicked.connect(self._adicionar_pela_busca)
         linha.addWidget(self._btn_adicionar)
 
@@ -702,7 +702,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         h.addWidget(titulo)
         h.addStretch(1)
         self._lbl_resumo_itens = QLabel("0 itens")
-        self._lbl_resumo_itens.setProperty("role", "muted")
+        estado_muted(self._lbl_resumo_itens)
         h.addWidget(self._lbl_resumo_itens)
         col_e.addWidget(cabeca)
 
@@ -781,7 +781,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._lbl_troco_rotulo.setObjectName("labelForm")
         col.addWidget(self._lbl_troco_rotulo)
         self._lbl_troco = QLabel("R$ 0,00")
-        self._lbl_troco.setProperty("role", "success")
+        estado_sucesso(self._lbl_troco)
         col.addWidget(self._lbl_troco)
         return caixa
 
@@ -794,9 +794,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
         linha = QHBoxLayout()
         rotulo = QLabel("Subtotal")
-        rotulo.setProperty("role", "muted")
+        estado_muted(rotulo)
         self._lbl_subtotal = QLabel("R$ 0,00")
-        self._lbl_subtotal.setProperty("role", "muted")
+        estado_muted(self._lbl_subtotal)
         linha.addWidget(rotulo)
         linha.addStretch(1)
         linha.addWidget(self._lbl_subtotal)
@@ -804,9 +804,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
         linha_desc = QHBoxLayout()
         rotulo_desc = QLabel("Desconto")
-        rotulo_desc.setProperty("role", "muted")
+        estado_muted(rotulo_desc)
         self._lbl_desconto_totais = QLabel("R$ 0,00")
-        self._lbl_desconto_totais.setProperty("role", "muted")
+        estado_muted(self._lbl_desconto_totais)
         linha_desc.addWidget(rotulo_desc)
         linha_desc.addStretch(1)
         linha_desc.addWidget(self._lbl_desconto_totais)
@@ -891,7 +891,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
         self._vazio = QLabel("Nenhuma venda encontrada. Clique em Nova venda (F6).")
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._vazio.setProperty("role", "muted")
+        estado_muted(self._vazio)
         self._vazio.setWordWrap(True)
 
         self._pilha_lista = QStackedWidget()
@@ -959,11 +959,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             # Dinheiro entregue não cobre o total (revisão nº 7): aviso claro.
             self._lbl_troco_rotulo.setText("FALTA")
             self._lbl_troco.setText(formatar_moeda(str(-troco)))
-            self._lbl_troco.setProperty("role", "atencao")
+            estado_atencao(self._lbl_troco)
         else:
             self._lbl_troco_rotulo.setText("TROCO")
             self._lbl_troco.setText(formatar_moeda(str(troco if troco > 0 else 0)))
-            self._lbl_troco.setProperty("role", "success")
+            estado_sucesso(self._lbl_troco)
         aplicar_estilo(self._lbl_troco)
 
     def _atualizar_estado_finalizar(self) -> None:
@@ -1065,7 +1065,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             if dado.get("status") == "ok" and not self._modo_leitura:
                 botao = QPushButton("Cancelar")
                 botao.setObjectName("acaoLinha")
-                botao.setProperty("role", "danger")
+                estado_danger(botao)
                 botao.clicked.connect(
                     lambda _=False, alvo=dado: self._cancelar_venda(alvo)
                 )
@@ -1073,7 +1073,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             else:
                 vazio = QLabel("—")
                 vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                vazio.setProperty("role", "muted")
+                estado_muted(vazio)
                 self._tabela.setCellWidget(linha, coluna, vazio)
             for c in range(len(self.CHAVES)):
                 item = self._tabela.item(linha, c)
@@ -1258,7 +1258,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.setContentsMargins(12, 8, 12, 8)
         linha.setSpacing(10)
         rotulo = QLabel("Caixa fechado — abra o caixa antes de registrar vendas.")
-        rotulo.setProperty("role", "atencao")
+        estado_atencao(rotulo)
         linha.addWidget(rotulo, 1)
         botao = QPushButton("Abrir caixa")
         botao.setObjectName("acaoLinha")
