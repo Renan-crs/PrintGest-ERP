@@ -46,7 +46,7 @@ Os changelogs oficiais estão em [CHANGELOG.md](CHANGELOG.md).
 
 | Versão | Servidor | Estação |
 |--------|----------|---------|
-| 0.3.4 | 78.1 MB | 37.9 MB |
+| 0.3.4 | 75.9 MB | 37.9 MB |
 | 0.3.3 | 77.7 MB | 37.9 MB |
 | 0.3.2 | 77.7 MB | 37.9 MB |
 
