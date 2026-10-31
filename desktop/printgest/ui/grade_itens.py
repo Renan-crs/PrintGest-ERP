@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core import catalogos
 from printgest.core.api import Api
+from printgest.ui.widgets import estado_muted, estado_primario
 from printgest.ui.formulario import CampoValor, formatar_moeda, para_decimal
 from printgest.ui.tabela import TabelaDensa
 
@@ -67,7 +68,7 @@ class GradeItens(QWidget):
         layout.addWidget(self._barra_editor())
 
         self._resumo = QLabel("0 itens • Subtotal: R$ 0,00")
-        self._resumo.setProperty("role", "muted")
+        estado_muted(self._resumo)
         layout.addWidget(self._resumo)
 
         if api is not None:
@@ -131,7 +132,7 @@ class GradeItens(QWidget):
         linha2.addWidget(self._desconto)
 
         botao = QPushButton("Adicionar")
-        botao.setProperty("role", "primary")
+        estado_primario(botao)
         botao.clicked.connect(self._adicionar)
         botao.setMinimumWidth(100)
         linha2.addWidget(botao)

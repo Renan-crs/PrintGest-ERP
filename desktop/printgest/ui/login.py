@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from printgest import APP_NAME, __version__
 from printgest.core.api import Api
 from printgest.core.tarefas import rodar
-from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho
+from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho, estado_sucesso, estado_erro, estado_muted
 
 TITULO = "Acesso ao Sistema"
 
@@ -51,7 +51,7 @@ class LoginWindow(QMainWindow):
         linha_top.addWidget(badge(f"Build {__version__}", "primary"))
         linha_top.addStretch(1)
         daemon = QLabel("Local API Service: 127.0.0.1:8000")
-        daemon.setProperty("role", "muted")
+        estado_muted(daemon)
         linha_top.addWidget(daemon)
         cabeçalho.addLayout(linha_top)
 
@@ -64,7 +64,7 @@ class LoginWindow(QMainWindow):
         card_layout.addLayout(cabeçalho)
 
         self._erro = QLabel("")
-        self._erro.setProperty("role", "error")
+        estado_erro(self._erro)
         self._erro.setWordWrap(True)
         card_layout.addWidget(self._erro)
 
@@ -77,7 +77,7 @@ class LoginWindow(QMainWindow):
         self._campo_senha.returnPressed.connect(self._tentar_login)
 
         self._status = QLabel("")
-        self._status.setProperty("role", "muted")
+        estado_muted(self._status)
         card_layout.addWidget(self._status)
 
         card_layout.addSpacing(4)
@@ -94,7 +94,7 @@ class LoginWindow(QMainWindow):
         card_layout.addLayout(acoes)
 
         matricula = QLabel("Entre com as credenciais fornecidas pela gerência.")
-        matricula.setProperty("role", "muted")
+        estado_muted(matricula)
         matricula.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(matricula)
 
@@ -132,13 +132,11 @@ class LoginWindow(QMainWindow):
 
         def ok(_) -> None:
             self._status.setText("● Local API Service respondendo (online)")
-            self._status.setProperty("role", "success")
-            aplicar_estilo(self._status)
+            estado_sucesso(self._status)
 
         def erro(msg: str) -> None:
             self._status.setText("● Local API Service sem resposta — verifique o daemon")
-            self._status.setProperty("role", "error")
-            aplicar_estilo(self._status)
+            estado_erro(self._status)
 
         rodar(checar, ok, erro)
 
@@ -171,6 +169,6 @@ class LoginWindow(QMainWindow):
     def _bloquear_form(self, bloqueado: bool) -> None:
         self._botao_entrar.setEnabled(not bloqueado)
         if bloqueado:
-            self._erro.setProperty("role", "error")
+            estado_erro(self._erro)
             self._erro.setText("Autenticando…")
             aplicar_estilo(self._erro)

@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core.api import Api, base_url_padrao
 from printgest.core.tarefas import rodar
-from printgest.ui.widgets import EtiquetaQuebra, aplicar_estilo, marca_printgest
+from printgest.ui.widgets import EtiquetaQuebra, aplicar_estilo, marca_printgest, estado_sucesso, estado_erro, estado_primario, estado_secundario
 
 _CHAVE_ENDERECO = "servidor/endereco"
 
@@ -176,9 +176,9 @@ class ConexaoWindow(QMainWindow):
         b.setMinimumHeight(40)
         b.setAccessibleName(texto)
         if plano == "primary":
-            b.setProperty("role", "primary")
+            estado_primario(b)
         elif plano == "secondary":
-            b.setProperty("role", "secondary")
+            estado_secundario(b)
         else:
             b.setObjectName("botaoFlat")
         return b
@@ -220,23 +220,22 @@ class ConexaoWindow(QMainWindow):
             return
         self._botao_testar.setEnabled(False)
         self._status.setText("Servidor: testando…")
-        self._status.setProperty("role", "")
         aplicar_estilo(self._status)
 
         def ok(resultado) -> None:
             self._botao_testar.setEnabled(True)
             if resultado:
                 self._status.setText("Servidor: conectado")
-                self._status.setProperty("role", "success")
+                estado_sucesso(self._status)
             else:
                 self._status.setText("Servidor: sem resposta")
-                self._status.setProperty("role", "error")
+                estado_erro(self._status)
             aplicar_estilo(self._status)
 
         def erro(_) -> None:
             self._botao_testar.setEnabled(True)
             self._status.setText("Servidor: sem resposta")
-            self._status.setProperty("role", "error")
+            estado_erro(self._status)
             aplicar_estilo(self._status)
 
         endereco = normalizar_endereco(self._campo.text())
@@ -266,7 +265,7 @@ class ConexaoWindow(QMainWindow):
             self._botao_conectar.setText("Conectar (F10)")
             if not resultado:
                 self._status.setText("Servidor: sem resposta")
-                self._status.setProperty("role", "error")
+                estado_erro(self._status)
                 aplicar_estilo(self._status)
                 self._erro.setText(
                     "Não foi possível conectar — confira o endereço e se o "
@@ -285,7 +284,7 @@ class ConexaoWindow(QMainWindow):
             self._botao_conectar.setEnabled(True)
             self._botao_conectar.setText("Conectar (F10)")
             self._status.setText("Servidor: sem resposta")
-            self._status.setProperty("role", "error")
+            estado_erro(self._status)
             aplicar_estilo(self._status)
             self._erro.setText(msg)
 
