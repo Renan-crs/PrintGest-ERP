@@ -9,7 +9,7 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
-## [0.3.1] - 2026-10-30 · Sistema de atualização, helpers de UI, refatoração
+## [0.3.2] - 2026-11-01 · Refatoração de UI e consolidação
 
 ### Novos Recursos
 - **Sistema de notificação de atualização (M3 §3.11):** widget `NotificacaoAtualizacao`
