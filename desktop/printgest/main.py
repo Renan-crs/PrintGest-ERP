@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from printgest import APP_NAME, __version__
 from printgest.core import daemon
 from printgest.core.api import Api, modo_estacao
+from printgest.core.sessao import carregar_sessao, salvar_sessao, limpar_sessao
 from printgest.core.tarefas import rodar
 from printgest.ui.ativacao import AtivacaoWindow
 from printgest.ui.conexao import ConexaoWindow
@@ -77,7 +78,7 @@ def _erro_inesperado(tipo: type, valor: BaseException, tb) -> None:
 
 class _Roteador:
     """Fluxo de entrada (§3.1): Licença (serial) → Login → Dashboard.
-
+    
     Como em programas licenciados por serial, a ativação é pedida **na
     instalação**: na primeira execução, sem licença local, a tela de ativação
     aparece antes do login e o sistema só é liberado depois de validar o serial.
@@ -91,6 +92,10 @@ class _Roteador:
 
     Com `PRINTGEST_LICENCA_DESABILITADA=true`, a etapa de licença é pulada e o
     login abre direto o sistema (desenvolvimento).
+    
+    **Sessão Persistente:** Quando há sessão salva localmente (após login
+    anterior), o sistema pode abrir diretamente no dashboard sem repetir o
+    login, exceto quando o usuário fizer logout ou o computador for reiniciado.
     """
 
     def __init__(self, api: Api, estacao: bool = False) -> None:
@@ -99,13 +104,61 @@ class _Roteador:
         self._janela: QWidget | None = None
         self._licenca_desabilitada = _licenca_desabilitada()
         self._estacao = estacao
+        self._sessao_salva = False  # Flag para controlar se vem de sessão salva
 
     def iniciar(self) -> None:
-        """Ponto de entrada: o serial precede o login (gate de instalação)."""
+        """Ponto de entrada: o serial precede o login (gate de instalação).
+        
+        Verifica primeiro se há sessão salva localmente (não expira entre
+        reinicializações). Se houver, tenta restaurar a sessão antes de pedir
+        login novamente.
+        """
+        # Primeiro verifica se há sessão salva (sessão persiste entre reinicições)
+        if not self._licenca_desabilitada and not self._estacao:
+            sessao = carregar_sessao()
+            if sessao:
+                self._sessao_salva = True
+                self._token = sessao["token"]
+                self._api.autenticar({**sessao["usuario"], "token": sessao["token"]})
+                # Verifica rapidamente se a sessão ainda é válida
+                rodar(
+                    lambda: self._api.situacao_licenca(self._token),
+                    on_ok=self._situacao_com_sessao,
+                    on_erro=self._sessao_invalida,
+                )
+                return
+        
+        # Fluxo normal (sem sessão salva ou modo desenvolvimento)
         if self._licenca_desabilitada or self._estacao:
             self._abrir_login()
             return
         self._verificar_licenca()
+    
+    def _situacao_com_sessao(self, sit: dict) -> None:
+        """Trata a situação quando a sessão foi restaurada com sucesso."""
+        status = sit["status"]
+        if status == "nao_ativada":
+            # Licença foi revogada ou reinstalação detectada
+            limpar_sessao()
+            self._abrir_ativacao(sit, token=self._token, apos_ativacao=self._abrir_login)
+        elif sit["modo_leitura"]:
+            self._abrir_modo_leitura(sit)
+        else:
+            self._abrir_dashboard(False, sit=sit)
+    
+    def _sessao_invalida(self, msg: str) -> None:
+        """A sessão salva está expirada ou inválida - limpa e abre login."""
+        limpar_sessao()
+        self._token = None
+        self._sessao_salva = False
+        QMessageBox.information(
+            None, "Sessão encerrada",
+            "Sua sessão expirou ou foi encerrada em outro dispositivo.\n\nPor favor, faça login novamente."
+        )
+        if self._licenca_desabilitada or self._estacao:
+            self._abrir_login()
+        else:
+            self._verificar_licenca()
 
     # ------------------------------------------------------------------ ajuda
 
@@ -117,7 +170,8 @@ class _Roteador:
     def _abrir(self, janela: QWidget) -> None:
         self._fechar_janela()
         self._janela = janela
-        self._janela.show()
+        # Maximizar a janela ao abrir, respeitando a barra do Windows
+        self._janela.showMaximized()
 
     # ---------------------------------------------------------------- licença
 
@@ -154,6 +208,11 @@ class _Roteador:
     def _pos_login(self, dados: dict) -> None:
         self._token = dados["token"]
         self._api.autenticar(dados)
+        
+        # Salvar sessão para persistência entre reinicializações
+        if not self._licenca_desabilitada and not self._estacao:
+            salvar_sessao(dados["token"], dados["usuario"])
+        
         if self._licenca_desabilitada:
             self._abrir_dashboard(False)
             return
@@ -200,6 +259,12 @@ class _Roteador:
             self._abrir_modo_leitura(sit)
         else:
             self._abrir_dashboard(False, sit=sit)
+    
+    def _limpar_e_logout(self) -> None:
+        """Limpa a sessão e abre a tela de login (usado quando usuário sai)."""
+        limpar_sessao()
+        self._sessao_salva = False
+        self._abrir_login()
 
     # ---------------------------------------------------------------- telas
 
@@ -236,7 +301,8 @@ class _Roteador:
             base_url=self._api.base_url_display,
             situacao_licenca=sit,
         )
-        principal.solicitado_logout.connect(lambda: self._abrir_login())
+        # Quando o usuário faz logout, limpar a sessão salva
+        principal.solicitado_logout.connect(self._limpar_e_logout)
         self._abrir(principal)
 
 
@@ -276,15 +342,15 @@ def main() -> None:
 
     if modo_estacao():
         _iniciar_modo_estacao(app)
-        sys.exit(app.exec())
+    else:
+        _preparar_daemon(app)
 
-    _preparar_daemon(app)
+        api = Api()
+        app.aboutToQuit.connect(api.fechar)
 
-    api = Api()
-    app.aboutToQuit.connect(api.fechar)
-
-    roteador = _Roteador(api)
-    roteador.iniciar()
+        roteador = _Roteador(api)
+        roteador.iniciar()
+    
     sys.exit(app.exec())
 
 
@@ -310,6 +376,7 @@ def _iniciar_modo_estacao(app: QApplication) -> None:
     janela.conectado.connect(conectar)
     janela.saida.connect(app.quit)
     janela.show()
+    janela.showMaximized()  # Maximizar a janela de conexão
     _ESTACAO["janela"] = janela  # referência Python viva durante o exec()
 
 
