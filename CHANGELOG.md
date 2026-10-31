@@ -21,6 +21,10 @@ de cada tag está indicado para rastreabilidade.
 - **Helper methods para estados visuais:** novos helpers em `widgets.py`:
   `estado_sucesso()`, `estado_erro()`, `estado_atencao()`, `estado_muted()`,
   `estado_ghost()`, `estado_secundario()`, `estado_primario()`, `aplicar_estado()`.
+- **Sessão persistente:** sessão do usuário não expira entre reinicializações do computador
+  (salva token localmente); sessão é limpa automaticamente quando o usuário clica em "Sair".
+- **Janelas maximizadas:** todas as janelas abrem maximizadas, respeitando a barra do Windows
+  automaticamente.
 
 ### Refatoração
 - **Helpers de UI:** substituição completa de `setProperty("role", ...)` por helpers padronizados em 11 arquivos:
