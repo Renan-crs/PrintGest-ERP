@@ -23,9 +23,15 @@ de cada tag está indicado para rastreabilidade.
   `estado_ghost()`, `estado_secundario()`, `estado_primario()`, `aplicar_estado()`.
 
 ### Refatoração
-- **Helpers de UI:** substituições de `setProperty("role", ...)` por helpers em:
+- **Helpers de UI:** substituição completa de `setProperty("role", ...)` por helpers padronizados em 11 arquivos:
   - `desktop/printgest/ui/tela_principal.py` (22 ocorrências)
-  - Padronização de estados visuais para consistência e manutenibilidade
+  - `desktop/printgest/ui/login.py`, `conexao.py`, `ativacao.py` (22 ocorrências totais)
+  - `desktop/printgest/ui/grade_itens.py`, `venda_balcao.py` (14 ocorrências)
+  - `desktop/printgest/ui/modulos/os.py`, `agendamento.py`, `projetos.py` (21 ocorrências)
+  - `desktop/printgest/ui/modoleitura.py`, `paginador.py`, `kanban.py` (15 ocorrências)
+  - `desktop/printgest/ui/widgets/atualizacao.py` (1 ocorrência)
+- Padronização total de estados visuais para consistência e manutenibilidade
+- **Estado:** 84 ocorrências substituídas em 100% dos arquivos aplicáveis
 
 ### Adicionado
 - **M3 §3.10 — repetir pedido e refação:** endpoints `POST /v1/os/{id}/repetir` e `POST /v1/os/{id}/refacao` com integração de status de OS. Repetir duplica itens e arte aprovada (preços calculados do catálogo). Refação cria OS filha com campos `refacao_motivo`, `refacao_responsavel_id`, `refacao_custo`, `refacao_erro` (Grafica ou Cliente). Tabelas `arte_versao`, `arte_aprovacao`, `link_publico` (migração `b0c1d2e3f4a5`, aditiva e reversível). NFR de arquivos: extensões executáveis bloqueadas (`.exe`, `.bat`, `.dll`, `.js`…), máximo 50 MB, arquivo vazio rejeitado, hash SHA-256 gravado para integridade. 
