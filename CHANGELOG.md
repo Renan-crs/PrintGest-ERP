@@ -9,7 +9,13 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
-## [0.3.2] - 2026-11-01 · Refatoração de UI e consolidação
+## [0.3.3] - 2026-11-01 · Sessão persistente e maximização
+
+### Novos Recursos
+- **Sessão persistente:** sessão do usuário não expira entre reinicializações do computador
+  - Token e dados de usuário são salvos localmente após login
+  - Sessão é limpa automaticamente quando o usuário clica em "Sair"
+- **Janelas maximizadas:** todas as janelas abrem maximizadas, respeitando a barra do Windows automaticamente
 
 ### Novos Recursos
 - **Sistema de notificação de atualização (M3 §3.11):** widget `NotificacaoAtualizacao`
