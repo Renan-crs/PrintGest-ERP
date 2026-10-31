@@ -25,6 +25,9 @@ from printgest.ui.widgets import (
     badge,
     botao_com_atalho,
     formatar_datahora,
+    estado_sucesso,
+    estado_erro,
+    estado_muted,
 )
 
 _PODERES = [
@@ -286,14 +289,14 @@ class ModoLeituraWindow(QMainWindow):
         self._botao_renovar.setEnabled(False)
         self._botao_revalidar.setEnabled(False)
         self._mensagem.setText("Tentando renovar a licença com o RedGest…")
-        self._mensagem.setProperty("role", "muted")
+        estado_muted(self._mensagem)
         aplicar_estilo(self._mensagem)
 
         def chamada():
             return self._api.renovar_licenca(self._token)
 
         def ok(_) -> None:
-            self._mensagem.setProperty("role", "success")
+            estado_sucesso(self._mensagem)
             self._mensagem.setText("Licença renovada! Retornando ao funcionamento normal…")
             aplicar_estilo(self._mensagem)
             self.renovada.emit()
@@ -301,7 +304,7 @@ class ModoLeituraWindow(QMainWindow):
         def erro(msg: str) -> None:
             self._botao_renovar.setEnabled(True)
             self._botao_revalidar.setEnabled(True)
-            self._mensagem.setProperty("role", "error")
+            estado_erro(self._mensagem)
             self._mensagem.setText(
                 f"Não foi possível renovar agora: {msg}. O sistema permanece em modo "
                 "leitura — novas tentativas acontecem automaticamente."
@@ -336,7 +339,7 @@ class ModoLeituraWindow(QMainWindow):
         rodar(self._api.testar_comunicacao, ok, erro)
 
     def _suporte(self) -> None:
-        self._mensagem.setProperty("role", "muted")
+        estado_muted(self._mensagem)
         self._mensagem.setText(
             "Canais de atendimento RedGest: WhatsApp Financeiro e Central 0800 "
             "(Opção 2 — Licenciamento). Consulte o contrato para os canais oficiais."

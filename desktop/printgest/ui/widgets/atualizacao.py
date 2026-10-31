@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon, QPalette, QColor
 
 from printgest import __version__
+from printgest.ui.widgets import estado_muted
 
 
 class NotificacaoAtualizacao(QWidget):
@@ -56,7 +57,7 @@ class NotificacaoAtualizacao(QWidget):
         titulo.setStyleSheet("font-weight: 600; font-size: 14px; color: #1e293b;")
         
         data_label = QLabel(f"• {self._inf.get('data', '')}")
-        data_label.setProperty("role", "muted")
+        estado_muted(data_label)
         linha1.addWidget(titulo)
         linha1.addWidget(data_label)
         linha1.addStretch(1)

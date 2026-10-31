@@ -63,7 +63,13 @@ from printgest.ui.formulario import (
     formatar_data_iso,
 )
 from printgest.ui.kanban import CartaoKanban, QuadroKanban
-from printgest.ui.widgets import ElideLabel, botao_com_atalho
+from printgest.ui.widgets import (
+    ElideLabel,
+    botao_com_atalho,
+    estado_muted,
+    estado_primario,
+    estado_danger,
+)
 
 _ORIGENS = {
     "lista": "Lista",
@@ -215,7 +221,7 @@ class DialogoCartao(QDialog):
         self._btn_arquivar = QPushButton("Arquivar")
         self._btn_restaurar = QPushButton("Restaurar")
         self._btn_salvar = QPushButton("Salvar")
-        self._btn_salvar.setProperty("role", "primary")
+        estado_primario(self._btn_salvar)
         self._btn_fechar = QPushButton("Fechar")
 
         self._btn_arquivar.clicked.connect(self._arquivar)
@@ -447,7 +453,7 @@ class DialogoListas(QDialog):
         self._btn_renomear = QPushButton("Renomear")
         self._btn_arquivar = QPushButton("Arquivar")
         self._btn_excluir = QPushButton("Excluir")
-        self._btn_excluir.setProperty("role", "danger")
+        estado_danger(self._btn_excluir)
         self._btn_excluir.setVisible(self._admin)
         self._btn_fechar = QPushButton("Fechar")
         for botao in (
@@ -608,7 +614,7 @@ class PaginaProjetos(QWidget):
         self._vazio = QLabel(
             "O quadro ainda não tem listas. Um gestor pode criar a primeira."
         )
-        self._vazio.setProperty("role", "muted")
+        estado_muted(self._vazio)
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._vazio.setVisible(False)
         raiz.addWidget(self._vazio)

@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from printgest.ui import animacao
-from printgest.ui.widgets import ElideLabel, badge
+from printgest.ui.widgets import ElideLabel, badge, estado_muted
 
 # Formato usado para carregar o id do cartão durante o arraste.
 MIME_CARTAO = "application/x-printgest-cartao"
@@ -100,7 +100,7 @@ class CartaoKanban(QFrame):
         coluna.addWidget(self._subtitulo)
 
         self._rodape = ElideLabel(rodape)
-        self._rodape.setProperty("role", "muted")
+        estado_muted(self._rodape)
         coluna.addWidget(self._rodape)
 
         self.setToolTip(" · ".join(p for p in (titulo, subtitulo, rodape) if p))
@@ -231,7 +231,7 @@ class ColunaKanban(QFrame):
         self._corpo.setContentsMargins(0, 0, 0, 0)
         self._corpo.setSpacing(8)
         self._vazio = ElideLabel("Sem registros")
-        self._vazio.setProperty("role", "muted")
+        estado_muted(self._vazio)
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._corpo.addWidget(self._vazio)
 
