@@ -4,6 +4,16 @@ Os changelogs oficiais estão em [CHANGELOG.md](CHANGELOG.md).
 
 ## Últimas Releases
 
+### [0.3.4] - 2026-11-01
+
+#### Novos Recursos
+- **Timeout de sessão:** sessão expira após 8 horas de inatividade
+- **Validação de integridade:** hash SHA-256 protege contra alterações na sessão
+- **Melhor tratamento de WinError 10061:** sessão salva aguarda daemon estar pronto antes de conectar
+
+#### Corrigido
+- WinError 10061: sessão persistente aguarda verificação de saúde do daemon antes de restaurar conexão
+
 ### [0.3.3] - 2026-11-01
 
 #### Novos Recursos
@@ -36,6 +46,7 @@ Os changelogs oficiais estão em [CHANGELOG.md](CHANGELOG.md).
 
 | Versão | Servidor | Estação |
 |--------|----------|---------|
+| 0.3.4 | 78.1 MB | 37.9 MB |
 | 0.3.3 | 77.7 MB | 37.9 MB |
 | 0.3.2 | 77.7 MB | 37.9 MB |
 
@@ -52,6 +63,7 @@ git tag -f v0.3.3  # Atualiza sua cópia local
 
 | Versão | Data | Principais Mudanças |
 |--------|------|---------------------|
+| 0.3.4 | 31/10/2026 | Timeout de sessão, validação de integridade, fix WinError 10061 |
 | 0.3.3 | 31/10/2026 | Sessão persistente, maximização |
 | 0.3.2 | 31/10/2026 | Refatoração de UI, sistema de atualização |
 | 0.3.1 | 30/10/2026 | Sistema de atualização, helpers de UI |
