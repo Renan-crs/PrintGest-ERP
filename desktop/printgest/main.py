@@ -24,6 +24,9 @@ from printgest.ui.tela_principal import TelaPrincipal
 from printgest.ui.theme import aplicar_theme
 from printgest.ui.widgets import icone_printgest
 
+# Timeout para aguardar daemon estar pronto (segundos)
+DAEMON_READY_TIMEOUT = 2.0
+
 
 def _carregar_env_do_executavel(caminho: Path | None = None) -> None:
     """Instalação empacotada (estação): `.env` ao lado do exe define o servidor.
@@ -58,6 +61,22 @@ def _licenca_desabilitada() -> bool:
         "on",
         "sim",
     }
+
+
+def _aguardar_daemon_pronto(timeout: float = DAEMON_READY_TIMEOUT) -> bool:
+    """Aguarda o daemon estar saudável por um breve período.
+    
+    Retorna True se o daemon estiver saudável, False caso contrário.
+    Usado para garantir que a sessão persistente não tenta conectar
+    antes que o daemon esteja totalmente inicializado.
+    """
+    import time
+    inicio = time.monotonic()
+    while time.monotonic() - inicio < timeout:
+        if daemon.saude():
+            return True
+        time.sleep(0.1)
+    return False
 
 
 def _erro_inesperado(tipo: type, valor: BaseException, tb) -> None:
