@@ -60,3 +60,4 @@ backend/test_token.txt
 .DS_Store
 Thumbs.db
 *.code-workspace
+.env.neon
