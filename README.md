@@ -37,16 +37,20 @@
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor**: `PrintGest-Setup-0.3.5.exe` (44.1 MB - Neon)
-   - **Estação**: `PrintGest-Setup-0.3.5Estacao.exe` (37.9 MB)
+   - **Servidor (latest)**: `PrintGest-Setup-0.3.7.exe` (46.2 MB - Neon)
+   - **Estação (latest)**: `PrintGest-Setup-0.3.7Estacao.exe` (25.8 MB)
+   
+   Versões anteriores:
+   - `PrintGest-Setup-0.3.5.exe` (44.1 MB - Neon)
+   - `PrintGest-Setup-0.3.5Estacao.exe` (37.9 MB)
 
 2. Execute o instalador:
    ```powershell
-   # Instalação padrão (Servidor)
-   PrintGest-Setup-0.3.5.exe
+   # Instalação padrão (Servidor) - v0.3.7
+   PrintGest-Setup-0.3.7.exe
    
    # Instalação Estação (aponta para servidor existente)
-   PrintGest-Setup-0.3.5Estacao.exe
+   PrintGest-Setup-0.3.7Estacao.exe
    ```
 
 3. Siga o assistente e configure a conexão com Neon
@@ -79,9 +83,9 @@ python main.py
 ### Tecnologias
 | Camada | Tecnologia |
 |--------|------------|
-| **Backend** | FastAPI, SQLAlchemy, PostgreSQL, Alembic |
+| **Backend** | FastAPI, SQLAlchemy, PostgreSQL (Neon), Alembic |
 | **Desktop** | PySide6, Python 3.11+ |
-| **Banco** | PostgreSQL 14 (embarcado ou externo) |
+| **Banco** | Neon Database (PostgreSQL gerenciado em nuvem) |
 | **Licenciamento** | Integração RedGest API |
 
 ### Estrutura do Projeto
@@ -189,6 +193,7 @@ Para questões de licenciamento, entre em contato com o provedor RedGest.
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| **0.3.7** | 01/11/2026 | Correção PermissionError 13, neon.ts criado, .env.local gerado, instalação estável |
 | **0.3.6** | 01/11/2026 | Correção PermissionError SSL, tratamento de exceções no daemon, migrations idempotentes |
 | **0.3.5** | 01/11/2026 | Migração para Neon (PostgreSQL gerenciado em nuvem), PostgreSQL embarcado removido, 40% redução no tamanho do instalador |
 | **0.3.4** | 31/10/2026 | Timeout de sessão, validação de integridade, fix WinError 10061 |
