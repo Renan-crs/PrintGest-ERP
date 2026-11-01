@@ -33,7 +33,7 @@ def saude(timeout: float = 1.0) -> bool:
     try:
         httpx.get(SAUDE_URL, timeout=timeout)
         return True
-    except httpx.HTTPError:
+    except (httpx.HTTPError, PermissionError, OSError):
         return False
 
 
