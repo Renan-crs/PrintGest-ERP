@@ -28,10 +28,10 @@ _NOVOS = ["aguardando_arte", "aguardando_aprovacao"]
 
 
 def upgrade() -> None:
-    # ALTER TYPE ... ADD VALUE não pode rodar em transação em PostgreSQL < 12.
+    # Verificar se os valores já existem (idempotente)
     with op.get_context().autocommit_block():
         for valor in _NOVOS:
-            op.execute(f"ALTER TYPE status_os ADD VALUE '{valor}'")
+            op.execute(f"ALTER TYPE status_os ADD VALUE IF NOT EXISTS '{valor}'")
 
 
 def downgrade() -> None:

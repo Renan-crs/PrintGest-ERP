@@ -56,11 +56,11 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "icone_area_trabalho"; Description: "Criar atalho na área de trabalho"; GroupDescription: "Atalhos:"
 
 [Files]
-; O desktop existe nos dois modos; backend/PostgreSQL apenas no Servidor.
+; Desktop para ambos os modos; backend apenas para Servidor.
+; PostgreSQL REMOVIDO - usando Neon em nuvem (v0.3.4)
 Source: "..\build\dist\PrintGest\*"; DestDir: "{app}\PrintGest"; Flags: ignoreversion recursesubdirs createallsubdirs
 #ifndef ModoEstacao
 Source: "..\build\dist\PrintGestAPI\*"; DestDir: "{app}\PrintGestAPI"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\build\pacote\postgres\*"; DestDir: "{app}\postgres"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\build\pacote\LEIA-ME.txt"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 
@@ -74,17 +74,13 @@ Filename: "{app}\PrintGest\PrintGest.exe"; Description: "Executar {#NomeExibicao
 
 #ifndef ModoEstacao
 [UninstallRun]
-; Para o desktop, o daemon e o PostgreSQL embarcado antes de apagar arquivos.
+; Para o desktop e o daemon - PostgreSQL removido (usa Neon)
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM PrintGest.exe /F"; Flags: runhidden; RunOnceId: "EncerraDesktop"
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM PrintGestAPI.exe /F"; Flags: runhidden; RunOnceId: "EncerraAPI"
-Filename: "{app}\postgres\pgsql\bin\pg_ctl.exe"; Parameters: "stop -D ""{app}\postgres\data"" -m fast"; Flags: runhidden skipifdoesntexist; RunOnceId: "ParaPostgres"
 
 [UninstallDelete]
-; Gerados em runtime - nao estao em [Files] e precisam da limpeza explícita.
-Type: filesandordirs; Name: "{app}\postgres\data"
+; Logs do backend
 Type: filesandordirs; Name: "{app}\PrintGestAPI\logs"
-Type: files; Name: "{app}\postgres\postgres.log"
-; O daemon pode demorar a liberar handles mesmo apos o taskkill — forca.
 Type: filesandordirs; Name: "{app}\PrintGestAPI"
 #else
 [UninstallDelete]

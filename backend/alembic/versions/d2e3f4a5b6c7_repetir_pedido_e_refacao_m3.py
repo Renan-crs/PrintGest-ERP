@@ -23,6 +23,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Criar o tipo Enum antes de usá-lo
+    refacao_erro = sa.Enum("grafica", "cliente", name="refacao_erro")
+    refacao_erro.create(op.get_bind(), checkfirst=True)
+    
     op.add_column(
         "ordem_servico",
         sa.Column(

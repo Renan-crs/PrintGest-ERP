@@ -14,6 +14,7 @@ Create Date: 2026-10-29
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = "e8f9a0b1c2d3"
@@ -24,35 +25,51 @@ depends_on = None
 
 def upgrade() -> None:
     # Usuario: senha_hash torna-se nullable para primeiro acesso
-    op.alter_column(
-        "usuario",
-        "senha_hash",
-        existing_type=sa.String(255),
-        nullable=True,
-    )
+    # Verificar se a coluna já permite NULL
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col["name"] for col in inspector.get_columns("usuario")]
+    
+    if "senha_hash" in columns:
+        # Alterar apenas se não estiver nullable
+        result = conn.execute(sa.text("SELECT is_nullable FROM information_schema.columns WHERE table_name='usuario' AND column_name='senha_hash'"))
+        is_nullable = result.scalar()
+        if not is_nullable:
+            op.alter_column(
+                "usuario",
+                "senha_hash",
+                existing_type=sa.String(255),
+                nullable=True,
+            )
+    
     # Novo campo: primeiro_acesso (default False para usuarios existentes)
-    op.add_column(
-        "usuario",
-        sa.Column(
-            "primeiro_acesso",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("false"),
-        ),
-    )
+    if "primeiro_acesso" not in columns:
+        op.add_column(
+            "usuario",
+            sa.Column(
+                "primeiro_acesso",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+        )
+    
     # Novo campo: link com funcionario
-    op.add_column(
-        "usuario",
-        sa.Column(
-            "funcionario_id",
-            sa.BigInteger(),
-            sa.ForeignKey("funcionario.id"),
-            nullable=True,
-        ),
-    )
-    op.create_index(
-        "idx_usuario_funcionario", "usuario", ["funcionario_id"]
-    )
+    if "funcionario_id" not in columns:
+        op.add_column(
+            "usuario",
+            sa.Column(
+                "funcionario_id",
+                sa.BigInteger(),
+                sa.ForeignKey("funcionario.id"),
+                nullable=True,
+            ),
+        )
+    
+    if "idx_usuario_funcionario" not in [idx["name"] for idx in inspector.get_indexes("usuario")]:
+        op.create_index(
+            "idx_usuario_funcionario", "usuario", ["funcionario_id"]
+        )
 
 
 def downgrade() -> None:
