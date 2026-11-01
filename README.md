@@ -33,30 +33,23 @@
 ### Requisitos
 - **Windows 10/11** (64-bit)
 - **PowerShell 5.1+**
-- **PostgreSQL 14+** (embarcado no instalador)
+- **Neon Database** (PostgreSQL gerenciado em nuvem)
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor**: `PrintGest-Setup-0.3.4.exe` (77.7 MB - com suporte Neon)
-   - **Estação**: `PrintGest-Setup-0.3.4Estacao.exe` (37.9 MB)
+   - **Servidor**: `PrintGest-Setup-0.3.5.exe` (44.1 MB - Neon)
+   - **Estação**: `PrintGest-Setup-0.3.5Estacao.exe` (37.9 MB)
 
 2. Execute o instalador:
    ```powershell
    # Instalação padrão (Servidor)
-   PrintGest-Setup-0.3.4.exe
+   PrintGest-Setup-0.3.5.exe
    
    # Instalação Estação (aponta para servidor existente)
-   PrintGest-Setup-0.3.4Estacao.exe
+   PrintGest-Setup-0.3.5Estacao.exe
    ```
 
-3. Siga o assistente e informe a licença RedGest
-
-### 📊 **Requisitos para Neon**
-- **Banco Neon:** PostgreSQL gerenciado em nuvem
-- **Credenciais:** Servidor, usuário, senha e database do Neon
-- **Conexão SSL:** obrigatória (sslmode=require)
-
-**⚠️ Importante:** A versão 0.3.4 usa Neon como provedor de banco de dados padrão. O PostgreSQL embarcado foi removido do instalador.
+3. Siga o assistente e configure a conexão com Neon
 
 ### Instalação Manual (Desenvolvedores)
 
@@ -196,6 +189,7 @@ Para questões de licenciamento, entre em contato com o provedor RedGest.
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| **0.3.5** | 01/11/2026 | Migração para Neon (PostgreSQL gerenciado em nuvem), PostgreSQL embarcado removido, 40% redução no tamanho do instalador |
 | **0.3.4** | 31/10/2026 | Timeout de sessão, validação de integridade, fix WinError 10061 |
 | **0.3.3** | 31/10/2026 | Sessão persistente, maximização |
 | **0.3.2** | 31/10/2026 | Refatoração de UI, sistema de atualização |
