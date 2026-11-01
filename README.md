@@ -37,7 +37,7 @@
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor**: `PrintGest-Setup-0.3.4.exe` (75.9 MB)
+   - **Servidor**: `PrintGest-Setup-0.3.4.exe` (77.7 MB - com suporte Neon)
    - **Estação**: `PrintGest-Setup-0.3.4Estacao.exe` (37.9 MB)
 
 2. Execute o instalador:
@@ -50,6 +50,13 @@
    ```
 
 3. Siga o assistente e informe a licença RedGest
+
+### 📊 **Requisitos para Neon**
+- **Banco Neon:** PostgreSQL gerenciado em nuvem
+- **Credenciais:** Servidor, usuário, senha e database do Neon
+- **Conexão SSL:** obrigatória (sslmode=require)
+
+**⚠️ Importante:** A versão 0.3.4 usa Neon como provedor de banco de dados padrão. O PostgreSQL embarcado foi removido do instalador.
 
 ### Instalação Manual (Desenvolvedores)
 
