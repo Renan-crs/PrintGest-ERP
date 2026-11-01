@@ -189,6 +189,7 @@ Para questões de licenciamento, entre em contato com o provedor RedGest.
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| **0.3.6** | 01/11/2026 | Correção PermissionError SSL, tratamento de exceções no daemon, migrations idempotentes |
 | **0.3.5** | 01/11/2026 | Migração para Neon (PostgreSQL gerenciado em nuvem), PostgreSQL embarcado removido, 40% redução no tamanho do instalador |
 | **0.3.4** | 31/10/2026 | Timeout de sessão, validação de integridade, fix WinError 10061 |
 | **0.3.3** | 31/10/2026 | Sessão persistente, maximização |
