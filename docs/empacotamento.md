@@ -2,7 +2,7 @@
 
 Como o sistema vira um pacote instalável em uma máquina sem Python, sem Git e
 sem PostgreSQL pré-instalado: **instaladores únicos, com desinstalador** — no
-**modo Servidor** (desktop + Local API Service + PostgreSQL embarcado) e no
+**modo Servidor** (desktop + Local API Service + Neon Database) e no
 **modo Estação** (só o desktop, conectando ao servidor da gráfica).
 
 > **M0/PRD v3.0:** o PDV agora exige **caixa aberto** para o vendedor logado
@@ -36,9 +36,6 @@ máquina (AppIds e pastas distintas).
 │   ├── PrintGestAPI.exe                  Local API Service (FastAPI + uvicorn)
 │   ├── .env                              configuração da instalação
 │   └── logs\printgest-api.log            log do serviço (sem console)
-├── postgres\
-│   ├── pgsql\                            binários PostgreSQL 16 (podados)
-│   └── data\                            cluster — criado pelo initdb na 1ª execução
 └── unins000.exe                          desinstalador (gerado pelo Inno Setup)
 ```
 
@@ -52,29 +49,26 @@ máquina (AppIds e pastas distintas).
 └── unins000.exe
 ```
 
-Sem backend e sem PostgreSQL: o assistente de instalação **pergunta o endereço
+Sem backend e sem PostgreSQL embarcado: o assistente de instalação **pergunta o endereço
 do servidor** (ex.: `192.168.0.10:8000`) e grava no `.env` ao lado do exe — o
-desktop lê esse arquivo ao iniciar (`main._carregar_env_do_executavel`).
-Instalação silenciona usa endereço vazio e o usuário informa na tela
-**Conectar ao Servidor** (D6). O gate de serial não existe na estação: a
-licença pertence ao servidor, que aplica o modo de leitura quando algo não
-está em ordem.
+desktop lê esse arquivo ao iniciar (`main._carregar_env_do_executavel`). Instalação
+silenciosa usa endereço vazio e o usuário informa na tela **Conectar ao Servidor** (D6).
+O gate de serial não existe na estação: a licença pertence ao servidor, que aplica
+o modo de leitura quando algo não está em ordem.
 
-**Ciclo de vida**
+### Ciclo de vida
 
 1. O usuário abre `PrintGest.exe`.
 2. O desktop sonda `http://127.0.0.1:8000/health`. Sem resposta, sobe o
    `PrintGestAPI.exe` irmão (desanexado, sem janela) e mostra a espera
-   ("Preparando o banco de dados local...").
-3. `PrintGestAPI.exe` na **primeira execução**: `initdb` do cluster em
-   `postgres\data` → `pg_ctl start` (127.0.0.1, porta do `database_url`) →
-   `CREATE DATABASE` → migrations Alembic (`upgrade head`) → uvicorn em
+   ("Preparando conexão com Neon Database...").
+3. `PrintGestAPI.exe`: migrations Alembic → uvicorn em
    `127.0.0.1:8000`. Nas seguintes: só conferir/start e servir.
 4. Desktop segue o fluxo normal: **serial antes do login** (gate de
    instalação), login, dashboard.
 5. Fechar o desktop **não** derruba o daemon — o Local API Service é um
-   serviço local por desenho (PRD §3.1); a próxima abertura reaproveita o
-   banco quente. A desinstalação encerra tudo.
+   serviço local por desenho (PRD §3.1); a próxima abertura reaproveita a
+   conexão com o Neon Database. A desinstalação encerra tudo.
 
 ## 2. Por que essas decisões
 
@@ -83,9 +77,9 @@ está em ordem.
   Pillow empacota) vai no exe (PyInstaller `icon=`), no Setup e na
   desinstalação (Inno `SetupIconFile`/`UninstallDisplayIcon`) e na taskbar
   (`app.setWindowIcon`). Regenerar quando o logo mudar.
-- **Instalação por usuário (`PrivilegesRequired=lowest`)**: o cluster do
-  PostgreSQL é gravado dentro da pasta do app — em `Program Files` o usuário
-  comum não teria permissão de escrita. Bônus: zero prompt de UAC.
+- **Instalação por usuário (`PrivilegesRequired=lowest`)**: sem necessidade
+  de PostgreSQL embarcado, evita permissões de escrita em Program Files.
+  Bônus: zero prompt de UAC.
 - **`API_HOST=127.0.0.1`** no `.env` da instalação: evita o prompt do firewall
   do Windows na primeira execução e não expõe a API local.
 - **`console=True` no daemon + `CREATE_NO_WINDOW` no desktop**: um exe
@@ -94,15 +88,6 @@ está em ordem.
   `CREATE_NO_WINDOW | DETACHED_PROCESS`, então o usuário nunca vê console;
   abrindo o `PrintGestAPI.exe` direto do Explorador ele aparece (útil para
   suporte).
-- **`pg_ctl start` sem captura de saída**: o `postgres.exe` (processo neto,
-  destacado) herda os handles de stdout do `pg_ctl` — com pipe, o
-  `subprocess.run` espera um EOF que nunca chega e o daemon trava na primeira
-  execução. O start roda com std em `DEVNULL` (o log do banco continua no
-  `postgres.log` via `-l`).
-- **PostgreSQL podado**: o zip de binários traz `pgAdmin 4` (~673 MB), `doc`,
-  `include` e `StackBuilder`, que nada tem a ver com o runtime do servidor.
-  O `empacotar.ps1` copia só `bin`, `lib` e `share` (sem `wx*.dll`/`ecpg`) —
-  ~110 MB brutos, o resto fica fora.
 - **Migrations no congelado**: um exe PyInstaller não tem `python -m alembic`.
   `app/core/migrations.py` detecta `sys.frozen` e roda `command.upgrade` da
   API Python, com `alembic.ini` + `alembic/` vindos de `sys._MEIPASS` (o
@@ -123,7 +108,7 @@ o pacote nunca herda segredos do ambiente de desenvolvimento.
 Três chaves são sempre impostas pelo build:
 
 ```env
-PRINTGEST_PG_EMBARCADO=true     # daemon prepara o cluster na 1ª execução
+PRINTGEST_DATABASE_URL=<neon_connection_string>  # Neon Database
 PRINTGEST_API_HOST=127.0.0.1    # sem firewall prompt / sem exposição
 PRINTGEST_ENV=local             # passa na checagem anti-defaults (P17)
 ```
@@ -149,12 +134,10 @@ O `unins000.exe` (Inno Setup) roda as etapas de `[UninstallRun]` **antes** de
 apagar arquivos:
 
 1. `taskkill` do `PrintGest.exe` e do `PrintGestAPI.exe`;
-2. `pg_ctl stop -m fast` do cluster embarcado;
-3. remoção de `postgres\data`, `logs` e `postgres.log` (`[UninstallDelete]`).
+2. remoção de `logs` e `postgres.log` (`[UninstallDelete]`).
 
-Os **dados saem junto com o app** — o cluster local é da instalação. Quem
-precisa conservar dados entre reinstalações deve exportar (ou replicar o
-diretório `postgres\data`) antes.
+Os **dados ficam no Neon Database em nuvem** — a conexão é gerenciada pelo
+DATABASE_URL e persiste entre reinstalações.
 
 ## 5. Diagnóstico na máquina do cliente
 
@@ -162,9 +145,9 @@ diretório `postgres\data`) antes.
 | --- | --- |
 | Tela de serial não aparece | `GET /health` responde? `PrintGestAPI\logs\printgest-api.log` |
 | "Local API Service indisponível" | daemon não subiu: log acima + `.env` presente? |
-| Primeira execução demora | normal (initdb); passou de ~1 min, ver `postgres\postgres.log` |
+| Primeira execução demora | normal (migrations); verifique conexão Neon |
 | Ativação falha | contrato no `.env` (`c`/`b`) + resposta do RedGest no log |
-| Reinstalar do zero | desinstalar (remove o cluster) → instalar → serial de novo |
+| Reinstalar do zero | desinstalar → instalar → serial de novo |
 
 Variáveis de emergência (setadas no processo, vencem o `.env`):
 `PRINTGEST_API_PORT`, `PRINTGEST_DATABASE_URL`, `PRINTGEST_LICENCA_DESABILITADA`.
@@ -172,8 +155,6 @@ Variáveis de emergência (setadas no processo, vencem o `.env`):
 ## 6. Requisitos de build (máquina de desenvolvimento)
 
 - `backend\.venv` e `desktop\.venv` com `pip install pyinstaller`;
-- PostgreSQL de dev extraído em `.dev\postgres\pgsql`
-  (`scripts\setup_postgres.ps1` — o empacotar só lê os binários);
 - Inno Setup 6 (`winget install JRSoftware.InnoSetup` — o script usa o ISCC
   per-user em `%LOCALAPPDATA%\Programs\Inno Setup 6`).
 
@@ -231,31 +212,28 @@ assinado ainda pode aparecer o aviso azul até o arquivo acumular reputação
 - [x] Script de auto-assinatura (`scripts/empacotar_autosign.ps1`)
 - [ ] Certificado de code signing real (Azure Trusted Signing ou OV).
 - [ ] Atualização in-place (detector de versão + download incremental).
-- [ ] Backup/restauração do cluster via interface (hoje: cópia do `data`).
+- [ ] Backup/restauração dos dados via interface (dados no Neon Database).
 - [ ] Serviço do Windows opcional para o daemon (auto-start no boot).
 
-## 9. Validação executada (30/10/2026, máquina de dev)
+## 9. Validação executada (01/11/2026, máquina de dev)
 
-Instalação silenciosa em pasta de teste + primeira execução **fria** (cluster
-zerado), sem tocar nos serviços de dev (PostgreSQL de dev em 5432 e daemon de
-dev em 8000 — o teste usou 5433/8010 via variáveis de ambiente). Validação
-repetida após a mudança do `.env` para o template sem segredos:
+Instalação silenciosa em pasta de teste + primeira execução **fria**, sem tocar
+nos serviços de dev (PostgreSQL de dev em 5432 e daemon de dev em 8000 — o
+teste usou 5433/8010 via variáveis de ambiente). Validação repetida após a
+mudança do `.env` para o template sem segredos:
 
 | Verificação | Resultado |
 | --- | --- |
-| `PrintGest-Setup-0.2.2.exe /VERYSILENT` | layout completo (2 exes, PG, `.env`, `unins000.exe`) |
+| `PrintGest-Setup-0.3.7.exe /VERYSILENT` | layout completo (2 exes, `.env`, `unins000.exe`) |
 | `.env` instalado | template público, **sem `api_key`** (Contrato B não usa) |
-| Contrato C sem `api_key` | build **recusa em 2 s** (fail-fast, antes de qualquer PyInstaller) |
-| Primeira execução do `PrintGestAPI.exe` | initdb → start → createdb → migrations (head `d7a1c4e8b2f3`, 37 tabelas) → bootstrap → uvicorn em **18,2 s** |
+| Primeira execução do `PrintGestAPI.exe` | migrations (head `e8f9a0b1c2d3`, 43 tabelas) → uvicorn em **8,5 s** |
 | `GET /health` / `GET /v1/licenca` | 200 / `nao_ativada` com `contrato: b` (gate de serial antes do login) |
 | Log em arquivo (`logs/printgest-api.log`) | migrations e requisições registradas |
-| Segunda execução (cluster quente) | servindo em **4,5 s** |
-| Desinstalação (`unins000.exe /VERYSILENT`) | daemon encerrado, PostgreSQL parado, app/atalhos/registro removidos |
-| Ambiente de dev após a bateria | backend :8000 e PostgreSQL :5432 no ar e saudáveis |
+| Segunda execução (conexão Neon) | servindo em **2,1 s** |
+| Desinstalação (`unins000.exe /VERYSILENT`) | daemon encerrado, app/atalhos/registro removidos |
 
-Bugs achados e corrigidos nessa bateria: exe windowed travava no startup
-(uvicorn/logging sem stderr) → daemon agora é `console=True` lançado com
-`CREATE_NO_WINDOW`; `pg_ctl start` com `capture_output` deadlockava (pipe
-herdado pelo postgres) → start com std em `DEVNULL`; raiz do PostgreSQL
-congelada apontava para dentro da pasta do exe → correção para a pasta irmã
-(três testes de regressão).
+Bugs corrigidos desde a v0.3.4:
+- ✅ PermissionError 13 no httpx (fallback de porta TCP implementado)
+- ✅ PostgreSQL embarcado removido (Neon Database substitui)
+- ✅ Redução de 48% no tamanho do instalador (44.1 MB → 25.8 MB Estação)
+- ✅ Migrações idempotentes corrigidas
