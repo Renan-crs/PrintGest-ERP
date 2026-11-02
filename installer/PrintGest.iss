@@ -1,6 +1,6 @@
 ; PrintGest ERP - instalador Inno Setup (modo Servidor ou Estacao).
 ;
-; SERVIDOR (padrao): desktop + Local API Service + PostgreSQL embarcado.
+; SERVIDOR (padrao): desktop + Local API Service + Neon Database.
 ;   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
 ; ESTACAO: apenas o desktop; o assistente pergunta o ENDERECO do servidor e
 ;   grava um .env ao lado do PrintGest.exe (PRINTGEST_API_URL). Instalacao
@@ -10,7 +10,7 @@
 ; As duas instalacoes convivem na mesma maquina (AppIds e pastas distintos).
 
 #ifndef VersaoApp
-  #define VersaoApp "0.3.4"
+  #define VersaoApp "0.3.5"
 #endif
 
 #define NomeApp "PrintGest ERP"
