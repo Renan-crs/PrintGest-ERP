@@ -33,27 +33,31 @@
 ### Requisitos
 - **Windows 10/11** (64-bit)
 - **PowerShell 5.1+**
-- **Neon Database** (PostgreSQL gerenciado em nuvem)
+- **Neon Database** (PostgreSQL gerenciado em nuvem) - Conexão SSL obrigatória
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor (latest)**: `PrintGest-Setup-0.3.7.exe` (46.2 MB - Neon)
-   - **Estação (latest)**: `PrintGest-Setup-0.3.7Estacao.exe` (25.8 MB)
-   
-   Versões anteriores:
-   - `PrintGest-Setup-0.3.5.exe` (44.1 MB - Neon)
-   - `PrintGest-Setup-0.3.5Estacao.exe` (37.9 MB)
-
+   - **Servidor (latest)**: `PrintGest-Setup-0.3.5.exe` (57 MB - Neon)
+   - **Estação (latest)**: `PrintGest-Setup-0.3.5Estacao.exe` (25 MB - sem backend)
+    
 2. Execute o instalador:
    ```powershell
-   # Instalação padrão (Servidor) - v0.3.7
-   PrintGest-Setup-0.3.7.exe
+   # Instalação padrão (Servidor)
+   PrintGest-Setup-0.3.5.exe
    
    # Instalação Estação (aponta para servidor existente)
-   PrintGest-Setup-0.3.7Estacao.exe
+   PrintGest-Setup-0.3.5Estacao.exe
    ```
 
-3. Siga o assistente e configure a conexão com Neon
+3. Na primeira execução, o sistema verificará a conexão com o Neon Database
+
+### Configuração do Neon Database
+O instalador v0.3.5 está configurado para usar Neon Database. Certifique-se de:
+- Ter uma conta Neon ativa
+- Ter o DATABASE_URL configurado em `installer/env.instalacao`
+- Usar a URL no formato: `postgresql+psycopg://user:password@host.neon.tech/db?sslmode=require`
+
+4. Siga o assistente de ativação e configure sua licença no RedGest
 
 ### Instalação Manual (Desenvolvedores)
 

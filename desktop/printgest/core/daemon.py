@@ -25,7 +25,7 @@ import time
 from pathlib import Path
 
 SAUDE_URL = "http://127.0.0.1:8000/health"
-TEMPO_LIMITE_SUBIDA_SEGUNDOS = 90.0
+TEMPO_LIMITE_SUBIDA_SEGUNDOS = 120.0  # Aumentado de 90s para 2min (Neon cold start)
 
 
 def saude(timeout: float = 1.0) -> bool:
@@ -35,18 +35,26 @@ def saude(timeout: float = 1.0) -> bool:
     verifica se a porta esta aberta como fallback.
     """
     import httpx
+    import logging
+    logger = logging.getLogger("printgest.daemon")
     
     # Primeiro tenta HTTP com httpx
     try:
-        httpx.get(SAUDE_URL, timeout=timeout)
-        return True
+        resp = httpx.get(SAUDE_URL, timeout=timeout)
+        if resp.status_code == 200:
+            return True
+        logger.debug("Health check retornou status %s", resp.status_code)
+        return False
     except PermissionError:
         # Erro de permissao SSL - verificar se porta esta aberta
+        logger.debug("PermissionError ao acessar health endpoint")
         return _porta_aberta(timeout)
-    except OSError:
+    except OSError as e:
+        logger.debug("OSError ao acessar health endpoint: %s", e)
         return _porta_aberta(timeout)
-    except httpx.HTTPError:
+    except httpx.HTTPError as e:
         # Conexao recusada ou timeout - verificar porta como fallback
+        logger.debug("HTTPError ao acessar health endpoint: %s", e)
         return _porta_aberta(timeout)
 
 
@@ -92,23 +100,37 @@ def garantir(
     segundos: float = TEMPO_LIMITE_SUBIDA_SEGUNDOS, a_cada_iteracao=None
 ) -> bool:
     """Sobe o daemon quando necessario; True quando o /health responde.
-
+    
     `a_cada_iteracao` e chamado a cada volta do laço de espera (o `main.py`
     passa `QApplication.processEvents` para manter o dialogo vivo).
     """
+    import logging
+    logger = logging.getLogger("printgest.daemon")
+    
     if saude():
         return True
     caminho = caminho_do_backend()
     if caminho is None:
         # Nao empacotado (dev): nada para subir — o roteador trata o daemon
         # ausente com o dialogo padrao "Local API Service indisponivel".
+        logger.debug("Daemon nao empacotado - nada para subir")
         return saude(timeout=3.0)
+    
+    logger.info("Subindo PrintGestAPI.exe de %s", caminho)
     subir(caminho)
     limite = time.monotonic() + segundos
+    tentativas = 0
     while time.monotonic() < limite:
         if a_cada_iteracao is not None:
             a_cada_iteracao()
         if saude(timeout=1.0):
+            elapsed = time.monotonic() - (limite - segundos)
+            logger.info("Daemon pronto apos %.1f segundos", elapsed)
             return True
+        tentativas += 1
+        if tentativas % 4 == 0:  # Log a cada 1 segundo
+            elapsed = time.monotonic() - (limite - segundos)
+            logger.debug("Aguardando daemon... %.0fs de %ds", elapsed, int(segundos))
         time.sleep(0.25)
+    logger.warning("Timeout (%ds) aguardando daemon", int(segundos))
     return False
