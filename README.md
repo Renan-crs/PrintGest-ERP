@@ -37,22 +37,22 @@
 
 ### Instalação Rápida
 1. Baixe o instalador:
-   - **Servidor (latest)**: `PrintGest-Setup-0.3.5.exe` (57 MB - Neon)
-   - **Estação (latest)**: `PrintGest-Setup-0.3.5Estacao.exe` (25 MB - sem backend)
-    
+   - **Servidor (latest)**: `PrintGest-Setup-0.3.8.exe` (57.1 MB - Neon)
+   
+   Versões anteriores:
+   - `PrintGest-Setup-0.3.7.exe` (46.2 MB - Neon)
+   - `PrintGest-Setup-0.3.5.exe` (44.1 MB - Neon)
+
 2. Execute o instalador:
    ```powershell
    # Instalação padrão (Servidor)
-   PrintGest-Setup-0.3.5.exe
-   
-   # Instalação Estação (aponta para servidor existente)
-   PrintGest-Setup-0.3.5Estacao.exe
+   PrintGest-Setup-0.3.8.exe
    ```
 
-3. Na primeira execução, o sistema verificará a conexão com o Neon Database
+3. Na primeira execução, o sistema se conecta ao Neon Database
 
 ### Configuração do Neon Database
-O instalador v0.3.5 está configurado para usar Neon Database. Certifique-se de:
+O instalador v0.3.8 está configurado para usar Neon Database. Certifique-se de:
 - Ter uma conta Neon ativa
 - Ter o DATABASE_URL configurado em `installer/env.instalacao`
 - Usar a URL no formato: `postgresql+psycopg://user:password@host.neon.tech/db?sslmode=require`
@@ -197,8 +197,8 @@ Para questões de licenciamento, entre em contato com o provedor RedGest.
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| **0.3.8** | 02/11/2026 | Correção AmbiguousForeignKeysError, extração DATABASE_URL robusta, Neon Database estável |
 | **0.3.7** | 01/11/2026 | Correção PermissionError 13, neon.ts criado, .env.local gerado, instalação estável |
-| **0.3.6** | 01/11/2026 | Correção PermissionError SSL, tratamento de exceções no daemon, migrations idempotentes |
 | **0.3.5** | 01/11/2026 | Migração para Neon (PostgreSQL gerenciado em nuvem), PostgreSQL embarcado removido, 40% redução no tamanho do instalador |
 | **0.3.4** | 31/10/2026 | Timeout de sessão, validação de integridade, fix WinError 10061 |
 | **0.3.3** | 31/10/2026 | Sessão persistente, maximização |
