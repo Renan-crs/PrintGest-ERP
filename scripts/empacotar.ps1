@@ -1,6 +1,6 @@
 # Empacota o PrintGest ERP em instaladores Inno Setup (com desinstalador).
 #
-# Modo SERVIDOR (padrao) - desktop + Local API Service + PostgreSQL embarcado:
+# Modo SERVIDOR (padrao) - desktop + Local API Service + Neon Database.
 #   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
 #
 # Modo ESTACAO - apenas o desktop; o assistente pergunta o endereco do
@@ -10,8 +10,7 @@
 # Assinatura digital (opcional - exige certificado de code signing):
 #   ... -Assinar <thumbprint-ou-arquivo.pfx>  (senha em PRINTGEST_SIGN_SENHA)
 #
-# Requisitos: venvs de backend/desktop com PyInstaller, PostgreSQL de dev em
-# .dev\postgres\pgsql (scripts\setup_postgres.ps1) e Inno Setup 6.
+# Requisitos: venvs de backend/desktop com PyInstaller e Inno Setup 6.
 
 param(
     [string]$Saida = "dist_installer",
@@ -56,19 +55,53 @@ function Ler-Chave([string[]]$conteudo, [string]$chave) {
 
 $linhas = $null
 if ($ehServidor) {
-    # Fonte: installer/env.instalacao quando existir (credenciais por cliente,
-    # fora do git); senao o template versionado. NUNCA o backend/.env de dev.
+    # Para builds de PRODUCAO: use env.instalacao (fora do git, com credenciais reais)
+    # Para builds de DESENVOLVIMENTO: use env.instalacao.neon (com placeholders)
     $envLocal = Join-Path $installer "env.instalacao"
+    $envNeon = Join-Path $installer "env.instalacao.neon"
     $envExemplo = Join-Path $installer "env.instalacao.example"
-    $envBase = if (Test-Path $envLocal) { $envLocal } else { $envExemplo }
+    
+    # Prioriza env.instalacao (producao) se existir com DATABASE_URL real
+    $envBase = $envExemplo
+    if (Test-Path $envLocal) {
+        $conteudoLocal = Get-Content $envLocal -ErrorAction SilentlyContinue
+        if ($conteudoLocal -and ($conteudoLocal -match "PRINTGEST_DATABASE_URL=")) {
+            if ($conteudoLocal -notmatch "__NEON_HOST__") {
+                $envBase = $envLocal
+                Write-Host "  base do .env: env.instalacao (credenciais Neon reais)"
+            } else {
+                Write-Host "  aviso: env.instalacao tem placeholders, usando env.instalacao.neon"
+            }
+        }
+    }
+    if ($envBase -eq $envExemplo -and Test-Path $envNeon) {
+        $envBase = $envNeon
+    }
     if ($envBase -eq $envLocal) {
-        Write-Host "  base do .env: env.instalacao (credenciais locais, fora do git)"
+        Write-Host "  base do .env: env.instalacao (credenciais Neon reais)"
+    } elseif ($envBase -eq $envNeon) {
+        Write-Host "  base do .env: env.instalacao.neon (template Neon com placeholders)"
     } else {
         Write-Host "  base do .env: env.instalacao.example (template publico)"
     }
+    
     $linhas = @(Get-Content $envBase | Where-Object {
-        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV)\s*='
+        $_ -notmatch '^\s*PRINTGEST_PG_EMBARCADO\s*='
     })
+    
+    # Extrair DATABASE_URL se existir (do env base ou como placeholder)
+    $databaseUrl = ""
+    if (Test-Path $envBase) {
+        $dbUrlLine = Select-String -Path $envBase -Pattern '^PRINTGEST_DATABASE_URL\s*=' -SimpleMatch -ErrorAction SilentlyContinue
+        if ($dbUrlLine) {
+            $databaseUrl = $dbUrlLine.Line.Trim()
+        }
+    }
+    
+    # Se nao tem DATABASE_URL, usar placeholder (o instalador deve configurar)
+    if (-not $databaseUrl) {
+        $databaseUrl = "PRINTGEST_DATABASE_URL=postgresql+psycopg:@127.0.0.1:5432/printgest"
+    }
 
     $contrato = Ler-Chave $linhas "PRINTGEST_REDGEST_CONTRATO"
     $apiChave = Ler-Chave $linhas "PRINTGEST_REDGEST_API_KEY"
@@ -88,7 +121,7 @@ Contrato B (CNPJ + codigo) NAO usa api_key e pode seguir sem ela.
 }
 
 # ------------------------------------------------------------ 1) limpeza
-foreach ($alvo in @((Join-Path $dist "PrintGest"), (Join-Path $dist "PrintGestAPI"), (Join-Path $pacote "postgres"))) {
+foreach ($alvo in @((Join-Path $dist "PrintGest"), (Join-Path $dist "PrintGestAPI"))) {
     if (Test-Path $alvo) { Remove-Item -Recurse -Force $alvo }
 }
 
@@ -100,7 +133,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no desktop." }
 } finally { Pop-Location }
 
-# ------------------------------------- 3) backend + PostgreSQL (so servidor)
+# ------------------------------------- 3) backend (so servidor)
 if ($ehServidor) {
     Write-Host "[2/4] PyInstaller: PrintGestAPI.exe (backend)..."
     Push-Location $installer
@@ -109,30 +142,15 @@ if ($ehServidor) {
         if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no backend." }
     } finally { Pop-Location }
 
-    Write-Host "[3/4] PostgreSQL embarcado (bin, lib, share)..."
-    $pgOrigem = Join-Path $raiz ".dev\postgres\pgsql"
-    $pgDestino = Join-Path $pacote "postgres\pgsql"
-    if (-not (Test-Path (Join-Path $pgOrigem "bin\pg_ctl.exe"))) {
-        throw "PostgreSQL de dev nao encontrado em $pgOrigem (rode scripts\setup_postgres.ps1)."
-    }
-    # pgAdmin 4 (~673 MB), doc, include e StackBuilder nao sao usados em runtime;
-    # wx*.dll/ecpg pertencem a ferramentas fora do fluxo servidor.
-    robocopy $pgOrigem $pgDestino /E /NFL /NDL /NJH /NJS /NP `
-        /XD "pgAdmin 4" "doc" "include" "StackBuilder" "symbols" `
-        /XF "wx*.dll" "ecpg.exe" | Out-Null
-    if ($LASTEXITCODE -ge 8) { throw "robocopy do PostgreSQL falhou (codigo $LASTEXITCODE)." }
-    $LASTEXITCODE = 0
-
+    # Neon Database: PostgreSQL embarcado REMOVIDO (v0.3.4+)
     # .env da instalacao (chaves fixas impostas pelo build):
-    #   PG_EMBARCADO -> o daemon prepara o cluster na primeira execucao
-    #   API_HOST     -> 127.0.0.1: sem prompt de firewall, sem exposicao
-    #   ENV          -> "local" passa na checagem anti-defaults (P17)
     $forcadas = @{
-        "PRINTGEST_PG_EMBARCADO" = "true"
+        "PRINTGEST_PG_EMBARCADO" = "false"
         "PRINTGEST_API_HOST"     = "127.0.0.1"
         "PRINTGEST_ENV"          = "local"
     }
-    $conteudo = @($linhas) + @(
+    # Adicionar DATABASE_URL no inicio (antes das chaves forçadas)
+    $conteudo = @($databaseUrl) + $linhas + @(
         "",
         "# Instalacao empacotada (gerado por scripts/empacotar.ps1)"
     ) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
