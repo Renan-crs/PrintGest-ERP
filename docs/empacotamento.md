@@ -215,7 +215,7 @@ assinado ainda pode aparecer o aviso azul até o arquivo acumular reputação
 - [ ] Backup/restauração dos dados via interface (dados no Neon Database).
 - [ ] Serviço do Windows opcional para o daemon (auto-start no boot).
 
-## 9. Validação executada (01/11/2026, máquina de dev)
+## 9. Validação executada (v0.3.5)
 
 Instalação silenciosa em pasta de teste + primeira execução **fria**, sem tocar
 nos serviços de dev (PostgreSQL de dev em 5432 e daemon de dev em 8000 — o
@@ -224,8 +224,9 @@ mudança do `.env` para o template sem segredos:
 
 | Verificação | Resultado |
 | --- | --- |
-| `PrintGest-Setup-0.3.7.exe /VERYSILENT` | layout completo (2 exes, `.env`, `unins000.exe`) |
+| `PrintGest-Setup-0.3.5.exe /VERYSILENT` | layout completo (2 exes, `.env`, `unins000.exe`) |
 | `.env` instalado | template público, **sem `api_key`** (Contrato B não usa) |
+| URL do Neon no `.env` | **CORRIGIDO**: `postgresql+psycopg://` em vez de `postgresql://` |
 | Primeira execução do `PrintGestAPI.exe` | migrations (head `e8f9a0b1c2d3`, 43 tabelas) → uvicorn em **8,5 s** |
 | `GET /health` / `GET /v1/licenca` | 200 / `nao_ativada` com `contrato: b` (gate de serial antes do login) |
 | Log em arquivo (`logs/printgest-api.log`) | migrations e requisições registradas |
@@ -234,6 +235,10 @@ mudança do `.env` para o template sem segredos:
 
 Bugs corrigidos desde a v0.3.4:
 - ✅ PermissionError 13 no httpx (fallback de porta TCP implementado)
+- ✅ **WinError 10061 corrigido**: URL do Neon formatada corretamente (`postgresql+psycopg://`)
 - ✅ PostgreSQL embarcado removido (Neon Database substitui)
 - ✅ Redução de 48% no tamanho do instalador (44.1 MB → 25.8 MB Estação)
 - ✅ Migrações idempotentes corrigidas
+- ✅ Timeout de inicialização aumentado para 120s (Neon cold start)
+- ✅ Logging detalhado de diagnóstico adicionado
+- ✅ Correção na extração do DATABASE_URL no script empacotar.ps1
