@@ -127,7 +127,10 @@ class Usuario(Base):
     )
 
     sessoes: Mapped[list["UsuarioSessao"]] = relationship(back_populates="usuario")
-    funcionario: Mapped["Funcionario | None"] = relationship(back_populates="usuario")
+    funcionario: Mapped["Funcionario | None"] = relationship(
+        back_populates="usuario",
+        foreign_keys=[funcionario_id]
+    )
 
 
 class UsuarioSessao(Base):
