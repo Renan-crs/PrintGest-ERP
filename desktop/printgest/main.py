@@ -328,16 +328,16 @@ class _Roteador:
 def _preparar_daemon(app: QApplication) -> None:
     """Instalação empacotada: sobe o Local API Service antes do fluxo normal.
 
-    A primeira execução paga o initdb do PostgreSQL embarcado (segundos); o
-    diálogo indeterminado mantém o usuário informado em vez de uma janela
-    congelada. Sem nada para subir (dev) a chamada é uma sondagem rápida.
+    O daemon se conecta ao Neon Database (não há mais initdb local).
+    O diálogo mantém o usuário informado em vez de uma janela congelada.
+    Sem nada para subir (dev) a chamada é uma sondagem rápida.
     """
     if daemon.saude():
         return
     if daemon.caminho_do_backend() is None:
         return
     espera = QProgressDialog(
-        "Preparando o banco de dados local...\nA primeira execução pode levar alguns segundos.",
+        "Preparando conexão com Neon Database...\nA primeira execução pode levar alguns segundos.",
         None,
         0,
         0,

@@ -148,7 +148,7 @@ PrintGest ERP $versao (Servidor)
 
 PRIMEIRA EXECUCAO
   1. Abra o PrintGest ERP (atalho da area de trabalho / menu Iniciar).
-  2. O sistema prepara o banco de dados local (leva alguns segundos).
+  2. O sistema se conecta ao Neon Database (nao ha banco local - levou alguns segundos).
   3. A tela de ativacao pede a licenca emitida pelo RedGest - como em
      programas licenciados por serial, ela so e pedida na instalacao.
   4. Faca login com o usuario inicial: admin / admin123 (troque a senha
@@ -156,13 +156,12 @@ PRIMEIRA EXECUCAO
 
 ONDE FICAM AS COISAS
   - Programa:        {localappdata}\Programs\PrintGest
-  - Banco de dados:  ...\PrintGest\postgres\data (PostgreSQL embarcado)
   - Log do servico:  ...\PrintGest\PrintGestAPI\logs\printgest-api.log
 
 DESINSTALACAO
   Use "Desinstalar PrintGest ERP" no menu Iniciar ou Aplicativos do Windows.
-  A desinstalacao encerra o servico, para o PostgreSQL embarcado e remove o
-  banco local. Os dados do sistema saem junto - exporte antes, se precisar.
+  A desinstalacao encerra o servico e remove o programa. Os dados sao mantidos
+  no Neon Database em nuvem - exporte antes, se precisar.
 
 Suporte: veja docs/empacotamento.md no repositorio.
 "@ } else { @"
