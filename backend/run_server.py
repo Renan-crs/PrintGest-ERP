@@ -7,8 +7,8 @@ ambiente da instalação antes de servir:
 1. Carrega o `.env` ao lado do **executável** no `os.environ` — o pydantic
    resolve `env_file=".env"` pelo CWD, e o CWD de um atalho do menu Iniciar não
    é garantido. Variáveis de ambiente reais continuam vencendo o arquivo.
-2. Aciona o PostgreSQL embarcado quando `PRINTGEST_PG_EMBARCADO=true` (o `.env`
-   do instalador carrega a chave; a primeira execução roda o initdb).
+2. Usa Neon Database (PostgreSQL gerenciado em nuvem) quando 
+   `PRINTGEST_PG_EMBARCADO=false` - não há PostgreSQL embarcado desde v0.3.5.
 3. Registra log em arquivo (`logs/printgest-api.log` ao lado do exe) quando
    congelado — sem console, o log em arquivo é o único rastro de diagnóstico.
 4. Serve o app via uvicorn (sem reload), no host/porta das configurações.

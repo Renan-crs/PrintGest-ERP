@@ -169,7 +169,10 @@ class Funcionario(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    usuario: Mapped["Usuario | None"] = relationship(back_populates="funcionario")
+    usuario: Mapped["Usuario | None"] = relationship(
+        back_populates="funcionario",
+        foreign_keys=[usuario_id]
+    )
 
 
 class ProdutoCategoria(Base):
