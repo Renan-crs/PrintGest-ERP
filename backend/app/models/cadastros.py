@@ -170,7 +170,6 @@ class Funcionario(Base):
     )
 
     usuario: Mapped["Usuario | None"] = relationship(
-        back_populates="funcionario",
         foreign_keys=[usuario_id]
     )
 
