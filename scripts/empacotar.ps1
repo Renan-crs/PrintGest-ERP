@@ -54,65 +54,51 @@ function Ler-Chave([string[]]$conteudo, [string]$chave) {
 }
 
 $linhas = $null
+$databaseUrl = ""
 if ($ehServidor) {
-    # Para builds de PRODUCAO: use env.instalacao (fora do git, com credenciais reais)
-    # Para builds de DESENVOLVIMENTO: use env.instalacao.neon (com placeholders)
-    $envLocal = Join-Path $installer "env.instalacao"
+    # Fonte do .env: env.instalacao.neon ou env.instalacao.example
     $envNeon = Join-Path $installer "env.instalacao.neon"
+    $envLocal = Join-Path $installer "env.instalacao"
     $envExemplo = Join-Path $installer "env.instalacao.example"
     
-    # Prioriza env.instalacao (producao) se existir com DATABASE_URL real
     $envBase = $envExemplo
     if (Test-Path $envLocal) {
         $conteudoLocal = Get-Content $envLocal -ErrorAction SilentlyContinue
         if ($conteudoLocal -and ($conteudoLocal -match "PRINTGEST_DATABASE_URL=")) {
-            if ($conteudoLocal -notmatch "__NEON_HOST__") {
+            if ($conteudoLocal -notmatch "__NEON") {
                 $envBase = $envLocal
-                Write-Host "  base do .env: env.instalacao (credenciais Neon reais)"
-            } else {
-                Write-Host "  aviso: env.instalacao tem placeholders, usando env.instalacao.neon"
             }
         }
     }
-    if ($envBase -eq $envExemplo -and Test-Path $envNeon) {
+    if ($envBase -eq $envExemplo -and (Test-Path $envNeon)) {
         $envBase = $envNeon
     }
+    
     if ($envBase -eq $envLocal) {
         Write-Host "  base do .env: env.instalacao (credenciais Neon reais)"
     } elseif ($envBase -eq $envNeon) {
-        Write-Host "  base do .env: env.instalacao.neon (template Neon com placeholders)"
+        Write-Host "  base do .env: env.instalacao.neon (template Neon)"
     } else {
         Write-Host "  base do .env: env.instalacao.example (template publico)"
     }
     
     $linhas = @(Get-Content $envBase | Where-Object {
-        $_ -notmatch '^\s*PRINTGEST_PG_EMBARCADO\s*='
+        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV)\s*='
     })
     
-    # Extrair DATABASE_URL se existir (do env base ou como placeholder)
-    $databaseUrl = ""
+    # Extrair DATABASE_URL se existir (apenas o valor, sem o nome da variável)
     if (Test-Path $envBase) {
         $dbUrlLine = Select-String -Path $envBase -Pattern '^PRINTGEST_DATABASE_URL\s*=' -SimpleMatch -ErrorAction SilentlyContinue
         if ($dbUrlLine) {
-            $databaseUrl = $dbUrlLine.Line.Trim()
+            $match = $dbUrlLine.Line -match '^PRINTGEST_DATABASE_URL\s*=\s*(.+)$'
+            if ($match) {
+                $databaseUrl = $Matches[1]
+            } else {
+                $databaseUrl = $dbUrlLine.Line.Trim()
+            }
         }
     }
     
-    # Se nao tem DATABASE_URL, usar placeholder (o instalador deve configurar)
-    if (-not $databaseUrl) {
-        $databaseUrl = "PRINTGEST_DATABASE_URL=postgresql+psycopg:@127.0.0.1:5432/printgest"
-    }
-
-    $contrato = Ler-Chave $linhas "PRINTGEST_REDGEST_CONTRATO"
-    $apiChave = Ler-Chave $linhas "PRINTGEST_REDGEST_API_KEY"
-    if ($contrato -eq "c" -and -not $apiChave) {
-        throw @"
-Contrato C exige PRINTGEST_REDGEST_API_KEY, e ela esta vazia.
-Preencha em installer\env.instalacao (copie do .example; esse nome e ignorado
-pelo git) - a validacao da chave de produto e assinada com essa credencial.
-Contrato B (CNPJ + codigo) NAO usa api_key e pode seguir sem ela.
-"@
-    }
     if ($apiChave) {
         Write-Host ("  ATENCAO: o pacote carrega a api_key do RedGest ({0}...{1})." -f $apiChave.Substring(0,5), $apiChave.Substring($apiChave.Length-3))
     } else {
@@ -149,8 +135,13 @@ if ($ehServidor) {
         "PRINTGEST_API_HOST"     = "127.0.0.1"
         "PRINTGEST_ENV"          = "local"
     }
-    # Adicionar DATABASE_URL no inicio (antes das chaves forçadas)
-    $conteudo = @($databaseUrl) + $linhas + @(
+    # DATABASE_URL deve vir antes das outras variaveis
+    $dbUrlVar = if ($databaseUrl) {
+        if ($databaseUrl -match "^[A-Z_]+=.*") { $databaseUrl } else { "PRINTGEST_DATABASE_URL=$databaseUrl" }
+    } else {
+        ""
+    }
+    $conteudo = @($dbUrlVar) + $linhas + @(
         "",
         "# Instalacao empacotada (gerado por scripts/empacotar.ps1)"
     ) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
