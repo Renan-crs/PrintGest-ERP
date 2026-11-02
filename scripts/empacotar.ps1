@@ -94,15 +94,11 @@ if ($ehServidor) {
     
     # Extrair DATABASE_URL se existir (apenas o valor, sem o nome da variável)
     if (Test-Path $envBase) {
-        $dbUrlLine = Select-String -Path $envBase -Pattern '^PRINTGEST_DATABASE_URL\s*=' -SimpleMatch -ErrorAction SilentlyContinue
-        if ($dbUrlLine) {
-            # Extrair apenas o valor (depois do sinal de igual)
-            $fullLine = $dbUrlLine.Line
-            $equalsIndex = $fullLine.IndexOf('=')
-            if ($equalsIndex -ge 0) {
-                $databaseUrl = $fullLine.Substring($equalsIndex + 1).Trim()
-            } else {
-                $databaseUrl = $fullLine.Trim()
+        $lines = Get-Content $envBase
+        foreach ($line in $lines) {
+            if ($line -match '^PRINTGEST_DATABASE_URL\s*=\s*(.+)$') {
+                $databaseUrl = $Matches[1].Trim()
+                break
             }
         }
     }
