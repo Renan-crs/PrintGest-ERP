@@ -55,6 +55,8 @@ function Ler-Chave([string[]]$conteudo, [string]$chave) {
 
 $linhas = $null
 $databaseUrl = ""
+$contrato = ""
+$apiChave = ""
 if ($ehServidor) {
     # Fonte do .env: env.instalacao.neon ou env.instalacao.example
     $envNeon = Join-Path $installer "env.instalacao.neon"
@@ -82,23 +84,37 @@ if ($ehServidor) {
         Write-Host "  base do .env: env.instalacao.example (template publico)"
     }
     
+    # Ler as chaves antes de filtrar
+    $contrato = Ler-Chave (Get-Content $envBase) "PRINTGEST_REDGEST_CONTRATO"
+    $apiChave = Ler-Chave (Get-Content $envBase) "PRINTGEST_REDGEST_API_KEY"
+    
     $linhas = @(Get-Content $envBase | Where-Object {
-        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV)\s*='
+        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV|DATABASE_URL)\s*='
     })
     
     # Extrair DATABASE_URL se existir (apenas o valor, sem o nome da variável)
     if (Test-Path $envBase) {
         $dbUrlLine = Select-String -Path $envBase -Pattern '^PRINTGEST_DATABASE_URL\s*=' -SimpleMatch -ErrorAction SilentlyContinue
         if ($dbUrlLine) {
-            $match = $dbUrlLine.Line -match '^PRINTGEST_DATABASE_URL\s*=\s*(.+)$'
-            if ($match) {
-                $databaseUrl = $Matches[1]
+            # Extrair apenas o valor (depois do sinal de igual)
+            $fullLine = $dbUrlLine.Line
+            $equalsIndex = $fullLine.IndexOf('=')
+            if ($equalsIndex -ge 0) {
+                $databaseUrl = $fullLine.Substring($equalsIndex + 1).Trim()
             } else {
-                $databaseUrl = $dbUrlLine.Line.Trim()
+                $databaseUrl = $fullLine.Trim()
             }
         }
     }
     
+    if ($contrato -eq "c" -and -not $apiChave) {
+        throw @"
+Contrato C exige PRINTGEST_REDGEST_API_KEY, e ela esta vazia.
+Preencha em installer\env.instalacao (copie do .example; esse nome e ignorado
+pelo git) - a validacao da chave de produto e assinada com essa credencial.
+Contrato B (CNPJ + codigo) NAO usa api_key e pode seguir sem ela.
+"@
+    }
     if ($apiChave) {
         Write-Host ("  ATENCAO: o pacote carrega a api_key do RedGest ({0}...{1})." -f $apiChave.Substring(0,5), $apiChave.Substring($apiChave.Length-3))
     } else {
@@ -135,9 +151,9 @@ if ($ehServidor) {
         "PRINTGEST_API_HOST"     = "127.0.0.1"
         "PRINTGEST_ENV"          = "local"
     }
-    # DATABASE_URL deve vir antes das outras variaveis
+    # DATABASE_URL deve vir antes das outras variaveis - valor já limpo
     $dbUrlVar = if ($databaseUrl) {
-        if ($databaseUrl -match "^[A-Z_]+=.*") { $databaseUrl } else { "PRINTGEST_DATABASE_URL=$databaseUrl" }
+        "PRINTGEST_DATABASE_URL=$databaseUrl"
     } else {
         ""
     }
