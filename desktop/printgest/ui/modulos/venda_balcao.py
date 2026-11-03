@@ -54,7 +54,7 @@ from printgest.ui.formulario import (
 from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.paginador import LOTE, Paginador
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, botao_com_atalho, estado_sucesso, estado_erro, estado_muted, estado_atencao, estado_danger
+from printgest.ui.widgets import aplicar_estilo, botao_com_atalho, estado_primario, estado_sucesso, estado_erro, estado_muted, estado_atencao, estado_danger
 
 # Formas que aceitam parcelamento (mostram o campo "Parcelas").
 _FORMAS_PARCELAVEIS = {"cartao_credito", "boleto", "fiado"}
