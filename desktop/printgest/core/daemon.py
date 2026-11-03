@@ -31,26 +31,33 @@ TEMPO_LIMITE_SUBIDA_SEGUNDOS = 120.0  # Aumentado de 90s para 2min (Neon cold st
 def saude(timeout: float = 1.0) -> bool:
     """True quando o Local API Service responde ao /health.
     
-    Tenta conexao HTTP primeiro, mas se falhar por permissões SSL,
-    verifica se a porta esta aberta como fallback.
+    Tenta conexão HTTP primeiro, mas se falhar por permissões SSL,
+    verifica se a porta está aberta como fallback.
     """
     import httpx
     import logging
+    import socket as sock_module
+    
     logger = logging.getLogger("printgest.daemon")
     
     # Primeiro tenta HTTP com httpx
     try:
         resp = httpx.get(SAUDE_URL, timeout=timeout)
         if resp.status_code == 200:
+            logger.debug("Health check OK - status 200")
             return True
         logger.debug("Health check retornou status %s", resp.status_code)
         return False
     except PermissionError:
-        # Erro de permissao SSL - verificar se porta esta aberta
-        logger.debug("PermissionError ao acessar health endpoint")
+        # Erro de permissão SSL - verificar se porta está aberta
+        logger.debug("PermissionError ao acessar health endpoint via HTTP, usando fallback TCP")
         return _porta_aberta(timeout)
     except OSError as e:
-        logger.debug("OSError ao acessar health endpoint: %s", e)
+        import errno
+        if e.errno == errno.ECONNREFUSED:
+            logger.debug("Conexao recusada (ECONNREFUSED) - verificando porta TCP")
+        else:
+            logger.debug("OSError ao acessar health endpoint: %s", e)
         return _porta_aberta(timeout)
     except httpx.HTTPError as e:
         # Conexao recusada ou timeout - verificar porta como fallback
