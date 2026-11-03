@@ -320,7 +320,7 @@ def test_repetir_pedido_copia_itens_e_arte(client, admin_token):
 
     # Repetir o pedido
     resp = client.post(f"/v1/os/{os_id}/repetir", headers=auth(client, admin_token))
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 201, resp.text
     novo = resp.json()["data"]
 
     # O novo OS deve ter itens copiados, arte replicada e status aprovado
@@ -343,7 +343,7 @@ def test_repetir_pode_vir_como_orcamento(client, admin_token):
     resp = client.post(f"/v1/os/{os_origem['id']}/repetir",
                        headers=auth(client, admin_token),
                        json={"tipo": "orcamento"})
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 201, resp.text
     novo = resp.json()["data"]
     assert novo["tipo"] == "orcamento"
 
@@ -361,7 +361,7 @@ def test_refacao_cria_os_filha(client, admin_token):
                            "erro": "grafica",
                            "custo": 150.00,
                        })
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 201, resp.text
     refacao = resp.json()["data"]
 
     assert refacao["refacao_origem_id"] == os_origem["id"]
@@ -369,7 +369,7 @@ def test_refacao_cria_os_filha(client, admin_token):
     assert refacao["refacao_erro"] == "grafica"
     assert Decimal(str(refacao["refacao_custo"])) == Decimal("150.00")
     # Erro da gráfica → desconto 100% → total 0
-    assert refacao["valor_total"] == 0
+    assert Decimal(str(refacao["valor_total"])) == Decimal("0.00")
 
 
 def test_refacao_separa_erro_cliente(client, admin_token):
@@ -384,13 +384,13 @@ def test_refacao_separa_erro_cliente(client, admin_token):
                            "motivo": "Cliente mudou de ideia",
                            "erro": "cliente",
                        })
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 201, resp.text
     refacao = resp.json()["data"]
 
     assert refacao["refacao_erro"] == "cliente"
     # Erro do cliente: desconto original mantido, preço não é zerado
-    assert refacao["desconto"] == Decimal("10.00")
-    assert refacao["valor_total"] > 0
+    assert Decimal(str(refacao["desconto"])) == Decimal("10.00")
+    assert Decimal(str(refacao["valor_total"])) > 0
 
 
 def test_refacao_sobre_os_nao_orcamento(client, admin_token):

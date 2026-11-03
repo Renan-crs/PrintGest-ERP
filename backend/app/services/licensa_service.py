@@ -808,16 +808,19 @@ def renovar(db: Session) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licenciamento desabilitado nesta build de desenvolvimento.",
         )
+    if contrato_b():
+        # Contrato B resolve as credenciais (linha local ou cópia de recuperação
+        # da máquina) e trata a instalação sem licença — por isso vem antes do
+        # atalho de "sem chave local" do Contrato C.
+        from app.services import licensa_contrato_b
+
+        return licensa_contrato_b.revalidar(db)
     lic = _licenca_local(db)
     if lic is None or not lic.chave_ativacao:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Licença ainda não ativada.",
         )
-    if contrato_b():
-        from app.services import licensa_contrato_b
-
-        return licensa_contrato_b.revalidar(db)
     chave = _chave_em_claro(lic)
     if not chave:
         raise HTTPException(

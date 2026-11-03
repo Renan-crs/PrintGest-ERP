@@ -42,6 +42,7 @@ import datetime as dt
 import hmac
 import json
 import re
+import unicodedata
 import uuid
 from typing import Any
 
@@ -49,7 +50,7 @@ import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core import cofre
+from app.core import cofre, cofre_maquina
 from app.core.config import settings
 from app.models.licenca import Licenca
 from app.services import licensa_service as svc
@@ -225,8 +226,9 @@ def _persistir(db: Session, dados: dict, *, codigo: str, cnpj: str) -> Licenca:
         entitlements["modulos"] = modulos
     entitlements["contrato"] = "b"
     entitlements["cnpj"] = cnpj
-    if dados.get("licenca_id"):
-        entitlements["licenca_id"] = dados["licenca_id"]
+    licenca_id = str(dados.get("licenca_id") or dados.get("id") or "").strip()
+    if licenca_id:
+        entitlements["licenca_id"] = licenca_id
     if dados.get("client_id"):
         entitlements["client_id"] = dados["client_id"]
     if dados.get("entitlements"):
@@ -238,6 +240,9 @@ def _persistir(db: Session, dados: dict, *, codigo: str, cnpj: str) -> Licenca:
     lic.ultima_validacao = agora
     lic.ultima_tentativa_em = agora
     lic.ultimo_erro = None
+    # Cópia de recuperação fora do banco: sobrevive à reinstalação e permite
+    # reconstruir a linha local com `/validar/` em vez de um novo handshake.
+    _registrar_no_cofre_local(dados, codigo=codigo, cnpj=cnpj)
     db.commit()
     db.refresh(lic)
     svc._recalcular_estado(lic)
@@ -272,6 +277,188 @@ def _credenciais_do_cofre(lic: Licenca) -> tuple[str, str]:
     return svc._separar_credencial(guardado)
 
 
+# ------------------------------------- recuperação fora do banco (reinstalação)
+def _sem_acento(texto: str) -> str:
+    """Minúsculas sem acentos — comparação tolerante das mensagens do RedGest."""
+    decomposto = unicodedata.normalize("NFKD", texto or "")
+    return decomposto.encode("ascii", "ignore").decode("ascii").lower()
+
+
+def _material_completo(material: dict) -> bool:
+    return bool(
+        material.get("client_id")
+        and material.get("client_secret")
+        and material.get("codigo")
+    )
+
+
+def _material_combina(material: dict, numero: str, codigo: str) -> bool:
+    """O material guardado é da licença (CNPJ + código) que o usuário digitou?"""
+    return (
+        _material_completo(material)
+        and str(material.get("cnpj") or "") == numero
+        and str(material.get("codigo") or "").casefold() == codigo.casefold()
+    )
+
+
+def _linha_combina(lic: Licenca | None, numero: str, codigo: str) -> bool:
+    """A linha local já corresponde à licença digitada (mesmo CNPJ + código)?"""
+    if lic is None:
+        return False
+    entitlements = dict(lic.entitlements or {})
+    guardado = svc._chave_em_claro(lic)
+    return (
+        str(entitlements.get("cnpj") or "") == numero
+        and bool(guardado)
+        and guardado.casefold() == codigo.casefold()
+    )
+
+
+def _registrar_no_cofre_local(dados: dict, *, codigo: str, cnpj: str) -> None:
+    """Mantém a cópia de recuperação da ativação na máquina.
+
+    Chamado em toda resposta bem-sucedida (ativação **e** revalidação): o
+    `/validar` rotaciona o `client_secret`, então o arquivo precisa acompanhar.
+    Quando a resposta não traz o par (servidor que não o ecoa), preserva o que
+    já estava guardado.
+    """
+    atual = cofre_maquina.ler()
+    client_id = str(dados.get("client_id") or "").strip()
+    segredo = str(dados.get("client_secret") or "").strip()
+    if not (client_id and segredo):
+        client_id = client_id or str(atual.get("client_id") or "")
+        segredo = segredo or str(atual.get("client_secret") or "")
+    if not (client_id and segredo):
+        return
+    codigo_final = codigo or str(atual.get("codigo") or "")
+    if not codigo_final:
+        return
+    licenca_id = str(
+        dados.get("licenca_id")
+        or dados.get("id")
+        or atual.get("licenca_id")
+        or codigo_final
+    ).strip()
+    cofre_maquina.guardar(
+        {
+            "versao": 1,
+            "cnpj": cnpj or str(atual.get("cnpj") or ""),
+            "codigo": codigo_final,
+            "licenca_id": licenca_id,
+            "client_id": client_id,
+            "client_secret": segredo,
+            "atualizado_em": svc._agora().isoformat(),
+        }
+    )
+
+
+def _credencial_recusada(exc: HTTPException) -> bool:
+    """400 específico de credencial recusada pelo `/validar` (HTTP 403 do RedGest)."""
+    return exc.status_code == status.HTTP_400_BAD_REQUEST and "credenciais" in (
+        _sem_acento(str(exc.detail or ""))
+    )
+
+
+def _erro_ativacao_ja_existente(exc: HTTPException) -> bool:
+    """O `/ativar/` recusou porque a licença já tem credenciais M2M emitidas."""
+    if exc.status_code not in (
+        status.HTTP_400_BAD_REQUEST,
+        status.HTTP_409_CONFLICT,
+    ):
+        return False
+    texto = _sem_acento(str(exc.detail or ""))
+    return any(
+        marca in texto
+        for marca in (
+            "ja possui ativacao",
+            "ativacao ativa",
+            "reset das credenciais",
+            "credenciais m2m",
+            "credenciais ja emitidas",
+        )
+    )
+
+
+def _erro_credenciais_perdidas(exc: HTTPException, codigo: str) -> HTTPException:
+    """Mensagem acionável quando não há cópia local para recuperar a licença."""
+    return HTTPException(
+        status_code=exc.status_code,
+        detail=(
+            "Esta licença já foi ativada e não foi possível recuperar as "
+            f"credenciais desta instalação. Guarde o código {codigo} e peça ao "
+            "suporte do RedGest o reset das credenciais M2M; depois ative "
+            "novamente — nas próximas reinstalações a recuperação será automática."
+        ),
+    )
+
+
+def _material_da_linha(
+    lic: Licenca | None, *, codigo: str, cnpj: str
+) -> dict | None:
+    """Material de ativação legível na própria linha local (``None`` se não há)."""
+    if lic is None:
+        return None
+    try:
+        client_id, segredo = _credenciais_do_cofre(lic)
+    except HTTPException:
+        return None
+    if not client_id or not segredo:
+        return None
+    entitlements = dict(lic.entitlements or {})
+    return {
+        "client_id": client_id,
+        "client_secret": segredo,
+        "licenca_id": str(entitlements.get("licenca_id") or codigo or "").strip(),
+        "cnpj": cnpj,
+        "codigo": codigo,
+    }
+
+
+def _validar_com_material(
+    db: Session, material: dict, *, cnpj: str, codigo: str
+) -> dict:
+    """Chama `/validar/` com um material já resolvido e persiste o resultado.
+
+    É o caminho comum da revalidação periódica e da recuperação após
+    reinstalação (linha local perdida ou blob DPAPI do banco ilegível). Não gasta
+    o handshake de uso único do §7.2.
+    """
+    licenca_id = str(material.get("licenca_id") or codigo or "").strip()
+    corpo = {
+        "client_id": str(material.get("client_id") or "").strip(),
+        "client_secret": str(material.get("client_secret") or "").strip(),
+        "hardware_profile": _perfil_hardware(),
+    }
+    dados = _requisitar(
+        db,
+        svc._cliente_com_idempotencia(uuid.uuid4().hex),
+        f"/api/v1/licencas/{licenca_id}/validar/",
+        corpo,
+        contexto="validação da licença",
+    )
+    if dados.get("valida") is False:
+        motivo = _culminancia(dados)
+        if motivo == "licenca_expirada" and svc._licenca_local(db) is None:
+            # Reinstalação dentro do grace: reconstrói a linha em tolerância em
+            # vez de bloquear (o `/validar` não devolve `data_fim` confiável).
+            grace = svc._parse_dt(dados.get("grace_deadline"))
+            if grace is not None and grace > svc._agora():
+                lic = _persistir(db, dados, codigo=codigo, cnpj=cnpj)
+                lic.chave_ativacao = cofre.proteger(codigo)
+                db.commit()
+                svc._recalcular_estado(lic)
+                return svc.situacao(db)
+        _tratar_valida_false(db, dados, origem="recuperacao")
+        return svc.situacao(db)
+    lic = _persistir(db, dados, codigo=codigo, cnpj=cnpj)
+    # A coluna da chave guarda o `codigo_licenca` cifrado: mantém `_estado()`
+    # (que exige uma chave legível) e o mascaramento da situação funcionando.
+    lic.chave_ativacao = cofre.proteger(codigo)
+    db.commit()
+    svc._recalcular_estado(lic)
+    return svc.situacao(db)
+
+
 def _erro_transporte(db: Session, contexto: str, exc: Exception) -> HTTPException:
     svc._registrar_falha(db, f"RedGest inacessível ({type(exc).__name__})")
     return svc._indisponivel(contexto, exc)
@@ -291,7 +478,8 @@ def _erro_de_resposta(db: Session, resp: httpx.Response) -> HTTPException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "O servidor de licenças recusou as credenciais desta instalação. "
-                "Reative a licença com o CNPJ e o código."
+                "Reative a licença com o CNPJ e o código; se o erro persistir, "
+                "peça ao suporte o reset das credenciais M2M."
             ),
         )
     if resp.status_code == status.HTTP_404_NOT_FOUND:
@@ -395,7 +583,18 @@ def _requisitar(
 
 # --------------------------------------------------------------- operações
 def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
-    """Handshake do §7.2: troca CNPJ + código por credenciais de longa duração."""
+    """Ativa a licença — ou recupera a ativação já existente nesta máquina.
+
+    Ordem (a mesma máquina dentro da vigência reutiliza a licença sem suporte):
+
+    1. linha local legível e correspondente ao CNPJ + código -> `/validar/`;
+    2. cópia de recuperação da máquina (sobrevive à reinstalação) -> `/validar/`;
+    3. handshake `/ativar/` (primeira ativação).
+
+    Se o RedGest recusar o handshake porque a licença já possui credenciais M2M
+    (§7.2, segredo emitido uma única vez) e não houver cópia local, a mensagem
+    orienta o reset de suporte.
+    """
     if not settings.redgest_url:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -413,18 +612,52 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Informe o código da licença entregue na contratação.",
         )
+
+    # 1) A instalação já tem o par no cofre do banco para esta mesma licença:
+    #    revalida (rotaciona o secret) em vez de tentar um novo handshake.
+    lic = svc._licenca_local(db)
+    if _linha_combina(lic, numero, codigo):
+        material_linha = _material_da_linha(lic, codigo=codigo, cnpj=numero)
+        if material_linha is not None:
+            try:
+                return _validar_com_material(
+                    db, material_linha, cnpj=numero, codigo=codigo
+                )
+            except HTTPException as exc:
+                if not _credencial_recusada(exc):
+                    raise
+
+    # 2) Linha perdida (reinstalação/recriação do banco): reconstrói pelo cofre
+    #    local da máquina, sem consumir um novo handshake.
+    material = cofre_maquina.ler()
+    if _material_combina(material, numero, codigo):
+        try:
+            return _validar_com_material(db, material, cnpj=numero, codigo=codigo)
+        except HTTPException as exc:
+            if not _credencial_recusada(exc):
+                raise
+            # Par local não vale mais (segredo rotacionado sem resposta): o
+            # handshake abaixo devolve a mensagem correta — normalmente "já
+            # ativada", que vira a orientação de reset.
+
+    # 3) Primeira ativação nesta instalação.
     corpo = {
         "cnpj": numero,
         "codigo_licenca": codigo,
         "hardware_profile": _perfil_hardware(),
     }
-    dados = _requisitar(
-        db,
-        svc._cliente_com_idempotencia(uuid.uuid4().hex),
-        f"/api/v1/licencas/{codigo}/ativar/",
-        corpo,
-        contexto="ativação da licença",
-    )
+    try:
+        dados = _requisitar(
+            db,
+            svc._cliente_com_idempotencia(uuid.uuid4().hex),
+            f"/api/v1/licencas/{codigo}/ativar/",
+            corpo,
+            contexto="ativação da licença",
+        )
+    except HTTPException as exc:
+        if _erro_ativacao_ja_existente(exc):
+            raise _erro_credenciais_perdidas(exc, codigo) from exc
+        raise
     lic = _persistir(db, dados, codigo=codigo, cnpj=numero)
     # A coluna da chave guarda o `codigo_licenca` cifrado: mantém `_estado()`
     # (que exige uma chave legível) e o mascaramento da situação funcionando.
@@ -435,16 +668,49 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
 
 
 def revalidar(db: Session) -> dict:
-    """`/validar` do §7.3: credenciais M2M + perfil de hardware."""
+    """`/validar` do §7.3: credenciais M2M + perfil de hardware.
+
+    Sem a linha local (ou com o par ilegível), tenta a cópia de recuperação da
+    máquina antes de pedir reativação — cobre reinstalação e banco restaurado de
+    outro computador.
+    """
     lic = svc._licenca_local(db)
     if lic is None:
+        material = cofre_maquina.ler()
+        if _material_completo(material):
+            return _validar_com_material(
+                db,
+                material,
+                cnpj=str(material.get("cnpj") or ""),
+                codigo=str(material.get("codigo") or ""),
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Licença ainda não ativada."
         )
-    client_id, segredo = _credenciais_do_cofre(lic)
+
     entitlements = dict(lic.entitlements or {})
-    codigo = str(entitlements.get("licenca_id") or svc._chave_em_claro(lic) or "").strip()
-    if not codigo or not client_id or not segredo:
+    codigo_local = svc._chave_em_claro(lic)
+    licenca_id = str(entitlements.get("licenca_id") or codigo_local or "").strip()
+    codigo = codigo_local or licenca_id
+    cnpj = str(entitlements.get("cnpj") or "")
+    material = _material_da_linha(lic, codigo=codigo, cnpj=cnpj)
+
+    if material is None:
+        # Banco sem o par legível (linha restaurada de outra máquina): a cópia
+        # da máquina é a única saída sem reset. Se o código local é legível,
+        # ela precisa ser da mesma licença.
+        recuperavel = cofre_maquina.ler()
+        if _material_completo(recuperavel) and (
+            not codigo_local
+            or str(recuperavel.get("codigo") or "").casefold()
+            == codigo_local.casefold()
+        ):
+            return _validar_com_material(
+                db,
+                recuperavel,
+                cnpj=cnpj or str(recuperavel.get("cnpj") or ""),
+                codigo=codigo_local or str(recuperavel.get("codigo") or ""),
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -452,23 +718,5 @@ def revalidar(db: Session) -> dict:
                 "Reative a licença com o CNPJ e o código."
             ),
         )
-    corpo = {
-        "client_id": client_id,
-        "client_secret": segredo,
-        "hardware_profile": _perfil_hardware(),
-    }
-    dados = _requisitar(
-        db,
-        svc._cliente_com_idempotencia(uuid.uuid4().hex),
-        f"/api/v1/licencas/{codigo}/validar/",
-        corpo,
-        contexto="validação da licença",
-    )
-    if dados.get("valida") is False:
-        motivo = _culminancia(dados)
-        _tratar_valida_false(db, dados, origem="validacao")
-        if motivo == "licenca_expirada":
-            # Já tratado em tolerância/modo leitura; não repersistir estado "ativa".
-            return svc.situacao(db)
-    _persistir(db, dados, codigo=codigo, cnpj=str(entitlements.get("cnpj") or ""))
-    return svc.situacao(db)
+
+    return _validar_com_material(db, material, cnpj=cnpj, codigo=codigo)

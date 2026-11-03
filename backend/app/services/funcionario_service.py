@@ -7,9 +7,10 @@ o funcionário deve definir sua senha.
 
 from typing import Any
 
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password
 from app.models.cadastros import Funcionario
 from app.models.core import Usuario
 
@@ -24,19 +25,30 @@ def criar_com_usuario(
 
     funcionario = modelo_funcionario(**dados)
     db.add(funcionario)
-    db.flush()  # Garante que funcionario.id existe
+    try:
+        db.flush()  # Garante que funcionario.id existe
 
-    usuario = Usuario(
-        nome=dados.get("nome"),
-        login=login,
-        senha_hash=None,  # Primeiro acesso: senha será definida no login
-        primeiro_acesso=True,  # Flag para pedir senha no primeiro login
-        nivel_acesso="operador",
-        funcionario_id=funcionario.id,
-        filial_id=dados.get("filial_id"),
-        email=dados.get("email"),
-    )
-    db.add(usuario)
-    db.commit()
+        usuario = Usuario(
+            nome=dados.get("nome"),
+            login=login,
+            senha_hash=None,  # Primeiro acesso: senha será definida no login
+            primeiro_acesso=True,  # Flag para pedir senha no primeiro login
+            nivel_acesso="operador",
+            funcionario_id=funcionario.id,
+            filial_id=dados.get("filial_id"),
+            email=dados.get("email"),
+        )
+        db.add(usuario)
+        db.flush()
+        # Link reverso (Funcionario.usuario_id) — mantém as duas pontas coerentes
+        # e evita `Funcionario.usuario` sempre nulo.
+        funcionario.usuario_id = usuario.id
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dados duplicados: já existe um registro com esses valores.",
+        ) from exc
     db.refresh(funcionario)
     return funcionario

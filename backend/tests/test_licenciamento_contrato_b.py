@@ -14,7 +14,7 @@ import uuid
 import httpx
 import pytest
 
-from app.core import cofre
+from app.core import cofre, cofre_maquina
 from app.core.config import settings
 from app.services import licensa_contrato_b as contrato_b
 from app.services import licensa_service
@@ -29,7 +29,7 @@ DIA = 24 * 3600
 
 
 @pytest.fixture(autouse=True)
-def _contrato_b(client, monkeypatch):
+def _contrato_b(client, monkeypatch, tmp_path):
     """Roda DEPOIS do conftest: limpa a licença e liga o Contrato B."""
     from app.db import SessionLocal
     from app.models.licenca import Licenca
@@ -37,6 +37,11 @@ def _contrato_b(client, monkeypatch):
     monkeypatch.setattr(settings, "redgest_contrato", "b")
     monkeypatch.setattr(settings, "licenca_desabilitada", False)
     monkeypatch.setattr(settings, "maquina_fingerprint", FINGERPRINT_FIXO)
+    # Cópia de recuperação isolada por teste (nunca toca o arquivo real).
+    monkeypatch.setattr(
+        settings, "cofre_licenca_arquivo", str(tmp_path / "licenca.dat")
+    )
+    cofre_maquina.limpar()
 
     sessao = SessionLocal()
     try:
@@ -49,6 +54,7 @@ def _contrato_b(client, monkeypatch):
     licensa_service._fingerprint_do_hardware.cache_clear()
     licensa_service._abrir_chave.cache_clear()
     yield
+    cofre_maquina.limpar()
 
 
 # ------------------------------------------------------------------- helpers
@@ -230,6 +236,116 @@ def test_ativacao_recusada_repassa_mensagem(client, monkeypatch):
     assert _licenca() is None
 
 
+# --------------------------- recuperação na mesma máquina (reinstalação)
+def _apagar_licenca_local() -> None:
+    """Simula reinstalação/recriação do banco: a linha local deixa de existir."""
+    from app.db import SessionLocal
+    from app.models.licenca import Licenca
+
+    sessao = SessionLocal()
+    try:
+        sessao.query(Licenca).delete()
+        sessao.commit()
+    finally:
+        sessao.close()
+
+
+def test_ativacao_grava_copia_de_recuperacao_na_maquina(client, monkeypatch):
+    _mock(monkeypatch, _resposta_ativacao())
+
+    assert _ativar(client).status_code == 200
+
+    material = cofre_maquina.ler()
+    assert material["cnpj"] == CNPJ
+    assert material["codigo"] == CODIGO
+    assert material["licenca_id"] == CODIGO
+    assert material["client_id"] == CLIENT_ID
+    assert material["client_secret"] == CLIENT_SECRET
+    # nunca em texto puro no arquivo (quando o DPAPI está disponível)
+    if cofre.disponivel():
+        assert CLIENT_SECRET not in cofre_maquina.caminho().read_text(encoding="utf-8")
+
+
+def test_reinstalacao_recupera_pelo_cofre_local_sem_novo_handshake(
+    client, monkeypatch
+):
+    _mock(monkeypatch, _resposta_ativacao())
+    assert _ativar(client).status_code == 200
+    _apagar_licenca_local()
+
+    registro = _mock(monkeypatch, _resposta_validacao())
+    resp = _ativar(client)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["estado"] == "ativa"
+    assert len(registro) == 1  # nenhum novo /ativar: só /validar
+    assert registro[0].url.path == f"/api/v1/licencas/{CODIGO}/validar/"
+    corpo = json.loads(registro[0].read())
+    assert corpo["client_id"] == CLIENT_ID
+    assert corpo["client_secret"] == CLIENT_SECRET
+    assert corpo["hardware_profile"]
+
+    lic = _licenca()
+    assert lic is not None
+    assert cofre.revelar(lic.chave_ativacao) == CODIGO
+    # O /validar rotacionou o secret: a cópia local acompanha.
+    assert cofre_maquina.ler()["client_secret"] == "s3gr3d0-rotacionado"
+
+
+def test_renovar_reconstroi_linha_perdida_pelo_cofre_local(client, monkeypatch):
+    _mock(monkeypatch, _resposta_ativacao())
+    assert _ativar(client).status_code == 200
+    _apagar_licenca_local()
+
+    registro = _mock(monkeypatch, _resposta_validacao())
+    resp = client.post("/v1/licenca/renovar")
+
+    assert resp.status_code == 200, resp.text
+    assert registro[-1].url.path == f"/api/v1/licencas/{CODIGO}/validar/"
+    assert _licenca() is not None
+
+
+def test_banco_de_outra_maquina_usa_copia_local(client, monkeypatch):
+    """Blob DPAPI do banco ilegível, mas a cópia desta máquina recupera."""
+    _mock(monkeypatch, _resposta_ativacao())
+    assert _ativar(client).status_code == 200
+    _ajustar_licenca(client_secret="dpapi:v1:@@@ilegivel@@@")
+
+    registro = _mock(monkeypatch, _resposta_validacao())
+    resp = client.post("/v1/licenca/renovar")
+
+    assert resp.status_code == 200, resp.text
+    corpo = json.loads(registro[-1].read())
+    assert corpo["client_secret"] == CLIENT_SECRET  # veio da cópia local
+    assert cofre.revelar(_licenca().client_secret) == f"{CLIENT_ID}|s3gr3d0-rotacionado"
+
+
+def test_ativar_ja_ativada_sem_copia_local_orienta_reset(client, monkeypatch):
+    cofre_maquina.limpar()
+    _mock(
+        monkeypatch,
+        httpx.Response(
+            409,
+            json={
+                "detail": (
+                    "Licença já possui ativação ativa. Solicite ao suporte o "
+                    "reset das credenciais M2M antes de reativar"
+                ),
+                "codigo": "LICENCA_JA_ATIVADA",
+            },
+        ),
+    )
+
+    resp = _ativar(client)
+
+    assert resp.status_code == 409
+    detalhe = resp.json()["detail"]
+    assert CODIGO in detalhe
+    assert "reset" in detalhe.lower()
+    assert "M2M" in detalhe
+    assert _licenca() is None
+
+
 # -------------------------------------------- revalidação (itens 4, 5, 7, 9)
 def test_renovar_rotaciona_credenciais_e_mantem_ativa(client, monkeypatch):
     _mock(monkeypatch, _resposta_ativacao())
@@ -282,6 +398,7 @@ def test_renovar_sem_credenciais_pede_reativacao(client, monkeypatch):
     _mock(monkeypatch, _resposta_ativacao())
     assert _ativar(client).status_code == 200
     _ajustar_licenca(client_secret=None)
+    cofre_maquina.limpar()  # sem cópia de recuperação nesta máquina
 
     resp = client.post("/v1/licenca/renovar")
 

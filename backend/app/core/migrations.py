@@ -41,7 +41,34 @@ def _upgrade_congelado() -> None:
 
     cfg = Config()
     cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
-    command.upgrade(cfg, "head")
+    try:
+        command.upgrade(cfg, "head")
+    except Exception as exc:
+        # Caso clássico em Neon: o banco foi criado pelo papel dono
+        # (`neondb_owner`) e a instalação usa um papel sem posse das tabelas.
+        # O stack trace do Alembic não diz o que fazer; traduzimos.
+        if _erro_de_permissao(exc):
+            raise RuntimeError(
+                "Sem permissão para aplicar migrations no banco. O usuário de "
+                "PRINTGEST_DATABASE_URL precisa ser dono das tabelas do schema "
+                "public (ou membro do papel dono). Peça ao suporte para ajustar "
+                "o papel do banco antes de abrir o PrintGest.\n"
+                f"{exc}"
+            ) from exc
+        raise
+
+
+def _erro_de_permissao(exc: BaseException) -> bool:
+    """`True` quando a falha do Alembic é de privilégio (não de schema)."""
+    texto = f"{type(exc).__name__}: {exc}".lower()
+    marcas = (
+        "insufficientprivilege",
+        "must be owner",
+        "permission denied for schema",
+        "permission denied for table",
+        "permission denied for relation",
+    )
+    return any(marca in texto for marca in marcas)
 
 
 def aplicar_migrations() -> None:
