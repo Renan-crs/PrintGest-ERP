@@ -44,12 +44,13 @@ from printgest.core.tarefas import rodar
 from printgest.ui.widgets import (
     EtiquetaQuebra,
     aplicar_estilo,
-    formatar_datahora,
-    marca_printgest,
+    estado_primario,
+    estado_secundario,
     estado_sucesso,
     estado_erro,
     estado_muted,
-    estado_secundario,
+    formatar_datahora,
+    marca_printgest,
 )
 
 _FORMATO_CHAVE = re.compile(r"^[0-9A-F]{4}(-[0-9A-F]{4}){3}$")
