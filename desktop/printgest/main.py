@@ -139,7 +139,12 @@ class _Roteador:
             if sessao:
                 self._sessao_salva = True
                 self._token = sessao["token"]
-                self._api.autenticar({**sessao["usuario"], "token": sessao["token"]})
+                # `autenticar` espera o formato da resposta do login
+                # (`{"token": ..., "usuario": {...}}`); passar o usuário
+                # "achatado" quebrava a restauração da sessão com KeyError.
+                self._api.autenticar(
+                    {"token": sessao["token"], "usuario": sessao["usuario"]}
+                )
                 # Verifica rapidamente se a sessão ainda é válida
                 rodar(
                     lambda: self._api.situacao_licenca(self._token),
@@ -158,9 +163,13 @@ class _Roteador:
         """Trata a situação quando a sessão foi restaurada com sucesso."""
         status = sit["status"]
         if status == "nao_ativada":
-            # Licença foi revogada ou reinstalação detectada
+            # Licença foi revogada ou reinstalação detectada: a sessão salva não
+            # vale mais e a ativação acontece antes de qualquer autenticação.
             limpar_sessao()
-            self._abrir_ativacao(sit, token=self._token, apos_ativacao=self._abrir_login)
+            self._token = None
+            self._api.encerrar_sessao()
+            self._sessao_salva = False
+            self._abrir_ativacao(sit, token=None, apos_ativacao=self._abrir_login)
         elif sit["modo_leitura"]:
             self._abrir_modo_leitura(sit)
         else:

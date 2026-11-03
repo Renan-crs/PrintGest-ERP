@@ -58,6 +58,7 @@ from printgest.ui.widgets import (
     estado_atencao,
     estado_primario,
     estado_danger,
+    formatar_datahora,
 )
 
 
