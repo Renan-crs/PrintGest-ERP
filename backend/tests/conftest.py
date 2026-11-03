@@ -29,6 +29,10 @@ os.environ["PRINTGEST_AUTO_MIGRATE"] = "false"
 # contrato dos testes — os casos do Contrato B ligam a flag via monkeypatch.
 os.environ["PRINTGEST_REDGEST_CONTRATO"] = "c"
 
+# A suíte usa o admin de teste (`admin123`); não herda a senha do `.env` da
+# máquina, que pode estar em piloto/produção.
+os.environ["PRINTGEST_ADMIN_INICIAL_SENHA"] = "admin123"
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEST_DB = "printgest_test"
 _HOST = "127.0.0.1:5432"

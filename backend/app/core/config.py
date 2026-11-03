@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
-    version: str = "0.3.8"
+    version: str = "0.4.2"
     env: str = "dev"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # Cofre do SO para a chave de ativação (§9.4): `dpapi` (Windows, escopo de
     # máquina) ou `nenhum` (grava em texto puro — só para dev/diagnóstico).
     cofre: str = "dpapi"
+    # Cópia de recuperação do material de ativação (CNPJ, código e par M2M),
+    # fora do banco, para sobreviver à reinstalação/recriação do banco na mesma
+    # máquina. Vazio = `%LOCALAPPDATA%\PrintGest\licenca.dat` (Windows) ou
+    # `~/.printgest/licenca.dat`. O conteúdo é cifrado com o mesmo DPAPI.
+    cofre_licenca_arquivo: str = ""
     licenca_refresh_intervalo_segundos: int = 300
     # Cadência de revalidação online da chave de produto (default 6 h). A licença
     # em si vale até `expira_em`; isso só controla de quanto em quanto tempo o

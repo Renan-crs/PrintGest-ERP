@@ -31,10 +31,12 @@ def upgrade() -> None:
     columns = [col["name"] for col in inspector.get_columns("usuario")]
     
     if "senha_hash" in columns:
-        # Alterar apenas se não estiver nullable
+        # Alterar apenas se não estiver nullable. `information_schema` devolve a
+        # string 'YES'/'NO' — comparar explicitamente (a versão anterior usava
+        # `not is_nullable`, que nunca alterava uma coluna NOT NULL).
         result = conn.execute(sa.text("SELECT is_nullable FROM information_schema.columns WHERE table_name='usuario' AND column_name='senha_hash'"))
         is_nullable = result.scalar()
-        if not is_nullable:
+        if is_nullable == "NO":
             op.alter_column(
                 "usuario",
                 "senha_hash",

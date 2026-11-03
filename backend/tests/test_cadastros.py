@@ -192,6 +192,7 @@ def test_funcionario_crud(client, admin_token):
         headers=auth(client, admin_token),
         json={
             "nome": "Funcionario Teste",
+            "login": f"func_{_u()[:10]}",
             "cpf": _u()[:11],
             "cargo": "Atendente",
             "e_atendente": True,
@@ -224,12 +225,12 @@ def test_funcionario_duplicado_cpf_409(client, admin_token):
     client.post(
         "/v1/funcionarios",
         headers=auth(client, admin_token),
-        json={"nome": "Um", "cpf": cpf},
+        json={"nome": "Um", "login": f"um_{_u()[:10]}", "cpf": cpf},
     )
     resp = client.post(
         "/v1/funcionarios",
         headers=auth(client, admin_token),
-        json={"nome": "Dois", "cpf": cpf},
+        json={"nome": "Dois", "login": f"dois_{_u()[:10]}", "cpf": cpf},
     )
     assert resp.status_code == 409
 

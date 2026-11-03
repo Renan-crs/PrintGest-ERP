@@ -5,12 +5,10 @@ Níveis de acesso (PRD v2.0 §5):
   - Usuários/Sistema: ADMIN (configurações de sistema)
 """
 
-from typing import Annotated
-
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.crud_factory import criar_router_crud
-from app.deps import DbDep, UsuarioDep, require_nivel
+from app.deps import DbDep, FilialDep, require_nivel
 from app.models.cadastros import (
     Cliente,
     Fornecedor,
@@ -40,8 +38,11 @@ from app.schemas.cadastros import (
 from app.services.crud import listar
 from app.services.funcionario_service import criar_com_usuario
 
+# Sem prefixo de grupo: as rotas são `/v1/clientes`, `/v1/produtos`,
+# `/v1/funcionarios`... — é o contrato consumido pelo desktop
+# (`/v1/{entidade}`), pela matriz de módulos (`gating._ROTAS_MODULOS`) e pela
+# suíte. Um prefixo `/cadastros` aqui quebraria todos esses consumidores.
 router = APIRouter(
-    prefix="/cadastros",
     tags=["cadastros"],
     dependencies=[Depends(require_nivel(NivelAcesso.OPERADOR))],
 )
@@ -80,7 +81,7 @@ router.include_router(fornecedores_router)
 @router.get("/funcionarios")
 def listar_funcionarios(
     db: DbDep,
-    filial: int,
+    filial: FilialDep,
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -98,8 +99,7 @@ def listar_funcionarios(
 def criar_funcionario(
     body: FuncionarioCreate,
     db: DbDep,
-    filial: int,
-    usuario: Annotated[UsuarioDep, Depends()],
+    filial: FilialDep,
 ) -> ItemResponse[FuncionarioOut]:
     """Cria funcionário com usuário de login (M3 §3.10 - primeiro acesso)."""
     dados = body.model_dump()
@@ -113,7 +113,7 @@ def atualizar_funcionario(
     item_id: int,
     body: FuncionarioUpdate,
     db: DbDep,
-    filial: int,
+    filial: FilialDep,
 ) -> ItemResponse[FuncionarioOut]:
     dados = body.model_dump(exclude_unset=True)
     if dados:
@@ -139,7 +139,7 @@ def atualizar_funcionario(
 def deletar_funcionario(
     item_id: int,
     db: DbDep,
-    filial: int,
+    filial: FilialDep,
 ) -> None:
     item = (
         db.query(Funcionario)

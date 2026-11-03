@@ -71,14 +71,24 @@ def test_gerente_sem_acesso_usuarios(client, admin_token):
 
 
 def test_admin_gerencia_usuarios(client, admin_token):
-    resp = client.get("/v1/usuarios", headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/usuarios",
+        headers=auth(client, admin_token),
+        params={"q": "admin", "limit": 200},
+    )
     assert resp.status_code == 200
     logins = [u["login"] for u in resp.json()["data"]]
     assert "admin" in logins
 
 
 def _id_admin(client, admin_token) -> int:
-    resp = client.get("/v1/usuarios", headers=auth(client, admin_token))
+    # `q=admin` + limite alto: o banco de teste é compartilhado entre execuções
+    # e o admin pode não estar na primeira página (50) depois de muitos testes.
+    resp = client.get(
+        "/v1/usuarios",
+        headers=auth(client, admin_token),
+        params={"q": "admin", "limit": 200},
+    )
     assert resp.status_code == 200
     return next(u["id"] for u in resp.json()["data"] if u["login"] == "admin")
 
