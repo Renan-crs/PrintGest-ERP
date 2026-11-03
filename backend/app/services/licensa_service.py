@@ -145,8 +145,16 @@ def _base_redgest() -> str:
 
 
 def _cliente() -> httpx.Client:
+    # trust_env=False: o httpx honra `SSLKEYLOGFILE` ao montar o contexto TLS e
+    # tenta abrir o arquivo apontado por ela. Em algumas máquinas essa variável
+    # aponta para a raiz de um volume sem permissão de escrita para o usuário
+    # comum (ex.: \\?\Volume{...}\virtual_file.log), quebrando a ativação com
+    # `PermissionError: [Errno 13]`. A verificação TLS continua usando o bundle
+    # do certifi.
     return httpx.Client(
-        base_url=_base_redgest(), timeout=settings.licenca_timeout_segundos
+        base_url=_base_redgest(),
+        timeout=settings.licenca_timeout_segundos,
+        trust_env=False,
     )
 
 
@@ -161,6 +169,7 @@ def _cliente_com_idempotencia(chave_idempotencia: str) -> httpx.Client:
         base_url=_base_redgest(),
         timeout=settings.licenca_timeout_segundos,
         headers={"Idempotency-Key": chave_idempotencia},
+        trust_env=False,
     )
 
 

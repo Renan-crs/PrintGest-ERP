@@ -17,6 +17,23 @@ TIMEOUT = 8.0
 _LIGADO = {"1", "true", "yes", "on", "sim"}
 
 
+def _novo_cliente(**kwargs) -> httpx.Client:
+    """Cria o cliente HTTP sem herdar a configuração de TLS do ambiente.
+
+    O httpx honra a variável `SSLKEYLOGFILE` ao montar o contexto TLS e tenta
+    abrir o arquivo apontado por ela. Em algumas máquinas essa variável aponta
+    para um arquivo na raiz de um volume sem permissão de escrita para o
+    usuário comum (ex.: ``\\\\?\\Volume{...}\\virtual_file.log``), e a
+    inicialização quebra com ``PermissionError: [Errno 13]``.
+
+    O Local API Service é local (HTTP), então não há motivo para herdar
+    proxy/CA/keylog do ambiente do Windows. `trust_env=False` também evita
+    que variáveis como `HTTP_PROXY` desviem chamadas para 127.0.0.1.
+    """
+    kwargs.setdefault("trust_env", False)
+    return httpx.Client(**kwargs)
+
+
 def base_url_padrao() -> str:
     """Endereço do Local API Service: o do servidor (modo Estação) ou o local.
 
@@ -60,7 +77,7 @@ class Api:
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._transport = transport
-        self._cliente = httpx.Client(
+        self._cliente = _novo_cliente(
             base_url=base_url, timeout=timeout, transport=transport
         )
         self._token: str | None = None
@@ -487,7 +504,7 @@ class Api:
         Fechar o cliente em pleno voo interrompe a requisição de verdade; o
         cliente compartilhado segue intocado para o resto da aplicação.
         """
-        return httpx.Client(
+        return _novo_cliente(
             base_url=self._base_url,
             timeout=self.TIMEOUT_ATIVACAO_SEGUNDOS,
             transport=self._transport,
