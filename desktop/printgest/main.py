@@ -124,6 +124,7 @@ class _Roteador:
         self._licenca_desabilitada = _licenca_desabilitada()
         self._estacao = estacao
         self._sessao_salva = False  # Flag para controlar se vem de sessão salva
+        self._validando_licenca = False  # Flag anti-reentrância
 
     def iniciar(self) -> None:
         """Ponto de entrada: o serial precede o login (gate de instalação).
@@ -201,6 +202,7 @@ class _Roteador:
         Local API Service justamente para permitir a ativação antes de haver
         usuário autenticado.
         """
+        self._validando_licenca = True
         rodar(
             lambda: self._api.situacao_licenca(),
             on_ok=self._situacao_instalacao,
