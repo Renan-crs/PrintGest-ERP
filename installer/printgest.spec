@@ -7,12 +7,36 @@
 # partir de __file__, que no exe aponta para dentro do bundle.
 # console=False: aplicação de janela; o log do daemon fica em
 # {app}\PrintGestAPI\logs\printgest-api.log.
+#
+# IMPORTANTE (v0.4.0): não listar hiddenimports à mão. A lista manual já
+# ficou desatualizada e gerou `NameError: name 'estado_primario' is not
+# defined` no executável instalado (o código empacotado era de um build
+# antigo). Agora coletamos TODOS os submódulos de `printgest`
+# automaticamente, então qualquer módulo novo entra no bundle sem edição.
 
 import os
+import sys
 
 RAIZ = os.path.abspath(os.path.join(SPECPATH, ".."))
 DESKTOP = os.path.join(RAIZ, "desktop")
 ICONE = os.path.join(DESKTOP, "printgest", "ui", "assets", "printgest.ico")
+
+# collect_submodules precisa do pacote importável neste ponto do spec.
+if DESKTOP not in sys.path:
+    sys.path.insert(0, DESKTOP)
+
+from PyInstaller.utils.hooks import collect_submodules
+
+# `desktop/printgest/ui/widgets.py` é um MÓDULO, mas existe também um
+# diretório `ui/widgets/` sem __init__.py (arquivo órfão atualizacao.py).
+# Os submodules desse diretório não são importáveis (colidem com o módulo)
+# e não são usados por ninguém — ficam fora para não poluir a análise.
+hiddenimports = [
+    modulo
+    for modulo in collect_submodules("printgest")
+    if not modulo.startswith("printgest.ui.widgets.")
+]
+hiddenimports.append("printgest.ui.widgets")
 
 a = Analysis(
     [os.path.join(DESKTOP, "main.py")],
@@ -24,34 +48,7 @@ a = Analysis(
             os.path.join("printgest", "ui", "assets"),
         ),
     ],
-    hiddenimports=[
-        "printgest.ui.widgets",
-        "printgest.ui.ativacao",
-        "printgest.ui.login",
-        "printgest.ui.conexao",
-        "printgest.ui.tela_principal",
-        "printgest.ui.modulos.os",
-        "printgest.ui.modulos.venda_balcao",
-        "printgest.ui.modulos.projetos",
-        "printgest.ui.modulos.fiscal",
-        "printgest.ui.modulos.financeiro",
-        "printgest.ui.modulos.cotacoes",
-        "printgest.ui.modulos.agendamento",
-        "printgest.ui.modulos.clientes",
-        "printgest.ui.modulos.categorias",
-        "printgest.ui.modulos.fornecedores",
-        "printgest.ui.modulos.estoque",
-        "printgest.ui.modulos.configuracao",
-        "printgest.ui.modulos.em_construcao",
-        "printgest.ui.modulos.relatorios",
-        "printgest.core.api",
-        "printgest.core.daemon",
-        "printgest.core.tarefas",
-        "printgest.core.sessao",
-        "printgest.core.dominio",
-        "printgest.core.rbac",
-        "printgest.core.catalogos",
-    ],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
