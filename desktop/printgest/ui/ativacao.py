@@ -448,7 +448,12 @@ class AtivacaoWindow(QMainWindow):
         b.setMinimumHeight(40)  # A1: alvo de toque >= 40 px
         b.setAccessibleName(texto)
         if plano == "primary":
-            estado_primario(b)
+            try:
+                estado_primario(b)
+            except NameError:
+                # Fallback: definir propriedade diretamente
+                b.setProperty("role", "primary")
+                aplicar_estilo(b)
         elif plano == "secondary":
             estado_secundario(b)
         else:
