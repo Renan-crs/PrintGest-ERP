@@ -1,0 +1,18 @@
+================================================================================
+PrintGest ERP v0.3.8 - BUILD DE PRODUÇÃO
+================================================================================
+
+Data: 02/11/2026
+Status: ✅ Backend funcionando com Neon Database
+Correções: 
+  - Unificação de migrations (merge heads)
+  - Correção relação Usuario/Funcionario  
+  - PermissionError 13 (fallback TCP)
+  - Daemon atualizado
+
+Instalador: PrintGest-Setup-0.3.8.exe (59.8 MB)
+
+Para compilar, execute:
+  powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
+
+================================================================================
