@@ -66,13 +66,15 @@ def saude(timeout: float = 1.0) -> bool:
 
 
 def _porta_aberta(timeout: float = 1.0) -> bool:
-    """Verifica se a porta 8000 esta aberta (sem usar HTTP)."""
+    """Verifica se o host/porta de `SAUDE_URL` aceita conexão TCP (sem HTTP)."""
+    from urllib.parse import urlsplit
+
+    partes = urlsplit(SAUDE_URL)
+    host = partes.hostname or "127.0.0.1"
+    porta = partes.port or (443 if partes.scheme == "https" else 80)
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        result = sock.connect_ex(('127.0.0.1', 8000))
-        sock.close()
-        return result == 0
+        with socket.create_connection((host, porta), timeout=timeout):
+            return True
     except (OSError, socket.error):
         return False
 
