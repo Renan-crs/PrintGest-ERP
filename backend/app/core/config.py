@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # Instalação nova: o admin nasce sem senha e o operador define a dele na
     # tela "Primeiro acesso" do login. Em dev/testes, desligue para manter a
     # senha de fábrica (`PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO=false`).
-    admin_inicial_primeiro_acesso: bool = True
+    admin_inicial_primeiro_acesso: bool = False
 
     redgest_url: str = "http://127.0.0.1:9100"
     redgest_sistema: str = "printgest"
