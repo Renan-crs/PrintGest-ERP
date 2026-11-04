@@ -109,7 +109,8 @@ def test_iniciar_com_licenca_ja_ativada_nao_pede_serial(app, monkeypatch):
     roteador.iniciar()
 
     assert isinstance(roteador._janela, LoginWindow)
-    assert _REQUISICOES == ["/v1/licenca"]
+    # O LoginWindow faz o diagnóstico do daemon (`/health`) ao abrir.
+    assert [c for c in _REQUISICOES if c != "/health"] == ["/v1/licenca"]
 
 
 def test_ativacao_na_instalacao_leva_ao_login(app, monkeypatch):
@@ -144,7 +145,8 @@ def test_flag_dev_pula_o_serial_e_abre_login(app, monkeypatch):
     roteador.iniciar()
 
     assert isinstance(roteador._janela, LoginWindow)
-    assert _REQUISICOES == []  # não consulta a licença
+    # Não consulta a licença; só o `/health` do diagnóstico do LoginWindow.
+    assert all(c == "/health" for c in _REQUISICOES)
 
 
 def test_modo_estacao_pula_o_serial_e_vai_ao_login(app):

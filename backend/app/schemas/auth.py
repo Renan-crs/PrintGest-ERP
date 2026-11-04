@@ -13,6 +13,13 @@ class LoginIn(BaseModel):
     senha: str = Field(min_length=1, max_length=128)
 
 
+class PrimeiroAcessoIn(BaseModel):
+    """Define a senha de um usuário que ainda está em primeiro acesso."""
+
+    login: str = Field(min_length=1, max_length=60)
+    nova_senha: str = Field(min_length=8, max_length=128)
+
+
 class UsuarioSessaoOut(ORMModel):
     id: int
     nome: str

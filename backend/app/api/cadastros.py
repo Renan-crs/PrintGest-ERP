@@ -116,6 +116,9 @@ def atualizar_funcionario(
     filial: FilialDep,
 ) -> ItemResponse[FuncionarioOut]:
     dados = body.model_dump(exclude_unset=True)
+    # `login` é imutável e não é coluna de `funcionario` (vive em `usuario`);
+    # ignorar aqui evita `setattr` na property somente-leitura.
+    dados.pop("login", None)
     if dados:
         item = (
             db.query(Funcionario)

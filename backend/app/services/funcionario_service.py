@@ -23,6 +23,12 @@ def criar_com_usuario(
     if not login:
         raise ValueError("O campo 'login' é obrigatório para cadastro de funcionário.")
 
+    if db.query(Usuario).filter(Usuario.login == login).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Já existe um usuário com o login '{login}'. Escolha outro.",
+        )
+
     funcionario = modelo_funcionario(**dados)
     db.add(funcionario)
     try:

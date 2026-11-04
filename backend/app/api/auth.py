@@ -4,8 +4,20 @@ from fastapi import APIRouter, Header, HTTPException, status
 
 from app.deps import DbDep, UsuarioDep
 from app.models.core import Usuario
-from app.schemas import ItemResponse, LoginIn, LoginOut, TrocarSenhaIn, UsuarioSessaoOut
-from app.services.auth_service import login, logout, trocar_senha as service_trocar_senha, primeiro_acesso as service_primeiro_acesso
+from app.schemas import (
+    ItemResponse,
+    LoginIn,
+    LoginOut,
+    PrimeiroAcessoIn,
+    TrocarSenhaIn,
+    UsuarioSessaoOut,
+)
+from app.services.auth_service import (
+    login,
+    logout,
+    trocar_senha as service_trocar_senha,
+    primeiro_acesso as service_primeiro_acesso,
+)
 
 router = APIRouter(prefix="/auth", tags=["autenticação"])
 
@@ -24,10 +36,12 @@ def fazer_login(body: LoginIn, db: DbDep) -> ItemResponse[LoginOut]:
 
 @router.post("/primeiro-acesso", status_code=201)
 def completar_primeiro_acesso(
-    body: LoginIn, db: DbDep
+    body: PrimeiroAcessoIn, db: DbDep
 ) -> ItemResponse[LoginOut]:
     """Completa o primeiro acesso: define senha e devolve token de sessão."""
-    token, expira, usuario_obj = service_primeiro_acesso(db, login=body.login, nova_senha=body.senha)
+    token, expira, usuario_obj = service_primeiro_acesso(
+        db, login=body.login, nova_senha=body.nova_senha
+    )
     return ItemResponse(
         data=LoginOut(
             token=token,
