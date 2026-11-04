@@ -61,3 +61,7 @@ backend/test_token.txt
 Thumbs.db
 *.code-workspace
 .env.neon
+
+# Neon env files (never commit)
+backend/.env.neon
+installer/env.instalacao.neon

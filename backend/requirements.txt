@@ -6,3 +6,4 @@ psycopg[binary]==3.2.*
 pydantic-settings==2.*
 httpx==0.27.*
 python-multipart==0.0.*
+certifi>=2026.10.18
