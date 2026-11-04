@@ -7,6 +7,10 @@ atendimento (vendedor/atendente/produção) e comissão.
 
 from __future__ import annotations
 
+import re
+
+from PySide6.QtWidgets import QMessageBox
+
 from printgest.ui.formulario import (
     MASCARA_CPF,
     CampoArea,
@@ -26,6 +30,7 @@ ENTIDADE = "funcionarios"
 
 CHAVES = ["id", "nome", "cargo", "cpf", "contato", "funcoes"]
 COLUNAS = ["Cód.", "Funcionário", "Cargo", "CPF", "Contato", "Funções"]
+_LOGIN_VALIDO = re.compile(r"^[a-zA-Z0-9_.-]{3,60}$")
 
 
 class PaginaFuncionarios(PaginaCrud):
@@ -56,6 +61,11 @@ class PaginaFuncionarios(PaginaCrud):
         self._e_producao = CampoCheck("Produção")
         self._obs = CampoArea("Observações", linhas=2)
 
+        self._login = CampoTexto("Login de acesso", maximo=60)
+        self._login.widget.setPlaceholderText(
+            "ex.: maria.souza — o funcionário define a senha no primeiro acesso"
+        )
+
         return [
             (
                 "Dados Pessoais",
@@ -72,6 +82,10 @@ class PaginaFuncionarios(PaginaCrud):
                 [self._cargo, self._admissao, self._comissao],
             ),
             (
+                "Acesso ao Sistema",
+                [self._login],
+            ),
+            (
                 "Papéis no Atendimento",
                 [self._e_vendedor, self._e_atendente, self._e_producao, self._obs],
             ),
@@ -79,6 +93,8 @@ class PaginaFuncionarios(PaginaCrud):
 
     def _padroes_do_form(self) -> None:
         self._comissao.definir("0")
+        # O login é escolhido no cadastro e não muda depois (como em Usuários).
+        self._login.habilitar(not self._modo_leitura)
 
     # -------------------------------------------------------------- leitura
 
@@ -109,16 +125,26 @@ class PaginaFuncionarios(PaginaCrud):
         self._e_atendente.definir(dado.get("e_atendente"))
         self._e_producao.definir(dado.get("e_producao"))
         self._obs.definir(dado.get("observacoes"))
+        self._login.definir(dado.get("login"))
+        self._login.habilitar(False)  # login é imutável depois de criado
 
     # ---------------------------------------------------------------- salvar
 
     def _validar(self):
         if not self._nome.valido():
             return ("Informe o nome do funcionário.", self._nome)
+        if self._editando_id is None:
+            login = self._login.valor().strip()
+            if not _LOGIN_VALIDO.match(login):
+                return (
+                    "Informe um login de 3 a 60 caracteres (letras, números, "
+                    "ponto, hífen ou sublinhado).",
+                    self._login,
+                )
         return None
 
     def _payload(self) -> dict:
-        return {
+        dados = {
             "nome": self._nome.valor(),
             "cpf": limpo(self._cpf.valor()),
             "cargo": limpo(self._cargo.valor()),
@@ -132,3 +158,23 @@ class PaginaFuncionarios(PaginaCrud):
             "comissao_pct": numero(self._comissao),
             "observacoes": limpo(self._obs.valor()),
         }
+        if self._editando_id is None:
+            dados["login"] = self._login.valor().strip()
+        return dados
+
+    def _salvo(self, dado: dict) -> None:
+        era_novo = self._editando_id is None
+        super()._salvo(dado)
+        if not era_novo:
+            return
+        login = dado.get("login") or self._login.valor().strip()
+        QMessageBox.information(
+            self,
+            "Funcionário cadastrado",
+            f"Acesso criado para {dado.get('nome', 'o funcionário')}.\n\n"
+            f"Login: {login}\n\n"
+            "O funcionário define a senha no primeiro acesso: na tela de login, "
+            "ele clica em \"Primeiro acesso — definir senha\", informa esse login "
+            "e escolhe a senha. O administrador não precisa (nem deve) definir "
+            "uma senha inicial.",
+        )

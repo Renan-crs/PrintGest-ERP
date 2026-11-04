@@ -20,6 +20,10 @@ from app.models.core import Usuario, UsuarioSessao
 _HASH_NEUTRO = hash_password("--neutralizacao-dummy--")
 
 
+# 407 não tem constante própria no Starlette; o nome "proxy auth" é o padrão HTTP.
+_STATUS_PRIMEIRO_ACESSO = status.HTTP_407_PROXY_AUTHENTICATION_REQUIRED
+
+
 def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usuario]:
     agora = datetime.now(timezone.utc)
     usuario = db.query(Usuario).filter(Usuario.login == login_input).first()
@@ -34,7 +38,7 @@ def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usu
     # M3 (§3.10): primeiro acesso - usuário sem senha definida precisa completar
     if usuario.senha_hash is None or usuario.primeiro_acesso:
         raise HTTPException(
-            status_code=status.HTTP_407_REQUIRED_PASSWORD_REPLAY,
+            status_code=_STATUS_PRIMEIRO_ACESSO,
             detail="Primeiro acesso: cadastre sua senha.",
         )
 
@@ -72,19 +76,18 @@ def primeiro_acesso(db: Session, login: str, nova_senha: str, usuario_id: int | 
         usuario = db.get(Usuario, usuario_id)
     else:
         usuario = db.query(Usuario).filter(Usuario.login == login).first()
-    if not usuario:
+    # A mesma mensagem para "não existe" e "já tem senha" evita confirmar quais
+    # logins existem (enumeração) — o endpoint é público, como o /login.
+    if not usuario or not usuario.primeiro_acesso:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado.",
-        )
-    if not usuario.primeiro_acesso:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Este usuário não está em modo primeiro acesso.",
+            detail="Login não encontrado ou já possui senha definida.",
         )
     usuario.senha_hash = hash_password(nova_senha)
     usuario.primeiro_acesso = False
-    
+    usuario.falhas_login = 0
+    usuario.bloqueado_em = None
+
     token = gerar_token_sessao()
     expira = agora + timedelta(minutes=settings.session_ttl_minutes)
     sessao = UsuarioSessao(

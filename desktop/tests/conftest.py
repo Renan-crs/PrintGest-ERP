@@ -25,6 +25,7 @@ def pytest_sessionstart(session):
     import printgest.ui.modulos.estoque as est_mod
     import printgest.ui.ativacao as ativacao_mod
     import printgest.ui.conexao as conexao_mod
+    import printgest.ui.login as login_mod
 
     def _rodar_sync(fn, on_ok, on_erro):
         try:
@@ -34,7 +35,7 @@ def pytest_sessionstart(session):
 
     for mod in (
         tarefas_mod, agendamento_mod, config_mod, os_mod, fin_mod,
-        fiscal_mod, est_mod, ativacao_mod, conexao_mod,
+        fiscal_mod, est_mod, ativacao_mod, conexao_mod, login_mod,
     ):
         if hasattr(mod, "rodar"):
             mod.rodar = _rodar_sync

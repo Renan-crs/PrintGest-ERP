@@ -173,6 +173,16 @@ class Funcionario(Base):
         foreign_keys=[usuario_id]
     )
 
+    @property
+    def login(self) -> str | None:
+        """Login do usuário vinculado (exposto em `FuncionarioOut`).
+
+        Não é coluna: a credencial vive em `usuario`. O admin escolhe o login no
+        cadastro e ele é imutável depois (o usuário pode trocar a senha, não o
+        login).
+        """
+        return self.usuario.login if self.usuario is not None else None
+
 
 class ProdutoCategoria(Base):
     __tablename__ = "produto_categoria"

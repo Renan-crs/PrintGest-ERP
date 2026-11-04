@@ -1,8 +1,10 @@
 """Bootstrap inicial: empresa, filial e usuário administrador de fábrica.
 
 Executado no startup do serviço e idempotente — só cria o que não existe
-(busca por CNPJ fixo e login 'admin'). As senhas iniciais para dev vêm do
-Settings (PRINTGEST_ADMIN_INICIAL_SENHA); em produção substituir via env.
+(busca por CNPJ fixo e login 'admin'). Em instalações novas o admin nasce sem
+senha (`primeiro_acesso=True`) e o operador define a dele na tela de primeiro
+acesso. Em dev/testes, `PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO=false` mantém a
+senha de fábrica de `PRINTGEST_ADMIN_INICIAL_SENHA`.
 """
 
 from app.core.config import settings
@@ -38,11 +40,17 @@ def _empresa() -> Empresa:
             db.flush()
         admin = db.query(Usuario).filter(Usuario.login == settings.admin_inicial_login).first()
         if not admin:
+            primeiro_acesso = settings.admin_inicial_primeiro_acesso
             admin = Usuario(
                 filial_id=filial.id,
                 nome=settings.admin_inicial_nome,
                 login=settings.admin_inicial_login,
-                senha_hash=hash_password(settings.admin_inicial_senha),
+                senha_hash=(
+                    None
+                    if primeiro_acesso
+                    else hash_password(settings.admin_inicial_senha)
+                ),
+                primeiro_acesso=primeiro_acesso,
                 nivel_acesso=NivelAcesso.ADMIN,
             )
             db.add(admin)

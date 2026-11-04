@@ -13,6 +13,7 @@ _FUNCIONARIOS = [
     {
         "id": 1,
         "nome": "Marta Souza",
+        "login": "marta.souza",
         "cpf": "293.881.440-10",
         "cargo": "Impressão Digital",
         "telefone": "(11) 99311-4455",
@@ -26,6 +27,7 @@ _FUNCIONARIOS = [
     {
         "id": 2,
         "nome": "Carlos Pereira",
+        "login": "carlos.pereira",
         "cpf": "155.443.887-90",
         "cargo": "Representante",
         "email": "carlos@grafica.local",
@@ -106,9 +108,21 @@ def test_salvar_existente_envia_put_e_datapara_iso(app, pumpar):
     assert enviado["data_nascimento"] is None
     assert enviado["e_atendente"] is True
     assert enviado["comissao_pct"] == "0"
+    # Login é imutável: não deve ser reenviado no PUT.
+    assert "login" not in enviado
+    assert pagina._login.valor() == "marta.souza"
+    assert pagina._login.widget.isEnabled() is False
 
 
-def test_criar_novo_aplica_padroes_e_envia_post(app, pumpar):
+def test_criar_novo_aplica_padroes_e_envia_post(app, pumpar, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    avisos: list[str] = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "information",
+        lambda _parent, _titulo, texto, *a, **k: avisos.append(texto),
+    )
     _GETS.clear()
     _ESCRITAS.clear()
     pagina = _pagina()
@@ -117,9 +131,11 @@ def test_criar_novo_aplica_padroes_e_envia_post(app, pumpar):
     assert pagina._editando_id is None
     assert pagina._nome.valor() == ""
     assert pagina._comissao.valor() == 0
+    assert pagina._login.widget.isEnabled() is True
     pagina._nome.definir("Junia Lima")
     pagina._cargo.definir("Acabamento")
     pagina._comissao.definir("2,5")
+    pagina._login.definir("junia.lima")
     pagina._btn_salvar.click()
     pumpar(lambda: any(escr[0] == "POST" for escr in _ESCRITAS))
 
@@ -128,9 +144,31 @@ def test_criar_novo_aplica_padroes_e_envia_post(app, pumpar):
     enviado = json.loads(corpo)
     assert enviado["nome"] == "Junia Lima"
     assert enviado["cargo"] == "Acabamento"
+    assert enviado["login"] == "junia.lima"
     assert float(enviado["comissao_pct"].replace(",", ".")) == 2.5
     assert enviado["data_nascimento"] is None
     assert enviado["e_vendedor"] is False
+    assert avisos and "junia.lima" in avisos[-1]
+    assert "primeiro acesso" in avisos[-1].lower()
+
+
+def test_criar_exige_login_valido(app, pumpar):
+    _GETS.clear()
+    _ESCRITAS.clear()
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._btn_novo.click()
+    pagina._nome.definir("Sem Login")
+    assert pagina._validar() is not None
+
+    pagina._login.definir("ab")  # curto demais
+    assert pagina._validar() is not None
+
+    pagina._login.definir("sem login")
+    assert pagina._validar() is not None
+
+    pagina._login.definir("sem_login")
+    assert pagina._validar() is None
 
 
 def test_modo_leitura_nao_salva(app, pumpar):

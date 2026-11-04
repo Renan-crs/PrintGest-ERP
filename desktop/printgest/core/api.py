@@ -57,7 +57,15 @@ def modo_estacao() -> bool:
 
 
 class ApiError(Exception):
-    """Falha mapeada da API (detail em PT-BR) ou de comunicação."""
+    """Falha mapeada da API (detail em PT-BR) ou de comunicação.
+
+    `status_code` preserva o código HTTP para a UI distinguir casos de fluxo
+    (ex.: 407 = primeiro acesso) de erros comuns.
+    """
+
+    def __init__(self, mensagem: str, status_code: int | None = None) -> None:
+        super().__init__(mensagem)
+        self.status_code = status_code
 
 
 def _detalhe(resp: httpx.Response) -> str:
@@ -490,6 +498,13 @@ class Api:
     def login(self, login: str, senha: str) -> dict:
         return self._post("/v1/auth/login", {"login": login, "senha": senha})
 
+    def primeiro_acesso(self, login: str, nova_senha: str) -> dict:
+        """Define a senha de um login em primeiro acesso e devolve a sessão."""
+        return self._post(
+            "/v1/auth/primeiro-acesso",
+            {"login": login, "nova_senha": nova_senha},
+        )
+
     def situacao_licenca(self, token: str | None = None) -> dict:
         return self._get("/v1/licenca", token)
 
@@ -683,7 +698,7 @@ class Api:
     def _delete(self, path: str, token: str | None = None) -> None:
         resp = self._cliente.delete(path, headers=self._headers(token))
         if resp.status_code >= 400:
-            raise ApiError(_detalhe(resp))
+            raise ApiError(_detalhe(resp), resp.status_code)
 
     def _delete_data(self, path: str, token: str | None = None) -> dict:
         """DELETE que devolve o corpo `data` (ex.: remover membro de um cartão)."""
@@ -697,7 +712,7 @@ class Api:
     @staticmethod
     def _tratar(resp: httpx.Response) -> dict:
         if resp.status_code >= 400:
-            raise ApiError(_detalhe(resp))
+            raise ApiError(_detalhe(resp), resp.status_code)
         return resp.json()["data"]
 
     @staticmethod
@@ -713,5 +728,5 @@ class Api:
     @staticmethod
     def _resposta_completa(resp: httpx.Response) -> dict:
         if resp.status_code >= 400:
-            raise ApiError(_detalhe(resp))
+            raise ApiError(_detalhe(resp), resp.status_code)
         return resp.json()

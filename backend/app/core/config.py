@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
-    version: str = "0.4.3"
+    version: str = "0.4.4"
     env: str = "dev"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     admin_inicial_login: str = "admin"
     admin_inicial_senha: str = "admin123"
     admin_inicial_nome: str = "Administrador"
+    # Instalação nova: o admin nasce sem senha e o operador define a dele na
+    # tela "Primeiro acesso" do login. Em dev/testes, desligue para manter a
+    # senha de fábrica (`PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO=false`).
+    admin_inicial_primeiro_acesso: bool = True
 
     redgest_url: str = "http://127.0.0.1:9100"
     redgest_sistema: str = "printgest"
