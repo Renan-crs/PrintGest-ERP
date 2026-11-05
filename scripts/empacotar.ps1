@@ -172,12 +172,12 @@ PRIMEIRA EXECUCAO
   2. O sistema se conecta ao Neon Database (nao ha banco local - levou alguns segundos).
   3. A tela de ativacao pede a licenca emitida pelo RedGest - como em
      programas licenciados por serial, ela so e pedida na instalacao.
-  4. Primeiro acesso do administrador: na tela de login, clique em
-     "Primeiro acesso" e use o login admin para definir a senha da grafica.
-     Nenhuma senha padrao e enviada no pacote.
+  4. Login do administrador: usuario "admin", senha de fabrica "admin123".
+     Troque a senha no primeiro login (tela de troca de senha) - nao opere
+     com a senha de fabrica.
   5. Depois de entrar, cadastre a equipe em Cadastro de Funcionarios. Informe
      o login de cada funcionario: ele define a propria senha no primeiro
-     acesso, pela mesma opcao "Primeiro acesso" da tela de login.
+     acesso, pela opcao "Primeiro acesso" da tela de login.
 
 ONDE FICAM AS COISAS
   - Programa:        {localappdata}\Programs\PrintGest

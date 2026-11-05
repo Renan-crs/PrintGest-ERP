@@ -9,6 +9,24 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.4.5] - 2026-11-04 — Senha de fábrica do admin e suporte Neon
+
+### Alterado
+- **Primeiro acesso do admin desligado por padrão** (`admin_inicial_primeiro_acesso=false`):
+  instalações novas nascem com o usuário `admin` na senha de fábrica (`admin123`),
+  sem a etapa "Primeiro acesso". O operador deve trocar a senha no primeiro login.
+  O instalador (`env.instalacao.neon`) e o LEIA-ME do pacote foram alinhados.
+
+### Adicionado
+- **`scripts/reset_senha_admin.py`:** reset de senha de suporte (admin ou outro
+  login) com dry-run por padrão, destrave de bloqueio, revogação de sessões e
+  guarda P17 contra a senha de fábrica fora de dev/local/test.
+- **`scripts/configurar_auth_neon.py`:** prepara o processo de autenticação no
+  banco Neon — migrations, bootstrap (empresa/filial/admin) e validação do
+  estado do admin, sem imprimir credenciais.
+
+---
+
 ## [0.3.4] - 2026-11-01 · Melhorias de sessão e estabilidade
 
 ### Novos Recursos
