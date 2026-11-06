@@ -317,6 +317,15 @@ class _Roteador:
         janela = ModoLeituraWindow(self._api, token=self._token, situacao=sit)
         janela.renovada.connect(lambda: self._abrir_dashboard(False))
         janela.consulta.connect(lambda: self._abrir_dashboard(True))
+        # Licença revogada/expirada: renovar não recupera — a saída é inserir a
+        # licença nova (o `/v1/licenca/ativar` é liberado no modo leitura).
+        janela.reativar.connect(
+            lambda: self._abrir_ativacao(
+                sit,
+                token=self._token,
+                apos_ativacao=lambda: self._abrir_dashboard(False),
+            )
+        )
         janela.saida.connect(QApplication.instance().quit)
         self._abrir(janela)
 

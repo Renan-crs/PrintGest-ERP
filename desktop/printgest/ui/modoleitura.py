@@ -2,7 +2,9 @@
 
 Exibida quando a licença existe mas o token não pôde ser renovado dentro da
 tolerância offline. O usuário pode tentar renovar (`F5`), seguir no modo
-consulta ou acionar o suporte.
+consulta, acionar o suporte ou — quando a licença foi revogada/expirada e há
+uma licença nova emitida — inserir a nova licença (`F2`), que abre a tela de
+ativação (`POST /v1/licenca/ativar` é liberado no modo leitura).
 """
 
 from __future__ import annotations
@@ -58,6 +60,7 @@ class ModoLeituraWindow(QMainWindow):
 
     renovada = Signal()
     consulta = Signal()
+    reativar = Signal()
     saida = Signal()
 
     def __init__(
@@ -94,6 +97,7 @@ class ModoLeituraWindow(QMainWindow):
 
         self.setCentralWidget(base)
         QShortcut(QKeySequence(Qt.Key.Key_F5), self, self._renovar)
+        QShortcut(QKeySequence(Qt.Key.Key_F2), self, self.reativar.emit)
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.saida.emit)
 
     # ------------------------------------------------------------------ helpers
@@ -247,8 +251,8 @@ class ModoLeituraWindow(QMainWindow):
         if self._revogada:
             return (
                 "A última verificação no RedGest retornou revogação da licença. "
-                "Reative o contrato com o fornecedor; a renovação automática será "
-                "retomada quando o RedGest voltar a autorizar esta estação."
+                "Renovar não recupera uma licença revogada: emita uma licença nova "
+                'com o fornecedor e use "Inserir nova licença" (F2) para ativá-la.'
             )
         partes = [
             "Status da Internet na máquina servidora: a renovação automática não "
@@ -270,17 +274,29 @@ class ModoLeituraWindow(QMainWindow):
         linha = QHBoxLayout()
         linha.setSpacing(10)
 
-        btn_renovar = botao_com_atalho("Tentar Renovar Agora", "F5", "primary")
+        if self._revogada:
+            # Revogação é terminal: renovar não recupera — a saída é a licença
+            # nova, que recebe o destaque primário.
+            btn_renovar = botao_com_atalho("Tentar Renovar Agora", "F5")
+            btn_nova_licenca = botao_com_atalho(
+                "Inserir nova licença", "F2", "primary"
+            )
+        else:
+            btn_renovar = botao_com_atalho("Tentar Renovar Agora", "F5", "primary")
+            btn_nova_licenca = botao_com_atalho("Inserir nova licença", "F2")
         btn_renovar[1].clicked.connect(self._renovar)
+        btn_nova_licenca[1].clicked.connect(self.reativar.emit)
         btn_consulta = botao_com_atalho("Continuar em Modo Consulta", "Enter")
         btn_consulta[1].clicked.connect(self.consulta.emit)
         btn_suporte = botao_com_atalho("Contatar Suporte / Financeiro RedGest", "F1", "danger")
         btn_suporte[1].clicked.connect(self._suporte)
 
         self._botao_renovar = btn_renovar[1]
+        self._botao_nova_licenca = btn_nova_licenca[1]
         linha.addWidget(btn_suporte[0], 1)
         linha.addWidget(btn_consulta[0], 1)
-        linha.addWidget(btn_renovar[0], 2)
+        linha.addWidget(btn_nova_licenca[0], 2 if self._revogada else 1)
+        linha.addWidget(btn_renovar[0], 1 if self._revogada else 2)
         return linha
 
     # --------------------------------------------------------------- ações

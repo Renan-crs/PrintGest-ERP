@@ -165,6 +165,47 @@ def test_modo_estacao_pula_o_serial_e_vai_ao_login(app):
     assert all(c == "/health" for c in _REQUISICOES)
 
 
+# --------------------------------- licença revogada: inserir licença nova
+
+
+def test_modo_leitura_inserir_nova_licenca_abre_ativacao_com_token(app):
+    """Revogada: `Inserir nova licença` abre a ativação com a sessão vigente."""
+    _REQUISICOES.clear()
+    from printgest.main import _Roteador
+    from printgest.ui.ativacao import AtivacaoWindow
+    from printgest.ui.modoleitura import ModoLeituraWindow
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    roteador = _Roteador(api)
+    roteador._token = "tok"
+    sit = {"status": "revogada", "estado": "revogada", "modo_leitura": True, "contrato": "b"}
+
+    roteador._abrir_modo_leitura(sit)
+    assert isinstance(roteador._janela, ModoLeituraWindow)
+
+    roteador._janela.reativar.emit()
+    assert isinstance(roteador._janela, AtivacaoWindow)
+    assert roteador._janela._token == "tok"  # ativação com a sessão vigente
+
+
+def test_ativacao_apos_modo_leitura_vai_ao_login_sem_usuario(app):
+    """Sem usuário autenticado, concluída a ativação o fluxo cai no login."""
+    _REQUISICOES.clear()
+    from printgest.main import _Roteador
+    from printgest.ui.login import LoginWindow
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    roteador = _Roteador(api)
+    roteador._token = "tok"
+    sit = {"estado": "revogada", "modo_leitura": True, "contrato": "b"}
+
+    roteador._abrir_modo_leitura(sit)
+    roteador._janela.reativar.emit()
+    roteador._janela.ativada.emit()
+
+    assert isinstance(roteador._janela, LoginWindow)
+
+
 # ------------------------------------------------- .env da estação (P5)
 
 
