@@ -104,3 +104,22 @@ def test_tolerancia_esgotada_mostra_diagnostico(app):
 def test_sem_situacao_mantem_mensagem_padrao(app):
     janela = _janela_situacao(None)
     assert "tolerância offline" in janela._mensagem.text().lower()
+
+
+# --------------------------------- inserir licença nova (revogada/expirada)
+
+
+def test_inserir_nova_licenca_emite_sinal_reativar(app):
+    janela = _janela(lambda r: httpx.Response(404))
+    recebido = []
+    janela.reativar.connect(lambda: recebido.append(True))
+    janela._botao_nova_licenca.click()
+    assert recebido == [True]
+
+
+def test_revogada_diagnostico_orienta_inserir_nova_licenca(app):
+    janela = _janela_situacao({"estado": "revogada"})
+    texto = janela._diag_texto.toPlainText().lower()
+    assert "revogação" in texto
+    assert "inserir nova licença" in texto
+    assert "não recupera" in texto or "nao recupera" in texto
