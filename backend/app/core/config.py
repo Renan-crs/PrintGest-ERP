@@ -5,7 +5,10 @@ class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
     version: str = "0.4.6"
     env: str = "dev"
-    api_host: str = "0.0.0.0"
+    # Seguro por padrão: bind apenas em localhost. O instalador fixa
+    # 127.0.0.1; uma instalação que servira ESTAÇÕES em rede local sobrescreve
+    # com PRINTGEST_API_HOST (ex.: 0.0.0.0) conscientemente.
+    api_host: str = "127.0.0.1"
     api_port: int = 8000
     database_url: str = (
         "postgresql+psycopg://printgest:printgest@127.0.0.1:5432/printgest"

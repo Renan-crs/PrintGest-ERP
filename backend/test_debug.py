@@ -35,7 +35,7 @@ try:
     logger.info("Carregando configurações...")
     from app.core.config import settings
 
-    logger.info(f"Database URL: {settings.database_url[:50]}...")
+    logger.info(f"Database URL: {settings.database_url.split('@')[-1]}")
     logger.info(f"API Host: {settings.api_host}:{settings.api_port}")
     logger.info(f"ENV: {settings.env}")
     logger.info(f"Auto-migrate: {settings.auto_migrate}")
