@@ -38,15 +38,37 @@ os.environ["PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO"] = "false"
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEST_DB = "printgest_test"
-_HOST = "127.0.0.1:5432"
-BASE_URL = f"postgresql+psycopg://printgest:printgest@{_HOST}"
-TEST_DB_URL = f"{BASE_URL}/{TEST_DB}"
+
+# CI: o workflow fornece `DATABASE_URL` (serviço Postgres efêmero do GitHub
+# Actions — banco descartável, pode ser zerado direto). Local: Postgres
+# portable da `.dev` (auth trust), onde a suíte isola em `printgest_test`
+# para nunca tocar no banco de desenvolvimento. Só aceitamos a env quando é
+# Postgres: outras bases (ex.: `sqlite:///:memory:` de outro projeto na
+# máquina) não servem para a suíte e precisam cair no default local.
+_URL_CI = os.environ.get("DATABASE_URL", "").strip()
+if _URL_CI.startswith("postgresql"):
+    if "://" not in _URL_CI:
+        _URL_CI = "postgresql://" + _URL_CI
+    _BASE_CRUA = _URL_CI.rstrip("/")
+    _ADMIN_CRUA = None  # o banco do CI já existe
+    TEST_DB_URL_CRUA = _BASE_CRUA
+else:
+    _BASE_CRUA = "postgresql://printgest@127.0.0.1:5432/printgest"
+    _ADMIN_CRUA = "postgresql://printgest@127.0.0.1:5432/postgres"
+    TEST_DB_URL_CRUA = f"postgresql://printgest@127.0.0.1:5432/{TEST_DB}"
+
+# SQLAlchemy exige o driver explícito; o psycopg.connect aceita a URL crua.
+TEST_DB_URL = TEST_DB_URL_CRUA.replace(
+    "postgresql://", "postgresql+psycopg://", 1
+)
 
 from app.core.config import settings  # noqa: E402 — depois das chaves de env acima
 
 
 def _criar_banco() -> None:
-    with psycopg.connect(f"host=127.0.0.1 port=5432 dbname=postgres user=printgest") as conn:
+    if _ADMIN_CRUA is None:
+        return  # CI: o banco do serviço já existe
+    with psycopg.connect(_ADMIN_CRUA) as conn:
         conn.autocommit = True
         existe = conn.execute(
             "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB,)
@@ -56,9 +78,7 @@ def _criar_banco() -> None:
 
 
 def _resetar_banco() -> None:
-    with psycopg.connect(
-        f"host=127.0.0.1 port=5432 dbname={TEST_DB} user=printgest"
-    ) as conn:
+    with psycopg.connect(TEST_DB_URL_CRUA) as conn:
         conn.autocommit = True
         conn.execute("DROP SCHEMA IF EXISTS public CASCADE")
         conn.execute("CREATE SCHEMA public")
