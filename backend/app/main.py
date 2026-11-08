@@ -131,7 +131,9 @@ async def _gating_modulos(request: Request, call_next):
 
 @app.middleware("http")
 async def controle_modo_leitura(request: Request, call_next):
-    if request.method in {"GET", "HEAD", "OPTIONS"} or _caminho_permitido(request.url.path):
+    if request.method in {"GET", "HEAD", "OPTIONS"} or _caminho_permitido(
+        request.url.path
+    ):
         return await call_next(request)
     if not settings.licenca_desabilitada and licensa_service.ESTADO["modo_leitura"]:
         return JSONResponse(

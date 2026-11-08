@@ -39,12 +39,10 @@ Pendências conhecidas do adaptador (fase M2 do plano):
 """
 
 import datetime as dt
-import hmac
 import json
 import re
 import unicodedata
 import uuid
-from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
@@ -73,18 +71,21 @@ _MOTIVOS = {
     ),
     "hardware_divergente": (
         svc.STATUS_BLOQUEADA,
-        "[RedGest] Hardware divergente: esta máquina precisa ser vinculada "
-        "novamente à licença (rebind).",
+        (
+            "[RedGest] Hardware divergente: esta máquina precisa ser vinculada "
+            "novamente à licença (rebind)."
+        ),
     ),
     "sem_hardware_vinculado": (
         svc.STATUS_BLOQUEADA,
-        "[RedGest] A licença ainda não tem máquina vinculada — solicite o "
-        "vínculo ao fornecedor.",
+        (
+            "[RedGest] A licença ainda não tem máquina vinculada — solicite o "
+            "vínculo ao fornecedor."
+        ),
     ),
     "hardware_nao_enviado": (
         svc.STATUS_BLOQUEADA,
-        "[RedGest] O servidor de licenças exige o perfil de hardware nesta "
-        "validação.",
+        "[RedGest] O servidor de licenças exige o perfil de hardware nesta validação.",
     ),
     "jwt_nao_configurado": (
         svc.STATUS_BLOQUEADA,
@@ -392,9 +393,7 @@ def _erro_credenciais_perdidas(exc: HTTPException, codigo: str) -> HTTPException
     )
 
 
-def _material_da_linha(
-    lic: Licenca | None, *, codigo: str, cnpj: str
-) -> dict | None:
+def _material_da_linha(lic: Licenca | None, *, codigo: str, cnpj: str) -> dict | None:
     """Material de ativação legível na própria linha local (``None`` se não há)."""
     if lic is None:
         return None
@@ -466,7 +465,7 @@ def _erro_transporte(db: Session, contexto: str, exc: Exception) -> HTTPExceptio
 
 def _erro_de_resposta(db: Session, resp: httpx.Response) -> HTTPException:
     """Traduz códigos HTTP do Contrato B (§10.3) sem nunca revogar por engano."""
-    codigo, detalhe = svc._erro_do_corpo(resp)
+    _codigo, detalhe = svc._erro_do_corpo(resp)
     if resp.status_code == status.HTTP_401_UNAUTHORIZED:
         return HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

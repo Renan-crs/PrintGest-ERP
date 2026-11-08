@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -28,8 +29,6 @@ from app.models.enums import (
 )
 
 
-from decimal import Decimal
-
 class PlanoContas(Base):
     __tablename__ = "plano_contas"
 
@@ -42,7 +41,9 @@ class PlanoContas(Base):
     tipo: Mapped[TipoPlanoConta] = mapped_column(
         pg_enum(TipoPlanoConta), nullable=False
     )
-    pai_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("plano_contas.id"))
+    pai_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("plano_contas.id")
+    )
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     __table_args__ = (
         UniqueConstraint("filial_id", "codigo"),
@@ -56,9 +57,7 @@ class ContaReceber(Base):
         CheckConstraint(
             "valor >= 0 AND valor_pago >= 0", name="ck_cr_valores_nao_negativos"
         ),
-        CheckConstraint(
-            "parcela >= 1 AND total_parcelas >= 1", name="ck_cr_parcelas"
-        ),
+        CheckConstraint("parcela >= 1 AND total_parcelas >= 1", name="ck_cr_parcelas"),
         Index("idx_cr_vencimento", "status", "vencimento"),
         Index("idx_cr_cliente", "cliente_id"),
     )
@@ -79,7 +78,9 @@ class ContaReceber(Base):
     )
     descricao: Mapped[str] = mapped_column(String(255), nullable=False)
     parcela: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
-    total_parcelas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    total_parcelas: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1"
+    )
     vencimento: Mapped[date] = mapped_column(Date, nullable=False)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     valor_pago: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
@@ -105,9 +106,7 @@ class ContaPagar(Base):
         CheckConstraint(
             "valor >= 0 AND valor_pago >= 0", name="ck_cp_valores_nao_negativos"
         ),
-        CheckConstraint(
-            "parcela >= 1 AND total_parcelas >= 1", name="ck_cp_parcelas"
-        ),
+        CheckConstraint("parcela >= 1 AND total_parcelas >= 1", name="ck_cp_parcelas"),
         Index("idx_cp_vencimento", "status", "vencimento"),
         Index("idx_cp_fornecedor", "fornecedor_id"),
     )
@@ -127,7 +126,9 @@ class ContaPagar(Base):
     )
     descricao: Mapped[str] = mapped_column(String(255), nullable=False)
     parcela: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
-    total_parcelas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    total_parcelas: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1"
+    )
     vencimento: Mapped[date] = mapped_column(Date, nullable=False)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     valor_pago: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
@@ -150,9 +151,7 @@ class ContaPagar(Base):
 class Caixa(Base):
     __tablename__ = "caixa"
     __table_args__ = (
-        CheckConstraint(
-            "valor_abertura >= 0", name="ck_caixa_valor_abertura"
-        ),
+        CheckConstraint("valor_abertura >= 0", name="ck_caixa_valor_abertura"),
         Index("idx_caixa_status", "status", "data_abertura"),
         Index(
             "uq_caixa_aberto_filial_usuario",

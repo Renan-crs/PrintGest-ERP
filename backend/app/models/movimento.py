@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -6,7 +7,6 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
-    ForeignKeyConstraint,
     ForeignKey,
     Index,
     Integer,
@@ -17,6 +17,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -37,10 +38,7 @@ from app.models.enums import (
     TipoOs,
     pg_enum,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 
-
-from decimal import Decimal
 
 class OrdemServico(Base):
     __tablename__ = "ordem_servico"
@@ -127,12 +125,8 @@ class OrdemServico(Base):
     )
 
     cliente: Mapped[Cliente | None] = relationship(foreign_keys=[cliente_id])
-    vendedor: Mapped[Funcionario | None] = relationship(
-        foreign_keys=[vendedor_id]
-    )
-    atendente: Mapped[Funcionario | None] = relationship(
-        foreign_keys=[atendente_id]
-    )
+    vendedor: Mapped[Funcionario | None] = relationship(foreign_keys=[vendedor_id])
+    atendente: Mapped[Funcionario | None] = relationship(foreign_keys=[atendente_id])
     itens: Mapped[list["OrdemServicoItem"]] = relationship(
         back_populates="os",
         cascade="all, delete-orphan",
@@ -228,7 +222,9 @@ class OrdemServicoItemCotacao(Base):
     prazo_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
     observacoes: Mapped[str | None] = mapped_column(Text)
     anexo_path: Mapped[str | None] = mapped_column(String(500))
-    selecionada: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    selecionada: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
     # M1 (§3.2.2 item 7): item do pedido de compra gerado na aprovação do
     # orçamento — carrega o VF cotado para este fornecedor.
     pedido_item_id: Mapped[int | None] = mapped_column(
@@ -287,13 +283,12 @@ class OsTerceirizado(Base):
     previsao_retorno: Mapped[date | None] = mapped_column(Date, nullable=True)
     data_retorno: Mapped[date | None] = mapped_column(Date, nullable=True)
     conferencia: Mapped[ConferenciaTerceirizado] = mapped_column(
-        pg_enum(ConferenciaTerceirizado), nullable=False,
+        pg_enum(ConferenciaTerceirizado),
+        nullable=False,
         server_default=ConferenciaTerceirizado.PENDENTE.value,
     )
     observacoes: Mapped[str | None] = mapped_column(Text)
-    criado_por: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("usuario.id")
-    )
+    criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -346,9 +341,7 @@ class ArteAprovacao(Base):
     """
 
     __tablename__ = "arte_aprovacao"
-    __table_args__ = (
-        Index("idx_arte_aprovacao_versao", "versao_id"),
-    )
+    __table_args__ = (Index("idx_arte_aprovacao_versao", "versao_id"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
@@ -357,9 +350,7 @@ class ArteAprovacao(Base):
     versao_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("arte_versao.id", ondelete="CASCADE"), nullable=False
     )
-    decisao: Mapped[str] = mapped_column(
-        pg_enum(DecisaoArte), nullable=False
-    )
+    decisao: Mapped[str] = mapped_column(pg_enum(DecisaoArte), nullable=False)
     comentarios: Mapped[str | None] = mapped_column(Text)
     ip: Mapped[str | None] = mapped_column(String(45))
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
@@ -378,9 +369,7 @@ class LinkPublico(Base):
     """
 
     __tablename__ = "link_publico"
-    __table_args__ = (
-        Index("idx_link_publico_os", "os_id"),
-    )
+    __table_args__ = (Index("idx_link_publico_os", "os_id"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
@@ -390,9 +379,7 @@ class LinkPublico(Base):
         BigInteger, ForeignKey("ordem_servico.id", ondelete="CASCADE"), nullable=False
     )
     token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    tipo: Mapped[str] = mapped_column(
-        pg_enum(TipoLinkPublico), nullable=False
-    )
+    tipo: Mapped[str] = mapped_column(pg_enum(TipoLinkPublico), nullable=False)
     expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     usado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     criado_em: Mapped[datetime] = mapped_column(
@@ -570,12 +557,12 @@ class PedidoCompraItem(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False)
     # M1 (§3.2.2): serviço terceirizado não tem produto no catálogo — a
     # descrição vive em `descricao_avulsa` (produto NULO nesses casos).
-    produto_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("produto.id")
-    )
+    produto_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("produto.id"))
     descricao_avulsa: Mapped[str | None] = mapped_column(String(255))
     quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="1")
-    quantidade_recebida: Mapped[Decimal] = mapped_column(Numeric(12, 3), server_default="0")
+    quantidade_recebida: Mapped[Decimal] = mapped_column(
+        Numeric(12, 3), server_default="0"
+    )
     valor_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
 
@@ -599,7 +586,9 @@ class Agendamento(Base):
         pg_enum(TipoAgenda), nullable=False, server_default=TipoAgenda.PRODUCAO.value
     )
     status: Mapped[StatusAgenda] = mapped_column(
-        pg_enum(StatusAgenda), nullable=False, server_default=StatusAgenda.AGENDADO.value
+        pg_enum(StatusAgenda),
+        nullable=False,
+        server_default=StatusAgenda.AGENDADO.value,
     )
     titulo: Mapped[str] = mapped_column(String(160), nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text)

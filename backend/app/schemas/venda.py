@@ -17,16 +17,16 @@ from app.schemas.common import ORMModel
 class VendaItemIn(BaseModel):
     produto_id: int | None = Field(default=None)
     descricao_avulsa: str | None = Field(default=None, max_length=255)
-    quantidade: Decimal = Field(default=Decimal("1"), gt=0)
-    valor_unitario: Decimal = Field(default=Decimal("0"), ge=0)
-    desconto: Decimal = Field(default=Decimal("0"), ge=0)
+    quantidade: Decimal = Field(default=Decimal(1), gt=0)
+    valor_unitario: Decimal = Field(default=Decimal(0), ge=0)
+    desconto: Decimal = Field(default=Decimal(0), ge=0)
 
 
 class VendaCreate(BaseModel):
     cliente_id: int | None = None
     vendedor_id: int | None = None
     data_venda: date = Field(default_factory=date.today)
-    desconto: Decimal = Field(default=Decimal("0"), ge=0)
+    desconto: Decimal = Field(default=Decimal(0), ge=0)
     forma_pagamento: FormaPagamento
     parcelas: int = Field(default=1, ge=1)
     observacoes: str | None = None
@@ -69,4 +69,4 @@ class VendaOut(ORMModel):
     criado_por: int | None = None
     created_at: datetime
     updated_at: datetime
-    itens: list[VendaItemOut] = []
+    itens: list[VendaItemOut] = Field(default_factory=list)

@@ -10,8 +10,9 @@ Create Date: 2026-10-26
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB  # noqa: F401 — compat com o padrão local
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b5d6e7f8a9c0"
@@ -41,7 +42,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint("filial_id", "chave", name="uq_preco_parametro_filial_chave"),
+        sa.UniqueConstraint(
+            "filial_id", "chave", name="uq_preco_parametro_filial_chave"
+        ),
         sa.CheckConstraint("valor >= 0", name="ck_preco_parametro_valor"),
     )
 

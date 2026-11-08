@@ -67,7 +67,6 @@ def test_raiz_congelada_e_irma_da_pasta_do_exe(monkeypatch, tmp_path):
     """
     import sys
 
-    app_dir = tmp_path / "PrintGest"
     api_dir = tmp_path / "PrintGestAPI"
     api_dir.mkdir(parents=True)
 
@@ -87,7 +86,7 @@ def test_raiz_padrao_do_repositorio_aponta_para_dev(monkeypatch):
 def test_garantir_postgres_primeira_execucao(tmp_path, monkeypatch):
     """initdb → pg_ctl start → pg_isready → CREATE DATABASE do banco da URL."""
     raiz = tmp_path / "postgres"
-    bin_dir = _instalar_binarios(raiz)
+    _instalar_binarios(raiz)
     data_dir = raiz / "data"
     log = raiz / "postgres.log"
 
@@ -141,7 +140,7 @@ def test_garantir_postgres_primeira_execucao(tmp_path, monkeypatch):
 
 def test_garantir_postgres_cluster_ja_no_ar_pula_initdb_e_start(tmp_path, monkeypatch):
     raiz = tmp_path
-    bin_dir = _instalar_binarios(raiz)
+    _instalar_binarios(raiz)
     data_dir = raiz / "data"
     data_dir.mkdir(parents=True)
     (data_dir / "PG_VERSION").write_text("16")
@@ -210,9 +209,7 @@ def test_iniciar_nao_captura_a_saida_do_pg_ctl(monkeypatch, tmp_path):
         return _Resultado(rc=0)
 
     monkeypatch.setattr(pg.subprocess, "run", run_fake)
-    pg._iniciar(
-        tmp_path, tmp_path, tmp_path / "postgres.log", "127.0.0.1", 5433
-    )
+    pg._iniciar(tmp_path, tmp_path, tmp_path / "postgres.log", "127.0.0.1", 5433)
     assert capturado["kwargs"]["stdout"] is subprocess.DEVNULL
     assert capturado["kwargs"]["stderr"] is subprocess.DEVNULL
     assert capturado["kwargs"]["stdin"] is subprocess.DEVNULL
@@ -227,9 +224,7 @@ def test_iniciar_falha_inclui_a_cauda_do_log(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pg.subprocess, "run", run_fake)
     with pytest.raises(RuntimeError, match="porta em uso"):
-        pg._iniciar(
-            tmp_path, tmp_path, log, "127.0.0.1", 5433
-        )
+        pg._iniciar(tmp_path, tmp_path, log, "127.0.0.1", 5433)
 
 
 def test_banco_com_nome_invalido_e_recusado(tmp_path, monkeypatch):

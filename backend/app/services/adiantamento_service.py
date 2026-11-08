@@ -23,7 +23,7 @@ from app.models.enums import StatusCaixa, StatusConta, TipoMovCaixa
 from app.models.financeiro import Caixa, ContaReceber, MovimentoCaixa
 
 _TWO = Decimal("0.01")
-_CEM = Decimal("100")
+_CEM = Decimal(100)
 
 
 def _q(valor: Decimal) -> Decimal:

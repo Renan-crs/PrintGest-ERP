@@ -225,7 +225,10 @@ def test_ativacao_recusada_repassa_mensagem(client, monkeypatch):
         monkeypatch,
         httpx.Response(
             400,
-            json={"detail": "Licença expirada, sem reativação.", "codigo": "LICENCA_EXPIRADA"},
+            json={
+                "detail": "Licença expirada, sem reativação.",
+                "codigo": "LICENCA_EXPIRADA",
+            },
         ),
     )
 
@@ -266,9 +269,7 @@ def test_ativacao_grava_copia_de_recuperacao_na_maquina(client, monkeypatch):
         assert CLIENT_SECRET not in cofre_maquina.caminho().read_text(encoding="utf-8")
 
 
-def test_reinstalacao_recupera_pelo_cofre_local_sem_novo_handshake(
-    client, monkeypatch
-):
+def test_reinstalacao_recupera_pelo_cofre_local_sem_novo_handshake(client, monkeypatch):
     _mock(monkeypatch, _resposta_ativacao())
     assert _ativar(client).status_code == 200
     _apagar_licenca_local()
@@ -446,7 +447,12 @@ def test_vigencia_vencida_dentro_do_grace_opera_normal(client, monkeypatch):
     assert _ativar(client).status_code == 200
 
     grace = _grace()
-    _mock(monkeypatch, _resposta_validacao(valida=False, motivo="licenca_expirada", grace_deadline=grace))
+    _mock(
+        monkeypatch,
+        _resposta_validacao(
+            valida=False, motivo="licenca_expirada", grace_deadline=grace
+        ),
+    )
     resp = client.post("/v1/licenca/renovar")
 
     # §12: `data_fim` venceu mas ainda dentro do `grace_deadline` -> tolerância.
@@ -454,7 +460,9 @@ def test_vigencia_vencida_dentro_do_grace_opera_normal(client, monkeypatch):
     situacao = resp.json()["data"]
     assert situacao["estado"] == "tolerancia"
     assert situacao["modo_leitura"] is False
-    assert licensa_service._parse_dt(situacao["tolerancia_expira_em"]) == licensa_service._parse_dt(grace)
+    assert licensa_service._parse_dt(
+        situacao["tolerancia_expira_em"]
+    ) == licensa_service._parse_dt(grace)
 
 
 def test_grace_esgotado_entra_em_modo_leitura(client, monkeypatch):
@@ -522,13 +530,17 @@ def test_contrato_c_intacto_com_a_flag_desligada(client, monkeypatch):
     monkeypatch.setattr(settings, "redgest_contrato", "c")
     monkeypatch.setattr(settings, "redgest_api_key", "")
 
-    resp = client.post("/v1/licenca/ativar", json={"cnpj": CNPJ, "codigo_licenca": CODIGO})
+    resp = client.post(
+        "/v1/licenca/ativar", json={"cnpj": CNPJ, "codigo_licenca": CODIGO}
+    )
 
     assert resp.status_code == 400
     assert "Chave de ativação inválida" in resp.json()["detail"]
 
 
-def test_bloqueio_operacional_impede_escrita_e_leitura_permite(client, admin_token, monkeypatch):
+def test_bloqueio_operacional_impede_escrita_e_leitura_permite(
+    client, admin_token, monkeypatch
+):
     _mock(monkeypatch, _resposta_ativacao())
     assert _ativar(client).status_code == 200
     assert (
@@ -549,7 +561,9 @@ def test_bloqueio_operacional_impede_escrita_e_leitura_permite(client, admin_tok
         json={"nome_razao": "Revogado", "tipo_pessoa": "pf"},
     )
     assert bloqueado.status_code == 423
-    assert client.get("/v1/clientes", headers=auth(client, admin_token)).status_code == 200
+    assert (
+        client.get("/v1/clientes", headers=auth(client, admin_token)).status_code == 200
+    )
     assert client.get("/v1/licenca").status_code == 200
 
 
@@ -582,7 +596,11 @@ def test_modulos_do_plano_sao_persistidos_e_publicados(client, monkeypatch):
     _mock(
         monkeypatch,
         _resposta_ativacao(
-            entitlements={"cnpj_vinculado": CNPJ, "max_estacoes": 5, "modulos": modulos},
+            entitlements={
+                "cnpj_vinculado": CNPJ,
+                "max_estacoes": 5,
+                "modulos": modulos,
+            },
         ),
     )
     _ativar(client)
@@ -600,7 +618,11 @@ def test_payload_sem_modulos_apaga_o_valor_anterior(client, monkeypatch):
     _mock(
         monkeypatch,
         _resposta_ativacao(
-            entitlements={"cnpj_vinculado": CNPJ, "max_estacoes": 5, "modulos": modulos},
+            entitlements={
+                "cnpj_vinculado": CNPJ,
+                "max_estacoes": 5,
+                "modulos": modulos,
+            },
         ),
     )
     _ativar(client)
@@ -646,7 +668,7 @@ def test_perfil_de_hardware_traduz_chaves_do_manual(monkeypatch):
 
 
 def test_perfil_de_hardware_tem_fallback_estavel(monkeypatch):
-    monkeypatch.setattr(licensa_service, "_consultar_hardware", lambda: {})
+    monkeypatch.setattr(licensa_service, "_consultar_hardware", dict)
 
     perfil = contrato_b._perfil_hardware()
 

@@ -86,8 +86,14 @@ def test_cotacao_selecionada_calcula_vo_e_atualiza_a_os(client, admin_token):
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
 
     resp = _lancar(
-        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "100.00",
-        selecionada=True, prazo_dias=5,
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        fornecedor["id"],
+        "100.00",
+        selecionada=True,
+        prazo_dias=5,
     )
     assert resp.status_code == 201, resp.text
     cotacao = resp.json()["data"]
@@ -125,7 +131,12 @@ def test_varias_cotacoes_e_somente_uma_selecionada(client, admin_token):
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
 
     primeira = _lancar(
-        client, admin_token, os_criada["id"], item["id"], f1["id"], "100.00",
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        f1["id"],
+        "100.00",
         selecionada=True,
     )
     assert primeira.status_code == 201
@@ -184,7 +195,9 @@ def test_cotacao_em_item_proprio_e_recusada(client, admin_token):
     assert os_criada["itens"][0]["estado_cotacao"] is None
 
     item_id = os_criada["itens"][0]["id"]
-    resp = _lancar(client, admin_token, os_criada["id"], item_id, fornecedor["id"], "10.00")
+    resp = _lancar(
+        client, admin_token, os_criada["id"], item_id, fornecedor["id"], "10.00"
+    )
     assert resp.status_code == 409
 
 
@@ -200,13 +213,20 @@ def _tokens_por_nivel(client, admin_token):
     return criar
 
 
-def test_operador_ve_comparativo_sem_vf_nem_snapshot(client, admin_token, _tokens_por_nivel):
+def test_operador_ve_comparativo_sem_vf_nem_snapshot(
+    client, admin_token, _tokens_por_nivel
+):
     """Aceite §8.1: sem `ver_custo_terceiro`, nenhuma resposta contém VF/CP."""
     cliente = _criar_cliente(client, admin_token)
     fornecedor = _criar_fornecedor(client, admin_token)
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
     _lancar(
-        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "100.00",
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        fornecedor["id"],
+        "100.00",
         selecionada=True,
     )
 
@@ -235,7 +255,7 @@ def test_operador_ve_comparativo_sem_vf_nem_snapshot(client, admin_token, _token
 def test_converter_com_item_sem_cotacao_selecionada_e_bloqueado(client, admin_token):
     cliente = _criar_cliente(client, admin_token)
     _criar_fornecedor(client, admin_token, "Fornecedor X")
-    os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
+    os_criada, _item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
     # nenhuma cotação lançada
 
     resp = client.post(
@@ -256,8 +276,14 @@ def test_converter_gera_pedido_de_compra_rascunho_com_vf(client, admin_token):
     fornecedor = _criar_fornecedor(client, admin_token, "Laminadora Prime")
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
     resp = _lancar(
-        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "87.35",
-        selecionada=True, prazo_dias=7,
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        fornecedor["id"],
+        "87.35",
+        selecionada=True,
+        prazo_dias=7,
     )
     assert resp.status_code == 201
 
@@ -275,6 +301,7 @@ def test_converter_gera_pedido_de_compra_rascunho_com_vf(client, admin_token):
     # O pedido de compra em rascunho existe, com o VF (87,35 — valor interno).
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import Session
+
     from tests.conftest import TEST_DB_URL
 
     engine = create_engine(TEST_DB_URL)
@@ -342,8 +369,13 @@ def test_converter_agrupa_um_pedido_por_fornecedor(client, admin_token):
     os_criada = resp.json()["data"]
     for item in os_criada["itens"]:
         r = _lancar(
-            client, admin_token, os_criada["id"], item["id"], fornecedor["id"],
-            "50.00", selecionada=True,
+            client,
+            admin_token,
+            os_criada["id"],
+            item["id"],
+            fornecedor["id"],
+            "50.00",
+            selecionada=True,
         )
         assert r.status_code == 201
 
@@ -355,14 +387,13 @@ def test_converter_agrupa_um_pedido_por_fornecedor(client, admin_token):
 
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import Session
+
     from tests.conftest import TEST_DB_URL
 
     engine = create_engine(TEST_DB_URL)
     with Session(engine) as db:
         pedidos = db.execute(
-            text(
-                "SELECT id, valor_total FROM pedido_compra WHERE os_origem_id = :os"
-            ),
+            text("SELECT id, valor_total FROM pedido_compra WHERE os_origem_id = :os"),
             {"os": os_nova["id"]},
         ).fetchall()
         assert len(pedidos) == 1  # um pedido por fornecedor
@@ -377,7 +408,9 @@ def test_converter_agrupa_um_pedido_por_fornecedor(client, admin_token):
     engine.dispose()
 
 
-def test_operador_e_caixa_nao_lancam_nem_selecionam(client, admin_token, _tokens_por_nivel):
+def test_operador_e_caixa_nao_lancam_nem_selecionam(
+    client, admin_token, _tokens_por_nivel
+):
     cliente = _criar_cliente(client, admin_token)
     fornecedor = _criar_fornecedor(client, admin_token)
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)

@@ -11,7 +11,7 @@ Payloads são validados pelos schemas Pydantic de Create/Update antes de persist
 RBAC: o menor nível informado é exigido em todas as rotas do router (via Depends).
 """
 
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -92,11 +92,15 @@ def criar_router_crud(
 
     @router.get("/{item_id}")
     def detalhe(item_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[OutT]:
-        return ItemResponse(data=_out(buscar_por_id(db, model, item_id, filial_id=filial)))
+        return ItemResponse(
+            data=_out(buscar_por_id(db, model, item_id, filial_id=filial))
+        )
 
     @router.post("")
     def criar_item(
-        body: schema_in, db: DbDep, filial: FilialDep  # type: ignore[valid-type]
+        body: schema_in,
+        db: DbDep,
+        filial: FilialDep,  # type: ignore[valid-type]
     ) -> ItemResponse[OutT]:
         return ItemResponse(
             data=_out(criar(db, model, _normalizar(filial, body.model_dump())))

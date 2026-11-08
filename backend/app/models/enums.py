@@ -1,5 +1,5 @@
-from enum import StrEnum
 import re
+from enum import StrEnum
 
 from sqlalchemy import Enum as SAEnum
 

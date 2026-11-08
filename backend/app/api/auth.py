@@ -1,9 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header
 
 from app.deps import DbDep, UsuarioDep
-from app.models.core import Usuario
 from app.schemas import (
     ItemResponse,
     LoginIn,
@@ -15,8 +14,12 @@ from app.schemas import (
 from app.services.auth_service import (
     login,
     logout,
-    trocar_senha as service_trocar_senha,
+)
+from app.services.auth_service import (
     primeiro_acesso as service_primeiro_acesso,
+)
+from app.services.auth_service import (
+    trocar_senha as service_trocar_senha,
 )
 
 router = APIRouter(prefix="/auth", tags=["autenticação"])

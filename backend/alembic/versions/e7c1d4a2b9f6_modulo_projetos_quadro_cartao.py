@@ -15,17 +15,18 @@ remover. `cartao.capa_anexo_id` e as demais tabelas de "cartão rico"
 (etiqueta, checklist, anexo, comentário, atividade) entram nas fases 2 e 3.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "e7c1d4a2b9f6"
-down_revision: Union[str, None] = "d4b5c6e7f8a0"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "d4b5c6e7f8a0"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Tipos novos deste módulo.
 tipo_lista = sa.Enum(
@@ -103,7 +104,10 @@ def upgrade() -> None:
         sa.Column("tipo", tipo_lista, nullable=False, server_default="livre"),
         sa.Column("status_os", status_os, nullable=True),
         sa.Column(
-            "usuario_dono_id", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True
+            "usuario_dono_id",
+            sa.BigInteger(),
+            sa.ForeignKey("usuario.id"),
+            nullable=True,
         ),
         sa.Column(
             "fornecedor_id",
@@ -125,9 +129,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index(
-        "idx_quadro_lista_quadro", "quadro_lista", ["quadro_id", "posicao"]
-    )
+    op.create_index("idx_quadro_lista_quadro", "quadro_lista", ["quadro_id", "posicao"])
 
     op.create_table(
         "cartao",
@@ -192,9 +194,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("ordem_servico_id", name="uq_cartao_ordem_servico"),
     )
     op.create_index("idx_cartao_lista", "cartao", ["lista_id", "posicao"])
-    op.create_index(
-        "idx_cartao_filial_arquivado", "cartao", ["filial_id", "arquivado"]
-    )
+    op.create_index("idx_cartao_filial_arquivado", "cartao", ["filial_id", "arquivado"])
 
     op.create_table(
         "cartao_membro",
@@ -212,7 +212,10 @@ def upgrade() -> None:
         ),
         sa.Column("origem", origem_membro, nullable=False, server_default="manual"),
         sa.Column(
-            "adicionado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True
+            "adicionado_por",
+            sa.BigInteger(),
+            sa.ForeignKey("usuario.id"),
+            nullable=True,
         ),
         sa.Column(
             "adicionado_em",

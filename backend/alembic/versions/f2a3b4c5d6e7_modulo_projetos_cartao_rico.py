@@ -14,8 +14,9 @@ e `capa_anexo_id` ficam para a Fase 3.
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 # Revision identifiers, used by Alembic.
 revision = "f2a3b4c5d6e7"
@@ -95,7 +96,10 @@ def upgrade() -> None:
         sa.Column("texto", sa.String(length=500), nullable=False),
         sa.Column("concluido", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
-            "responsavel_id", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True
+            "responsavel_id",
+            sa.BigInteger(),
+            sa.ForeignKey("usuario.id"),
+            nullable=True,
         ),
         sa.Column("data_entrega", sa.Date(), nullable=True),
         sa.Column("posicao", sa.Numeric(24, 12), nullable=False),

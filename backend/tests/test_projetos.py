@@ -43,9 +43,9 @@ def _criar_usuario(client, admin_token, nivel: str) -> tuple[str, int]:
     )
     assert resp.status_code == 200, resp.text
     usuario_id = resp.json()["data"]["id"]
-    token = client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    token = client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
     return token, usuario_id
 
 
@@ -314,9 +314,9 @@ def test_mover_com_versao_obsoleta_retorna_409_e_nao_move(client, admin_token):
     # Repetir com a versão antiga falha e **não** move de volta (atomicidade).
     conflito = _mover(client, header, cartao, lista_a, 0)
     assert conflito.status_code == 409
-    atual = client.get(
-        f"/v1/projetos/cartoes/{cartao['id']}", headers=header
-    ).json()["data"]
+    atual = client.get(f"/v1/projetos/cartoes/{cartao['id']}", headers=header).json()[
+        "data"
+    ]
     assert atual["lista_id"] == lista_b
     assert atual["versao"] == versao_inicial + 1
 
@@ -417,7 +417,9 @@ def test_pv2_cartao_restrito_da_404_para_nao_membro(client, admin_token):
     )
     # E some da busca de C.
     itens = client.get(
-        "/v1/projetos/cartoes", headers=auth(client, token_c), params={"q": cartao["titulo"]}
+        "/v1/projetos/cartoes",
+        headers=auth(client, token_c),
+        params={"q": cartao["titulo"]},
     ).json()["data"]
     assert all(c["id"] != cartao["id"] for c in itens)
 

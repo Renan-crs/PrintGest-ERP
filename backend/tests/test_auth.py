@@ -31,8 +31,12 @@ def test_bloqueio_apos_5_falhas(client, admin_token):
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": "Teste Bloqueio", "login": login, "senha": "abc12345",
-              "nivel_acesso": "operador"},
+        json={
+            "nome": "Teste Bloqueio",
+            "login": login,
+            "senha": "abc12345",
+            "nivel_acesso": "operador",
+        },
     )
     assert resp.status_code == 200, resp.text
 
@@ -88,9 +92,7 @@ def test_primeiro_acesso_funcionario(client, admin_token):
     )
     assert resp.status_code == 401
 
-    resp = client.post(
-        "/v1/auth/login", json={"login": login, "senha": "senha12345"}
-    )
+    resp = client.post("/v1/auth/login", json={"login": login, "senha": "senha12345"})
     assert resp.status_code == 200, resp.text
 
 
@@ -134,8 +136,12 @@ def test_trocar_senha_invalida_outras_sessoes(client, admin_token):
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": "Troca Senha", "login": login, "senha": "senha123",
-              "nivel_acesso": "operador"},
+        json={
+            "nome": "Troca Senha",
+            "login": login,
+            "senha": "senha123",
+            "nivel_acesso": "operador",
+        },
     )
     assert resp.status_code == 200, resp.text
 
@@ -159,7 +165,11 @@ def test_trocar_senha_invalida_outras_sessoes(client, admin_token):
     assert resp_a.status_code == 200
 
     # login com a nova senha funciona; com a antiga não
-    resp_antiga = client.post("/v1/auth/login", json={"login": login, "senha": "senha123"})
+    resp_antiga = client.post(
+        "/v1/auth/login", json={"login": login, "senha": "senha123"}
+    )
     assert resp_antiga.status_code in (401, 423)
-    resp_nova = client.post("/v1/auth/login", json={"login": login, "senha": "novaSenha2"})
+    resp_nova = client.post(
+        "/v1/auth/login", json={"login": login, "senha": "novaSenha2"}
+    )
     assert resp_nova.status_code == 200

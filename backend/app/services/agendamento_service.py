@@ -95,9 +95,7 @@ def obter(db: Session, *, filial_id: int, item_id: int) -> dict:
     return _item(ag, numero, cliente)
 
 
-def criar(
-    db: Session, *, filial_id: int, usuario_id: int, dados: dict
-) -> dict:
+def criar(db: Session, *, filial_id: int, usuario_id: int, dados: dict) -> dict:
     ag = Agendamento(**dados, filial_id=filial_id, usuario_id=usuario_id)
     db.add(ag)
     db.commit()
@@ -105,9 +103,7 @@ def criar(
     return obter(db, filial_id=filial_id, item_id=ag.id)
 
 
-def atualizar(
-    db: Session, *, filial_id: int, item_id: int, dados: dict
-) -> dict:
+def atualizar(db: Session, *, filial_id: int, item_id: int, dados: dict) -> dict:
     ag = _buscar(db, filial_id, item_id)
     for campo, valor in dados.items():
         if valor is not None:

@@ -35,14 +35,19 @@ def test_reset_senha_por_admin_revoga_sessoes(client, admin_token):
     criado = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": "Reset Senha", "login": login, "senha": senha, "nivel_acesso": "operador"},
+        json={
+            "nome": "Reset Senha",
+            "login": login,
+            "senha": senha,
+            "nivel_acesso": "operador",
+        },
     )
     assert criado.status_code == 200, criado.text
     uid = criado.json()["data"]["id"]
 
-    token = client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    token = client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
     assert client.get("/v1/auth/me", headers=auth(client, token)).status_code == 200
 
     resp = client.put(

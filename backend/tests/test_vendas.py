@@ -81,7 +81,7 @@ def test_venda_baixa_estoque_e_registra_kardex(client, admin_token, caixa_admin)
     venda = resp.json()["data"]
     assert venda["status"] == "ok"
     assert Decimal(venda["valor_total"]) == Decimal("60.00")
-    assert _saldo(client, admin_token, produto["id"]) == Decimal("7")
+    assert _saldo(client, admin_token, produto["id"]) == Decimal(7)
 
     kardex = client.get(
         f"/v1/estoque/{produto['id']}/kardex", headers=auth(client, admin_token)
@@ -91,7 +91,7 @@ def test_venda_baixa_estoque_e_registra_kardex(client, admin_token, caixa_admin)
     assert mov["origem"] == "venda_balcao"
     assert mov["tipo"] == "saida"
     assert mov["documento_id"] == venda["id"]
-    assert Decimal(mov["quantidade"]) == Decimal("3")
+    assert Decimal(mov["quantidade"]) == Decimal(3)
 
 
 # --- M0 (PRD v3.0 §2): o PDV não opera com caixa fechado --------------------------
@@ -106,7 +106,7 @@ def test_venda_com_caixa_fechado_e_recusada(client, admin_token):
     assert resp.status_code == 409, resp.text
     assert "Caixa fechado" in resp.json()["detail"]
     # Nada foi persistido: o estoque segue intacto.
-    assert _saldo(client, admin_token, produto["id"]) == Decimal("10")
+    assert _saldo(client, admin_token, produto["id"]) == Decimal(10)
 
 
 def test_venda_com_caixa_aberto_passa(client, admin_token, caixa_admin):
@@ -126,18 +126,18 @@ def test_venda_estoque_insuficiente_409(client, admin_token, caixa_admin):
     assert resp.status_code == 409, resp.text
     assert "insuficiente" in resp.json()["detail"].lower()
     # A transação é revertida: o saldo permanece intacto.
-    assert _saldo(client, admin_token, produto["id"]) == Decimal("1")
+    assert _saldo(client, admin_token, produto["id"]) == Decimal(1)
 
 
 def test_cancelar_venda_estorna_estoque(client, admin_token, caixa_admin):
     produto = _criar_produto(client, admin_token)
     _entrada(client, admin_token, produto["id"], 10)
     venda = _vender(client, admin_token, produto["id"], quantidade=4).json()["data"]
-    assert _saldo(client, admin_token, produto["id"]) == Decimal("6")
+    assert _saldo(client, admin_token, produto["id"]) == Decimal(6)
 
     resp = client.delete(f"/v1/vendas/{venda['id']}", headers=auth(client, admin_token))
     assert resp.status_code == 204, resp.text
-    assert _saldo(client, admin_token, produto["id"]) == Decimal("10")
+    assert _saldo(client, admin_token, produto["id"]) == Decimal(10)
 
 
 def test_venda_busca_por_cliente_e_numero(client, admin_token, caixa_admin):
@@ -145,9 +145,9 @@ def test_venda_busca_por_cliente_e_numero(client, admin_token, caixa_admin):
     cliente = _criar_cliente(client, admin_token, nome=f"Gráfica Rápida {_u()}")
     produto = _criar_produto(client, admin_token)
     _entrada(client, admin_token, produto["id"], 5)
-    venda = _vender(client, admin_token, produto["id"], cliente_id=cliente["id"]).json()[
-        "data"
-    ]
+    venda = _vender(
+        client, admin_token, produto["id"], cliente_id=cliente["id"]
+    ).json()["data"]
 
     por_nome = client.get(
         "/v1/vendas",
@@ -172,4 +172,4 @@ def test_venda_cliente_inexistente_409(client, admin_token, caixa_admin):
     resp = _vender(client, admin_token, produto["id"], cliente_id=999999)
     assert resp.status_code == 409, resp.text
     # Nada é persistido nem baixado quando a FK é inválida.
-    assert _saldo(client, admin_token, produto["id"]) == Decimal("3")
+    assert _saldo(client, admin_token, produto["id"]) == Decimal(3)

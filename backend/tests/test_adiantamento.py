@@ -152,7 +152,10 @@ def test_os_adiantado_confirmado_cria_conta_paga(client, admin_token, db_teste):
 def test_os_sinal_usa_percentual_do_cliente(client, admin_token, db_teste):
     cliente = _criar_cliente(client, admin_token, sinal=True, sinal_pct=30)
     resp = _criar_os(
-        client, admin_token, cliente["id"], confirmado=True,
+        client,
+        admin_token,
+        cliente["id"],
+        confirmado=True,
         itens=[_item(quantidade=1, valor=200.0)],
     )
     assert resp.status_code == 200, resp.text
@@ -178,7 +181,10 @@ def test_orcamento_nao_exige_pagamento(client, admin_token):
 def test_converter_orcamento_exige_pagamento(client, admin_token, db_teste):
     cliente = _criar_cliente(client, admin_token, pagamento_adiantado=True)
     orc = _criar_os(
-        client, admin_token, cliente["id"], tipo="orcamento",
+        client,
+        admin_token,
+        cliente["id"],
+        tipo="orcamento",
         itens=[_item(quantidade=1, valor=50.0)],
     )
     assert orc.status_code == 200, orc.text
@@ -202,15 +208,15 @@ def test_converter_orcamento_exige_pagamento(client, admin_token, db_teste):
 # --- Venda de balcão ------------------------------------------------------------
 
 
-def test_venda_sinal_bloqueia_e_confirmada_cria_conta(client, admin_token, db_teste, caixa_admin):
+def test_venda_sinal_bloqueia_e_confirmada_cria_conta(
+    client, admin_token, db_teste, caixa_admin
+):
     cliente = _criar_cliente(client, admin_token, sinal=True, sinal_pct=50)
     produto_id = _produto_com_estoque(client, admin_token, 5)
     payload = {
         "forma_pagamento": "dinheiro",
         "cliente_id": cliente["id"],
-        "itens": [
-            {"produto_id": produto_id, "quantidade": 1, "valor_unitario": 100.0}
-        ],
+        "itens": [{"produto_id": produto_id, "quantidade": 1, "valor_unitario": 100.0}],
     }
 
     sem = client.post("/v1/vendas", headers=auth(client, admin_token), json=payload)
@@ -221,7 +227,7 @@ def test_venda_sinal_bloqueia_e_confirmada_cria_conta(client, admin_token, db_te
         text("SELECT saldo FROM produto_estoque WHERE produto_id = :id"),
         {"id": produto_id},
     ).scalar_one()
-    assert Decimal(saldo) == Decimal("5")
+    assert Decimal(saldo) == Decimal(5)
 
     com = client.post(
         "/v1/vendas",
@@ -256,7 +262,10 @@ def test_confirmacao_gera_movimento_de_caixa_com_caixa_aberto(
     db_teste.commit()
     try:
         resp = _criar_os(
-            client, admin_token, cliente["id"], confirmado=True,
+            client,
+            admin_token,
+            cliente["id"],
+            confirmado=True,
             itens=[_item(quantidade=1, valor=80.0)],
         )
         assert resp.status_code == 200, resp.text

@@ -5,7 +5,7 @@ Os agendamentos são semeados direto no banco para o teste.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.db import SessionLocal
 from app.models.enums import NivelAcesso, StatusAgenda, TipoAgenda
@@ -32,9 +32,9 @@ def _token_de(client, admin_token, nivel: str) -> str:
         },
     )
     assert resp.status_code == 200, resp.text
-    return client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    return client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
 
 
 def _seed(
@@ -184,29 +184,26 @@ def test_atualizar_concluir_e_remover(client, admin_token):
     atualizado = client.put(
         f"/v1/agendamento/{item_id}",
         headers=headers,
-        json={"titulo": "Produção X (reagendada)", "data_hora_inicio": "2026-10-13T10:00:00"},
+        json={
+            "titulo": "Produção X (reagendada)",
+            "data_hora_inicio": "2026-10-13T10:00:00",
+        },
     )
     assert atualizado.status_code == 200, atualizado.text
     assert atualizado.json()["data"]["titulo"] == "Produção X (reagendada)"
 
-    concluido = client.patch(
-        f"/v1/agendamento/{item_id}/concluir", headers=headers
-    )
+    concluido = client.patch(f"/v1/agendamento/{item_id}/concluir", headers=headers)
     assert concluido.status_code == 200, concluido.text
     assert concluido.json()["data"]["status"] == "concluido"
 
     removido = client.delete(f"/v1/agendamento/{item_id}", headers=headers)
     assert removido.status_code == 204, removido.text
-    assert (
-        client.get(f"/v1/agendamento/{item_id}", headers=headers).status_code == 404
-    )
+    assert client.get(f"/v1/agendamento/{item_id}", headers=headers).status_code == 404
 
 
 def test_404_para_agendamento_inexistente(client, admin_token):
     headers = auth(client, admin_token)
-    assert (
-        client.get("/v1/agendamento/999999999", headers=headers).status_code == 404
-    )
+    assert client.get("/v1/agendamento/999999999", headers=headers).status_code == 404
 
 
 def test_rbac_operador_pode_caixa_nao(client, admin_token):

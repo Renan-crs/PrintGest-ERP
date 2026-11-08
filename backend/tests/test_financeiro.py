@@ -21,12 +21,17 @@ def _token_de(client, admin_token, nivel: str) -> str:
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": f"Usuário {nivel}", "login": login, "senha": senha, "nivel_acesso": nivel},
+        json={
+            "nome": f"Usuário {nivel}",
+            "login": login,
+            "senha": senha,
+            "nivel_acesso": nivel,
+        },
     )
     assert resp.status_code == 200, resp.text
-    return client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    return client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
 
 
 def _seed_conta(usuario_id: int | None = None) -> tuple[int, int]:
@@ -44,7 +49,7 @@ def _seed_conta(usuario_id: int | None = None) -> tuple[int, int]:
             total_parcelas=1,
             vencimento=date(2026, 1, 10),
             valor=Decimal("100.00"),
-            valor_pago=Decimal("0"),
+            valor_pago=Decimal(0),
             status=StatusConta.ABERTA,
         )
         pagar = ContaPagar(
@@ -54,7 +59,7 @@ def _seed_conta(usuario_id: int | None = None) -> tuple[int, int]:
             total_parcelas=1,
             vencimento=date(2026, 1, 15),
             valor=Decimal("250.00"),
-            valor_pago=Decimal("0"),
+            valor_pago=Decimal(0),
             status=StatusConta.ABERTA,
         )
         db.add_all([receber, pagar])
@@ -69,7 +74,9 @@ def _seed_conta(usuario_id: int | None = None) -> tuple[int, int]:
 # --------------------------------------------------------------------- caixa
 def test_caixa_abertura_extrato_e_fechamento(client, admin_token):
     headers = auth(client, _token_de(client, admin_token, NivelAcesso.CAIXA.value))
-    assert client.get("/v1/financeiro/caixa/atual", headers=headers).json()["data"] is None
+    assert (
+        client.get("/v1/financeiro/caixa/atual", headers=headers).json()["data"] is None
+    )
 
     resp = client.post(
         "/v1/financeiro/caixa/abrir", headers=headers, json={"valor_abertura": "200.00"}
@@ -110,7 +117,9 @@ def test_caixa_abertura_extrato_e_fechamento(client, admin_token):
     assert fechado["status"] == "fechado"
     assert Decimal(fechado["valor_esperado"]) == Decimal("220.00")
     assert Decimal(fechado["diferenca"]) == Decimal("0.00")
-    assert client.get("/v1/financeiro/caixa/atual", headers=headers).json()["data"] is None
+    assert (
+        client.get("/v1/financeiro/caixa/atual", headers=headers).json()["data"] is None
+    )
 
 
 def test_fechar_caixa_registra_divergencia(client, admin_token):
@@ -128,7 +137,9 @@ def test_fechar_caixa_registra_divergencia(client, admin_token):
 
 def test_abrir_caixa_duplicado(client, admin_token):
     headers = auth(client, _token_de(client, admin_token, NivelAcesso.CAIXA.value))
-    client.post("/v1/financeiro/caixa/abrir", headers=headers, json={"valor_abertura": "0"})
+    client.post(
+        "/v1/financeiro/caixa/abrir", headers=headers, json={"valor_abertura": "0"}
+    )
     resp = client.post(
         "/v1/financeiro/caixa/abrir", headers=headers, json={"valor_abertura": "0"}
     )
@@ -193,7 +204,9 @@ def test_contas_receber_lista_e_baixa(client, admin_token):
     conta_id, _ = _seed_conta()
 
     lista = client.get(
-        "/v1/financeiro/contas-receber", headers=headers, params={"status_conta": "aberta"}
+        "/v1/financeiro/contas-receber",
+        headers=headers,
+        params={"status_conta": "aberta"},
     )
     assert lista.status_code == 200, lista.text
     linha = next(i for i in lista.json()["data"] if i["id"] == conta_id)

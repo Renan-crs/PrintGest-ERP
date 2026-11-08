@@ -1,9 +1,9 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
-    CHAR,
     DateTime,
     ForeignKey,
     Index,

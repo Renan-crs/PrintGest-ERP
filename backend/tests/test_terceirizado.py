@@ -83,7 +83,13 @@ def test_selecao_de_cotacao_cria_rastreio_automatico(client, admin_token):
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
 
     _selecionar_cotacao(
-        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "100.00", prazo_dias=7
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        fornecedor["id"],
+        "100.00",
+        prazo_dias=7,
     )
 
     resp = client.get(
@@ -105,7 +111,13 @@ def test_receber_e_conferir_ok(client, admin_token):
     fornecedor = _criar_fornecedor(client, admin_token)
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
     _selecionar_cotacao(
-        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "50.00", prazo_dias=3
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        fornecedor["id"],
+        "50.00",
+        prazo_dias=3,
     )
 
     # 1. receber
@@ -200,13 +212,20 @@ def test_atrasado_quando_previsao_vence_sem_retorno(client, admin_token):
     """Previsão no passado + sem retorno = atrasado (para o sino/dashboard)."""
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import Session
+
     from tests.conftest import TEST_DB_URL
 
     cliente = _criar_cliente(client, admin_token)
     fornecedor = _criar_fornecedor(client, admin_token)
     os_criada, item = _criar_os_com_item_fornecedor(client, admin_token, cliente)
     _selecionar_cotacao(
-        client, admin_token, os_criada["id"], item["id"], fornecedor["id"], "60.00", prazo_dias=1
+        client,
+        admin_token,
+        os_criada["id"],
+        item["id"],
+        fornecedor["id"],
+        "60.00",
+        prazo_dias=1,
     )
 
     # Força envio e previsão para o passado (simula passagem de tempo)

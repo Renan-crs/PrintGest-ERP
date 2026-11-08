@@ -27,12 +27,8 @@ _NOVO = "Matriz"
 
 
 def upgrade() -> None:
-    op.execute(
-        f"UPDATE filial SET nome = '{_NOVO}' WHERE nome = '{_ANTIGO}'"
-    )
+    op.execute(f"UPDATE filial SET nome = '{_NOVO}' WHERE nome = '{_ANTIGO}'")
 
 
 def downgrade() -> None:
-    op.execute(
-        f"UPDATE filial SET nome = '{_ANTIGO}' WHERE nome = '{_NOVO}'"
-    )
+    op.execute(f"UPDATE filial SET nome = '{_ANTIGO}' WHERE nome = '{_NOVO}'")

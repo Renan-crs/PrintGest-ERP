@@ -91,9 +91,7 @@ def rota_bloqueada(caminho: str, modulos_habilitados: set[str]) -> str | None:
 
 async def controle_modulos(request: Request, call_next):
     """Middleware transversal: módulo não habilitado responde `403` (PRD §2)."""
-    bloqueado = rota_bloqueada(
-        request.url.path, licensa_service.MODULOS_HABILITADOS
-    )
+    bloqueado = rota_bloqueada(request.url.path, licensa_service.MODULOS_HABILITADOS)
     if bloqueado is not None:
         nome = _NOMES_MODULOS.get(bloqueado, bloqueado)
         return JSONResponse(

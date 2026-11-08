@@ -68,7 +68,9 @@ def para_out(cotacao: OrdemServicoItemCotacao, *, ver_custo: bool) -> dict:
     saida = {
         "id": cotacao.id,
         "fornecedor_id": cotacao.fornecedor_id,
-        "fornecedor_nome": cotacao.fornecedor.nome_razao if cotacao.fornecedor else None,
+        "fornecedor_nome": cotacao.fornecedor.nome_razao
+        if cotacao.fornecedor
+        else None,
         "validade": cotacao.validade,
         "prazo_dias": cotacao.prazo_dias,
         "observacoes": cotacao.observacoes,
@@ -105,14 +107,16 @@ def _aplicar_selecao(
     cotacao.selecionada = True
 
     snapshot = precificacao.calcular_item_terceirizado(
-        db, filial_id=filial_id, vf=cotacao.vf,
+        db,
+        filial_id=filial_id,
+        vf=cotacao.vf,
         fornecedor_id=cotacao.fornecedor_id,  # M2: sobrescrita do fornecedor
     )
     item.snapshot_preco = snapshot
     item.valor_unitario = Decimal(snapshot["vo"])
-    item.valor_total = (
-        item.valor_unitario * item.quantidade - item.desconto
-    ).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
+    item.valor_total = (item.valor_unitario * item.quantidade - item.desconto).quantize(
+        _CENTAVOS, rounding=ROUND_HALF_UP
+    )
     if item.valor_total < 0:
         item.valor_total = Decimal("0.00")
 
@@ -135,7 +139,7 @@ def _aplicar_selecao(
 
 def _recalcular_totais_os(db: Session, os_obj: OrdemServico) -> None:
     """Totais da OS a partir dos itens (mantém a invariável itens − desconto)."""
-    valor_itens = sum((i.valor_total for i in os_obj.itens), Decimal("0")).quantize(
+    valor_itens = sum((i.valor_total for i in os_obj.itens), Decimal(0)).quantize(
         _CENTAVOS, rounding=ROUND_HALF_UP
     )
     os_obj.valor_itens = valor_itens
@@ -189,7 +193,9 @@ def selecionar(
     _exigir_item_fornecedor(item)
     cotacao = next((c for c in item.cotacoes if c.id == cotacao_id), None)
     if cotacao is None:
-        raise HTTPException(status_code=404, detail="Cotação não encontrada para este item.")
+        raise HTTPException(
+            status_code=404, detail="Cotação não encontrada para este item."
+        )
 
     _aplicar_selecao(db, item=item, cotacao=cotacao, filial_id=filial_id)
     db.commit()

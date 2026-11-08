@@ -1,0 +1,44 @@
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint.flake8-bugbear]
+# O FastAPI usa chamadas em defaults como injeção de dependência
+# (`def rota(q: str = Query(...))`) — são imutáveis por design do framework.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.File",
+    "fastapi.Header",
+    "fastapi.Cookie",
+]
+
+[tool.mypy]
+python_version = "3.11"
+# Mesma linha do CI (`mypy app --ignore-missing-imports`).
+ignore_missing_imports = true
+
+# Baseline da dívida de tipagem (69 erros em 16 módulos, medidos em 08/11/2026).
+# Módulos AUSENTES desta lista já passam estrito — código novo deve ficar fora
+# dela. Queimar gradualmente: corrigiu um módulo? Remova-o daqui.
+[[tool.mypy.overrides]]
+module = [
+    "app.api.crud_factory",          # 10 — generics ModelT (filtro/atualizar)
+    "app.api.licenca",               # 3  — dict vs LicencaSituacaoOut
+    "app.api.movimento",             # 1
+    "app.core.postgres_embarcado",   # 4
+    "app.deps",                      # 1
+    "app.schemas.cadastros",         # 6
+    "app.services.adiantamento_service",
+    "app.services.cotacao_service",
+    "app.services.crud",             # 5
+    "app.services.dashboard_service",
+    "app.services.financeiro_service",
+    "app.services.licensa_contrato_b",
+    "app.services.licensa_service",
+    "app.services.os_service",
+    "app.services.projetos_service",
+    "app.services.terceirizado_service",
+]
+ignore_errors = true

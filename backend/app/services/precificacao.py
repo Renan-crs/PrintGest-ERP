@@ -32,18 +32,18 @@ _CENTAVOS = Decimal("0.01")
 
 # Parâmetros globais por filial (Configurações > Precificação, Admin).
 PARAMETROS_PADRAO: dict[str, Decimal] = {
-    "acrescimo_fornecedor_pct": Decimal("130"),
-    "markup_orcamento_pct": Decimal("6"),
+    "acrescimo_fornecedor_pct": Decimal(130),
+    "markup_orcamento_pct": Decimal(6),
 }
 
-_LIMITE_PCT = Decimal("100000")
+_LIMITE_PCT = Decimal(100000)
 
 
 # ------------------------------------------------------------- cálculo puro
 
 
 def _fator(pct: Decimal) -> Decimal:
-    return Decimal("1") + pct / Decimal("100")
+    return Decimal(1) + pct / Decimal(100)
 
 
 def _pct_valido(valor, nome: str) -> Decimal:

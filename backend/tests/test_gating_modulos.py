@@ -8,13 +8,14 @@ emitir `modulos`).
 
 from __future__ import annotations
 
-import httpx
+from typing import ClassVar
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
+from app.main import app
 from app.services import gating, licensa_service
-from app.main import app  # noqa: F401
 
 client = TestClient(app)
 
@@ -55,7 +56,10 @@ def test_modulo_da_rota(caminho, esperado):
 @pytest.mark.parametrize(
     "entitlements,esperado",
     [
-        ({"modulos": ["cadastros", "caixa", "movimento"]}, {"cadastros", "caixa", "movimento"}),
+        (
+            {"modulos": ["cadastros", "caixa", "movimento"]},
+            {"cadastros", "caixa", "movimento"},
+        ),
         ({"modulos": []}, set()),
         ({"modulos": "todas"}, set()),  # string: malformado
         ({"modulos": {"a": 1}}, set()),  # dict: malformado
@@ -74,8 +78,9 @@ def test_recalcular_estado_alimenta_modulos_habilitados(monkeypatch):
         licensa_service, "_estado", lambda lic: licensa_service.ESTADO_ATIVA
     )
     try:
+
         class LicencaFalsa:
-            entitlements = {"modulos": ["projetos", "fiscal"]}
+            entitlements: ClassVar[dict] = {"modulos": ["projetos", "fiscal"]}
 
         licensa_service._recalcular_estado(LicencaFalsa())
         assert licensa_service.MODULOS_HABILITADOS == {"projetos", "fiscal"}
@@ -123,7 +128,9 @@ def test_entitlements_vazio_nao_libera_nenhum_modulo(client, admin_token, monkey
     cabecalho = {"Authorization": f"Bearer {admin_token}"}
     assert client.get("/v1/clientes", headers=cabecalho).status_code == 403
     assert client.get("/v1/projetos", headers=cabecalho).status_code == 403
-    assert client.get("/v1/financeiro/caixa/atual", headers=cabecalho).status_code == 403
+    assert (
+        client.get("/v1/financeiro/caixa/atual", headers=cabecalho).status_code == 403
+    )
 
 
 def test_caixa_do_essencial_nao_libera_o_resto_do_financeiro(
@@ -135,19 +142,25 @@ def test_caixa_do_essencial_nao_libera_o_resto_do_financeiro(
         {"cadastros", "movimento", "estoque", "agendamento", "caixa", "configuracoes"},
     )
     cabecalho = {"Authorization": f"Bearer {admin_token}"}
-    assert client.get("/v1/financeiro/caixa/atual", headers=cabecalho).status_code != 403
     assert (
-        client.get("/v1/financeiro/contas-receber", headers=cabecalho).status_code != 403
+        client.get("/v1/financeiro/caixa/atual", headers=cabecalho).status_code != 403
     )
-    assert client.get("/v1/financeiro/contas-pagar", headers=cabecalho).status_code == 403
+    assert (
+        client.get("/v1/financeiro/contas-receber", headers=cabecalho).status_code
+        != 403
+    )
+    assert (
+        client.get("/v1/financeiro/contas-pagar", headers=cabecalho).status_code == 403
+    )
     assert (
         client.get("/v1/financeiro/plano-contas", headers=cabecalho).status_code == 403
     )
 
 
-def test_rotas_de_todos_os_planos_ficam_fora_do_gating(client, admin_token, monkeypatch):
+def test_rotas_de_todos_os_planos_ficam_fora_do_gating(
+    client, admin_token, monkeypatch
+):
     _armar(monkeypatch, set())
-    cabecalho = {"Authorization": f"Bearer {admin_token}"}
     # O gating roda antes das dependências: sem token algum módulo bloqueado daria
     # 403 MODULO_BLOQUEADO; dashboard não está no mapa, então segue para as
     # dependências normais (aqui, 401 de autenticação — não 403 de módulo).

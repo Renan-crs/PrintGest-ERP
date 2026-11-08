@@ -11,7 +11,7 @@ Regras centrais (mockups 4.1–4.3):
     max(mínimo, giro × lead-time) − saldo.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -95,9 +95,7 @@ def _rows_produtos(
     ]
     if q:
         termo = f"%{q.strip()}%"
-        filtros.append(
-            or_(Produto.codigo.ilike(termo), Produto.nome.ilike(termo))
-        )
+        filtros.append(or_(Produto.codigo.ilike(termo), Produto.nome.ilike(termo)))
     if categoria_id is not None:
         filtros.append(Produto.categoria_id == categoria_id)
 
@@ -175,12 +173,7 @@ def consultar(
         db, filial_id, q=q, categoria_id=categoria_id, abaixo_minimo=abaixo_minimo
     )
     total = qry.count()
-    linhas = (
-        qry.order_by(Produto.nome.asc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    linhas = qry.order_by(Produto.nome.asc()).offset(offset).limit(limit).all()
     return [_linha_out(r) for r in linhas], total
 
 
@@ -198,7 +191,9 @@ def resumo(
     total_itens = len(rows)
     itens_ativos = sum(1 for r in rows if r.ativo)
     total_bobinas = sum(1 for r in rows if r.dimensoes)
-    abaixo = sum(1 for r in rows if _q(Decimal(r.saldo)) < _q(Decimal(r.estoque_minimo)))
+    abaixo = sum(
+        1 for r in rows if _q(Decimal(r.saldo)) < _q(Decimal(r.estoque_minimo))
+    )
     valor = sum(
         (_money(_q(Decimal(r.saldo)) * _money(Decimal(r.preco_custo))) for r in rows),
         Decimal("0.00"),
@@ -212,7 +207,9 @@ def resumo(
     )
 
 
-def _kardex_out(mov: MovimentoEstoque, operador_nome: str | None, custo: Decimal) -> KardexOut:
+def _kardex_out(
+    mov: MovimentoEstoque, operador_nome: str | None, custo: Decimal
+) -> KardexOut:
     return KardexOut(
         id=mov.id,
         produto_id=mov.produto_id,
@@ -303,8 +300,7 @@ def movimentar(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    f"Estoque insuficiente: saldo atual {anterior}, "
-                    f"saída de {qtd}."
+                    f"Estoque insuficiente: saldo atual {anterior}, saída de {qtd}."
                 ),
             )
         lancado = _q(-qtd)
@@ -313,7 +309,7 @@ def movimentar(
         lancado = _q(novo - anterior)
 
     est.saldo = novo
-    est.atualizado_em = datetime.now(timezone.utc)
+    est.atualizado_em = datetime.now(UTC)
     mov = MovimentoEstoque(
         filial_id=filial_id,
         produto_id=dados.produto_id,
@@ -342,7 +338,7 @@ def reposicao(
     offset: int = 0,
 ) -> tuple[list[ReposicaoOut], int]:
     """Itens abaixo do mínimo com giro diário, autonomia e sugestão de lote."""
-    corte = datetime.now(timezone.utc) - timedelta(days=_DIAS_JANELA)
+    corte = datetime.now(UTC) - timedelta(days=_DIAS_JANELA)
     consumo_por_produto = {
         pid: Decimal(consumo or 0)
         for pid, consumo in db.query(
@@ -364,10 +360,12 @@ def reposicao(
         minimo = _q(Decimal(r.estoque_minimo))
         if apenas_abaixo and not (saldo < minimo and minimo > 0):
             continue
-        giro = _q(consumo_por_produto.get(r.produto_id, Decimal("0")) / Decimal(_DIAS_JANELA))
+        giro = _q(
+            consumo_por_produto.get(r.produto_id, Decimal(0)) / Decimal(_DIAS_JANELA)
+        )
         autonomia = _q(saldo / giro) if giro > 0 else None
         alvo = _q(max(minimo, _q(giro * _LEAD_DIAS)))
-        sugestao = _q(max(Decimal("0"), alvo - saldo))
+        sugestao = _q(max(Decimal(0), alvo - saldo))
         custo = _money(Decimal(r.preco_custo))
         resultado.append(
             ReposicaoOut(

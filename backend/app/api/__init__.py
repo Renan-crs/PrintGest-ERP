@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.api.auth import router as auth_router
 from app.api import agendamento, cadastros, config, financeiro, fiscal, projetos
+from app.api.auth import router as auth_router
 from app.api.balcao import router as balcao_router
 from app.api.dashboard import router as dashboard_router
 from app.api.estoque import router as estoque_router

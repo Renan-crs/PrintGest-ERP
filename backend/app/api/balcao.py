@@ -62,23 +62,26 @@ def criar(
 ) -> ItemResponse[VendaOut]:
     # M0 (PRD v3.0 §2): o PDV não opera com caixa fechado — o vendedor logado
     # precisa do próprio caixa aberto antes de registrar vendas.
-    if financeiro_service.caixa_aberto(
-        db, filial_id=filial, usuario_id=usuario.id
-    ) is None:
+    if (
+        financeiro_service.caixa_aberto(db, filial_id=filial, usuario_id=usuario.id)
+        is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Caixa fechado — abra o caixa antes de registrar vendas.",
         )
-    return ItemResponse(data=venda_service.criar(
-        db, filial_id=filial, usuario_id=usuario.id, dados=payload
-    ))
+    return ItemResponse(
+        data=venda_service.criar(
+            db, filial_id=filial, usuario_id=usuario.id, dados=payload
+        )
+    )
 
 
 @router.get("/{venda_id}")
 def buscar(venda_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[VendaOut]:
-    return ItemResponse(data=_para_out(venda_service.buscar(
-        db, filial_id=filial, venda_id=venda_id
-    )))
+    return ItemResponse(
+        data=_para_out(venda_service.buscar(db, filial_id=filial, venda_id=venda_id))
+    )
 
 
 @router.delete("/{venda_id}", status_code=status.HTTP_204_NO_CONTENT)

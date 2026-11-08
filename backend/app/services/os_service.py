@@ -14,6 +14,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.cadastros import Cliente, Produto
+from app.models.enums import (
+    DecisaoArte,
+    RefacaoErro,
+    StatusOs,
+    StatusPedido,
+    TipoItemOs,
+    TipoOs,
+)
 from app.models.movimento import (
     ArteAprovacao,
     ArteVersao,
@@ -22,14 +30,6 @@ from app.models.movimento import (
     OrdemServicoItemCotacao,
     PedidoCompra,
     PedidoCompraItem,
-)
-from app.models.enums import (
-    DecisaoArte,
-    RefacaoErro,
-    StatusOs,
-    StatusPedido,
-    TipoItemOs,
-    TipoOs,
 )
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
 from app.services import adiantamento_service
@@ -56,7 +56,9 @@ def _montar_item(payload: OsItemIn, seq: int) -> OrdemServicoItem:
         seq=seq,
         produto_id=payload.produto_id,
         descricao_avulsa=payload.descricao_avulsa,
-        quantidade=payload.quantidade.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP),
+        quantidade=payload.quantidade.quantize(
+            Decimal("0.001"), rounding=ROUND_HALF_UP
+        ),
         dimensoes=payload.dimensoes,
         valor_unitario=payload.valor_unitario,
         desconto=payload.desconto,
@@ -69,8 +71,10 @@ def _montar_itens(itens: list[OsItemIn]) -> list[OrdemServicoItem]:
     return [_montar_item(item, seq) for seq, item in enumerate(itens, start=1)]
 
 
-def _totais(itens: list[OrdemServicoItem], desconto: Decimal) -> tuple[Decimal, Decimal]:
-    valor_itens = _q(sum((i.valor_total for i in itens), Decimal("0")))
+def _totais(
+    itens: list[OrdemServicoItem], desconto: Decimal
+) -> tuple[Decimal, Decimal]:
+    valor_itens = _q(sum((i.valor_total for i in itens), Decimal(0)))
     if desconto > valor_itens:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -207,9 +211,13 @@ def atualizar(
 
 _TRANSICOES: dict[StatusOs, set[StatusOs]] = {
     StatusOs.ABERTO: {
-        StatusOs.AGUARDANDO_ARTE, StatusOs.AGUARDANDO_APROVACAO,
-        StatusOs.APROVADO, StatusOs.PRODUCAO, StatusOs.PRONTA,
-        StatusOs.ENTREGUE, StatusOs.CANCELADO,
+        StatusOs.AGUARDANDO_ARTE,
+        StatusOs.AGUARDANDO_APROVACAO,
+        StatusOs.APROVADO,
+        StatusOs.PRODUCAO,
+        StatusOs.PRONTA,
+        StatusOs.ENTREGUE,
+        StatusOs.CANCELADO,
     },
     # M3 (§3.5): a arte chegou e aguarda o cliente decidir; o cancelamento
     # continua possível enquanto a produção não começou. PRODUCAO entra no
@@ -217,13 +225,22 @@ _TRANSICOES: dict[StatusOs, set[StatusOs]] = {
     # "transição inválida" menos instrutivo — produção só passa com arte
     # aprovada, e arte aprovada move o status para APROVADO antes.
     StatusOs.AGUARDANDO_ARTE: {
-        StatusOs.AGUARDANDO_APROVACAO, StatusOs.PRODUCAO, StatusOs.CANCELADO,
-    },
-    StatusOs.AGUARDANDO_APROVACAO: {
-        StatusOs.APROVADO, StatusOs.AGUARDANDO_ARTE, StatusOs.PRODUCAO,
+        StatusOs.AGUARDANDO_APROVACAO,
+        StatusOs.PRODUCAO,
         StatusOs.CANCELADO,
     },
-    StatusOs.APROVADO: {StatusOs.PRODUCAO, StatusOs.PRONTA, StatusOs.ENTREGUE, StatusOs.CANCELADO},
+    StatusOs.AGUARDANDO_APROVACAO: {
+        StatusOs.APROVADO,
+        StatusOs.AGUARDANDO_ARTE,
+        StatusOs.PRODUCAO,
+        StatusOs.CANCELADO,
+    },
+    StatusOs.APROVADO: {
+        StatusOs.PRODUCAO,
+        StatusOs.PRONTA,
+        StatusOs.ENTREGUE,
+        StatusOs.CANCELADO,
+    },
     StatusOs.PRODUCAO: {StatusOs.PRONTA, StatusOs.ENTREGUE, StatusOs.CANCELADO},
     StatusOs.PRONTA: {StatusOs.ENTREGUE, StatusOs.CANCELADO},
     StatusOs.ENTREGUE: set(),
@@ -242,7 +259,9 @@ def mudar_status(
     os_obj = buscar(db, os_id, filial_id=filial_id)
 
     if os_obj.tipo == TipoOs.ORCAMENTO:
-        permitidos: set[StatusOs] = {StatusOs.CANCELADO} if os_obj.status == StatusOs.ABERTO else set()
+        permitidos: set[StatusOs] = (
+            {StatusOs.CANCELADO} if os_obj.status == StatusOs.ABERTO else set()
+        )
     else:
         permitidos = _TRANSICOES.get(os_obj.status, set())
 
@@ -356,8 +375,11 @@ def converter_em_os(
         # por fornecedor, com o VF cotado (ver §3.7). As cotações ficam nos
         # itens do ORÇAMENTO (histórico/auditoria) — é de lá que se lê.
         _gerar_pedidos_de_compra(
-            db, filial_id=filial_id, usuario_id=usuario_id,
-            os_nova=nova, orcamento=orcamento,
+            db,
+            filial_id=filial_id,
+            usuario_id=usuario_id,
+            os_nova=nova,
+            orcamento=orcamento,
         )
         adiantamento_service.exigir_e_registrar(
             db,
@@ -399,9 +421,7 @@ def _gerar_pedidos_de_compra(
     for item in orcamento.itens:
         if item.tipo != TipoItemOs.FORNECEDOR:
             continue
-        selecionada = next(
-            (c for c in item.cotacoes if c.selecionada), None
-        )
+        selecionada = next((c for c in item.cotacoes if c.selecionada), None)
         if selecionada is None:
             continue  # bloqueado antes; aqui é só defesa
         por_fornecedor.setdefault(selecionada.fornecedor_id, []).append(
@@ -409,9 +429,9 @@ def _gerar_pedidos_de_compra(
         )
 
     for fornecedor_id, pares in por_fornecedor.items():
-        valor_total = sum(
-            (c.vf for _, c in pares), Decimal("0")
-        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        valor_total = sum((c.vf for _, c in pares), Decimal(0)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
         prazo = min(
             (c.prazo_dias for _, c in pares if c.prazo_dias is not None),
             default=None,
@@ -436,7 +456,7 @@ def _gerar_pedidos_de_compra(
                 descricao_avulsa=(
                     f"{item.descricao_avulsa or f'item {item.seq}'} — serviço de fornecedor"
                 ),
-                quantidade=Decimal("1"),
+                quantidade=Decimal(1),
                 valor_unitario=cotacao.vf,
                 valor_total=cotacao.vf,
             )
@@ -641,7 +661,7 @@ def criar_refacao(
     desconto = origem.desconto
     if erro == RefacaoErro.GRAFICA:
         # Erro da gráfica: o cliente não paga pela refação.
-        valor_itens = _q(sum((i.valor_total for i in itens), Decimal("0")))
+        valor_itens = _q(sum((i.valor_total for i in itens), Decimal(0)))
         desconto = valor_itens
     valor_itens, valor_total = _totais(itens, Decimal(desconto))
 

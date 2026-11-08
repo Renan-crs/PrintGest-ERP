@@ -25,12 +25,17 @@ def _token_de(client, admin_token, nivel: str) -> str:
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": f"Usuário {nivel}", "login": login, "senha": senha, "nivel_acesso": nivel},
+        json={
+            "nome": f"Usuário {nivel}",
+            "login": login,
+            "senha": senha,
+            "nivel_acesso": nivel,
+        },
     )
     assert resp.status_code == 200, resp.text
-    return client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    return client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
 
 
 def _categoria() -> int:
@@ -45,7 +50,9 @@ def _categoria() -> int:
         db.close()
 
 
-def _produto(preco: str = "100.00", *, categoria_id: int | None = None, bloqueado: bool = False) -> int:
+def _produto(
+    preco: str = "100.00", *, categoria_id: int | None = None, bloqueado: bool = False
+) -> int:
     db = SessionLocal()
     try:
         produto = Produto(
@@ -114,7 +121,9 @@ def test_config_exige_admin(client, admin_token):
     assert client.get("/v1/config/empresa", headers=gerente).status_code == 403
 
     operador = auth(client, _token_de(client, admin_token, NivelAcesso.OPERADOR.value))
-    assert client.get("/v1/config/reajuste/historico", headers=operador).status_code == 403
+    assert (
+        client.get("/v1/config/reajuste/historico", headers=operador).status_code == 403
+    )
 
 
 # --------------------------------------------------------------------- reajuste
@@ -223,7 +232,9 @@ def test_aplicar_exige_senha_correta_e_grava_historico(client, admin_token):
     assert resultado["afetados"] >= 1
     assert _preco(produto_id) == Decimal("110.00")
 
-    historico = client.get("/v1/config/reajuste/historico", headers=headers).json()["data"]
+    historico = client.get("/v1/config/reajuste/historico", headers=headers).json()[
+        "data"
+    ]
     registro = next(h for h in historico if h["id"] == resultado["historico_id"])
     assert registro["tipo_reajuste"] == "percentual"
     assert registro["criterio"] == f"categoria:{cat}"

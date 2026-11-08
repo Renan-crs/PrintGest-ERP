@@ -7,7 +7,6 @@ orçamento via `orcamento_origem_id` e marca o original como `convertido`.
 
 from datetime import date, datetime
 from decimal import Decimal
-
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -16,7 +15,6 @@ from app.models.enums import (
     FormaPagamento,
     RefacaoErro,
     StatusOs,
-    StatusVenda,
     TipoItemOs,
     TipoOs,
 )
@@ -26,10 +24,10 @@ from app.schemas.common import ORMModel
 class OsItemIn(BaseModel):
     produto_id: int | None = Field(default=None)
     descricao_avulsa: str | None = Field(default=None, max_length=255)
-    quantidade: Decimal = Field(default=Decimal("1"), gt=0)
+    quantidade: Decimal = Field(default=Decimal(1), gt=0)
     dimensoes: str | None = Field(default=None, max_length=40)
-    valor_unitario: Decimal = Field(default=Decimal("0"), ge=0)
-    desconto: Decimal = Field(default=Decimal("0"), ge=0)
+    valor_unitario: Decimal = Field(default=Decimal(0), ge=0)
+    desconto: Decimal = Field(default=Decimal(0), ge=0)
     # M1 (PRD v3.0 §3.2.2): item próprio ou serviço de fornecedor. Item de
     # fornecedor nasce "Aguardando cotação" (valor 0) até a cotação selecionada.
     tipo: TipoItemOs = TipoItemOs.PROPRIO
@@ -49,7 +47,7 @@ class OsCreate(BaseModel):
     vendedor_id: int | None = None
     atendente_id: int | None = None
     data_previsao_entrega: date | None = None
-    desconto: Decimal = Field(default=Decimal("0"), ge=0)
+    desconto: Decimal = Field(default=Decimal(0), ge=0)
     forma_pagamento: FormaPagamento | None = None
     observacoes: str | None = None
     # Confirmação do recebimento antecipado (exigido pelo cliente, quando houver).
@@ -167,7 +165,6 @@ class CotacaoOut(BaseModel):
     criado_em: datetime
 
 
-
 class OsOut(ORMModel):
     id: int
     filial_id: int
@@ -200,4 +197,4 @@ class OsOut(ORMModel):
     criado_por: int | None = None
     created_at: datetime
     updated_at: datetime
-    itens: list[OsItemOut] = []
+    itens: list[OsItemOut] = Field(default_factory=list)

@@ -56,7 +56,9 @@ def _partes_url() -> tuple[str, int, str, str]:
     usuario = unquote(u.username or "printgest")
     banco = (u.path or "").lstrip("/") or "printgest"
     if not _NOME_BANCO_VALIDO.match(banco):
-        raise RuntimeError(f"Nome de banco inválido no PRINTGEST_DATABASE_URL: {banco!r}")
+        raise RuntimeError(
+            f"Nome de banco inválido no PRINTGEST_DATABASE_URL: {banco!r}"
+        )
     return host, u.port or 5432, usuario, banco
 
 
@@ -79,6 +81,7 @@ def _rodar(comando: list[str], etapa: str) -> str:
         capture_output=True,
         text=True,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        check=False,
     )
     if resultado.returncode != 0:
         detalhe = (resultado.stdout or "") + (resultado.stderr or "")
@@ -94,6 +97,7 @@ def _no_ar(bin_dir: Path, data_dir: Path) -> bool:
         capture_output=True,
         text=True,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        check=False,
     )
     return resultado.returncode == 0
 
@@ -116,9 +120,7 @@ def _inicializar(bin_dir: Path, data_dir: Path, usuario: str) -> None:
     )
 
 
-def _iniciar(
-    bin_dir: Path, data_dir: Path, log: Path, host: str, porta: int
-) -> None:
+def _iniciar(bin_dir: Path, data_dir: Path, log: Path, host: str, porta: int) -> None:
     logger.info("Iniciando o PostgreSQL embarcado em %s:%s...", host, porta)
     # NÃO capturar a saída do `pg_ctl start`: o postgres.exe (processo NETO,
     # destacado) herda os handles de stdout/stderr do pg_ctl — com pipe, o
@@ -141,6 +143,7 @@ def _iniciar(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        check=False,
     )
     if resultado.returncode != 0:
         cauda = ""
@@ -168,6 +171,7 @@ def _aguardar(bin_dir: Path, host: str, porta: int) -> None:
             capture_output=True,
             text=True,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False,
         )
         if resultado.returncode == 0:
             pronto = True
@@ -196,7 +200,7 @@ def _garantir_banco(
             "-U",
             usuario,
             "-tAc",
-            "SELECT 1 FROM pg_database WHERE datname = %s" % f"'{banco}'",
+            f"SELECT 1 FROM pg_database WHERE datname = '{banco}'",
         ],
         "psql",
     ).strip()

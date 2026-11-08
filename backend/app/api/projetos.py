@@ -17,13 +17,12 @@ a leitura da atividade são sub-recursos do cartão e passam pela visibilidade
 
 from fastapi import APIRouter, Depends, Query
 
-
 from app.deps import DbDep, FilialDep, UsuarioDep, require_perfis
 from app.models.enums import NivelAcesso
 from app.schemas.common import ItemResponse, ListaResponse, MetaPaginacao
 from app.schemas.projetos import (
-    AtribuirCartaoIn,
     AtividadeOut,
+    AtribuirCartaoIn,
     CartaoCreate,
     CartaoOut,
     CartaoUpdate,
@@ -54,14 +53,14 @@ router = APIRouter(
     prefix="/projetos",
     tags=["projetos"],
     dependencies=[
-        Depends(require_perfis(NivelAcesso.ADMIN, NivelAcesso.GERENTE, NivelAcesso.OPERADOR))
+        Depends(
+            require_perfis(NivelAcesso.ADMIN, NivelAcesso.GERENTE, NivelAcesso.OPERADOR)
+        )
     ],
 )
 
 # Gestores administram a estrutura do quadro (§4.1: criar/renomear/listas).
-_somente_gestor = Depends(
-    require_perfis(NivelAcesso.ADMIN, NivelAcesso.GERENTE)
-)
+_somente_gestor = Depends(require_perfis(NivelAcesso.ADMIN, NivelAcesso.GERENTE))
 _somente_admin = Depends(require_perfis(NivelAcesso.ADMIN))
 
 
@@ -83,7 +82,9 @@ def obter_quadro(db: DbDep, filial: FilialDep, usuario: UsuarioDep):
 def criar_lista(body: ListaCreate, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
     quadro = svc.obter_quadro(db, filial)
     return ItemResponse(
-        data=svc.criar_lista(db, usuario=usuario, quadro=quadro, dados=body.model_dump())
+        data=svc.criar_lista(
+            db, usuario=usuario, quadro=quadro, dados=body.model_dump()
+        )
     )
 
 
@@ -163,20 +164,28 @@ def listar_cartoes(
 @router.post("/cartoes", response_model=ItemResponse[CartaoOut], status_code=201)
 def criar_cartao(body: CartaoCreate, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
     return ItemResponse(
-        data=svc.criar_cartao(db, usuario=usuario, filial_id=filial, dados=body.model_dump())
+        data=svc.criar_cartao(
+            db, usuario=usuario, filial_id=filial, dados=body.model_dump()
+        )
     )
 
 
 @router.get("/cartoes/{cartao_id}", response_model=ItemResponse[CartaoOut])
 def obter_cartao(cartao_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
     return ItemResponse(
-        data=svc.obter_cartao(db, usuario=usuario, filial_id=filial, cartao_id=cartao_id)
+        data=svc.obter_cartao(
+            db, usuario=usuario, filial_id=filial, cartao_id=cartao_id
+        )
     )
 
 
 @router.patch("/cartoes/{cartao_id}", response_model=ItemResponse[CartaoOut])
 def atualizar_cartao(
-    cartao_id: int, body: CartaoUpdate, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+    cartao_id: int,
+    body: CartaoUpdate,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
 ):
     return ItemResponse(
         data=svc.atualizar_cartao(
@@ -191,7 +200,11 @@ def atualizar_cartao(
 
 @router.patch("/cartoes/{cartao_id}/mover", response_model=ItemResponse[CartaoOut])
 def mover_cartao(
-    cartao_id: int, body: MoverCartaoIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+    cartao_id: int,
+    body: MoverCartaoIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
 ):
     return ItemResponse(
         data=svc.mover_cartao(
@@ -212,7 +225,11 @@ def arquivar_cartao(
 ):
     return ItemResponse(
         data=svc.arquivar_cartao(
-            db, usuario=usuario, filial_id=filial, cartao_id=cartao_id, versao=body.versao
+            db,
+            usuario=usuario,
+            filial_id=filial,
+            cartao_id=cartao_id,
+            versao=body.versao,
         )
     )
 
@@ -223,14 +240,22 @@ def restaurar_cartao(
 ):
     return ItemResponse(
         data=svc.restaurar_cartao(
-            db, usuario=usuario, filial_id=filial, cartao_id=cartao_id, versao=body.versao
+            db,
+            usuario=usuario,
+            filial_id=filial,
+            cartao_id=cartao_id,
+            versao=body.versao,
         )
     )
 
 
 @router.patch("/cartoes/{cartao_id}/atribuir", response_model=ItemResponse[CartaoOut])
 def atribuir_cartao(
-    cartao_id: int, body: AtribuirCartaoIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+    cartao_id: int,
+    body: AtribuirCartaoIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
 ):
     return ItemResponse(
         data=svc.atribuir_cartao(
@@ -325,9 +350,7 @@ def excluir_etiqueta(etiqueta_id: int, db: DbDep, filial: FilialDep):
     svc.excluir_etiqueta(db, filial_id=filial, etiqueta_id=etiqueta_id)
 
 
-@router.post(
-    "/cartoes/{cartao_id}/etiquetas", response_model=ItemResponse[CartaoOut]
-)
+@router.post("/cartoes/{cartao_id}/etiquetas", response_model=ItemResponse[CartaoOut])
 def aplicar_etiqueta(
     cartao_id: int,
     body: EtiquetaAplicarIn,
@@ -611,9 +634,7 @@ def excluir_comentario(
 @router.get(
     "/cartoes/{cartao_id}/atividade", response_model=ListaResponse[AtividadeOut]
 )
-def listar_atividade(
-    cartao_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep
-):
+def listar_atividade(cartao_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
     itens = svc.listar_atividade(
         db, usuario=usuario, filial_id=filial, cartao_id=cartao_id
     )

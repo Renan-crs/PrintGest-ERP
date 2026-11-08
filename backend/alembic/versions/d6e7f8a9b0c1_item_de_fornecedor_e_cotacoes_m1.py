@@ -14,8 +14,9 @@ Create Date: 2026-10-26
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "d6e7f8a9b0c1"
@@ -52,7 +53,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column(
-            "fornecedor_id", sa.BigInteger(), sa.ForeignKey("fornecedor.id"), nullable=False
+            "fornecedor_id",
+            sa.BigInteger(),
+            sa.ForeignKey("fornecedor.id"),
+            nullable=False,
         ),
         sa.Column("vf", sa.Numeric(14, 2), nullable=False),
         sa.Column("validade", sa.Date(), nullable=True),
@@ -62,7 +66,9 @@ def upgrade() -> None:
         sa.Column(
             "selecionada", sa.Boolean(), nullable=False, server_default=sa.text("false")
         ),
-        sa.Column("criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True),
+        sa.Column(
+            "criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True
+        ),
         sa.Column(
             "criado_em",
             sa.DateTime(timezone=True),

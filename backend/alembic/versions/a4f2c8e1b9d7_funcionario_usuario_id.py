@@ -14,6 +14,7 @@ Create Date: 2026-11-03
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -44,9 +45,7 @@ def upgrade() -> None:
     # `usuario.senha_hash` precisa aceitar NULL para o primeiro acesso do
     # funcionário (senha definida no primeiro login). A migration
     # `e8f9a0b1c2d3` tentou isso, mas inverteu a checagem de `is_nullable`.
-    colunas_usuario = {
-        col["name"]: col for col in inspector.get_columns("usuario")
-    }
+    colunas_usuario = {col["name"]: col for col in inspector.get_columns("usuario")}
     senha = colunas_usuario.get("senha_hash")
     if senha is not None and not senha["nullable"]:
         op.alter_column(

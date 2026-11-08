@@ -10,9 +10,7 @@ _PBKDF2_ITERATIONS = 200_000
 def hash_password(senha: str) -> str:
     """Retorna hash no formato `pbkdf2_sha256$iterations$salt_hex$digest_hex`."""
     salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac(
-        "sha256", senha.encode(), salt, _PBKDF2_ITERATIONS
-    )
+    digest = hashlib.pbkdf2_hmac("sha256", senha.encode(), salt, _PBKDF2_ITERATIONS)
     return f"pbkdf2_sha256${_PBKDF2_ITERATIONS}${salt.hex()}${digest.hex()}"
 
 

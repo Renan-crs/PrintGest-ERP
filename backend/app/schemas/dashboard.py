@@ -31,9 +31,9 @@ class DashboardEntregaOut(BaseModel):
 class DashboardResumoOut(BaseModel):
     filial_nome: str | None = None
     vendas_hoje_qtd: int = 0
-    vendas_hoje_valor: Decimal = Decimal("0")
+    vendas_hoje_valor: Decimal = Decimal(0)
     vendas_ontem_qtd: int = 0
-    vendas_ontem_valor: Decimal = Decimal("0")
+    vendas_ontem_valor: Decimal = Decimal(0)
     os_abertas: int = 0
     os_prontas: int = 0
     # operacional (>= OPERADOR)

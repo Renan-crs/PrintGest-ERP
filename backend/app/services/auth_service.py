@@ -1,6 +1,6 @@
 """Serviços de autenticação: login com bloqueio por tentativas, sessão, troca de senha e logout."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -25,7 +25,7 @@ _STATUS_PRIMEIRO_ACESSO = status.HTTP_407_PROXY_AUTHENTICATION_REQUIRED
 
 
 def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usuario]:
-    agora = datetime.now(timezone.utc)
+    agora = datetime.now(UTC)
     usuario = db.query(Usuario).filter(Usuario.login == login_input).first()
     if not usuario:
         verify_password(senha, _HASH_NEUTRO)
@@ -69,9 +69,11 @@ def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usu
     return token, expira, usuario
 
 
-def primeiro_acesso(db: Session, login: str, nova_senha: str, usuario_id: int | None = None) -> tuple[str, datetime, Usuario]:
+def primeiro_acesso(
+    db: Session, login: str, nova_senha: str, usuario_id: int | None = None
+) -> tuple[str, datetime, Usuario]:
     """Completa o primeiro acesso: define senha e devolve token de sessão."""
-    agora = datetime.now(timezone.utc)
+    agora = datetime.now(UTC)
     if usuario_id:
         usuario = db.get(Usuario, usuario_id)
     else:

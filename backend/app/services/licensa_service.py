@@ -124,7 +124,7 @@ def contrato_b() -> bool:
 
 
 def _agora() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 def _base_redgest() -> str:
@@ -344,7 +344,7 @@ def _corpo(chave: str, fingerprint: str) -> bytes:
 
 
 def _assinatura(segredo: str, nonce: str, timestamp: str, corpo: bytes) -> str:
-    material = f"{nonce}{timestamp}".encode("utf-8") + corpo
+    material = f"{nonce}{timestamp}".encode() + corpo
     digest = hmac.new(segredo.encode("utf-8"), material, hashlib.sha256).hexdigest()
     return f"{PREFIXO_ASSINATURA}{digest}"
 
@@ -373,9 +373,9 @@ def _parse_dt(valor: Any) -> dt.datetime | None:
     if isinstance(valor, dt.datetime):
         momento = valor
     else:
-        momento = dt.datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+        momento = dt.datetime.fromisoformat(str(valor))
     if momento.tzinfo is None:
-        momento = momento.replace(tzinfo=dt.timezone.utc)
+        momento = momento.replace(tzinfo=dt.UTC)
     return momento
 
 
@@ -585,11 +585,8 @@ def situacao(db: Session) -> dict:
 
 
 # ---------------------------------------------------------------- persistência
-def _persistir_ok(
-    db: Session, *, chave: str, fingerprint: str, dados: dict
-) -> None:
+def _persistir_ok(db: Session, *, chave: str, fingerprint: str, dados: dict) -> None:
     lic = _licenca_local(db)
-    agora = _agora()
     expira = _parse_dt(dados.get("expira_em"))
     if lic is None:
         lic = Licenca()
@@ -701,9 +698,7 @@ def _tratar_recusa(db: Session, dados: dict) -> None:
         _marcar_status(db, novo_status, mensagem)
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail=mensagem)
     if motivo == "LIMITE_ATIVACOES_EXCEDIDO":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=_MSG_LIMITE
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_MSG_LIMITE)
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST, detail=_MSG_CHAVE_DESCONHECIDA
     )
@@ -898,8 +893,10 @@ async def loop_renovacao() -> None:
         if not _desabilitada():
             try:
                 falhou = await asyncio.to_thread(_tentativa_renovacao)
-            except Exception:  # noqa: BLE001 — falha externa não derruba o loop
-                logger.exception("Falha inesperada na revalidação automática da licença.")
+            except Exception:
+                logger.exception(
+                    "Falha inesperada na revalidação automática da licença."
+                )
                 falhou = True
             falhas = falhas + 1 if falhou else 0
         await asyncio.sleep(_atraso_proximo_ciclo(falhas))

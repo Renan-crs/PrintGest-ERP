@@ -1,6 +1,6 @@
 import sys
-from pathlib import Path
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import engine_from_config, pool
 
@@ -9,7 +9,6 @@ from alembic import context
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import app.models  # noqa: F401  — registra todas as tabelas no metadata
-
 from app.core.config import settings
 from app.db import Base
 

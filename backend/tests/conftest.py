@@ -8,10 +8,10 @@ O bootstrap de empresa/filial/admin roda no startup do app via lifespan e é
 idempotente — a primeira abertura do TestClient popula o banco de teste.
 """
 
+import asyncio
 import os
 import subprocess
 import sys
-import asyncio
 from pathlib import Path
 
 import psycopg
@@ -58,11 +58,9 @@ else:
     TEST_DB_URL_CRUA = f"postgresql://printgest@127.0.0.1:5432/{TEST_DB}"
 
 # SQLAlchemy exige o driver explícito; o psycopg.connect aceita a URL crua.
-TEST_DB_URL = TEST_DB_URL_CRUA.replace(
-    "postgresql://", "postgresql+psycopg://", 1
-)
+TEST_DB_URL = TEST_DB_URL_CRUA.replace("postgresql://", "postgresql+psycopg://", 1)
 
-from app.core.config import settings  # noqa: E402 — depois das chaves de env acima
+from app.core.config import settings
 
 
 def _criar_banco() -> None:
@@ -109,9 +107,7 @@ def client(_banco_teste):
     from app.db import SessionLocal
 
     SessionLocal.configure(bind=_banco_teste, expire_on_commit=False)
-    factory = sessionmaker(
-        bind=_banco_teste, autoflush=False, expire_on_commit=False
-    )
+    factory = sessionmaker(bind=_banco_teste, autoflush=False, expire_on_commit=False)
     deps.SessionLocal = factory
     bootstrap.SessionLocal = factory
 
@@ -122,8 +118,8 @@ def client(_banco_teste):
         finally:
             session.close()
 
-    from app.main import app
     from app.deps import get_db
+    from app.main import app
     from app.services import licensa_service
 
     # O loop de renovação (lifespan) fica inerte na suíte: testes de
@@ -146,14 +142,12 @@ def client(_banco_teste):
 
 @pytest.fixture()
 def admin_token(client):
-    resp = client.post(
-        "/v1/auth/login", json={"login": "admin", "senha": "admin123"}
-    )
+    resp = client.post("/v1/auth/login", json={"login": "admin", "senha": "admin123"})
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["token"]
 
 
-@ pytest.fixture
+@pytest.fixture
 def caixa_admin(_banco_teste):
     """Caixa aberto para o usuário admin — vendas de balcão o exigem (M0).
 
@@ -163,7 +157,6 @@ def caixa_admin(_banco_teste):
     """
     from app.db import SessionLocal
     from app.models.core import Usuario
-    from app.models.enums import StatusCaixa
     from app.models.financeiro import Caixa, MovimentoCaixa
     from app.services import financeiro_service
 

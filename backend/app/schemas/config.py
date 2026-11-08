@@ -125,9 +125,7 @@ class PrecoParametrosOut(BaseModel):
 class PrecoParametrosIn(BaseModel):
     """Alteração parcial: só o que vier diferente é gravado (Admin)."""
 
-    acrescimo_fornecedor_pct: Decimal | None = Field(
-        default=None, ge=0, le=100000
-    )
+    acrescimo_fornecedor_pct: Decimal | None = Field(default=None, ge=0, le=100000)
     markup_orcamento_pct: Decimal | None = Field(default=None, ge=0, le=100000)
 
 

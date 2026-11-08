@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
@@ -43,9 +43,11 @@ def caixa_aberto(db: Session, *, filial_id: int, usuario_id: int) -> Caixa | Non
 
 
 def _totais(db: Session, caixa: Caixa) -> tuple[Decimal, Decimal]:
-    movimentos = db.query(MovimentoCaixa).filter(MovimentoCaixa.caixa_id == caixa.id).all()
-    entradas = sum((_q(m.valor) for m in movimentos if m.tipo in _ENTRADAS), Decimal("0"))
-    saidas = sum((_q(m.valor) for m in movimentos if m.tipo in _SAIDAS), Decimal("0"))
+    movimentos = (
+        db.query(MovimentoCaixa).filter(MovimentoCaixa.caixa_id == caixa.id).all()
+    )
+    entradas = sum((_q(m.valor) for m in movimentos if m.tipo in _ENTRADAS), Decimal(0))
+    saidas = sum((_q(m.valor) for m in movimentos if m.tipo in _SAIDAS), Decimal(0))
     return entradas, saidas
 
 
@@ -102,7 +104,9 @@ def _obter_caixa(db: Session, caixa_id: int, filial_id: int) -> Caixa:
     return caixa
 
 
-def registrar_movimento(db: Session, *, caixa_id: int, filial_id: int, dados) -> MovimentoCaixa:
+def registrar_movimento(
+    db: Session, *, caixa_id: int, filial_id: int, dados
+) -> MovimentoCaixa:
     if dados.tipo not in (TipoMovCaixa.SANGRIA, TipoMovCaixa.SUPRIMENTO):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -127,7 +131,9 @@ def registrar_movimento(db: Session, *, caixa_id: int, filial_id: int, dados) ->
     return movimento
 
 
-def fechar_caixa(db: Session, *, caixa_id: int, filial_id: int, usuario_id: int, dados) -> Caixa:
+def fechar_caixa(
+    db: Session, *, caixa_id: int, filial_id: int, usuario_id: int, dados
+) -> Caixa:
     caixa = _obter_caixa(db, caixa_id, filial_id)
     if caixa.status != StatusCaixa.ABERTO:
         raise HTTPException(
@@ -140,7 +146,7 @@ def fechar_caixa(db: Session, *, caixa_id: int, filial_id: int, usuario_id: int,
     caixa.valor_informado = informado
     caixa.diferenca = informado - esperado
     caixa.status = StatusCaixa.FECHADO
-    caixa.data_fechamento = datetime.now(timezone.utc)
+    caixa.data_fechamento = datetime.now(UTC)
     caixa.closed_user_id = usuario_id
     if dados.observacoes:
         caixa.observacoes = dados.observacoes
@@ -248,7 +254,11 @@ def listar_contas_pagar(
 
 
 def _obter_conta(db: Session, model, item_id: int, filial_id: int):
-    conta = db.query(model).filter(model.id == item_id, model.filial_id == filial_id).first()
+    conta = (
+        db.query(model)
+        .filter(model.id == item_id, model.filial_id == filial_id)
+        .first()
+    )
     if conta is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Conta não encontrada."
@@ -263,13 +273,15 @@ def _baixar(db: Session, *, conta, usuario_id: int, dados) -> dict:
         )
     if conta.status == StatusConta.CANCELADA:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Conta cancelada não recebe baixa."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conta cancelada não recebe baixa.",
         )
     saldo = _q(conta.valor) - _q(conta.valor_pago)
     pago_agora = _q(dados.valor_pago) if dados.valor_pago is not None else saldo
     if pago_agora <= 0:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Informe um valor de baixa maior que zero."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe um valor de baixa maior que zero.",
         )
     if pago_agora > saldo:
         raise HTTPException(
@@ -288,7 +300,9 @@ def _baixar(db: Session, *, conta, usuario_id: int, dados) -> dict:
     return conta
 
 
-def baixar_conta_receber(db: Session, *, conta_id: int, filial_id: int, usuario_id: int, dados) -> dict:
+def baixar_conta_receber(
+    db: Session, *, conta_id: int, filial_id: int, usuario_id: int, dados
+) -> dict:
     conta = _obter_conta(db, ContaReceber, conta_id, filial_id)
     conta = _baixar(db, conta=conta, usuario_id=usuario_id, dados=dados)
     nome = None
@@ -300,7 +314,9 @@ def baixar_conta_receber(db: Session, *, conta_id: int, filial_id: int, usuario_
     return item
 
 
-def baixar_conta_pagar(db: Session, *, conta_id: int, filial_id: int, usuario_id: int, dados) -> dict:
+def baixar_conta_pagar(
+    db: Session, *, conta_id: int, filial_id: int, usuario_id: int, dados
+) -> dict:
     conta = _obter_conta(db, ContaPagar, conta_id, filial_id)
     conta = _baixar(db, conta=conta, usuario_id=usuario_id, dados=dados)
     nome = None

@@ -8,12 +8,12 @@ from app.services.crud import (
 )
 
 __all__ = [
+    "atualizar",
+    "buscar_por_id",
+    "criar",
+    "desativar",
+    "listar",
     "login",
     "logout",
     "trocar_senha",
-    "listar",
-    "buscar_por_id",
-    "criar",
-    "atualizar",
-    "desativar",
 ]

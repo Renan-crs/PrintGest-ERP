@@ -112,7 +112,9 @@ def _criar_produto_critico(client, token):
     return resp.json()["data"]
 
 
-def _criar_conta_receber(vencimento: date, valor: Decimal, valor_pago: Decimal = Decimal("0")):
+def _criar_conta_receber(
+    vencimento: date, valor: Decimal, valor_pago: Decimal = Decimal(0)
+):
     """Cria `conta_receber` diretamente no banco de teste (não há API ainda)."""
     from app.db import SessionLocal
     from app.models.core import Usuario
@@ -121,7 +123,8 @@ def _criar_conta_receber(vencimento: date, valor: Decimal, valor_pago: Decimal =
     sessao = SessionLocal()
     try:
         filial_id = (
-            sessao.query(Usuario).filter(Usuario.login == "admin").first().filial_id or 1
+            sessao.query(Usuario).filter(Usuario.login == "admin").first().filial_id
+            or 1
         )
         conta = ContaReceber(
             filial_id=filial_id,
@@ -152,8 +155,12 @@ def _criar_usuario(client, admin_token, nivel: NivelAcesso):
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": f"Usuário Dash {nivel.value}", "login": login,
-              "senha": senha, "nivel_acesso": nivel.value},
+        json={
+            "nome": f"Usuário Dash {nivel.value}",
+            "login": login,
+            "senha": senha,
+            "nivel_acesso": nivel.value,
+        },
     )
     assert resp.status_code == 200, resp.text
     resp = client.post("/v1/auth/login", json={"login": login, "senha": senha})
@@ -168,11 +175,17 @@ def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token, caixa_ad
     _criar_venda(client, admin_token)
     _criar_venda(client, admin_token, data=hoje - timedelta(days=1))
     _criar_conta_receber(hoje, Decimal("100.00"))
-    _criar_conta_receber(hoje - timedelta(days=3), Decimal("50.00"), valor_pago=Decimal("10.00"))
+    _criar_conta_receber(
+        hoje - timedelta(days=3), Decimal("50.00"), valor_pago=Decimal("10.00")
+    )
 
-    os_producao = _criar_os(client, admin_token, cliente, previsao=hoje + timedelta(days=5))
+    os_producao = _criar_os(
+        client, admin_token, cliente, previsao=hoje + timedelta(days=5)
+    )
     _avancar_os(client, admin_token, os_producao["id"], ["producao"])
-    os_atrasada = _criar_os(client, admin_token, cliente, previsao=hoje - timedelta(days=2))
+    os_atrasada = _criar_os(
+        client, admin_token, cliente, previsao=hoje - timedelta(days=2)
+    )
     os_hoje = _criar_os(client, admin_token, cliente, previsao=hoje)
     _criar_produto_critico(client, admin_token)
 
@@ -180,10 +193,14 @@ def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token, caixa_ad
 
     assert dados["filial_nome"] == "Matriz"
     assert dados["vendas_hoje_qtd"] == base["vendas_hoje_qtd"] + 1
-    assert Decimal(dados["vendas_hoje_valor"]) == Decimal(base["vendas_hoje_valor"]) + Decimal("25.00")
+    assert Decimal(dados["vendas_hoje_valor"]) == Decimal(
+        base["vendas_hoje_valor"]
+    ) + Decimal("25.00")
     # compare com ontem
     assert dados["vendas_ontem_qtd"] == base["vendas_ontem_qtd"] + 1
-    assert Decimal(dados["vendas_ontem_valor"]) == Decimal(base["vendas_ontem_valor"]) + Decimal("25.00")
+    assert Decimal(dados["vendas_ontem_valor"]) == Decimal(
+        base["vendas_ontem_valor"]
+    ) + Decimal("25.00")
 
     # campos operacionais preenchidos para ADMIN.
     assert dados["estoque_abaixo_minimo"] is not None
@@ -192,8 +209,12 @@ def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token, caixa_ad
     assert dados["projetos_atrasados"] == base["projetos_atrasados"] + 1
 
     # a receber: saldo em aberto (valor − pago), gerencial.
-    assert Decimal(dados["a_receber_vence_hoje"]) == Decimal(base["a_receber_vence_hoje"]) + Decimal("100.00")
-    assert Decimal(dados["a_receber_atrasado"]) == Decimal(base["a_receber_atrasado"]) + Decimal("40.00")
+    assert Decimal(dados["a_receber_vence_hoje"]) == Decimal(
+        base["a_receber_vence_hoje"]
+    ) + Decimal("100.00")
+    assert Decimal(dados["a_receber_atrasado"]) == Decimal(
+        base["a_receber_atrasado"]
+    ) + Decimal("40.00")
 
     # entregas do dia: as 2 O.S. com prazo <= hoje, atrasada sinalizada.
     entregas = dados["entregas_hoje"]
@@ -209,14 +230,18 @@ def test_resumo_dashboard_admin_agrega_dados_reais(client, admin_token, caixa_ad
     # série de 7 dias e previsto 7 dias por padrão.
     assert isinstance(dados["vendas_7_dias"], list)
     assert len(dados["vendas_7_dias"]) == 7
-    assert Decimal(dados["vendas_7_dias"][-1]["valor"]) == Decimal(base["vendas_7_dias"][-1]["valor"]) + Decimal("25.00")
+    assert Decimal(dados["vendas_7_dias"][-1]["valor"]) == Decimal(
+        base["vendas_7_dias"][-1]["valor"]
+    ) + Decimal("25.00")
 
     previsto = dados["faturamento_previsto"]
     base_previsto = base["faturamento_previsto"]
     assert isinstance(previsto, list)
     assert len(previsto) == 7
     # a conta que vence hoje entra no primeiro dia do previsto.
-    assert Decimal(previsto[0]["valor"]) == Decimal(base_previsto[0]["valor"]) + Decimal("100.00")
+    assert Decimal(previsto[0]["valor"]) == Decimal(
+        base_previsto[0]["valor"]
+    ) + Decimal("100.00")
 
 
 def test_resumo_dashboard_dias_30_estende_series(client, admin_token):
@@ -228,7 +253,9 @@ def test_resumo_dashboard_dias_30_estende_series(client, admin_token):
     assert dados7["vendas_7_dias"][-1]["data"] == dados30["vendas_7_dias"][-1]["data"]
 
 
-def test_resumo_dashboard_operador_ve_operacional_mas_nao_gerencial(client, admin_token):
+def test_resumo_dashboard_operador_ve_operacional_mas_nao_gerencial(
+    client, admin_token
+):
     base = _resumo(client, admin_token)
     token_operador = _criar_usuario(client, admin_token, NivelAcesso.OPERADOR)
 

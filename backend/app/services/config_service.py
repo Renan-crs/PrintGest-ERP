@@ -87,7 +87,7 @@ def _novo_preco(preco: Decimal, tipo: str, valor: Decimal) -> Decimal:
     else:
         novo = preco + valor
     if novo < 0:
-        novo = Decimal("0")
+        novo = Decimal(0)
     return novo.quantize(_DUAS_CASAS, rounding=ROUND_HALF_UP)
 
 

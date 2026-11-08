@@ -38,7 +38,11 @@ def _empresa() -> Empresa:
             filial = Filial(empresa_id=empresa.id, nome="Matriz")
             db.add(filial)
             db.flush()
-        admin = db.query(Usuario).filter(Usuario.login == settings.admin_inicial_login).first()
+        admin = (
+            db.query(Usuario)
+            .filter(Usuario.login == settings.admin_inicial_login)
+            .first()
+        )
         if not admin:
             primeiro_acesso = settings.admin_inicial_primeiro_acesso
             admin = Usuario(

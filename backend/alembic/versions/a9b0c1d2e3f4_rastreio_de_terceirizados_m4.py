@@ -13,6 +13,7 @@ Create Date: 2026-10-27
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -26,17 +27,33 @@ def upgrade() -> None:
     op.create_table(
         "os_terceirizado",
         sa.Column("id", sa.BigInteger(), primary_key=True),
-        sa.Column("filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False),
         sa.Column(
-            "os_id", sa.BigInteger(), sa.ForeignKey("ordem_servico.id", ondelete="CASCADE"),
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+        ),
+        sa.Column(
+            "os_id",
+            sa.BigInteger(),
+            sa.ForeignKey("ordem_servico.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
-            "item_id", sa.BigInteger(), sa.ForeignKey("ordem_servico_item.id", ondelete="CASCADE"),
+            "item_id",
+            sa.BigInteger(),
+            sa.ForeignKey("ordem_servico_item.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("cotacao_id", sa.BigInteger(), sa.ForeignKey("os_item_cotacao.id"), nullable=True),
-        sa.Column("pedido_compra_id", sa.BigInteger(), sa.ForeignKey("pedido_compra.id"), nullable=True),
+        sa.Column(
+            "cotacao_id",
+            sa.BigInteger(),
+            sa.ForeignKey("os_item_cotacao.id"),
+            nullable=True,
+        ),
+        sa.Column(
+            "pedido_compra_id",
+            sa.BigInteger(),
+            sa.ForeignKey("pedido_compra.id"),
+            nullable=True,
+        ),
         sa.Column("data_envio", sa.Date(), nullable=False),
         sa.Column("previsao_retorno", sa.Date(), nullable=True),
         sa.Column("data_retorno", sa.Date(), nullable=True),
@@ -47,9 +64,14 @@ def upgrade() -> None:
             server_default="pendente",
         ),
         sa.Column("observacoes", sa.Text(), nullable=True),
-        sa.Column("criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True),
         sa.Column(
-            "criado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+            "criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True
+        ),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
         ),
         sa.CheckConstraint(
             "data_retorno IS NULL OR data_retorno >= data_envio",

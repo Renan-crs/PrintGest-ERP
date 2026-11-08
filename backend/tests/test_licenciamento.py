@@ -41,9 +41,7 @@ FINGERPRINT_FIXO = "a" * 64
         ("https://redgest.exemplo.com/API/V1//", "https://redgest.exemplo.com"),
     ],
 )
-def test_base_redgest_nao_duplica_o_prefixo_da_api(
-    monkeypatch, configurado, esperado
-):
+def test_base_redgest_nao_duplica_o_prefixo_da_api(monkeypatch, configurado, esperado):
     """A URL configurada não pode carregar o path da API.
 
     Os caminhos de cada contrato já incluem `/api/v1/...`. Se o operador colar a
@@ -136,7 +134,7 @@ class _RedGestReal:
         dono = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def do_POST(self):  # noqa: N802 (nome fixado pelo stdlib)
+            def do_POST(self):
                 tamanho = int(self.headers.get("Content-Length") or 0)
                 corpo = self.rfile.read(tamanho)
                 dono.requisicoes.append(
@@ -182,7 +180,7 @@ def _ativar(client, chave: str = CHAVE):
 def _assinatura_esperada(request: httpx.Request) -> str:
     nonce = request.headers["X-RedGest-Nonce"]
     timestamp = request.headers["X-RedGest-Timestamp"]
-    material = f"{nonce}{timestamp}".encode("utf-8") + request.read()
+    material = f"{nonce}{timestamp}".encode() + request.read()
     digest = hmac.new(API_KEY.encode("utf-8"), material, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
@@ -321,10 +319,16 @@ def test_parse_chave_normaliza_e_valida():
 
 
 def test_chave_inexistente_devolve_400(client, monkeypatch):
-    _mock(monkeypatch, httpx.Response(403, json={
-        "detail": "Chave de ativação não encontrada.",
-        "codigo": "CHAVE_NAO_ENCONTRADA",
-    }))
+    _mock(
+        monkeypatch,
+        httpx.Response(
+            403,
+            json={
+                "detail": "Chave de ativação não encontrada.",
+                "codigo": "CHAVE_NAO_ENCONTRADA",
+            },
+        ),
+    )
     resp = _ativar(client, CHAVE_INVALIDA)
     assert resp.status_code == 400, resp.text
     assert client.get("/v1/licenca").json()["data"]["status"] == "nao_ativada"
@@ -341,10 +345,16 @@ def test_licenca_vitalicia_ativa_sem_expiracao(client, monkeypatch):
 
 
 def test_limite_de_ativacoes_devolve_409(client, monkeypatch):
-    _mock(monkeypatch, httpx.Response(409, json={
-        "detail": "Limite de ativações excedido.",
-        "codigo": "LIMITE_ATIVACOES_EXCEDIDO",
-    }))
+    _mock(
+        monkeypatch,
+        httpx.Response(
+            409,
+            json={
+                "detail": "Limite de ativações excedido.",
+                "codigo": "LIMITE_ATIVACOES_EXCEDIDO",
+            },
+        ),
+    )
     resp = _ativar(client)
     assert resp.status_code == 409, resp.text
     assert "limite" in resp.json()["detail"].lower()
@@ -366,10 +376,16 @@ def test_revogacao_volta_ao_modo_leitura(client, admin_token, monkeypatch):
     _mock(monkeypatch, _resposta_ok())
     assert _ativar(client).status_code == 200
 
-    _mock(monkeypatch, httpx.Response(403, json={
-        "detail": "Licença revogada.",
-        "codigo": "LICENCA_REVOGADA",
-    }))
+    _mock(
+        monkeypatch,
+        httpx.Response(
+            403,
+            json={
+                "detail": "Licença revogada.",
+                "codigo": "LICENCA_REVOGADA",
+            },
+        ),
+    )
     resp = client.post("/v1/licenca/renovar")
     assert resp.status_code == 423
 
@@ -390,10 +406,16 @@ def test_bloqueio_entra_em_modo_leitura(client, monkeypatch):
     _mock(monkeypatch, _resposta_ok())
     assert _ativar(client).status_code == 200
 
-    _mock(monkeypatch, httpx.Response(403, json={
-        "detail": "Licença bloqueada por inadimplência.",
-        "codigo": "LICENCA_BLOQUEADA",
-    }))
+    _mock(
+        monkeypatch,
+        httpx.Response(
+            403,
+            json={
+                "detail": "Licença bloqueada por inadimplência.",
+                "codigo": "LICENCA_BLOQUEADA",
+            },
+        ),
+    )
     assert client.post("/v1/licenca/renovar").status_code == 423
 
     data = client.get("/v1/licenca").json()["data"]
@@ -419,9 +441,10 @@ def test_ativacao_sem_rede_devolve_503(client, monkeypatch):
     _mock_sem_rede(monkeypatch)
     resp = _ativar(client)
     assert resp.status_code == 503, resp.text
-    assert "não foi possível falar com o servidor de licenças" in resp.json()[
-        "detail"
-    ].lower()
+    assert (
+        "não foi possível falar com o servidor de licenças"
+        in resp.json()["detail"].lower()
+    )
 
 
 def test_timeout_na_revalidacao_nao_revoga(client, monkeypatch):
@@ -587,7 +610,7 @@ def test_fingerprint_override_por_configuracao(monkeypatch):
 def test_fingerprint_sem_hardware_usa_fallback_estavel(monkeypatch):
     """Sem hardware disponível, cai num fallback estável (sem hostname/MAC)."""
     monkeypatch.setattr(settings, "maquina_fingerprint", "")
-    monkeypatch.setattr(licensa_service, "_consultar_hardware", lambda: {})
+    monkeypatch.setattr(licensa_service, "_consultar_hardware", dict)
     monkeypatch.setattr("platform.machine", lambda: "AMD64")
     monkeypatch.setattr("platform.processor", lambda: "")
     licensa_service._fingerprint_do_hardware.cache_clear()

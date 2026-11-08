@@ -13,16 +13,17 @@ Aplica as correções de integridade apontadas na revisão de schema:
   6) CHECKs de recebimento <= pedido e horário de agenda
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+
+import sqlalchemy as sa
 
 from alembic import op
-import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "f1a09c3b2d84"
-down_revision: Union[str, None] = "ae9f00b5a9a1"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "ae9f00b5a9a1"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -109,7 +110,9 @@ def upgrade() -> None:
     )
 
     # --- 3) caixa: caixa aberto Ãºnico por usuÃ¡rio/filial + valor >= 0 ---
-    op.create_check_constraint("ck_caixa_valor_abertura", "caixa", "valor_abertura >= 0")
+    op.create_check_constraint(
+        "ck_caixa_valor_abertura", "caixa", "valor_abertura >= 0"
+    )
     op.create_index(
         "uq_caixa_aberto_filial_usuario",
         "caixa",
@@ -149,7 +152,9 @@ def upgrade() -> None:
     op.create_index("idx_fornecedor_nome", "fornecedor", ["nome_razao"], unique=False)
 
     # --- 5) multi-filial: categoria por filial + filial_id obrigatório ---
-    op.drop_constraint("produto_categoria_nome_key", "produto_categoria", type_="unique")
+    op.drop_constraint(
+        "produto_categoria_nome_key", "produto_categoria", type_="unique"
+    )
     # Backfill antes do NOT NULL: bancos já populados podem ter linhas sem filial
     # (P12 — sem isto o upgrade falharia). Assume a filial de menor id (MVP).
     op.execute(
@@ -157,7 +162,9 @@ def upgrade() -> None:
         "COALESCE((SELECT id FROM filial ORDER BY id LIMIT 1), 1) "
         "WHERE filial_id IS NULL"
     )
-    op.alter_column("produto_categoria", "filial_id", existing_type=sa.BigInteger(), nullable=False)
+    op.alter_column(
+        "produto_categoria", "filial_id", existing_type=sa.BigInteger(), nullable=False
+    )
     op.create_unique_constraint(
         "uq_produto_categoria_filial_nome", "produto_categoria", ["filial_id", "nome"]
     )
@@ -166,17 +173,25 @@ def upgrade() -> None:
         "COALESCE((SELECT id FROM filial ORDER BY id LIMIT 1), 1) "
         "WHERE filial_id IS NULL"
     )
-    op.alter_column("plano_contas", "filial_id", existing_type=sa.BigInteger(), nullable=False)
+    op.alter_column(
+        "plano_contas", "filial_id", existing_type=sa.BigInteger(), nullable=False
+    )
 
 
 def downgrade() -> None:
     # --- 5) reverter multi-filial ---
-    op.alter_column("plano_contas", "filial_id", existing_type=sa.BigInteger(), nullable=True)
+    op.alter_column(
+        "plano_contas", "filial_id", existing_type=sa.BigInteger(), nullable=True
+    )
     op.drop_constraint(
         "uq_produto_categoria_filial_nome", "produto_categoria", type_="unique"
     )
-    op.alter_column("produto_categoria", "filial_id", existing_type=sa.BigInteger(), nullable=True)
-    op.create_unique_constraint("produto_categoria_nome_key", "produto_categoria", ["nome"])
+    op.alter_column(
+        "produto_categoria", "filial_id", existing_type=sa.BigInteger(), nullable=True
+    )
+    op.create_unique_constraint(
+        "produto_categoria_nome_key", "produto_categoria", ["nome"]
+    )
 
     # --- 4) dropar Ã­ndices de nome ---
     op.drop_index("idx_fornecedor_nome", table_name="fornecedor")
@@ -198,17 +213,19 @@ def downgrade() -> None:
     op.drop_constraint(
         "ck_pedido_item_valores_nao_negativos", "pedido_compra_item", type_="check"
     )
-    op.drop_constraint("ck_pedido_item_qtd_recebida", "pedido_compra_item", type_="check")
-    op.drop_constraint("ck_pedido_item_qtd_positiva", "pedido_compra_item", type_="check")
+    op.drop_constraint(
+        "ck_pedido_item_qtd_recebida", "pedido_compra_item", type_="check"
+    )
+    op.drop_constraint(
+        "ck_pedido_item_qtd_positiva", "pedido_compra_item", type_="check"
+    )
     op.drop_constraint("ck_pedido_valor_total", "pedido_compra", type_="check")
     op.drop_constraint(
         "ck_os_item_valores_nao_negativos", "ordem_servico_item", type_="check"
     )
     op.drop_constraint("ck_os_item_qtd_positiva", "ordem_servico_item", type_="check")
     op.drop_constraint("ck_os_valor_consistente", "ordem_servico", type_="check")
-    op.drop_constraint(
-        "ck_os_valores_nao_negativos", "ordem_servico", type_="check"
-    )
+    op.drop_constraint("ck_os_valores_nao_negativos", "ordem_servico", type_="check")
     op.drop_constraint(
         "ck_venda_item_valores_nao_negativos", "venda_balcao_item", type_="check"
     )

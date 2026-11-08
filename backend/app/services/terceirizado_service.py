@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.enums import ConferenciaTerceirizado, TipoItemOs
+from app.models.enums import ConferenciaTerceirizado
 from app.models.movimento import OrdemServico, OrdemServicoItem, OsTerceirizado
 
 
@@ -36,9 +36,7 @@ def registrar_envio(
     Idempotente: se o item já tem rastreio, devolve o existente.
     """
     existente = (
-        db.query(OsTerceirizado)
-        .filter(OsTerceirizado.item_id == item_id)
-        .first()
+        db.query(OsTerceirizado).filter(OsTerceirizado.item_id == item_id).first()
     )
     if existente is not None:
         return existente
@@ -158,7 +156,5 @@ def para_out(envio: OsTerceirizado, *, item: OrdemServicoItem | None = None) -> 
         "conferencia": envio.conferencia,
         "observacoes": envio.observacoes,
         "atrasado": atrasado,
-        "descricao_item": (
-            item.descricao_avulsa if item is not None else None
-        ),
+        "descricao_item": (item.descricao_avulsa if item is not None else None),
     }

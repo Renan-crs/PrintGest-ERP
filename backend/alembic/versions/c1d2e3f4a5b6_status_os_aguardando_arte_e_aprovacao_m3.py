@@ -21,7 +21,12 @@ depends_on = None
 
 # Valores do tipo SEM os acréscimos deste migration (usados no downgrade).
 _VALORES_BASE = [
-    "aberto", "aprovado", "producao", "pronta", "entregue", "cancelado",
+    "aberto",
+    "aprovado",
+    "producao",
+    "pronta",
+    "entregue",
+    "cancelado",
     "convertido",
 ]
 _NOVOS = ["aguardando_arte", "aguardando_aprovacao"]

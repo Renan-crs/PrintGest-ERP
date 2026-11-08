@@ -14,6 +14,7 @@ Aditiva e reversível: colunas anuláveis, sem mudança de dados existentes.
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # Revision identifiers, used by Alembic.

@@ -1,21 +1,23 @@
 """baseline models fase 1
 
 Revision ID: ae9f00b5a9a1
-Revises: 
+Revises:
 Create Date: 2026-09-20 22:55:26.997407
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
-revision: str = 'ae9f00b5a9a1'
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "ae9f00b5a9a1"
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -23,612 +25,1425 @@ def upgrade() -> None:
     op.execute("CREATE SEQUENCE seq_os_numero START 1")
     op.execute("CREATE SEQUENCE seq_venda_numero START 1")
     op.execute("CREATE SEQUENCE seq_pedido_numero START 1")
-    op.create_table('empresa',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('razao_social', sa.String(length=200), nullable=False),
-    sa.Column('nome_fantasia', sa.String(length=120), nullable=True),
-    sa.Column('cnpj', sa.CHAR(length=14), nullable=False),
-    sa.Column('inscricao_estadual', sa.String(length=20), nullable=True),
-    sa.Column('inscricao_municipal', sa.String(length=20), nullable=True),
-    sa.Column('regime_tributario', sa.String(length=60), server_default='Simples Nacional', nullable=True),
-    sa.Column('ambiente_fiscal', sa.CHAR(length=1), server_default='h', nullable=False),
-    sa.Column('cnae_fiscal', sa.String(length=10), nullable=True),
-    sa.Column('logradouro', sa.String(length=160), nullable=True),
-    sa.Column('numero', sa.String(length=12), nullable=True),
-    sa.Column('complemento', sa.String(length=80), nullable=True),
-    sa.Column('bairro', sa.String(length=80), nullable=True),
-    sa.Column('cidade', sa.String(length=80), nullable=True),
-    sa.Column('uf', sa.CHAR(length=2), nullable=True),
-    sa.Column('cep', sa.CHAR(length=8), nullable=True),
-    sa.Column('telefone', sa.String(length=20), nullable=True),
-    sa.Column('email', sa.String(length=120), nullable=True),
-    sa.Column('website', sa.String(length=160), nullable=True),
-    sa.Column('logotipo_path', sa.String(length=500), nullable=True),
-    sa.Column('fundo_tela_path', sa.String(length=500), nullable=True),
-    sa.Column('impressora_matricial', sa.String(length=160), nullable=True),
-    sa.Column('impressora_cupom', sa.String(length=160), nullable=True),
-    sa.Column('certificado_path', sa.String(length=500), nullable=True),
-    sa.Column('ativa', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('cnpj')
+    op.create_table(
+        "empresa",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("razao_social", sa.String(length=200), nullable=False),
+        sa.Column("nome_fantasia", sa.String(length=120), nullable=True),
+        sa.Column("cnpj", sa.CHAR(length=14), nullable=False),
+        sa.Column("inscricao_estadual", sa.String(length=20), nullable=True),
+        sa.Column("inscricao_municipal", sa.String(length=20), nullable=True),
+        sa.Column(
+            "regime_tributario",
+            sa.String(length=60),
+            server_default="Simples Nacional",
+            nullable=True,
+        ),
+        sa.Column(
+            "ambiente_fiscal", sa.CHAR(length=1), server_default="h", nullable=False
+        ),
+        sa.Column("cnae_fiscal", sa.String(length=10), nullable=True),
+        sa.Column("logradouro", sa.String(length=160), nullable=True),
+        sa.Column("numero", sa.String(length=12), nullable=True),
+        sa.Column("complemento", sa.String(length=80), nullable=True),
+        sa.Column("bairro", sa.String(length=80), nullable=True),
+        sa.Column("cidade", sa.String(length=80), nullable=True),
+        sa.Column("uf", sa.CHAR(length=2), nullable=True),
+        sa.Column("cep", sa.CHAR(length=8), nullable=True),
+        sa.Column("telefone", sa.String(length=20), nullable=True),
+        sa.Column("email", sa.String(length=120), nullable=True),
+        sa.Column("website", sa.String(length=160), nullable=True),
+        sa.Column("logotipo_path", sa.String(length=500), nullable=True),
+        sa.Column("fundo_tela_path", sa.String(length=500), nullable=True),
+        sa.Column("impressora_matricial", sa.String(length=160), nullable=True),
+        sa.Column("impressora_cupom", sa.String(length=160), nullable=True),
+        sa.Column("certificado_path", sa.String(length=500), nullable=True),
+        sa.Column("ativa", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("cnpj"),
     )
-    op.create_table('filial',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('empresa_id', sa.BigInteger(), nullable=False),
-    sa.Column('nome', sa.String(length=120), nullable=False),
-    sa.Column('cnpj', sa.CHAR(length=14), nullable=True),
-    sa.Column('logradouro', sa.String(length=160), nullable=True),
-    sa.Column('numero', sa.String(length=12), nullable=True),
-    sa.Column('complemento', sa.String(length=80), nullable=True),
-    sa.Column('bairro', sa.String(length=80), nullable=True),
-    sa.Column('cidade', sa.String(length=80), nullable=True),
-    sa.Column('uf', sa.CHAR(length=2), nullable=True),
-    sa.Column('cep', sa.CHAR(length=8), nullable=True),
-    sa.Column('telefone', sa.String(length=20), nullable=True),
-    sa.Column('email', sa.String(length=120), nullable=True),
-    sa.Column('ativa', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['empresa_id'], ['empresa.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_table(
+        "filial",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("empresa_id", sa.BigInteger(), nullable=False),
+        sa.Column("nome", sa.String(length=120), nullable=False),
+        sa.Column("cnpj", sa.CHAR(length=14), nullable=True),
+        sa.Column("logradouro", sa.String(length=160), nullable=True),
+        sa.Column("numero", sa.String(length=12), nullable=True),
+        sa.Column("complemento", sa.String(length=80), nullable=True),
+        sa.Column("bairro", sa.String(length=80), nullable=True),
+        sa.Column("cidade", sa.String(length=80), nullable=True),
+        sa.Column("uf", sa.CHAR(length=2), nullable=True),
+        sa.Column("cep", sa.CHAR(length=8), nullable=True),
+        sa.Column("telefone", sa.String(length=20), nullable=True),
+        sa.Column("email", sa.String(length=120), nullable=True),
+        sa.Column("ativa", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["empresa_id"],
+            ["empresa.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_filial_empresa', 'filial', ['empresa_id'], unique=False)
-    op.create_table('cliente',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('nome_razao', sa.String(length=200), nullable=False),
-    sa.Column('tipo_pessoa', sa.Enum('pf', 'pj', name='tipo_pessoa'), server_default='pf', nullable=False),
-    sa.Column('cpf_cnpj', sa.String(length=18), nullable=True),
-    sa.Column('inscricao_estadual', sa.String(length=20), nullable=True),
-    sa.Column('data_nascimento', sa.Date(), nullable=True),
-    sa.Column('email', sa.String(length=120), nullable=True),
-    sa.Column('telefone', sa.String(length=20), nullable=True),
-    sa.Column('celular', sa.String(length=20), nullable=True),
-    sa.Column('logradouro', sa.String(length=160), nullable=True),
-    sa.Column('numero', sa.String(length=12), nullable=True),
-    sa.Column('complemento', sa.String(length=80), nullable=True),
-    sa.Column('bairro', sa.String(length=80), nullable=True),
-    sa.Column('cidade', sa.String(length=80), nullable=True),
-    sa.Column('uf', sa.CHAR(length=2), nullable=True),
-    sa.Column('cep', sa.CHAR(length=8), nullable=True),
-    sa.Column('foto_path', sa.String(length=500), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('cpf_cnpj')
+    op.create_index("idx_filial_empresa", "filial", ["empresa_id"], unique=False)
+    op.create_table(
+        "cliente",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("nome_razao", sa.String(length=200), nullable=False),
+        sa.Column(
+            "tipo_pessoa",
+            sa.Enum("pf", "pj", name="tipo_pessoa"),
+            server_default="pf",
+            nullable=False,
+        ),
+        sa.Column("cpf_cnpj", sa.String(length=18), nullable=True),
+        sa.Column("inscricao_estadual", sa.String(length=20), nullable=True),
+        sa.Column("data_nascimento", sa.Date(), nullable=True),
+        sa.Column("email", sa.String(length=120), nullable=True),
+        sa.Column("telefone", sa.String(length=20), nullable=True),
+        sa.Column("celular", sa.String(length=20), nullable=True),
+        sa.Column("logradouro", sa.String(length=160), nullable=True),
+        sa.Column("numero", sa.String(length=12), nullable=True),
+        sa.Column("complemento", sa.String(length=80), nullable=True),
+        sa.Column("bairro", sa.String(length=80), nullable=True),
+        sa.Column("cidade", sa.String(length=80), nullable=True),
+        sa.Column("uf", sa.CHAR(length=2), nullable=True),
+        sa.Column("cep", sa.CHAR(length=8), nullable=True),
+        sa.Column("foto_path", sa.String(length=500), nullable=True),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("cpf_cnpj"),
     )
-    op.create_index('idx_cliente_dt_nas', 'cliente', ['data_nascimento'], unique=False, postgresql_where=sa.text('data_nascimento IS NOT NULL'))
-    op.create_index('idx_cliente_nome', 'cliente', ['nome_razao'], unique=False)
-    op.create_table('fornecedor',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('nome_razao', sa.String(length=200), nullable=False),
-    sa.Column('tipo_pessoa', sa.Enum('pf', 'pj', name='tipo_pessoa'), server_default='pj', nullable=False),
-    sa.Column('cpf_cnpj', sa.String(length=18), nullable=True),
-    sa.Column('inscricao_estadual', sa.String(length=20), nullable=True),
-    sa.Column('email', sa.String(length=120), nullable=True),
-    sa.Column('telefone', sa.String(length=20), nullable=True),
-    sa.Column('celular', sa.String(length=20), nullable=True),
-    sa.Column('contato_nome', sa.String(length=120), nullable=True),
-    sa.Column('logradouro', sa.String(length=160), nullable=True),
-    sa.Column('numero', sa.String(length=12), nullable=True),
-    sa.Column('complemento', sa.String(length=80), nullable=True),
-    sa.Column('bairro', sa.String(length=80), nullable=True),
-    sa.Column('cidade', sa.String(length=80), nullable=True),
-    sa.Column('uf', sa.CHAR(length=2), nullable=True),
-    sa.Column('cep', sa.CHAR(length=8), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('cpf_cnpj')
+    op.create_index(
+        "idx_cliente_dt_nas",
+        "cliente",
+        ["data_nascimento"],
+        unique=False,
+        postgresql_where=sa.text("data_nascimento IS NOT NULL"),
     )
-    op.create_table('funcionario',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('nome', sa.String(length=120), nullable=False),
-    sa.Column('cpf', sa.String(length=18), nullable=True),
-    sa.Column('cargo', sa.String(length=60), nullable=True),
-    sa.Column('email', sa.String(length=120), nullable=True),
-    sa.Column('telefone', sa.String(length=20), nullable=True),
-    sa.Column('data_nascimento', sa.Date(), nullable=True),
-    sa.Column('data_admissao', sa.Date(), nullable=True),
-    sa.Column('e_vendedor', sa.Boolean(), server_default='false', nullable=False),
-    sa.Column('e_atendente', sa.Boolean(), server_default='false', nullable=False),
-    sa.Column('e_producao', sa.Boolean(), server_default='false', nullable=False),
-    sa.Column('comissao_pct', sa.Numeric(precision=6, scale=3), server_default='0', nullable=False),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('cpf')
+    op.create_index("idx_cliente_nome", "cliente", ["nome_razao"], unique=False)
+    op.create_table(
+        "fornecedor",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("nome_razao", sa.String(length=200), nullable=False),
+        sa.Column(
+            "tipo_pessoa",
+            sa.Enum("pf", "pj", name="tipo_pessoa"),
+            server_default="pj",
+            nullable=False,
+        ),
+        sa.Column("cpf_cnpj", sa.String(length=18), nullable=True),
+        sa.Column("inscricao_estadual", sa.String(length=20), nullable=True),
+        sa.Column("email", sa.String(length=120), nullable=True),
+        sa.Column("telefone", sa.String(length=20), nullable=True),
+        sa.Column("celular", sa.String(length=20), nullable=True),
+        sa.Column("contato_nome", sa.String(length=120), nullable=True),
+        sa.Column("logradouro", sa.String(length=160), nullable=True),
+        sa.Column("numero", sa.String(length=12), nullable=True),
+        sa.Column("complemento", sa.String(length=80), nullable=True),
+        sa.Column("bairro", sa.String(length=80), nullable=True),
+        sa.Column("cidade", sa.String(length=80), nullable=True),
+        sa.Column("uf", sa.CHAR(length=2), nullable=True),
+        sa.Column("cep", sa.CHAR(length=8), nullable=True),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("cpf_cnpj"),
     )
-    op.create_table('plano_contas',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=True),
-    sa.Column('codigo', sa.String(length=20), nullable=False),
-    sa.Column('nome', sa.String(length=120), nullable=False),
-    sa.Column('tipo', sa.Enum('receita', 'despesa', name='tipo_plano_conta'), nullable=False),
-    sa.Column('pai_id', sa.BigInteger(), nullable=True),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['pai_id'], ['plano_contas.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('filial_id', 'codigo')
+    op.create_table(
+        "funcionario",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("nome", sa.String(length=120), nullable=False),
+        sa.Column("cpf", sa.String(length=18), nullable=True),
+        sa.Column("cargo", sa.String(length=60), nullable=True),
+        sa.Column("email", sa.String(length=120), nullable=True),
+        sa.Column("telefone", sa.String(length=20), nullable=True),
+        sa.Column("data_nascimento", sa.Date(), nullable=True),
+        sa.Column("data_admissao", sa.Date(), nullable=True),
+        sa.Column("e_vendedor", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("e_atendente", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("e_producao", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column(
+            "comissao_pct",
+            sa.Numeric(precision=6, scale=3),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("cpf"),
     )
-    op.create_index('idx_plano_pai', 'plano_contas', ['pai_id'], unique=False)
-    op.create_table('produto_categoria',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=True),
-    sa.Column('nome', sa.String(length=80), nullable=False),
-    sa.Column('description', sa.String(length=255), nullable=True),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('nome')
+    op.create_table(
+        "plano_contas",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=True),
+        sa.Column("codigo", sa.String(length=20), nullable=False),
+        sa.Column("nome", sa.String(length=120), nullable=False),
+        sa.Column(
+            "tipo",
+            sa.Enum("receita", "despesa", name="tipo_plano_conta"),
+            nullable=False,
+        ),
+        sa.Column("pai_id", sa.BigInteger(), nullable=True),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["pai_id"],
+            ["plano_contas.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("filial_id", "codigo"),
     )
-    op.create_table('usuario',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=True),
-    sa.Column('nome', sa.String(length=120), nullable=False),
-    sa.Column('login', sa.String(length=60), nullable=False),
-    sa.Column('senha_hash', sa.String(length=255), nullable=False),
-    sa.Column('nivel_acesso', sa.Enum('admin', 'gerente', 'operador', 'caixa', name='nivel_acesso'), server_default='operador', nullable=False),
-    sa.Column('email', sa.String(length=120), nullable=True),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('falhas_login', sa.Integer(), server_default='0', nullable=False),
-    sa.Column('bloqueado_em', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('ultimo_login', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('login')
+    op.create_index("idx_plano_pai", "plano_contas", ["pai_id"], unique=False)
+    op.create_table(
+        "produto_categoria",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=True),
+        sa.Column("nome", sa.String(length=80), nullable=False),
+        sa.Column("description", sa.String(length=255), nullable=True),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("nome"),
     )
-    op.create_table('caixa',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('usuario_id', sa.BigInteger(), nullable=False),
-    sa.Column('status', sa.Enum('aberto', 'fechado', name='status_caixa'), server_default='aberto', nullable=False),
-    sa.Column('data_abertura', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('valor_abertura', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('data_fechamento', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('valor_esperado', sa.Numeric(precision=14, scale=2), nullable=True),
-    sa.Column('valor_informado', sa.Numeric(precision=14, scale=2), nullable=True),
-    sa.Column('diferenca', sa.Numeric(precision=14, scale=2), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('closed_user_id', sa.BigInteger(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['closed_user_id'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_table(
+        "usuario",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=True),
+        sa.Column("nome", sa.String(length=120), nullable=False),
+        sa.Column("login", sa.String(length=60), nullable=False),
+        sa.Column("senha_hash", sa.String(length=255), nullable=False),
+        sa.Column(
+            "nivel_acesso",
+            sa.Enum("admin", "gerente", "operador", "caixa", name="nivel_acesso"),
+            server_default="operador",
+            nullable=False,
+        ),
+        sa.Column("email", sa.String(length=120), nullable=True),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column("falhas_login", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("bloqueado_em", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("ultimo_login", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("login"),
     )
-    op.create_index('idx_caixa_status', 'caixa', ['status', 'data_abertura'], unique=False)
-    op.create_table('ordem_servico',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('numero', sa.Integer(), server_default=sa.text("nextval('seq_os_numero')"), nullable=False),
-    sa.Column('tipo', sa.Enum('orcamento', 'os', name='tipo_os'), server_default='os', nullable=False),
-    sa.Column('status', sa.Enum('aberto', 'aprovado', 'producao', 'pronta', 'entregue', 'cancelado', 'convertido', name='status_os'), server_default='aberto', nullable=False),
-    sa.Column('orcamento_origem_id', sa.BigInteger(), nullable=True),
-    sa.Column('cliente_id', sa.BigInteger(), nullable=True),
-    sa.Column('vendedor_id', sa.BigInteger(), nullable=True),
-    sa.Column('atendente_id', sa.BigInteger(), nullable=True),
-    sa.Column('data_emissao', sa.Date(), server_default=sa.text('CURRENT_DATE'), nullable=False),
-    sa.Column('data_previsao_entrega', sa.Date(), nullable=True),
-    sa.Column('data_conclusao', sa.Date(), nullable=True),
-    sa.Column('data_entrega', sa.Date(), nullable=True),
-    sa.Column('desconto', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('valor_itens', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('valor_total', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('forma_pagamento', sa.Enum('dinheiro', 'cartao_credito', 'cartao_debito', 'pix', 'boleto', 'fiado', name='forma_pagamento'), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('criado_por', sa.BigInteger(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.CheckConstraint('orcamento_origem_id IS NULL OR orcamento_origem_id <> id', name='ck_os_origem_nao_self'),
-    sa.ForeignKeyConstraint(['atendente_id'], ['funcionario.id'], ),
-    sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], ),
-    sa.ForeignKeyConstraint(['criado_por'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['orcamento_origem_id'], ['ordem_servico.id'], ),
-    sa.ForeignKeyConstraint(['vendedor_id'], ['funcionario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_table(
+        "caixa",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("usuario_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum("aberto", "fechado", name="status_caixa"),
+            server_default="aberto",
+            nullable=False,
+        ),
+        sa.Column(
+            "data_abertura",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_abertura",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column("data_fechamento", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("valor_esperado", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column("valor_informado", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column("diferenca", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column("closed_user_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["closed_user_id"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_os_cliente', 'ordem_servico', ['cliente_id'], unique=False)
-    op.create_index('idx_os_numero', 'ordem_servico', ['filial_id', 'numero'], unique=False)
-    op.create_index('idx_os_status', 'ordem_servico', ['status', 'data_emissao'], unique=False)
-    op.create_table('pedido_compra',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('numero', sa.Integer(), server_default=sa.text("nextval('seq_pedido_numero')"), nullable=False),
-    sa.Column('status', sa.Enum('aberto', 'recebido', 'cancelado', name='status_pedido'), server_default='aberto', nullable=False),
-    sa.Column('fornecedor_id', sa.BigInteger(), nullable=True),
-    sa.Column('data_pedido', sa.Date(), server_default=sa.text('CURRENT_DATE'), nullable=False),
-    sa.Column('previsao_entrega', sa.Date(), nullable=True),
-    sa.Column('data_recebimento', sa.Date(), nullable=True),
-    sa.Column('valor_total', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('solicitante_id', sa.BigInteger(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['fornecedor_id'], ['fornecedor.id'], ),
-    sa.ForeignKeyConstraint(['solicitante_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_index(
+        "idx_caixa_status", "caixa", ["status", "data_abertura"], unique=False
     )
-    op.create_index('idx_pedido_fornecedor', 'pedido_compra', ['fornecedor_id'], unique=False)
-    op.create_index('idx_pedido_status', 'pedido_compra', ['status', 'data_pedido'], unique=False)
-    op.create_table('preco_reajuste_historico',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('usuario_id', sa.BigInteger(), nullable=False),
-    sa.Column('tipo_reajuste', sa.String(length=12), nullable=False),
-    sa.Column('valor_reajuste', sa.Numeric(precision=14, scale=4), nullable=False),
-    sa.Column('criterio', sa.Text(), nullable=False),
-    sa.Column('itens_afetados', sa.Integer(), nullable=False),
-    sa.Column('detalhes', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-    sa.Column('executado_em', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.CheckConstraint("tipo_reajuste IN ('percentual', 'valor_fixo')", name='ck_reajuste_tipo'),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_table(
+        "ordem_servico",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "numero",
+            sa.Integer(),
+            server_default=sa.text("nextval('seq_os_numero')"),
+            nullable=False,
+        ),
+        sa.Column(
+            "tipo",
+            sa.Enum("orcamento", "os", name="tipo_os"),
+            server_default="os",
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "aberto",
+                "aprovado",
+                "producao",
+                "pronta",
+                "entregue",
+                "cancelado",
+                "convertido",
+                name="status_os",
+            ),
+            server_default="aberto",
+            nullable=False,
+        ),
+        sa.Column("orcamento_origem_id", sa.BigInteger(), nullable=True),
+        sa.Column("cliente_id", sa.BigInteger(), nullable=True),
+        sa.Column("vendedor_id", sa.BigInteger(), nullable=True),
+        sa.Column("atendente_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "data_emissao",
+            sa.Date(),
+            server_default=sa.text("CURRENT_DATE"),
+            nullable=False,
+        ),
+        sa.Column("data_previsao_entrega", sa.Date(), nullable=True),
+        sa.Column("data_conclusao", sa.Date(), nullable=True),
+        sa.Column("data_entrega", sa.Date(), nullable=True),
+        sa.Column(
+            "desconto",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_itens",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_total",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "forma_pagamento",
+            sa.Enum(
+                "dinheiro",
+                "cartao_credito",
+                "cartao_debito",
+                "pix",
+                "boleto",
+                "fiado",
+                name="forma_pagamento",
+            ),
+            nullable=True,
+        ),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column("criado_por", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "orcamento_origem_id IS NULL OR orcamento_origem_id <> id",
+            name="ck_os_origem_nao_self",
+        ),
+        sa.ForeignKeyConstraint(
+            ["atendente_id"],
+            ["funcionario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["cliente_id"],
+            ["cliente.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["criado_por"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["orcamento_origem_id"],
+            ["ordem_servico.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["vendedor_id"],
+            ["funcionario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_reajuste_data', 'preco_reajuste_historico', ['executado_em'], unique=False)
-    op.create_table('produto',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('categoria_id', sa.BigInteger(), nullable=True),
-    sa.Column('codigo', sa.String(length=30), nullable=False),
-    sa.Column('codigo_barras', sa.String(length=30), nullable=True),
-    sa.Column('nome', sa.String(length=160), nullable=False),
-    sa.Column('descricao', sa.Text(), nullable=True),
-    sa.Column('tipo', sa.Enum('produto', 'servico', name='tipo_produto'), server_default='produto', nullable=False),
-    sa.Column('unidade', sa.String(length=12), server_default='un', nullable=False),
-    sa.Column('controla_estoque', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('preco_custo', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('preco_venda', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('estoque_minimo', sa.Numeric(precision=12, scale=3), server_default='0', nullable=False),
-    sa.Column('dimensoes', sa.String(length=40), nullable=True),
-    sa.Column('foto1_path', sa.String(length=500), nullable=True),
-    sa.Column('foto2_path', sa.String(length=500), nullable=True),
-    sa.Column('bloqueado_reajuste', sa.Boolean(), server_default='false', nullable=False),
-    sa.Column('ativo', sa.Boolean(), server_default='true', nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['categoria_id'], ['produto_categoria.id'], ),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('codigo')
+    op.create_index("idx_os_cliente", "ordem_servico", ["cliente_id"], unique=False)
+    op.create_index(
+        "idx_os_numero", "ordem_servico", ["filial_id", "numero"], unique=False
     )
-    op.create_index('idx_produto_categoria', 'produto', ['categoria_id'], unique=False)
-    op.create_index('idx_produto_codigo_busca', 'produto', ['codigo'], unique=False)
-    op.create_index('idx_produto_nome', 'produto', ['nome'], unique=False)
-    op.create_table('usuario_sessao',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('usuario_id', sa.BigInteger(), nullable=False),
-    sa.Column('token_hash', sa.String(length=64), nullable=False),
-    sa.Column('criado_em', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('expira_em', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('encerrada', sa.Boolean(), server_default='false', nullable=False),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('token_hash')
+    op.create_index(
+        "idx_os_status", "ordem_servico", ["status", "data_emissao"], unique=False
     )
-    op.create_index('idx_sessao_usuario', 'usuario_sessao', ['usuario_id', 'expira_em'], unique=False)
-    op.create_table('agendamento',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('tipo', sa.Enum('producao', 'entrega', name='tipo_agenda'), server_default='producao', nullable=False),
-    sa.Column('status', sa.Enum('agendado', 'concluido', 'cancelado', name='status_agenda'), server_default='agendado', nullable=False),
-    sa.Column('titulo', sa.String(length=160), nullable=False),
-    sa.Column('descricao', sa.Text(), nullable=True),
-    sa.Column('data_hora_inicio', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('data_hora_fim', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('ordem_servico_id', sa.BigInteger(), nullable=True),
-    sa.Column('usuario_id', sa.BigInteger(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['ordem_servico_id'], ['ordem_servico.id'], ),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_table(
+        "pedido_compra",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "numero",
+            sa.Integer(),
+            server_default=sa.text("nextval('seq_pedido_numero')"),
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            sa.Enum("aberto", "recebido", "cancelado", name="status_pedido"),
+            server_default="aberto",
+            nullable=False,
+        ),
+        sa.Column("fornecedor_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "data_pedido",
+            sa.Date(),
+            server_default=sa.text("CURRENT_DATE"),
+            nullable=False,
+        ),
+        sa.Column("previsao_entrega", sa.Date(), nullable=True),
+        sa.Column("data_recebimento", sa.Date(), nullable=True),
+        sa.Column(
+            "valor_total",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column("solicitante_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["fornecedor_id"],
+            ["fornecedor.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["solicitante_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_table('conta_pagar',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('fornecedor_id', sa.BigInteger(), nullable=True),
-    sa.Column('plano_conta_id', sa.BigInteger(), nullable=True),
-    sa.Column('pedido_compra_id', sa.BigInteger(), nullable=True),
-    sa.Column('descricao', sa.String(length=255), nullable=False),
-    sa.Column('parcela', sa.Integer(), server_default='1', nullable=False),
-    sa.Column('total_parcelas', sa.Integer(), server_default='1', nullable=False),
-    sa.Column('vencimento', sa.Date(), nullable=False),
-    sa.Column('valor', sa.Numeric(precision=14, scale=2), nullable=False),
-    sa.Column('valor_pago', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('status', sa.Enum('aberta', 'paga', 'cancelada', name='status_conta'), server_default='aberta', nullable=False),
-    sa.Column('data_pagamento', sa.Date(), nullable=True),
-    sa.Column('usuario_baixa_id', sa.BigInteger(), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['fornecedor_id'], ['fornecedor.id'], ),
-    sa.ForeignKeyConstraint(['pedido_compra_id'], ['pedido_compra.id'], ),
-    sa.ForeignKeyConstraint(['plano_conta_id'], ['plano_contas.id'], ),
-    sa.ForeignKeyConstraint(['usuario_baixa_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_index(
+        "idx_pedido_fornecedor", "pedido_compra", ["fornecedor_id"], unique=False
     )
-    op.create_index('idx_cp_fornecedor', 'conta_pagar', ['fornecedor_id'], unique=False)
-    op.create_index('idx_cp_vencimento', 'conta_pagar', ['status', 'vencimento'], unique=False)
-    op.create_table('movimento_estoque',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('produto_id', sa.BigInteger(), nullable=False),
-    sa.Column('tipo', sa.Enum('entrada', 'saida', 'ajuste', name='tipo_mov_estoque'), nullable=False),
-    sa.Column('origem', sa.Enum('venda_balcao', 'ordem_servico', 'pedido_compra', 'ajuste_manual', name='origem_mov'), nullable=False),
-    sa.Column('documento_id', sa.BigInteger(), nullable=True),
-    sa.Column('quantidade', sa.Numeric(precision=12, scale=3), nullable=False),
-    sa.Column('saldo_anterior', sa.Numeric(precision=12, scale=3), nullable=False),
-    sa.Column('saldo_posterior', sa.Numeric(precision=12, scale=3), nullable=False),
-    sa.Column('motivo', sa.String(length=255), nullable=True),
-    sa.Column('usuario_id', sa.BigInteger(), nullable=True),
-    sa.Column('criado_em', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['produto_id'], ['produto.id'], ),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_index(
+        "idx_pedido_status", "pedido_compra", ["status", "data_pedido"], unique=False
     )
-    op.create_index('idx_kardex_origem', 'movimento_estoque', ['origem', 'documento_id'], unique=False)
-    op.create_index('idx_kardex_produto', 'movimento_estoque', ['produto_id', sa.text('criado_em DESC')], unique=False)
-    op.create_table('ordem_servico_item',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('ordem_servico_id', sa.BigInteger(), nullable=False),
-    sa.Column('seq', sa.Integer(), nullable=False),
-    sa.Column('produto_id', sa.BigInteger(), nullable=True),
-    sa.Column('descricao_avulsa', sa.String(length=255), nullable=True),
-    sa.Column('quantidade', sa.Numeric(precision=12, scale=3), server_default='1', nullable=False),
-    sa.Column('dimensoes', sa.String(length=40), nullable=True),
-    sa.Column('valor_unitario', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('desconto', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('valor_total', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('executado', sa.Boolean(), server_default='false', nullable=False),
-    sa.ForeignKeyConstraint(['ordem_servico_id'], ['ordem_servico.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['produto_id'], ['produto.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('ordem_servico_id', 'seq')
+    op.create_table(
+        "preco_reajuste_historico",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("usuario_id", sa.BigInteger(), nullable=False),
+        sa.Column("tipo_reajuste", sa.String(length=12), nullable=False),
+        sa.Column("valor_reajuste", sa.Numeric(precision=14, scale=4), nullable=False),
+        sa.Column("criterio", sa.Text(), nullable=False),
+        sa.Column("itens_afetados", sa.Integer(), nullable=False),
+        sa.Column("detalhes", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "executado_em",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "tipo_reajuste IN ('percentual', 'valor_fixo')", name="ck_reajuste_tipo"
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_os_item_produto', 'ordem_servico_item', ['produto_id'], unique=False)
-    op.create_table('pedido_compra_item',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('pedido_compra_id', sa.BigInteger(), nullable=False),
-    sa.Column('seq', sa.Integer(), nullable=False),
-    sa.Column('produto_id', sa.BigInteger(), nullable=False),
-    sa.Column('descricao_avulsa', sa.String(length=255), nullable=True),
-    sa.Column('quantidade', sa.Numeric(precision=12, scale=3), server_default='1', nullable=False),
-    sa.Column('quantidade_recebida', sa.Numeric(precision=12, scale=3), server_default='0', nullable=False),
-    sa.Column('valor_unitario', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('valor_total', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.ForeignKeyConstraint(['pedido_compra_id'], ['pedido_compra.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['produto_id'], ['produto.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('pedido_compra_id', 'seq')
+    op.create_index(
+        "idx_reajuste_data", "preco_reajuste_historico", ["executado_em"], unique=False
     )
-    op.create_index('idx_pedido_item_produto', 'pedido_compra_item', ['produto_id'], unique=False)
-    op.create_table('produto_estoque',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('produto_id', sa.BigInteger(), nullable=False),
-    sa.Column('saldo', sa.Numeric(precision=12, scale=3), server_default='0', nullable=False),
-    sa.Column('reservado', sa.Numeric(precision=12, scale=3), server_default='0', nullable=False),
-    sa.Column('atualizado_em', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['produto_id'], ['produto.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('filial_id', 'produto_id')
+    op.create_table(
+        "produto",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("categoria_id", sa.BigInteger(), nullable=True),
+        sa.Column("codigo", sa.String(length=30), nullable=False),
+        sa.Column("codigo_barras", sa.String(length=30), nullable=True),
+        sa.Column("nome", sa.String(length=160), nullable=False),
+        sa.Column("descricao", sa.Text(), nullable=True),
+        sa.Column(
+            "tipo",
+            sa.Enum("produto", "servico", name="tipo_produto"),
+            server_default="produto",
+            nullable=False,
+        ),
+        sa.Column("unidade", sa.String(length=12), server_default="un", nullable=False),
+        sa.Column(
+            "controla_estoque", sa.Boolean(), server_default="true", nullable=False
+        ),
+        sa.Column(
+            "preco_custo",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "preco_venda",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "estoque_minimo",
+            sa.Numeric(precision=12, scale=3),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column("dimensoes", sa.String(length=40), nullable=True),
+        sa.Column("foto1_path", sa.String(length=500), nullable=True),
+        sa.Column("foto2_path", sa.String(length=500), nullable=True),
+        sa.Column(
+            "bloqueado_reajuste", sa.Boolean(), server_default="false", nullable=False
+        ),
+        sa.Column("ativo", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["categoria_id"],
+            ["produto_categoria.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("codigo"),
     )
-    op.create_index('idx_estoque_produto', 'produto_estoque', ['produto_id', 'filial_id'], unique=False)
-    op.create_table('venda_balcao',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('numero', sa.Integer(), server_default=sa.text("nextval('seq_venda_numero')"), nullable=False),
-    sa.Column('status', sa.Enum('ok', 'cancelado', name='status_venda'), server_default='ok', nullable=False),
-    sa.Column('cliente_id', sa.BigInteger(), nullable=True),
-    sa.Column('vendedor_id', sa.BigInteger(), nullable=True),
-    sa.Column('operador_caixa', sa.BigInteger(), nullable=True),
-    sa.Column('data_venda', sa.Date(), server_default=sa.text('CURRENT_DATE'), nullable=False),
-    sa.Column('valor_itens', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('desconto', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('valor_total', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('forma_pagamento', sa.Enum('dinheiro', 'cartao_credito', 'cartao_debito', 'pix', 'boleto', 'fiado', name='forma_pagamento'), nullable=False),
-    sa.Column('parcelas', sa.Integer(), server_default='1', nullable=False),
-    sa.Column('caixa_id', sa.BigInteger(), nullable=True),
-    sa.Column('documento_fiscal_id', sa.BigInteger(), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('criado_por', sa.BigInteger(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.CheckConstraint("status <> 'ok' OR operador_caixa IS NOT NULL", name='ck_venda_operador'),
-    sa.ForeignKeyConstraint(['caixa_id'], ['caixa.id'], ),
-    sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], ),
-    sa.ForeignKeyConstraint(['criado_por'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['operador_caixa'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['vendedor_id'], ['funcionario.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_index("idx_produto_categoria", "produto", ["categoria_id"], unique=False)
+    op.create_index("idx_produto_codigo_busca", "produto", ["codigo"], unique=False)
+    op.create_index("idx_produto_nome", "produto", ["nome"], unique=False)
+    op.create_table(
+        "usuario_sessao",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("usuario_id", sa.BigInteger(), nullable=False),
+        sa.Column("token_hash", sa.String(length=64), nullable=False),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("expira_em", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("encerrada", sa.Boolean(), server_default="false", nullable=False),
+        sa.ForeignKeyConstraint(
+            ["usuario_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("token_hash"),
     )
-    op.create_index('idx_venda_cliente', 'venda_balcao', ['cliente_id'], unique=False)
-    op.create_index('idx_venda_status', 'venda_balcao', ['status', 'data_venda'], unique=False)
-    op.create_table('conta_receber',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('cliente_id', sa.BigInteger(), nullable=True),
-    sa.Column('plano_conta_id', sa.BigInteger(), nullable=True),
-    sa.Column('venda_balcao_id', sa.BigInteger(), nullable=True),
-    sa.Column('ordem_servico_id', sa.BigInteger(), nullable=True),
-    sa.Column('descricao', sa.String(length=255), nullable=False),
-    sa.Column('parcela', sa.Integer(), server_default='1', nullable=False),
-    sa.Column('total_parcelas', sa.Integer(), server_default='1', nullable=False),
-    sa.Column('vencimento', sa.Date(), nullable=False),
-    sa.Column('valor', sa.Numeric(precision=14, scale=2), nullable=False),
-    sa.Column('valor_pago', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('status', sa.Enum('aberta', 'paga', 'cancelada', name='status_conta'), server_default='aberta', nullable=False),
-    sa.Column('data_pagamento', sa.Date(), nullable=True),
-    sa.Column('usuario_baixa_id', sa.BigInteger(), nullable=True),
-    sa.Column('observacoes', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], ),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['ordem_servico_id'], ['ordem_servico.id'], ),
-    sa.ForeignKeyConstraint(['plano_conta_id'], ['plano_contas.id'], ),
-    sa.ForeignKeyConstraint(['usuario_baixa_id'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['venda_balcao_id'], ['venda_balcao.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_index(
+        "idx_sessao_usuario",
+        "usuario_sessao",
+        ["usuario_id", "expira_em"],
+        unique=False,
     )
-    op.create_index('idx_cr_cliente', 'conta_receber', ['cliente_id'], unique=False)
-    op.create_index('idx_cr_vencimento', 'conta_receber', ['status', 'vencimento'], unique=False)
-    op.create_table('documento_fiscal',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('filial_id', sa.BigInteger(), nullable=False),
-    sa.Column('modelo', sa.Enum('nfe', 'nfce', name='modelo_fiscal'), nullable=False),
-    sa.Column('numero', sa.Integer(), nullable=True),
-    sa.Column('serie', sa.Integer(), nullable=True),
-    sa.Column('chave_acesso', sa.String(length=44), nullable=True),
-    sa.Column('status', sa.Enum('rascunho', 'processando', 'autorizado', 'rejeitado', 'cancelado', 'contingenciado', name='status_fiscal'), server_default='rascunho', nullable=False),
-    sa.Column('venda_balcao_id', sa.BigInteger(), nullable=True),
-    sa.Column('ordem_servico_id', sa.BigInteger(), nullable=True),
-    sa.Column('cliente_id', sa.BigInteger(), nullable=True),
-    sa.Column('valor_nota', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('xml_path', sa.String(length=500), nullable=True),
-    sa.Column('danfe_path', sa.String(length=500), nullable=True),
-    sa.Column('protocolo', sa.String(length=30), nullable=True),
-    sa.Column('mensagem_retorno', sa.Text(), nullable=True),
-    sa.Column('retorno_json', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('contingencia', sa.Boolean(), server_default='false', nullable=False),
-    sa.Column('tentativas', sa.Integer(), server_default='0', nullable=False),
-    sa.Column('criado_por', sa.BigInteger(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['cliente_id'], ['cliente.id'], ),
-    sa.ForeignKeyConstraint(['criado_por'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['filial_id'], ['filial.id'], ),
-    sa.ForeignKeyConstraint(['ordem_servico_id'], ['ordem_servico.id'], ),
-    sa.ForeignKeyConstraint(['venda_balcao_id'], ['venda_balcao.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_table(
+        "agendamento",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "tipo",
+            sa.Enum("producao", "entrega", name="tipo_agenda"),
+            server_default="producao",
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            sa.Enum("agendado", "concluido", "cancelado", name="status_agenda"),
+            server_default="agendado",
+            nullable=False,
+        ),
+        sa.Column("titulo", sa.String(length=160), nullable=False),
+        sa.Column("descricao", sa.Text(), nullable=True),
+        sa.Column("data_hora_inicio", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("data_hora_fim", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("ordem_servico_id", sa.BigInteger(), nullable=True),
+        sa.Column("usuario_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["ordem_servico_id"],
+            ["ordem_servico.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_df_chave', 'documento_fiscal', ['chave_acesso'], unique=False)
-    op.create_index('idx_df_os', 'documento_fiscal', ['ordem_servico_id'], unique=False, postgresql_where=sa.text('ordem_servico_id IS NOT NULL'))
-    op.create_index('idx_df_status', 'documento_fiscal', ['status', 'created_at'], unique=False)
-    op.create_index('idx_df_venda', 'documento_fiscal', ['venda_balcao_id'], unique=False, postgresql_where=sa.text('venda_balcao_id IS NOT NULL'))
-    op.create_table('venda_balcao_item',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('venda_balcao_id', sa.BigInteger(), nullable=False),
-    sa.Column('seq', sa.Integer(), nullable=False),
-    sa.Column('produto_id', sa.BigInteger(), nullable=True),
-    sa.Column('descricao_avulsa', sa.String(length=255), nullable=True),
-    sa.Column('quantidade', sa.Numeric(precision=12, scale=3), server_default='1', nullable=False),
-    sa.Column('valor_unitario', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('desconto', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.Column('valor_total', sa.Numeric(precision=14, scale=2), server_default='0', nullable=False),
-    sa.ForeignKeyConstraint(['produto_id'], ['produto.id'], ),
-    sa.ForeignKeyConstraint(['venda_balcao_id'], ['venda_balcao.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('venda_balcao_id', 'seq')
+    op.create_table(
+        "conta_pagar",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("fornecedor_id", sa.BigInteger(), nullable=True),
+        sa.Column("plano_conta_id", sa.BigInteger(), nullable=True),
+        sa.Column("pedido_compra_id", sa.BigInteger(), nullable=True),
+        sa.Column("descricao", sa.String(length=255), nullable=False),
+        sa.Column("parcela", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("total_parcelas", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("vencimento", sa.Date(), nullable=False),
+        sa.Column("valor", sa.Numeric(precision=14, scale=2), nullable=False),
+        sa.Column(
+            "valor_pago",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            sa.Enum("aberta", "paga", "cancelada", name="status_conta"),
+            server_default="aberta",
+            nullable=False,
+        ),
+        sa.Column("data_pagamento", sa.Date(), nullable=True),
+        sa.Column("usuario_baixa_id", sa.BigInteger(), nullable=True),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["fornecedor_id"],
+            ["fornecedor.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["pedido_compra_id"],
+            ["pedido_compra.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["plano_conta_id"],
+            ["plano_contas.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_baixa_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_venda_item_produto', 'venda_balcao_item', ['produto_id'], unique=False)
-    op.create_table('movimento_caixa',
-    sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('caixa_id', sa.BigInteger(), nullable=False),
-    sa.Column('tipo', sa.Enum('entrada', 'saida', 'sangria', 'suprimento', name='tipo_mov_caixa'), nullable=False),
-    sa.Column('venda_balcao_id', sa.BigInteger(), nullable=True),
-    sa.Column('conta_receber_id', sa.BigInteger(), nullable=True),
-    sa.Column('conta_pagar_id', sa.BigInteger(), nullable=True),
-    sa.Column('descricao', sa.String(length=255), nullable=True),
-    sa.Column('valor', sa.Numeric(precision=14, scale=2), nullable=False),
-    sa.Column('usuario_id', sa.BigInteger(), nullable=True),
-    sa.Column('criado_em', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['caixa_id'], ['caixa.id'], ),
-    sa.ForeignKeyConstraint(['conta_pagar_id'], ['conta_pagar.id'], ),
-    sa.ForeignKeyConstraint(['conta_receber_id'], ['conta_receber.id'], ),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['venda_balcao_id'], ['venda_balcao.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    op.create_index("idx_cp_fornecedor", "conta_pagar", ["fornecedor_id"], unique=False)
+    op.create_index(
+        "idx_cp_vencimento", "conta_pagar", ["status", "vencimento"], unique=False
     )
-    op.create_index('idx_movcaixa_caixa', 'movimento_caixa', ['caixa_id', 'criado_em'], unique=False)
+    op.create_table(
+        "movimento_estoque",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("produto_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "tipo",
+            sa.Enum("entrada", "saida", "ajuste", name="tipo_mov_estoque"),
+            nullable=False,
+        ),
+        sa.Column(
+            "origem",
+            sa.Enum(
+                "venda_balcao",
+                "ordem_servico",
+                "pedido_compra",
+                "ajuste_manual",
+                name="origem_mov",
+            ),
+            nullable=False,
+        ),
+        sa.Column("documento_id", sa.BigInteger(), nullable=True),
+        sa.Column("quantidade", sa.Numeric(precision=12, scale=3), nullable=False),
+        sa.Column("saldo_anterior", sa.Numeric(precision=12, scale=3), nullable=False),
+        sa.Column("saldo_posterior", sa.Numeric(precision=12, scale=3), nullable=False),
+        sa.Column("motivo", sa.String(length=255), nullable=True),
+        sa.Column("usuario_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["produto_id"],
+            ["produto.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_id"],
+            ["usuario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "idx_kardex_origem",
+        "movimento_estoque",
+        ["origem", "documento_id"],
+        unique=False,
+    )
+    op.create_index(
+        "idx_kardex_produto",
+        "movimento_estoque",
+        ["produto_id", sa.text("criado_em DESC")],
+        unique=False,
+    )
+    op.create_table(
+        "ordem_servico_item",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("ordem_servico_id", sa.BigInteger(), nullable=False),
+        sa.Column("seq", sa.Integer(), nullable=False),
+        sa.Column("produto_id", sa.BigInteger(), nullable=True),
+        sa.Column("descricao_avulsa", sa.String(length=255), nullable=True),
+        sa.Column(
+            "quantidade",
+            sa.Numeric(precision=12, scale=3),
+            server_default="1",
+            nullable=False,
+        ),
+        sa.Column("dimensoes", sa.String(length=40), nullable=True),
+        sa.Column(
+            "valor_unitario",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "desconto",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_total",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column("executado", sa.Boolean(), server_default="false", nullable=False),
+        sa.ForeignKeyConstraint(
+            ["ordem_servico_id"], ["ordem_servico.id"], ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(
+            ["produto_id"],
+            ["produto.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("ordem_servico_id", "seq"),
+    )
+    op.create_index(
+        "idx_os_item_produto", "ordem_servico_item", ["produto_id"], unique=False
+    )
+    op.create_table(
+        "pedido_compra_item",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("pedido_compra_id", sa.BigInteger(), nullable=False),
+        sa.Column("seq", sa.Integer(), nullable=False),
+        sa.Column("produto_id", sa.BigInteger(), nullable=False),
+        sa.Column("descricao_avulsa", sa.String(length=255), nullable=True),
+        sa.Column(
+            "quantidade",
+            sa.Numeric(precision=12, scale=3),
+            server_default="1",
+            nullable=False,
+        ),
+        sa.Column(
+            "quantidade_recebida",
+            sa.Numeric(precision=12, scale=3),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_unitario",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_total",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["pedido_compra_id"], ["pedido_compra.id"], ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(
+            ["produto_id"],
+            ["produto.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("pedido_compra_id", "seq"),
+    )
+    op.create_index(
+        "idx_pedido_item_produto", "pedido_compra_item", ["produto_id"], unique=False
+    )
+    op.create_table(
+        "produto_estoque",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("produto_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "saldo",
+            sa.Numeric(precision=12, scale=3),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "reservado",
+            sa.Numeric(precision=12, scale=3),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "atualizado_em",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["produto_id"],
+            ["produto.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("filial_id", "produto_id"),
+    )
+    op.create_index(
+        "idx_estoque_produto",
+        "produto_estoque",
+        ["produto_id", "filial_id"],
+        unique=False,
+    )
+    op.create_table(
+        "venda_balcao",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "numero",
+            sa.Integer(),
+            server_default=sa.text("nextval('seq_venda_numero')"),
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            sa.Enum("ok", "cancelado", name="status_venda"),
+            server_default="ok",
+            nullable=False,
+        ),
+        sa.Column("cliente_id", sa.BigInteger(), nullable=True),
+        sa.Column("vendedor_id", sa.BigInteger(), nullable=True),
+        sa.Column("operador_caixa", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "data_venda",
+            sa.Date(),
+            server_default=sa.text("CURRENT_DATE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_itens",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "desconto",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_total",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "forma_pagamento",
+            sa.Enum(
+                "dinheiro",
+                "cartao_credito",
+                "cartao_debito",
+                "pix",
+                "boleto",
+                "fiado",
+                name="forma_pagamento",
+            ),
+            nullable=False,
+        ),
+        sa.Column("parcelas", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("caixa_id", sa.BigInteger(), nullable=True),
+        sa.Column("documento_fiscal_id", sa.BigInteger(), nullable=True),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column("criado_por", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "status <> 'ok' OR operador_caixa IS NOT NULL", name="ck_venda_operador"
+        ),
+        sa.ForeignKeyConstraint(
+            ["caixa_id"],
+            ["caixa.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["cliente_id"],
+            ["cliente.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["criado_por"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["operador_caixa"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["vendedor_id"],
+            ["funcionario.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("idx_venda_cliente", "venda_balcao", ["cliente_id"], unique=False)
+    op.create_index(
+        "idx_venda_status", "venda_balcao", ["status", "data_venda"], unique=False
+    )
+    op.create_table(
+        "conta_receber",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column("cliente_id", sa.BigInteger(), nullable=True),
+        sa.Column("plano_conta_id", sa.BigInteger(), nullable=True),
+        sa.Column("venda_balcao_id", sa.BigInteger(), nullable=True),
+        sa.Column("ordem_servico_id", sa.BigInteger(), nullable=True),
+        sa.Column("descricao", sa.String(length=255), nullable=False),
+        sa.Column("parcela", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("total_parcelas", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("vencimento", sa.Date(), nullable=False),
+        sa.Column("valor", sa.Numeric(precision=14, scale=2), nullable=False),
+        sa.Column(
+            "valor_pago",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "status",
+            sa.Enum("aberta", "paga", "cancelada", name="status_conta"),
+            server_default="aberta",
+            nullable=False,
+        ),
+        sa.Column("data_pagamento", sa.Date(), nullable=True),
+        sa.Column("usuario_baixa_id", sa.BigInteger(), nullable=True),
+        sa.Column("observacoes", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["cliente_id"],
+            ["cliente.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["ordem_servico_id"],
+            ["ordem_servico.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["plano_conta_id"],
+            ["plano_contas.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_baixa_id"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["venda_balcao_id"],
+            ["venda_balcao.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("idx_cr_cliente", "conta_receber", ["cliente_id"], unique=False)
+    op.create_index(
+        "idx_cr_vencimento", "conta_receber", ["status", "vencimento"], unique=False
+    )
+    op.create_table(
+        "documento_fiscal",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("filial_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "modelo", sa.Enum("nfe", "nfce", name="modelo_fiscal"), nullable=False
+        ),
+        sa.Column("numero", sa.Integer(), nullable=True),
+        sa.Column("serie", sa.Integer(), nullable=True),
+        sa.Column("chave_acesso", sa.String(length=44), nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "rascunho",
+                "processando",
+                "autorizado",
+                "rejeitado",
+                "cancelado",
+                "contingenciado",
+                name="status_fiscal",
+            ),
+            server_default="rascunho",
+            nullable=False,
+        ),
+        sa.Column("venda_balcao_id", sa.BigInteger(), nullable=True),
+        sa.Column("ordem_servico_id", sa.BigInteger(), nullable=True),
+        sa.Column("cliente_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "valor_nota",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column("xml_path", sa.String(length=500), nullable=True),
+        sa.Column("danfe_path", sa.String(length=500), nullable=True),
+        sa.Column("protocolo", sa.String(length=30), nullable=True),
+        sa.Column("mensagem_retorno", sa.Text(), nullable=True),
+        sa.Column(
+            "retorno_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
+        sa.Column("contingencia", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("tentativas", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("criado_por", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["cliente_id"],
+            ["cliente.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["criado_por"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["filial_id"],
+            ["filial.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["ordem_servico_id"],
+            ["ordem_servico.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["venda_balcao_id"],
+            ["venda_balcao.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index("idx_df_chave", "documento_fiscal", ["chave_acesso"], unique=False)
+    op.create_index(
+        "idx_df_os",
+        "documento_fiscal",
+        ["ordem_servico_id"],
+        unique=False,
+        postgresql_where=sa.text("ordem_servico_id IS NOT NULL"),
+    )
+    op.create_index(
+        "idx_df_status", "documento_fiscal", ["status", "created_at"], unique=False
+    )
+    op.create_index(
+        "idx_df_venda",
+        "documento_fiscal",
+        ["venda_balcao_id"],
+        unique=False,
+        postgresql_where=sa.text("venda_balcao_id IS NOT NULL"),
+    )
+    op.create_table(
+        "venda_balcao_item",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("venda_balcao_id", sa.BigInteger(), nullable=False),
+        sa.Column("seq", sa.Integer(), nullable=False),
+        sa.Column("produto_id", sa.BigInteger(), nullable=True),
+        sa.Column("descricao_avulsa", sa.String(length=255), nullable=True),
+        sa.Column(
+            "quantidade",
+            sa.Numeric(precision=12, scale=3),
+            server_default="1",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_unitario",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "desconto",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.Column(
+            "valor_total",
+            sa.Numeric(precision=14, scale=2),
+            server_default="0",
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["produto_id"],
+            ["produto.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["venda_balcao_id"], ["venda_balcao.id"], ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("venda_balcao_id", "seq"),
+    )
+    op.create_index(
+        "idx_venda_item_produto", "venda_balcao_item", ["produto_id"], unique=False
+    )
+    op.create_table(
+        "movimento_caixa",
+        sa.Column("id", sa.BigInteger(), nullable=False),
+        sa.Column("caixa_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "tipo",
+            sa.Enum("entrada", "saida", "sangria", "suprimento", name="tipo_mov_caixa"),
+            nullable=False,
+        ),
+        sa.Column("venda_balcao_id", sa.BigInteger(), nullable=True),
+        sa.Column("conta_receber_id", sa.BigInteger(), nullable=True),
+        sa.Column("conta_pagar_id", sa.BigInteger(), nullable=True),
+        sa.Column("descricao", sa.String(length=255), nullable=True),
+        sa.Column("valor", sa.Numeric(precision=14, scale=2), nullable=False),
+        sa.Column("usuario_id", sa.BigInteger(), nullable=True),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["caixa_id"],
+            ["caixa.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["conta_pagar_id"],
+            ["conta_pagar.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["conta_receber_id"],
+            ["conta_receber.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["usuario_id"],
+            ["usuario.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["venda_balcao_id"],
+            ["venda_balcao.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "idx_movcaixa_caixa", "movimento_caixa", ["caixa_id", "criado_em"], unique=False
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index('idx_movcaixa_caixa', table_name='movimento_caixa')
-    op.drop_table('movimento_caixa')
-    op.drop_index('idx_venda_item_produto', table_name='venda_balcao_item')
-    op.drop_table('venda_balcao_item')
-    op.drop_index('idx_df_venda', table_name='documento_fiscal', postgresql_where=sa.text('venda_balcao_id IS NOT NULL'))
-    op.drop_index('idx_df_status', table_name='documento_fiscal')
-    op.drop_index('idx_df_os', table_name='documento_fiscal', postgresql_where=sa.text('ordem_servico_id IS NOT NULL'))
-    op.drop_index('idx_df_chave', table_name='documento_fiscal')
-    op.drop_table('documento_fiscal')
-    op.drop_index('idx_cr_vencimento', table_name='conta_receber')
-    op.drop_index('idx_cr_cliente', table_name='conta_receber')
-    op.drop_table('conta_receber')
-    op.drop_index('idx_venda_status', table_name='venda_balcao')
-    op.drop_index('idx_venda_cliente', table_name='venda_balcao')
-    op.drop_table('venda_balcao')
-    op.drop_index('idx_estoque_produto', table_name='produto_estoque')
-    op.drop_table('produto_estoque')
-    op.drop_index('idx_pedido_item_produto', table_name='pedido_compra_item')
-    op.drop_table('pedido_compra_item')
-    op.drop_index('idx_os_item_produto', table_name='ordem_servico_item')
-    op.drop_table('ordem_servico_item')
-    op.drop_index('idx_kardex_produto', table_name='movimento_estoque')
-    op.drop_index('idx_kardex_origem', table_name='movimento_estoque')
-    op.drop_table('movimento_estoque')
-    op.drop_index('idx_cp_vencimento', table_name='conta_pagar')
-    op.drop_index('idx_cp_fornecedor', table_name='conta_pagar')
-    op.drop_table('conta_pagar')
-    op.drop_table('agendamento')
-    op.drop_index('idx_sessao_usuario', table_name='usuario_sessao')
-    op.drop_table('usuario_sessao')
-    op.drop_index('idx_produto_nome', table_name='produto')
-    op.drop_index('idx_produto_codigo_busca', table_name='produto')
-    op.drop_index('idx_produto_categoria', table_name='produto')
-    op.drop_table('produto')
-    op.drop_index('idx_reajuste_data', table_name='preco_reajuste_historico')
-    op.drop_table('preco_reajuste_historico')
-    op.drop_index('idx_pedido_status', table_name='pedido_compra')
-    op.drop_index('idx_pedido_fornecedor', table_name='pedido_compra')
-    op.drop_table('pedido_compra')
-    op.drop_index('idx_os_status', table_name='ordem_servico')
-    op.drop_index('idx_os_numero', table_name='ordem_servico')
-    op.drop_index('idx_os_cliente', table_name='ordem_servico')
-    op.drop_table('ordem_servico')
-    op.drop_index('idx_caixa_status', table_name='caixa')
-    op.drop_table('caixa')
-    op.drop_table('usuario')
-    op.drop_table('produto_categoria')
-    op.drop_index('idx_plano_pai', table_name='plano_contas')
-    op.drop_table('plano_contas')
-    op.drop_table('funcionario')
-    op.drop_table('fornecedor')
-    op.drop_index('idx_cliente_nome', table_name='cliente')
-    op.drop_index('idx_cliente_dt_nas', table_name='cliente', postgresql_where=sa.text('data_nascimento IS NOT NULL'))
-    op.drop_table('cliente')
-    op.drop_index('idx_filial_empresa', table_name='filial')
-    op.drop_table('filial')
-    op.drop_table('empresa')
+    op.drop_index("idx_movcaixa_caixa", table_name="movimento_caixa")
+    op.drop_table("movimento_caixa")
+    op.drop_index("idx_venda_item_produto", table_name="venda_balcao_item")
+    op.drop_table("venda_balcao_item")
+    op.drop_index(
+        "idx_df_venda",
+        table_name="documento_fiscal",
+        postgresql_where=sa.text("venda_balcao_id IS NOT NULL"),
+    )
+    op.drop_index("idx_df_status", table_name="documento_fiscal")
+    op.drop_index(
+        "idx_df_os",
+        table_name="documento_fiscal",
+        postgresql_where=sa.text("ordem_servico_id IS NOT NULL"),
+    )
+    op.drop_index("idx_df_chave", table_name="documento_fiscal")
+    op.drop_table("documento_fiscal")
+    op.drop_index("idx_cr_vencimento", table_name="conta_receber")
+    op.drop_index("idx_cr_cliente", table_name="conta_receber")
+    op.drop_table("conta_receber")
+    op.drop_index("idx_venda_status", table_name="venda_balcao")
+    op.drop_index("idx_venda_cliente", table_name="venda_balcao")
+    op.drop_table("venda_balcao")
+    op.drop_index("idx_estoque_produto", table_name="produto_estoque")
+    op.drop_table("produto_estoque")
+    op.drop_index("idx_pedido_item_produto", table_name="pedido_compra_item")
+    op.drop_table("pedido_compra_item")
+    op.drop_index("idx_os_item_produto", table_name="ordem_servico_item")
+    op.drop_table("ordem_servico_item")
+    op.drop_index("idx_kardex_produto", table_name="movimento_estoque")
+    op.drop_index("idx_kardex_origem", table_name="movimento_estoque")
+    op.drop_table("movimento_estoque")
+    op.drop_index("idx_cp_vencimento", table_name="conta_pagar")
+    op.drop_index("idx_cp_fornecedor", table_name="conta_pagar")
+    op.drop_table("conta_pagar")
+    op.drop_table("agendamento")
+    op.drop_index("idx_sessao_usuario", table_name="usuario_sessao")
+    op.drop_table("usuario_sessao")
+    op.drop_index("idx_produto_nome", table_name="produto")
+    op.drop_index("idx_produto_codigo_busca", table_name="produto")
+    op.drop_index("idx_produto_categoria", table_name="produto")
+    op.drop_table("produto")
+    op.drop_index("idx_reajuste_data", table_name="preco_reajuste_historico")
+    op.drop_table("preco_reajuste_historico")
+    op.drop_index("idx_pedido_status", table_name="pedido_compra")
+    op.drop_index("idx_pedido_fornecedor", table_name="pedido_compra")
+    op.drop_table("pedido_compra")
+    op.drop_index("idx_os_status", table_name="ordem_servico")
+    op.drop_index("idx_os_numero", table_name="ordem_servico")
+    op.drop_index("idx_os_cliente", table_name="ordem_servico")
+    op.drop_table("ordem_servico")
+    op.drop_index("idx_caixa_status", table_name="caixa")
+    op.drop_table("caixa")
+    op.drop_table("usuario")
+    op.drop_table("produto_categoria")
+    op.drop_index("idx_plano_pai", table_name="plano_contas")
+    op.drop_table("plano_contas")
+    op.drop_table("funcionario")
+    op.drop_table("fornecedor")
+    op.drop_index("idx_cliente_nome", table_name="cliente")
+    op.drop_index(
+        "idx_cliente_dt_nas",
+        table_name="cliente",
+        postgresql_where=sa.text("data_nascimento IS NOT NULL"),
+    )
+    op.drop_table("cliente")
+    op.drop_index("idx_filial_empresa", table_name="filial")
+    op.drop_table("filial")
+    op.drop_table("empresa")
     op.execute("DROP SEQUENCE seq_os_numero")
     op.execute("DROP SEQUENCE seq_venda_numero")
     op.execute("DROP SEQUENCE seq_pedido_numero")

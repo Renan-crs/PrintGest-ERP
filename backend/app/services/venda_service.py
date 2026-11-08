@@ -60,10 +60,8 @@ def _montar_itens(itens: list[VendaItemIn]) -> list[VendaBalcaoItem]:
     return [_montar_item(item, seq) for seq, item in enumerate(itens, start=1)]
 
 
-def _totais(
-    itens: list[VendaBalcaoItem], desconto: Decimal
-) -> tuple[Decimal, Decimal]:
-    valor_itens = _q(sum((i.valor_total for i in itens), Decimal("0")))
+def _totais(itens: list[VendaBalcaoItem], desconto: Decimal) -> tuple[Decimal, Decimal]:
+    valor_itens = _q(sum((i.valor_total for i in itens), Decimal(0)))
     if desconto > valor_itens:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -76,9 +74,7 @@ def _para_out(venda: VendaBalcao) -> VendaOut:
     dados = {c.name: getattr(venda, c.name) for c in venda.__table__.columns}
     dados["cliente_nome"] = venda.cliente.nome_razao if venda.cliente else None
     dados["vendedor_nome"] = venda.vendedor.nome if venda.vendedor else None
-    dados["operador_caixa_nome"] = (
-        venda.operador.nome if venda.operador else None
-    )
+    dados["operador_caixa_nome"] = venda.operador.nome if venda.operador else None
     dados["itens"] = [
         VendaItemOut(
             id=i.id,
@@ -130,9 +126,7 @@ def _baixar_estoque(
         if venda.status == StatusVenda.OK and est.saldo < item.quantidade:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Estoque insuficiente do produto para concluir a venda."
-                ),
+                detail=("Estoque insuficiente do produto para concluir a venda."),
             )
 
         if venda.status == StatusVenda.OK:
@@ -152,7 +146,8 @@ def _baixar_estoque(
                 quantidade=item.quantidade,
                 saldo_anterior=anterior,
                 saldo_posterior=est.saldo,
-                motivo="Venda de balcão" if venda.status == StatusVenda.OK
+                motivo="Venda de balcão"
+                if venda.status == StatusVenda.OK
                 else "Estorno por cancelamento de venda de balcão",
                 usuario_id=usuario_id,
             )
@@ -254,9 +249,7 @@ def listar(
         base = base.filter(VendaBalcao.data_venda <= data_fim)
     if q:
         termo = f"%{q.strip()}%"
-        base = base.outerjoin(
-            Cliente, VendaBalcao.cliente_id == Cliente.id
-        ).filter(
+        base = base.outerjoin(Cliente, VendaBalcao.cliente_id == Cliente.id).filter(
             or_(
                 Cliente.nome_razao.ilike(termo),
                 cast(VendaBalcao.numero, String).ilike(termo),

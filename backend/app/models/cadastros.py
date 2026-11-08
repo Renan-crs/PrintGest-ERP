@@ -1,15 +1,15 @@
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
-    CHAR,
     CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
     Index,
-    Integer,
     Numeric,
     String,
     Text,
@@ -28,8 +28,14 @@ from app.models.enums import (
     pg_enum,
 )
 
+if TYPE_CHECKING:
+    # Só para a anotação de `Funcionario.usuario` — no runtime o SQLAlchemy
+    # resolve o nome pelo registry do declarative base (evita ciclo de import).
+    from app.models.core import Usuario
+
 
 from decimal import Decimal
+
 
 class Cliente(Base):
     __tablename__ = "cliente"
@@ -78,9 +84,7 @@ class Cliente(Base):
     pagamento_adiantado: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
-    sinal: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
-    )
+    sinal: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     sinal_pct: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False, server_default="50"
     )
@@ -169,9 +173,7 @@ class Funcionario(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    usuario: Mapped["Usuario | None"] = relationship(
-        foreign_keys=[usuario_id]
-    )
+    usuario: Mapped["Usuario | None"] = relationship(foreign_keys=[usuario_id])
 
     @property
     def login(self) -> str | None:
@@ -302,7 +304,9 @@ class MovimentoEstoque(Base):
     produto_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("produto.id"), nullable=False
     )
-    tipo: Mapped[TipoMovEstoque] = mapped_column(pg_enum(TipoMovEstoque), nullable=False)
+    tipo: Mapped[TipoMovEstoque] = mapped_column(
+        pg_enum(TipoMovEstoque), nullable=False
+    )
     origem: Mapped[OrigemMov] = mapped_column(pg_enum(OrigemMov), nullable=False)
     documento_id: Mapped[int | None] = mapped_column(BigInteger)
     quantidade: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)

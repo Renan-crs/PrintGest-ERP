@@ -43,8 +43,11 @@ def test_cliente_busca_rapida(client, admin_token):
         json={"nome_razao": nome, "tipo_pessoa": "pf"},
     )
     assert created.status_code == 200, created.text
-    resp = client.get("/v1/clientes", params={"q": "Busca", "limit": 10},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/clientes",
+        params={"q": "Busca", "limit": 10},
+        headers=auth(client, admin_token),
+    )
     assert resp.status_code == 200
     nomes = [c["nome_razao"] for c in resp.json()["data"]]
     assert nome in nomes
@@ -119,7 +122,9 @@ def test_cliente_update_parcial_soft_delete(client, admin_token):
     resp = client.get(f"/v1/clientes/{cli_id}", headers=auth(client, admin_token))
     assert resp.status_code == 404
 
-    resp = client.get(f"/v1/clientes?q=Editar+e+Remover", headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/clientes?q=Editar+e+Remover", headers=auth(client, admin_token)
+    )
     assert all(c["nome_razao"] != "Editar e Remover" for c in resp.json()["data"])
 
 
@@ -137,8 +142,11 @@ def test_clientes_paginacao_meta(client, admin_token):
             headers=auth(client, admin_token),
             json={"nome_razao": f"Pagina {_u()}"},
         )
-    resp = client.get("/v1/clientes", params={"limit": 1, "offset": 0},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/clientes",
+        params={"limit": 1, "offset": 0},
+        headers=auth(client, admin_token),
+    )
     assert resp.status_code == 200
     meta = resp.json()["meta"]
     assert meta["limit"] == 1
@@ -146,8 +154,9 @@ def test_clientes_paginacao_meta(client, admin_token):
     assert meta["total"] >= 3
     assert len(resp.json()["data"]) == 1
 
-    resp = client.get("/v1/clientes", params={"limit": 1000},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/clientes", params={"limit": 1000}, headers=auth(client, admin_token)
+    )
     assert resp.json()["meta"]["limit"] == 200
 
 
@@ -169,17 +178,22 @@ def test_fornecedor_crud(client, admin_token):
     forn_id = created.json()["data"]["id"]
     assert created.json()["data"]["filial_id"] == 1
 
-    resp = client.get("/v1/fornecedores", params={"q": "Central"},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/fornecedores", params={"q": "Central"}, headers=auth(client, admin_token)
+    )
     assert any(f["nome_razao"] == "Papelaria Central Ltda" for f in resp.json()["data"])
 
-    resp = client.put(f"/v1/fornecedores/{forn_id}",
-                      headers=auth(client, admin_token),
-                      json={"telefone": "1133334444"})
+    resp = client.put(
+        f"/v1/fornecedores/{forn_id}",
+        headers=auth(client, admin_token),
+        json={"telefone": "1133334444"},
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["telefone"] == "1133334444"
 
-    resp = client.delete(f"/v1/fornecedores/{forn_id}", headers=auth(client, admin_token))
+    resp = client.delete(
+        f"/v1/fornecedores/{forn_id}", headers=auth(client, admin_token)
+    )
     assert resp.status_code == 204
 
 
@@ -209,13 +223,16 @@ def test_funcionario_crud(client, admin_token):
     assert Decimal(created.json()["data"]["comissao_pct"]) == Decimal("3.500")
     assert created.json()["data"]["observacoes"] == "Regime parcial."
 
-    resp = client.get("/v1/funcionarios", params={"q": "Atendente"},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/funcionarios", params={"q": "Atendente"}, headers=auth(client, admin_token)
+    )
     assert any(f["nome"] == "Funcionario Teste" for f in resp.json()["data"])
 
-    resp = client.put(f"/v1/funcionarios/{func_id}",
-                      headers=auth(client, admin_token),
-                      json={"cargo": "Gerente de Produção"})
+    resp = client.put(
+        f"/v1/funcionarios/{func_id}",
+        headers=auth(client, admin_token),
+        json={"cargo": "Gerente de Produção"},
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["cargo"] == "Gerente de Produção"
 
@@ -247,13 +264,16 @@ def test_categoria_crud(client, admin_token):
     assert created.status_code == 200, created.text
     cat_id = created.json()["data"]["id"]
 
-    resp = client.get("/v1/categorias", params={"q": "Categoria"},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/categorias", params={"q": "Categoria"}, headers=auth(client, admin_token)
+    )
     assert any(c["id"] == cat_id for c in resp.json()["data"])
 
-    resp = client.put(f"/v1/categorias/{cat_id}",
-                      headers=auth(client, admin_token),
-                      json={"description": "Papéis especiais"})
+    resp = client.put(
+        f"/v1/categorias/{cat_id}",
+        headers=auth(client, admin_token),
+        json={"description": "Papéis especiais"},
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["description"] == "Papéis especiais"
 
@@ -263,8 +283,12 @@ def test_categoria_crud(client, admin_token):
 
 def test_categoria_duplicado_nome_409(client, admin_token):
     nome = f"Categoria Duplicada {_u()}"
-    client.post("/v1/categorias", headers=auth(client, admin_token), json={"nome": nome})
-    resp = client.post("/v1/categorias", headers=auth(client, admin_token), json={"nome": nome})
+    client.post(
+        "/v1/categorias", headers=auth(client, admin_token), json={"nome": nome}
+    )
+    resp = client.post(
+        "/v1/categorias", headers=auth(client, admin_token), json={"nome": nome}
+    )
     assert resp.status_code == 409
 
 
@@ -273,7 +297,9 @@ def test_categoria_duplicado_nome_409(client, admin_token):
 
 def test_produto_crud(client, admin_token):
     cat = client.post(
-        "/v1/categorias", headers=auth(client, admin_token), json={"nome": f"ProdCat {_u()}"}
+        "/v1/categorias",
+        headers=auth(client, admin_token),
+        json={"nome": f"ProdCat {_u()}"},
     ).json()["data"]
     codigo = f"P{uuid.uuid4().hex[:8].upper()}"
 
@@ -300,13 +326,16 @@ def test_produto_crud(client, admin_token):
     assert Decimal(prod["preco_venda"]) == Decimal("25.90")
     assert prod["tipo"] == "produto"
 
-    resp = client.get("/v1/produtos", params={"q": "A4"},
-                      headers=auth(client, admin_token))
+    resp = client.get(
+        "/v1/produtos", params={"q": "A4"}, headers=auth(client, admin_token)
+    )
     assert any(p["codigo"] == codigo for p in resp.json()["data"])
 
-    resp = client.put(f"/v1/produtos/{prod['id']}",
-                      headers=auth(client, admin_token),
-                      json={"preco_venda": 29.9})
+    resp = client.put(
+        f"/v1/produtos/{prod['id']}",
+        headers=auth(client, admin_token),
+        json={"preco_venda": 29.9},
+    )
     assert resp.status_code == 200
     assert Decimal(resp.json()["data"]["preco_venda"]) == Decimal("29.90")
 
@@ -329,10 +358,16 @@ def test_produto_servico_sem_estoque(client, admin_token):
 
 def test_produto_duplicado_codigo_409(client, admin_token):
     codigo = f"DUPL{uuid.uuid4().hex[:6].upper()}"
-    client.post("/v1/produtos", headers=auth(client, admin_token),
-                json={"codigo": codigo, "nome": "Produto duplicado"})
-    resp = client.post("/v1/produtos", headers=auth(client, admin_token),
-                       json={"codigo": codigo, "nome": "Produto duplicado 2"})
+    client.post(
+        "/v1/produtos",
+        headers=auth(client, admin_token),
+        json={"codigo": codigo, "nome": "Produto duplicado"},
+    )
+    resp = client.post(
+        "/v1/produtos",
+        headers=auth(client, admin_token),
+        json={"codigo": codigo, "nome": "Produto duplicado 2"},
+    )
     assert resp.status_code == 409
 
 

@@ -78,6 +78,7 @@ router.include_router(fornecedores_router)
 # ----------------------------------------------------------- funcionários (com login)
 # M3 (§3.10): cadastro de funcionário cria usuário com primeiro acesso
 
+
 @router.get("/funcionarios")
 def listar_funcionarios(
     db: DbDep,

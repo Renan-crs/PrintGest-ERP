@@ -1,9 +1,10 @@
 """Routers de usuários do sistema — gestão restrita a ADMIN (RBAC §5)."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 
 from app.core.security import hash_password
-from app.deps import DbDep, RANK, require_nivel, UsuarioDep
+from app.deps import RANK, DbDep, UsuarioDep, require_nivel
 from app.models.core import Usuario
 from app.models.enums import NivelAcesso
 from app.schemas import ItemResponse, ListaResponse
@@ -11,8 +12,6 @@ from app.schemas.common import MetaPaginacao
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from app.services.auth_service import revogar_sessoes
 from app.services.crud import atualizar, buscar_por_id, criar, desativar
-from sqlalchemy import or_
-
 
 router = APIRouter(
     prefix="/usuarios",
@@ -75,7 +74,9 @@ def lista(
 
 @router.get("/{item_id}")
 def detalhe(item_id: int, db: DbDep) -> ItemResponse[UsuarioOut]:
-    return ItemResponse(data=UsuarioOut.model_validate(buscar_por_id(db, Usuario, item_id)))
+    return ItemResponse(
+        data=UsuarioOut.model_validate(buscar_por_id(db, Usuario, item_id))
+    )
 
 
 @router.post("")

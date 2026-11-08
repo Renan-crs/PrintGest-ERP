@@ -115,14 +115,21 @@ def _vendas_ultimos_dias(
 
 
 def _somar_saldo_receber(
-    db: Session, filial_id: int, *, antes_de: date | None = None, no_dia: date | None = None
+    db: Session,
+    filial_id: int,
+    *,
+    antes_de: date | None = None,
+    no_dia: date | None = None,
 ) -> Decimal:
     """Saldo em aberto (valor − pago) das contas a receber ativas.
 
     Filtra por `vencimento == no_dia` (vence hoje) ou `vencimento < antes_de`
     (atrasado). Sem filtro, soma todo o saldo em aberto da filial.
     """
-    filtros = [ContaReceber.filial_id == filial_id, ContaReceber.status == StatusConta.ABERTA]
+    filtros = [
+        ContaReceber.filial_id == filial_id,
+        ContaReceber.status == StatusConta.ABERTA,
+    ]
     if no_dia is not None:
         filtros.append(ContaReceber.vencimento == no_dia)
     elif antes_de is not None:
@@ -130,7 +137,10 @@ def _somar_saldo_receber(
     saldo = (
         db.query(
             func.coalesce(
-                func.sum(ContaReceber.valor - func.coalesce(ContaReceber.valor_pago, 0)), 0
+                func.sum(
+                    ContaReceber.valor - func.coalesce(ContaReceber.valor_pago, 0)
+                ),
+                0,
             )
         )
         .filter(*filtros)
@@ -149,7 +159,9 @@ def _previsto_por_dia(
         db.query(
             ContaReceber.vencimento,
             func.coalesce(
-                func.sum(ContaReceber.valor - func.coalesce(ContaReceber.valor_pago, 0)),
+                func.sum(
+                    ContaReceber.valor - func.coalesce(ContaReceber.valor_pago, 0)
+                ),
                 0,
             ),
         )
@@ -226,8 +238,12 @@ def resumo(
         os_abertas=_contar_os(db, filial_id, StatusOs.ABERTO),
         os_prontas=_contar_os(db, filial_id, StatusOs.PRONTA),
         # operacional (>= OPERADOR)
-        projetos_em_producao=_contar_os(db, filial_id, StatusOs.PRODUCAO) if operacional else None,
-        projetos_atrasados=_contar_os_atrasadas(db, filial_id, hoje) if operacional else None,
+        projetos_em_producao=_contar_os(db, filial_id, StatusOs.PRODUCAO)
+        if operacional
+        else None,
+        projetos_atrasados=_contar_os_atrasadas(db, filial_id, hoje)
+        if operacional
+        else None,
         estoque_abaixo_minimo=(
             estoque_service.resumo(db, filial_id).abaixo_minimo if operacional else None
         ),
@@ -242,5 +258,7 @@ def resumo(
         faturamento_previsto=_previsto_por_dia(db, filial_id, hoje, dias)
         if gerencial
         else None,
-        vendas_7_dias=_vendas_ultimos_dias(db, filial_id, hoje, dias) if gerencial else None,
+        vendas_7_dias=_vendas_ultimos_dias(db, filial_id, hoje, dias)
+        if gerencial
+        else None,
     )

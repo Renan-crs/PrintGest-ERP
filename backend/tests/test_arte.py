@@ -33,7 +33,13 @@ def _criar_os(client_fixture, token):
         json={
             "tipo": "os",
             "cliente_id": _criar_cliente(client_fixture, token)["id"],
-            "itens": [{"descricao_avulsa": "Cartão visita", "quantidade": 100, "valor_unitario": 0.5}],
+            "itens": [
+                {
+                    "descricao_avulsa": "Cartão visita",
+                    "quantidade": 100,
+                    "valor_unitario": 0.5,
+                }
+            ],
         },
     )
     assert resp.status_code == 200, resp.text
@@ -86,7 +92,9 @@ def test_extensao_executavel_bloqueada(client, admin_token):
     resp = client.post(
         f"/v1/os/{os_criada['id']}/arte",
         headers=auth(client, admin_token),
-        files={"arquivo": ("virus.exe", io.BytesIO(b"MZ..."), "application/octet-stream")},
+        files={
+            "arquivo": ("virus.exe", io.BytesIO(b"MZ..."), "application/octet-stream")
+        },
     )
     assert resp.status_code == 400
     assert "não é permitida" in resp.json()["detail"]
@@ -148,7 +156,10 @@ def test_ajuste_arte_registra_comentarios_e_estado(client, admin_token):
     resp = client.post(
         f"/v1/os/{os_criada['id']}/arte/{upload['id']}/decisao",
         headers=auth(client, admin_token),
-        json={"decisao": "ajuste", "comentarios": "Trocar o logo para versão horizontal"},
+        json={
+            "decisao": "ajuste",
+            "comentarios": "Trocar o logo para versão horizontal",
+        },
     )
     assert resp.status_code == 201, resp.text
     assert "logo" in resp.json()["data"]["comentarios"]
@@ -194,7 +205,7 @@ def test_link_prova_gera_token_com_expiracao(client, admin_token):
     assert len(data["token"]) > 20
     assert data["tipo"] == "prova"
     # expira no futuro
-    expira = datetime.fromisoformat(data["expira_em"].replace("Z", "+00:00"))
+    expira = datetime.fromisoformat(data["expira_em"])
     assert expira > datetime.now(expira.tzinfo)
 
 
@@ -207,9 +218,7 @@ def test_hash_sha256_consistente(client, admin_token):
 
     conteudo = b"conteudo de teste para hash"
     os_criada = _criar_os(client, admin_token)
-    resp = _upload(
-        client, admin_token, os_criada["id"], conteudo=io.BytesIO(conteudo)
-    )
+    resp = _upload(client, admin_token, os_criada["id"], conteudo=io.BytesIO(conteudo))
     data = resp.json()["data"]
     assert data["hash_sha256"] == hashlib.sha256(conteudo).hexdigest()
 
@@ -270,7 +279,8 @@ def test_status_manual_aguardando_arte(client, admin_token):
     """O operador pode sinalizar "aguardando arte do cliente" manualmente."""
     os_criada = _criar_os(client, admin_token)
     resp = client.patch(
-        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        f"/v1/os/{os_criada['id']}/status",
+        headers=auth(client, admin_token),
         json={"status": "aguardando_arte"},
     )
     assert resp.status_code == 200, resp.text
@@ -281,7 +291,8 @@ def test_producao_sem_arte_aprovada_409(client, admin_token):
     """§3.5: não inicia produção sem arte aprovada."""
     os_criada = _criar_os(client, admin_token)
     resp = client.patch(
-        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        f"/v1/os/{os_criada['id']}/status",
+        headers=auth(client, admin_token),
         json={"status": "producao"},
     )
     assert resp.status_code == 409, resp.text
@@ -290,7 +301,8 @@ def test_producao_sem_arte_aprovada_409(client, admin_token):
     # arte pendente (sem decisão) também bloqueia
     _upload(client, admin_token, os_criada["id"])
     resp = client.patch(
-        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        f"/v1/os/{os_criada['id']}/status",
+        headers=auth(client, admin_token),
         json={"status": "producao"},
     )
     assert resp.status_code == 409, resp.text
@@ -300,7 +312,8 @@ def test_producao_com_arte_aprovada_200(client, admin_token):
     os_criada = _criar_os(client, admin_token)
     arte_aprovada(client, admin_token, os_criada["id"])
     resp = client.patch(
-        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        f"/v1/os/{os_criada['id']}/status",
+        headers=auth(client, admin_token),
         json={"status": "producao"},
     )
     assert resp.status_code == 200, resp.text
@@ -312,7 +325,8 @@ def test_reenvio_nao_regrede_status_avancado(client, admin_token):
     os_criada = _criar_os(client, admin_token)
     arte_aprovada(client, admin_token, os_criada["id"])
     client.patch(
-        f"/v1/os/{os_criada['id']}/status", headers=auth(client, admin_token),
+        f"/v1/os/{os_criada['id']}/status",
+        headers=auth(client, admin_token),
         json={"status": "producao"},
     )
     _upload(client, admin_token, os_criada["id"])  # ajuste tardio

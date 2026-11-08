@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
@@ -28,7 +28,19 @@ from app.models.movimento import (
 )
 
 # Extensões permitidas (§3.5: "extensões executáveis bloqueadas")
-_EXTENSOES_BLOQUEADAS = {".exe", ".bat", ".cmd", ".sh", ".ps1", ".msi", ".dll", ".com", ".scr", ".vbs", ".js"}
+_EXTENSOES_BLOQUEADAS = {
+    ".exe",
+    ".bat",
+    ".cmd",
+    ".sh",
+    ".ps1",
+    ".msi",
+    ".dll",
+    ".com",
+    ".scr",
+    ".vbs",
+    ".js",
+}
 _MAX_TAMANHO = 50 * 1024 * 1024  # 50 MB
 
 
@@ -67,9 +79,11 @@ def enviar_versao(
     arquivo: UploadFile,
 ) -> ArteVersao:
     """Faz upload de uma nova versão da arte (v1, v2… — auto-incremento)."""
-    os_obj = db.query(OrdemServico).filter(
-        OrdemServico.id == os_id, OrdemServico.filial_id == filial_id
-    ).first()
+    os_obj = (
+        db.query(OrdemServico)
+        .filter(OrdemServico.id == os_id, OrdemServico.filial_id == filial_id)
+        .first()
+    )
     if not os_obj:
         raise HTTPException(status_code=404, detail="Ordem de serviço não encontrada.")
 
@@ -79,7 +93,7 @@ def enviar_versao(
 
     # M3: sanitize filename to prevent path traversal
     nome_arquivo = Path(arquivo.filename or f"versao_{os_id}").name
-    
+
     ultima = (
         db.query(ArteVersao)
         .filter(ArteVersao.os_id == os_id)
@@ -237,7 +251,7 @@ def gerar_link(
         os_id=os_id,
         token=token,
         tipo=tipo.value,
-        expira_em=datetime.utcnow() + timedelta(hours=expira_horas),
+        expira_em=datetime.now(UTC) + timedelta(hours=expira_horas),
     )
     db.add(link)
     db.commit()

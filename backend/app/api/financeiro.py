@@ -30,7 +30,9 @@ router = APIRouter(prefix="/financeiro", tags=["financeiro"])
 
 
 # --------------------------------------------------------------------- caixa
-_caixa = [Depends(require_perfis(NivelAcesso.CAIXA, NivelAcesso.GERENTE, NivelAcesso.ADMIN))]
+_caixa = [
+    Depends(require_perfis(NivelAcesso.CAIXA, NivelAcesso.GERENTE, NivelAcesso.ADMIN))
+]
 _gerente = [Depends(require_nivel(NivelAcesso.GERENTE))]
 
 
@@ -42,11 +44,15 @@ _gerente = [Depends(require_nivel(NivelAcesso.GERENTE))]
 )
 def caixa_atual(db: DbDep, filial: FilialDep, usuario: UsuarioDep):
     caixa = financeiro_service.caixa_aberto(db, filial_id=filial, usuario_id=usuario.id)
-    return ItemResponse(data=None if caixa is None else financeiro_service.caixa_out(db, caixa))
+    return ItemResponse(
+        data=None if caixa is None else financeiro_service.caixa_out(db, caixa)
+    )
 
 
 @router.post("/caixa/abrir", response_model=ItemResponse[CaixaOut], dependencies=_caixa)
-def abrir_caixa(payload: AbrirCaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
+def abrir_caixa(
+    payload: AbrirCaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
     caixa = financeiro_service.abrir_caixa(
         db, filial_id=filial, usuario_id=usuario.id, dados=payload
     )
@@ -78,7 +84,9 @@ def extrato(
     response_model=ItemResponse[MovimentoCaixaOut],
     dependencies=_caixa,
 )
-def lancar_movimento(caixa_id: int, payload: MovimentoCaixaIn, db: DbDep, filial: FilialDep):
+def lancar_movimento(
+    caixa_id: int, payload: MovimentoCaixaIn, db: DbDep, filial: FilialDep
+):
     movimento = financeiro_service.registrar_movimento(
         db, caixa_id=caixa_id, filial_id=filial, dados=payload
     )
@@ -86,9 +94,17 @@ def lancar_movimento(caixa_id: int, payload: MovimentoCaixaIn, db: DbDep, filial
 
 
 @router.post(
-    "/caixa/{caixa_id}/fechar", response_model=ItemResponse[CaixaOut], dependencies=_caixa
+    "/caixa/{caixa_id}/fechar",
+    response_model=ItemResponse[CaixaOut],
+    dependencies=_caixa,
 )
-def fechar_caixa(caixa_id: int, payload: FecharCaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
+def fechar_caixa(
+    caixa_id: int,
+    payload: FecharCaixaIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+):
     caixa = financeiro_service.fechar_caixa(
         db, caixa_id=caixa_id, filial_id=filial, usuario_id=usuario.id, dados=payload
     )
@@ -97,7 +113,9 @@ def fechar_caixa(caixa_id: int, payload: FecharCaixaIn, db: DbDep, filial: Filia
 
 # -------------------------------------------------------------------- contas
 @router.get(
-    "/contas-receber", response_model=ListaResponse[ContaReceberOut], dependencies=_gerente
+    "/contas-receber",
+    response_model=ListaResponse[ContaReceberOut],
+    dependencies=_gerente,
 )
 def contas_receber(
     db: DbDep,
@@ -120,10 +138,16 @@ def contas_receber(
     response_model=ItemResponse[ContaReceberOut],
     dependencies=_gerente,
 )
-def baixar_receber(conta_id: int, payload: BaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
+def baixar_receber(
+    conta_id: int, payload: BaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
     return ItemResponse(
         data=financeiro_service.baixar_conta_receber(
-            db, conta_id=conta_id, filial_id=filial, usuario_id=usuario.id, dados=payload
+            db,
+            conta_id=conta_id,
+            filial_id=filial,
+            usuario_id=usuario.id,
+            dados=payload,
         )
     )
 
@@ -152,10 +176,16 @@ def contas_pagar(
     response_model=ItemResponse[ContaPagarOut],
     dependencies=_gerente,
 )
-def baixar_pagar(conta_id: int, payload: BaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
+def baixar_pagar(
+    conta_id: int, payload: BaixaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
     return ItemResponse(
         data=financeiro_service.baixar_conta_pagar(
-            db, conta_id=conta_id, filial_id=filial, usuario_id=usuario.id, dados=payload
+            db,
+            conta_id=conta_id,
+            filial_id=filial,
+            usuario_id=usuario.id,
+            dados=payload,
         )
     )
 

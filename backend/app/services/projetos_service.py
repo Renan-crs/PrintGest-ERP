@@ -26,7 +26,7 @@ as colunas `ordem_servico_id` e `status_os` já existem para recebê-la.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, status
@@ -88,9 +88,7 @@ def _condicao_visivel(db: Session, usuario: Usuario):
     if usuario.nivel_acesso in _GESTORES:
         return true()
     restrito = (
-        db.query(CartaoMembro)
-        .filter(CartaoMembro.cartao_id == Cartao.id)
-        .exists()
+        db.query(CartaoMembro).filter(CartaoMembro.cartao_id == Cartao.id).exists()
     )
     sou_membro = (
         db.query(CartaoMembro)
@@ -103,7 +101,9 @@ def _condicao_visivel(db: Session, usuario: Usuario):
     return or_(~restrito, sou_membro)
 
 
-def _buscar_cartao(db: Session, usuario: Usuario, cartao_id: int, filial_id: int) -> Cartao:
+def _buscar_cartao(
+    db: Session, usuario: Usuario, cartao_id: int, filial_id: int
+) -> Cartao:
     cartao = (
         db.query(Cartao)
         .filter(
@@ -183,15 +183,11 @@ def _nomes_usuarios(db: Session, ids) -> dict[int, str]:
     limpos = {i for i in ids if i is not None}
     if not limpos:
         return {}
-    linhas = (
-        db.query(Usuario.id, Usuario.nome).filter(Usuario.id.in_(limpos)).all()
-    )
+    linhas = db.query(Usuario.id, Usuario.nome).filter(Usuario.id.in_(limpos)).all()
     return {i: nome for i, nome in linhas}
 
 
-def _para_lista(
-    lista: QuadroLista, contagem: int, donos: dict[int, str]
-) -> dict:
+def _para_lista(lista: QuadroLista, contagem: int, donos: dict[int, str]) -> dict:
     return {
         "id": lista.id,
         "quadro_id": lista.quadro_id,
@@ -207,7 +203,9 @@ def _para_lista(
     }
 
 
-def _lista_out(db: Session, usuario: Usuario, quadro: Quadro, lista: QuadroLista) -> dict:
+def _lista_out(
+    db: Session, usuario: Usuario, quadro: Quadro, lista: QuadroLista
+) -> dict:
     """Saída de lista com dono nomeado e contagem real (PV5) — usada nas
     respostas de criar/atualizar/arquivar, que senão devolveriam `contagem: 0`
     e dono anônimo.
@@ -376,8 +374,7 @@ def _verificar_versao(cartao: Cartao, versao: int) -> None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "O cartão foi alterado por outro usuário. "
-                "Recarregue e tente novamente."
+                "O cartão foi alterado por outro usuário. Recarregue e tente novamente."
             ),
         )
 
@@ -456,13 +453,13 @@ def listar_cartoes(
     return [_para_cartao(db, c) for c in linhas], total
 
 
-def obter_cartao(db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int) -> dict:
+def obter_cartao(
+    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int
+) -> dict:
     return _para_cartao(db, _buscar_cartao(db, usuario, cartao_id, filial_id))
 
 
-def criar_cartao(
-    db: Session, *, usuario: Usuario, filial_id: int, dados: dict
-) -> dict:
+def criar_cartao(db: Session, *, usuario: Usuario, filial_id: int, dados: dict) -> dict:
     quadro = obter_quadro(db, filial_id)
     lista = _buscar_lista(db, quadro, dados["lista_id"])
     if lista.arquivada:
@@ -485,9 +482,7 @@ def criar_cartao(
     db.add(cartao)
     db.flush()
     _sincronizar_membro_lista(db, cartao, lista, usuario)
-    _registrar_atividade(
-        db, cartao.id, usuario.id, "criado", {"titulo": cartao.titulo}
-    )
+    _registrar_atividade(db, cartao.id, usuario.id, "criado", {"titulo": cartao.titulo})
     db.commit()
     db.refresh(cartao)
     return _para_cartao(db, cartao)
@@ -510,9 +505,11 @@ def atualizar_cartao(
     concluido_antes = cartao.concluido
     if dados.get("concluido") is not None:  # RN4: marca e desmarca sem bloquear
         cartao.concluido = bool(dados["concluido"])
-        cartao.concluido_em = datetime.now(timezone.utc) if cartao.concluido else None
+        cartao.concluido_em = datetime.now(UTC) if cartao.concluido else None
     if alterados:
-        _registrar_atividade(db, cartao.id, usuario.id, "atualizado", {"campos": alterados})
+        _registrar_atividade(
+            db, cartao.id, usuario.id, "atualizado", {"campos": alterados}
+        )
     if dados.get("concluido") is not None and cartao.concluido != concluido_antes:
         _registrar_atividade(
             db,
@@ -600,7 +597,13 @@ def restaurar_cartao(
 
 
 def atribuir_cartao(
-    db: Session, *, usuario: Usuario, filial_id: int, cartao_id: int, usuario_id: int, versao: int
+    db: Session,
+    *,
+    usuario: Usuario,
+    filial_id: int,
+    cartao_id: int,
+    usuario_id: int,
+    versao: int,
 ) -> dict:
     """WF2/PV4: atribui a um usuário e restringe o cartão a ele.
 
@@ -658,9 +661,7 @@ def remover_membro(
 # -------------------------------------------------------------------- listas
 
 
-def criar_lista(
-    db: Session, *, usuario: Usuario, quadro: Quadro, dados: dict
-) -> dict:
+def criar_lista(db: Session, *, usuario: Usuario, quadro: Quadro, dados: dict) -> dict:
     indice = dados.get("posicao")
     posicoes = _posicoes_lista(db, quadro.id)
     if indice is None:
@@ -694,7 +695,9 @@ def atualizar_lista(
     return _lista_out(db, usuario, quadro, lista)
 
 
-def _reordenar_lista(db: Session, quadro: Quadro, lista: QuadroLista, indice: int) -> None:
+def _reordenar_lista(
+    db: Session, quadro: Quadro, lista: QuadroLista, indice: int
+) -> None:
     posicoes = _posicoes_lista(db, quadro.id, exceto_id=lista.id)
     try:
         lista.posicao = _posicao_para_indice(posicoes, indice)
@@ -715,7 +718,9 @@ def arquivar_lista(
     return _lista_out(db, usuario, quadro, lista)
 
 
-def excluir_lista(db: Session, *, usuario: Usuario, quadro: Quadro, lista_id: int) -> None:
+def excluir_lista(
+    db: Session, *, usuario: Usuario, quadro: Quadro, lista_id: int
+) -> None:
     """Exclusão definitiva (Admin, §RN6): exige lista vazia de cartões."""
     lista = _buscar_lista(db, quadro, lista_id)
     ocupados = (
@@ -1351,7 +1356,7 @@ def atualizar_comentario(
             detail="Apenas o autor pode editar o comentário.",
         )
     comentario.texto = dados["texto"]
-    comentario.editado_em = datetime.now(timezone.utc)
+    comentario.editado_em = datetime.now(UTC)
     db.commit()
     db.refresh(comentario)
     return _comentario_dict(comentario, _nomes_usuarios(db, [comentario.usuario_id]))

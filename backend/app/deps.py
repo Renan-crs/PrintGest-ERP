@@ -1,6 +1,6 @@
 """Dependências FastAPI: sessão de banco, autenticação, RBAC e escopo de filial."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
@@ -12,7 +12,12 @@ from app.db import SessionLocal
 from app.models.core import Usuario, UsuarioSessao
 from app.models.enums import NivelAcesso
 
-RANK = {NivelAcesso.ADMIN: 4, NivelAcesso.GERENTE: 3, NivelAcesso.OPERADOR: 2, NivelAcesso.CAIXA: 1}
+RANK = {
+    NivelAcesso.ADMIN: 4,
+    NivelAcesso.GERENTE: 3,
+    NivelAcesso.OPERADOR: 2,
+    NivelAcesso.CAIXA: 1,
+}
 
 
 def get_db() -> Session:
@@ -41,7 +46,7 @@ def _autenticar(token: str, db: Session) -> Usuario:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sessão inválida. Faça login novamente.",
         )
-    agora = datetime.now(timezone.utc)
+    agora = datetime.now(UTC)
     if sessao.expira_em < agora:
         sessao.encerrada = True
         db.commit()

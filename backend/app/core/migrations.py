@@ -36,8 +36,9 @@ def _upgrade_congelado() -> None:
     quando `config.config_file_name` existe — sem ini, o logging da aplicação
     (root + request_id) não é reconfigurado pelo Alembic no processo vivo.
     """
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
 
     cfg = Config()
     cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
@@ -95,6 +96,7 @@ def aplicar_migrations() -> None:
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=str(_BACKEND_DIR),
         env=env,
+        check=False,
         capture_output=True,
         text=True,
     )

@@ -26,12 +26,17 @@ def _token_de(client, admin_token, nivel: str) -> str:
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": f"Usuário {nivel}", "login": login, "senha": senha, "nivel_acesso": nivel},
+        json={
+            "nome": f"Usuário {nivel}",
+            "login": login,
+            "senha": senha,
+            "nivel_acesso": nivel,
+        },
     )
     assert resp.status_code == 200, resp.text
-    return client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    return client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
 
 
 def _seed_documento(

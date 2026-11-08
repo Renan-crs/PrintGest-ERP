@@ -20,15 +20,14 @@ from app.schemas.movimento import (
     ArteDecisaoIn,
     ConferenciaTerceirizadoIn,
     CotacaoIn,
-    CotacaoOut,
     OsConverterIn,
     OsCreate,
     OsOut,
     OsStatusIn,
     OsUpdate,
     RecebimentoTerceirizadoIn,
-    RepetirIn,
     RefacaoIn,
+    RepetirIn,
 )
 from app.services import cotacao_service, os_service
 
@@ -45,7 +44,7 @@ def _opções_carga():
         joinedload(OrdemServico.vendedor),
         joinedload(OrdemServico.atendente),
         selectinload(OrdemServico.itens),
-    selectinload(OrdemServico.itens).selectinload(OrdemServicoItem.cotacoes),
+        selectinload(OrdemServico.itens).selectinload(OrdemServicoItem.cotacoes),
     )
 
 
@@ -90,7 +89,9 @@ def listar(
 
 @router.get("/{os_id}")
 def detalhe(os_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[OsOut]:
-    return ItemResponse(data=os_service._para_out(os_service.buscar(db, os_id, filial_id=filial)))
+    return ItemResponse(
+        data=os_service._para_out(os_service.buscar(db, os_id, filial_id=filial))
+    )
 
 
 @router.post("")
@@ -141,7 +142,9 @@ def alterar_status(
     os_id: int, body: OsStatusIn, db: DbDep, filial: FilialDep
 ) -> ItemResponse[OsOut]:
     return ItemResponse(
-        data=os_service.mudar_status(db, filial_id=filial, os_id=os_id, novo=body.status)
+        data=os_service.mudar_status(
+            db, filial_id=filial, os_id=os_id, novo=body.status
+        )
     )
 
 
@@ -156,7 +159,9 @@ def alterar_status(
 def listar_cotacoes(
     os_id: int, item_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep
 ):
-    return cotacao_service.listar(db, item_id=item_id, filial_id=filial, usuario=usuario)
+    return cotacao_service.listar(
+        db, item_id=item_id, filial_id=filial, usuario=usuario
+    )
 
 
 @router.post(
@@ -193,7 +198,11 @@ def selecionar_cotacao(
 ):
     return ItemResponse(
         data=cotacao_service.selecionar(
-            db, item_id=item_id, cotacao_id=cotacao_id, filial_id=filial, usuario=usuario
+            db,
+            item_id=item_id,
+            cotacao_id=cotacao_id,
+            filial_id=filial,
+            usuario=usuario,
         )
     )
 
@@ -202,17 +211,13 @@ def selecionar_cotacao(
 
 
 @router.get("/{os_id}/itens/{item_id}/terceirizado")
-def ver_terceirizado(
-    os_id: int, item_id: int, db: DbDep, filial: FilialDep
-):
+def ver_terceirizado(os_id: int, item_id: int, db: DbDep, filial: FilialDep):
     """Situação do envio ao fornecedor (envio, previsão, retorno, conferência)."""
     from app.services import terceirizado_service
 
     envio = terceirizado_service._obter(db, item_id, filial_id=filial)
     item = db.get(OrdemServicoItem, item_id)
-    return ItemResponse(
-        data=terceirizado_service.para_out(envio, item=item)
-    )
+    return ItemResponse(data=terceirizado_service.para_out(envio, item=item))
 
 
 @router.put("/{os_id}/itens/{item_id}/terceirizado/receber")
@@ -231,9 +236,7 @@ def receber_terceirizado(
         db, item_id=item_id, filial_id=filial, data_retorno=data_retorno
     )
     item = db.get(OrdemServicoItem, item_id)
-    return ItemResponse(
-        data=terceirizado_service.para_out(envio, item=item)
-    )
+    return ItemResponse(data=terceirizado_service.para_out(envio, item=item))
 
 
 @router.put("/{os_id}/itens/{item_id}/terceirizado/conferir")
@@ -255,9 +258,7 @@ def conferir_terceirizado(
         observacoes=body.observacoes,
     )
     item = db.get(OrdemServicoItem, item_id)
-    return ItemResponse(
-        data=terceirizado_service.para_out(envio, item=item)
-    )
+    return ItemResponse(data=terceirizado_service.para_out(envio, item=item))
 
 
 # --------------------------- arte, prova e aprovação (M3, §3.5)
@@ -285,9 +286,7 @@ async def enviar_arte(
 
 
 @router.get("/{os_id}/arte")
-def listar_arte(
-    os_id: int, db: DbDep, filial: FilialDep
-):
+def listar_arte(os_id: int, db: DbDep, filial: FilialDep):
     """Versões da arte + estado derivado (sem_arte / aguardando / aprovada / ajuste)."""
     from app.services import arte_service
 
@@ -309,8 +308,8 @@ def decidir_arte(
     request: Request,
 ):
     """Registra a decisão do cliente: aprovada ou ajuste (§3.5)."""
-    from app.services import arte_service
     from app.models.enums import DecisaoArte
+    from app.services import arte_service
 
     ip = request.client.host if request.client else None
     aprovacao = arte_service.registrar_decisao(

@@ -65,9 +65,7 @@ class Quadro(Base):
     nome: Mapped[str] = mapped_column(
         String(120), nullable=False, server_default="Projetos"
     )
-    ativo: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
-    )
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -119,9 +117,7 @@ class QuadroLista(Base):
     )
 
     quadro: Mapped[Quadro] = relationship(back_populates="listas")
-    usuario_dono: Mapped[Usuario | None] = relationship(
-        foreign_keys=[usuario_dono_id]
-    )
+    usuario_dono: Mapped[Usuario | None] = relationship(foreign_keys=[usuario_dono_id])
 
 
 class Cartao(Base):
@@ -165,9 +161,7 @@ class Cartao(Base):
         Boolean, nullable=False, server_default="false"
     )
     # Controle otimista de edição (§10): texto com versão; conflito => 409.
-    versao: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="1"
-    )
+    versao: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -294,7 +288,9 @@ class CartaoChecklistItem(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     checklist_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("cartao_checklist.id", ondelete="CASCADE"), nullable=False
+        BigInteger,
+        ForeignKey("cartao_checklist.id", ondelete="CASCADE"),
+        nullable=False,
     )
     texto: Mapped[str] = mapped_column(String(500), nullable=False)
     concluido: Mapped[bool] = mapped_column(
@@ -350,17 +346,13 @@ class CartaoAtividade(Base):
     """
 
     __tablename__ = "cartao_atividade"
-    __table_args__ = (
-        Index("idx_cartao_atividade_cartao", "cartao_id", "criado_em"),
-    )
+    __table_args__ = (Index("idx_cartao_atividade_cartao", "cartao_id", "criado_em"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     cartao_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("cartao.id", ondelete="CASCADE"), nullable=False
     )
-    usuario_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("usuario.id")
-    )
+    usuario_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     tipo: Mapped[str] = mapped_column(String(40), nullable=False)
     dados: Mapped[dict | None] = mapped_column(JSONB)
     criado_em: Mapped[datetime] = mapped_column(

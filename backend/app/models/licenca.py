@@ -18,7 +18,7 @@ como anuláveis, sem uso, para não quebrar bases já migradas.
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CHAR, DateTime, Integer, String, Text, func
+from sqlalchemy import CHAR, BigInteger, DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 

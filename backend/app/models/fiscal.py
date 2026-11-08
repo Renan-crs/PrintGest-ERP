@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -21,8 +22,6 @@ from app.db import Base
 from app.models.enums import ModeloFiscal, StatusFiscal, pg_enum
 
 
-from decimal import Decimal
-
 class DocumentoFiscal(Base):
     __tablename__ = "documento_fiscal"
     __table_args__ = (
@@ -38,9 +37,7 @@ class DocumentoFiscal(Base):
             postgresql_where=text("ordem_servico_id IS NOT NULL"),
         ),
         UniqueConstraint("chave_acesso", name="uq_df_chave_acesso"),
-        UniqueConstraint(
-            "modelo", "numero", "serie", name="uq_df_modelo_numero_serie"
-        ),
+        UniqueConstraint("modelo", "numero", "serie", name="uq_df_modelo_numero_serie"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -52,7 +49,9 @@ class DocumentoFiscal(Base):
     serie: Mapped[int | None] = mapped_column(Integer)
     chave_acesso: Mapped[str | None] = mapped_column(String(44))
     status: Mapped[StatusFiscal] = mapped_column(
-        pg_enum(StatusFiscal), nullable=False, server_default=StatusFiscal.RASCUNHO.value
+        pg_enum(StatusFiscal),
+        nullable=False,
+        server_default=StatusFiscal.RASCUNHO.value,
     )
     venda_balcao_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("venda_balcao.id")

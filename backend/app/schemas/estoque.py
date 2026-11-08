@@ -40,7 +40,9 @@ class EstoqueResumoOut(BaseModel):
 class MovimentarIn(BaseModel):
     produto_id: int
     tipo: TipoMovEstoque
-    quantidade: Decimal = Field(gt=0, description="Qtde > 0; em Ajuste, é o novo saldo físico.")
+    quantidade: Decimal = Field(
+        gt=0, description="Qtde > 0; em Ajuste, é o novo saldo físico."
+    )
     motivo: str | None = Field(default=None, max_length=255)
     documento_id: int | None = None
 

@@ -14,7 +14,7 @@ modelo de dados da §9 e as regras de visibilidade das §PV1–PV6:
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import OrigemMembro, StatusOs, TipoLista
 from app.schemas.common import ORMModel
@@ -162,9 +162,9 @@ class CartaoOut(ORMModel):
     terceiro_custo: Decimal | None = None
     arquivado: bool
     versao: int
-    membros: list[MembroOut] = []
+    membros: list[MembroOut] = Field(default_factory=list)
     # Fase 2 (Cartão rico): etiquetas aplicadas e selos de progresso (RF4).
-    etiquetas: list["EtiquetaOut"] = []
+    etiquetas: list["EtiquetaOut"] = Field(default_factory=list)
     checklist_total: int = 0
     checklist_concluidos: int = 0
     comentarios_total: int = 0
@@ -301,7 +301,7 @@ class ChecklistOut(ORMModel):
     posicao: Decimal
     total: int = 0
     concluidos: int = 0
-    itens: list[ChecklistItemOut] = []
+    itens: list[ChecklistItemOut] = Field(default_factory=list)
 
 
 # -------------------------------------------------------- Fase 2: comentários

@@ -13,6 +13,7 @@ Create Date: 2026-10-28
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -26,7 +27,7 @@ def upgrade() -> None:
     # Criar o tipo Enum antes de usá-lo
     refacao_erro = sa.Enum("grafica", "cliente", name="refacao_erro")
     refacao_erro.create(op.get_bind(), checkfirst=True)
-    
+
     op.add_column(
         "ordem_servico",
         sa.Column(
@@ -36,7 +37,9 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    op.add_column("ordem_servico", sa.Column("refacao_motivo", sa.Text(), nullable=True))
+    op.add_column(
+        "ordem_servico", sa.Column("refacao_motivo", sa.Text(), nullable=True)
+    )
     op.add_column(
         "ordem_servico",
         sa.Column(

@@ -32,7 +32,7 @@ class ClienteBase(EnderecoBase):
     observacoes: str | None = None
     pagamento_adiantado: bool = False
     sinal: bool = False
-    sinal_pct: Decimal = Field(default=Decimal("50"), ge=0, le=100)
+    sinal_pct: Decimal = Field(default=Decimal(50), ge=0, le=100)
 
     @model_validator(mode="after")
     def _adiantamento_exclusivo(self) -> "ClienteBase":
@@ -98,10 +98,12 @@ class FuncionarioBase(ORMModel):
     e_vendedor: bool = False
     e_atendente: bool = False
     e_producao: bool = False
-    comissao_pct: Decimal | None = Field(default=Decimal("0"), ge=0, le=100)
+    comissao_pct: Decimal | None = Field(default=Decimal(0), ge=0, le=100)
     observacoes: str | None = None
     # M3 (§3.10): login do funcionário (fornecido pelo admin)
-    login: str | None = Field(default=None, min_length=3, max_length=60, pattern=r"^[a-zA-Z0-9_.-]+$")
+    login: str | None = Field(
+        default=None, min_length=3, max_length=60, pattern=r"^[a-zA-Z0-9_.-]+$"
+    )
 
 
 class FuncionarioCreate(FuncionarioBase):
@@ -150,9 +152,9 @@ class ProdutoBase(ORMModel):
     tipo: TipoProduto = TipoProduto.PRODUTO
     unidade: str = Field(default="un", max_length=12)
     controla_estoque: bool = True
-    preco_custo: Decimal = Field(default=Decimal("0"), ge=0)
-    preco_venda: Decimal = Field(default=Decimal("0"), ge=0)
-    estoque_minimo: Decimal = Field(default=Decimal("0"), ge=0)
+    preco_custo: Decimal = Field(default=Decimal(0), ge=0)
+    preco_venda: Decimal = Field(default=Decimal(0), ge=0)
+    estoque_minimo: Decimal = Field(default=Decimal(0), ge=0)
     dimensoes: str | None = Field(default=None, max_length=40)
     foto1_path: str | None = Field(default=None, max_length=500)
     foto2_path: str | None = Field(default=None, max_length=500)

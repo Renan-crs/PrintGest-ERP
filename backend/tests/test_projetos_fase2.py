@@ -42,9 +42,9 @@ def _criar_usuario(client, admin_token, nivel: str) -> tuple[str, int]:
     )
     assert resp.status_code == 200, resp.text
     usuario_id = resp.json()["data"]["id"]
-    token = client.post(
-        "/v1/auth/login", json={"login": login, "senha": senha}
-    ).json()["data"]["token"]
+    token = client.post("/v1/auth/login", json={"login": login, "senha": senha}).json()[
+        "data"
+    ]["token"]
     return token, usuario_id
 
 
@@ -471,9 +471,9 @@ def test_atividade_registra_as_escritas(client, admin_token):
     assert _comentario(client, header, cartao["id"], "combinado").status_code == 201
 
     destino = _lista_nova(client, header)
-    versao = client.get(
-        f"/v1/projetos/cartoes/{cartao['id']}", headers=header
-    ).json()["data"]["versao"]
+    versao = client.get(f"/v1/projetos/cartoes/{cartao['id']}", headers=header).json()[
+        "data"
+    ]["versao"]
     assert (
         client.patch(
             f"/v1/projetos/cartoes/{cartao['id']}/mover",
@@ -530,9 +530,7 @@ def test_subrotas_respeitam_visibilidade_do_cartao(client, admin_token):
         ).status_code
         == 404
     )
-    assert (
-        _comentario(client, header_c, cartao["id"], "não posso").status_code == 404
-    )
+    assert _comentario(client, header_c, cartao["id"], "não posso").status_code == 404
     # O atribuído continua vendo.
     header_a = auth(client, token_a)
     assert (
@@ -547,9 +545,7 @@ def test_rbac_caixa_sem_acesso_a_fase2(client, admin_token):
     token_caixa, _ = _criar_usuario(client, admin_token, "caixa")
     header = auth(client, token_caixa)
     assert client.get("/v1/projetos/etiquetas", headers=header).status_code == 403
-    assert (
-        _comentario(client, header, 1, "sem acesso").status_code == 403
-    )
+    assert _comentario(client, header, 1, "sem acesso").status_code == 403
 
 
 def test_modo_leitura_bloqueia_escritas_da_fase2(client, admin_token, monkeypatch):

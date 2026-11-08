@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Entry point do Local API Service para o executável empacotado (PyInstaller).
 
 Diferente do `run_dev.py` (desenvolvimento, com reload), este arquivo prepara o
@@ -7,7 +7,7 @@ ambiente da instalação antes de servir:
 1. Carrega o `.env` ao lado do **executável** no `os.environ` — o pydantic
    resolve `env_file=".env"` pelo CWD, e o CWD de um atalho do menu Iniciar não
    é garantido. Variáveis de ambiente reais continuam vencendo o arquivo.
-2. Usa Neon Database (PostgreSQL gerenciado em nuvem) quando 
+2. Usa Neon Database (PostgreSQL gerenciado em nuvem) quando
    `PRINTGEST_PG_EMBARCADO=false` - não há PostgreSQL embarcado desde v0.3.5.
 3. Registra log em arquivo (`logs/printgest-api.log` ao lado do exe) quando
    congelado — sem console, o log em arquivo é o único rastro de diagnóstico.
@@ -46,9 +46,7 @@ def _anexar_log_em_arquivo() -> None:
     try:
         pasta = Path(sys.executable).resolve().parent / "logs"
         pasta.mkdir(exist_ok=True)
-        manipulador = logging.FileHandler(
-            pasta / "printgest-api.log", encoding="utf-8"
-        )
+        manipulador = logging.FileHandler(pasta / "printgest-api.log", encoding="utf-8")
         manipulador.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         )
@@ -60,19 +58,33 @@ def _anexar_log_em_arquivo() -> None:
 def _log_configuracao_inicial() -> None:
     """Log da configuração de inicialização para diagnóstico."""
     logger = logging.getLogger("printgest")
-    logger.info("=== PrintGest API Service v%s ===", logging.getLogger("app.core.config").__dict__.get("settings", {}).get("version", "unknown"))
-    logger.info("Modo: %s", "Neon Database" if not getattr(sys, 'frozen', False) or __import__('os').environ.get('PRINTGEST_PG_EMBARCADO', 'false').lower() != 'true' else "PostgreSQL embarcado")
-    logger.info("Banco de dados: %s", "Neon Cloud" if getattr(sys, 'frozen', False) else "Local")
+    logger.info(
+        "=== PrintGest API Service v%s ===",
+        logging.getLogger("app.core.config")
+        .__dict__.get("settings", {})
+        .get("version", "unknown"),
+    )
+    logger.info(
+        "Modo: %s",
+        "Neon Database"
+        if not getattr(sys, "frozen", False)
+        or __import__("os").environ.get("PRINTGEST_PG_EMBARCADO", "false").lower()
+        != "true"
+        else "PostgreSQL embarcado",
+    )
+    logger.info(
+        "Banco de dados: %s", "Neon Cloud" if getattr(sys, "frozen", False) else "Local"
+    )
 
 
 def main() -> None:
     _carregar_env_do_executavel()
-    
+
     # Configurar logging antes de qualquer import
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("printgest")
     logger.info("PrintGest API Service inicializando...")
-    
+
     import uvicorn
 
     from app.core.config import settings
@@ -86,10 +98,12 @@ def main() -> None:
         logger.info("Usando Neon Database (PostgreSQL gerenciado em nuvem)")
 
     # Verificar variáveis críticas
-    logger.info("DATABASE_URL configurada: %s", "SIM" if settings.database_url else "NAO")
+    logger.info(
+        "DATABASE_URL configurada: %s", "SIM" if settings.database_url else "NAO"
+    )
     logger.info("REDGEST_URL: %s", settings.redgest_url)
     logger.info("ENV: %s", settings.env)
-    
+
     # Importa o app primeiro para que o logging da aplicação (root + request_id)
     # já esteja no lugar quando o FileHandler for anexado.
     from app.main import app

@@ -15,8 +15,12 @@ def _criar_usuario(client, admin_token, nivel: NivelAcesso) -> tuple[str, str]:
     resp = client.post(
         "/v1/usuarios",
         headers=auth(client, admin_token),
-        json={"nome": f"User {nivel.value}", "login": login, "senha": senha,
-              "nivel_acesso": nivel.value},
+        json={
+            "nome": f"User {nivel.value}",
+            "login": login,
+            "senha": senha,
+            "nivel_acesso": nivel.value,
+        },
     )
     assert resp.status_code == 200, resp.text
     return login, senha
@@ -32,19 +36,31 @@ def test_operador_pode_cadastros_nao_usuarios(client, admin_token):
     login, senha = _criar_usuario(client, admin_token, NivelAcesso.OPERADOR)
     token = _login_usuario(client, login, senha)
 
-    resp = client.post("/v1/clientes", headers=auth(client, token),
-                       json={"nome_razao": "Operador criou", "tipo_pessoa": "pf"})
+    resp = client.post(
+        "/v1/clientes",
+        headers=auth(client, token),
+        json={"nome_razao": "Operador criou", "tipo_pessoa": "pf"},
+    )
     assert resp.status_code == 200, resp.text
 
-    resp = client.post("/v1/produtos", headers=auth(client, token),
-                       json={"codigo": f"OP{uuid.uuid4().hex[:6].upper()}", "nome": "Prod do Operador"})
+    resp = client.post(
+        "/v1/produtos",
+        headers=auth(client, token),
+        json={
+            "codigo": f"OP{uuid.uuid4().hex[:6].upper()}",
+            "nome": "Prod do Operador",
+        },
+    )
     assert resp.status_code == 200, resp.text
 
     resp = client.get("/v1/usuarios", headers=auth(client, token))
     assert resp.status_code == 403
 
-    resp = client.post("/v1/usuarios", headers=auth(client, token),
-                       json={"nome": "não pode", "login": "x", "senha": "xxxx"})
+    resp = client.post(
+        "/v1/usuarios",
+        headers=auth(client, token),
+        json={"nome": "não pode", "login": "x", "senha": "xxxx"},
+    )
     assert resp.status_code == 403
 
 
@@ -54,8 +70,9 @@ def test_caixa_sem_acesso_cadastros(client, admin_token):
 
     resp = client.get("/v1/clientes", headers=auth(client, token))
     assert resp.status_code == 403
-    resp = client.post("/v1/funcionarios", headers=auth(client, token),
-                       json={"nome": "não pode"})
+    resp = client.post(
+        "/v1/funcionarios", headers=auth(client, token), json={"nome": "não pode"}
+    )
     assert resp.status_code == 403
 
 

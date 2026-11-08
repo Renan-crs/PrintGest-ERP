@@ -72,13 +72,13 @@ class CaixaOut(ORMModel):
     diferenca: Decimal | None = None
     observacoes: str | None = None
     # Calculados na leitura (não persistidos): situação do extrato.
-    total_entradas: Decimal = Decimal("0")
-    total_saidas: Decimal = Decimal("0")
-    saldo_atual: Decimal = Decimal("0")
+    total_entradas: Decimal = Decimal(0)
+    total_saidas: Decimal = Decimal(0)
+    saldo_atual: Decimal = Decimal(0)
 
 
 class AbrirCaixaIn(ORMModel):
-    valor_abertura: Decimal = Field(default=Decimal("0"), ge=0)
+    valor_abertura: Decimal = Field(default=Decimal(0), ge=0)
     observacoes: str | None = None
 
 

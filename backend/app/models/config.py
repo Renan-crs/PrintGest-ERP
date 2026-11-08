@@ -1,16 +1,16 @@
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
-    Integer,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -18,8 +18,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
-
-from decimal import Decimal
 
 class PrecoReajusteHistorico(Base):
     __tablename__ = "preco_reajuste_historico"

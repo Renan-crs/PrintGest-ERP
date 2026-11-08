@@ -13,6 +13,7 @@ Create Date: 2026-10-27
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "b0c1d2e3f4a5"
@@ -26,9 +27,13 @@ def upgrade() -> None:
     op.create_table(
         "arte_versao",
         sa.Column("id", sa.BigInteger(), primary_key=True),
-        sa.Column("filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False),
         sa.Column(
-            "os_id", sa.BigInteger(), sa.ForeignKey("ordem_servico.id", ondelete="CASCADE"),
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+        ),
+        sa.Column(
+            "os_id",
+            sa.BigInteger(),
+            sa.ForeignKey("ordem_servico.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column("versao", sa.Integer(), nullable=False),
@@ -37,7 +42,12 @@ def upgrade() -> None:
         sa.Column("hash_sha256", sa.String(64), nullable=False),
         sa.Column("tamanho_bytes", sa.BigInteger(), nullable=False),
         sa.Column("criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id")),
-        sa.Column("criado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
         sa.UniqueConstraint("os_id", "versao", name="uq_arte_versao_os_versao"),
         sa.CheckConstraint("versao > 0", name="ck_arte_versao_positiva"),
         sa.CheckConstraint("tamanho_bytes > 0", name="ck_arte_versao_tamanho"),
@@ -48,9 +58,13 @@ def upgrade() -> None:
     op.create_table(
         "arte_aprovacao",
         sa.Column("id", sa.BigInteger(), primary_key=True),
-        sa.Column("filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False),
         sa.Column(
-            "versao_id", sa.BigInteger(), sa.ForeignKey("arte_versao.id", ondelete="CASCADE"),
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+        ),
+        sa.Column(
+            "versao_id",
+            sa.BigInteger(),
+            sa.ForeignKey("arte_versao.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
@@ -60,8 +74,15 @@ def upgrade() -> None:
         ),
         sa.Column("comentarios", sa.Text(), nullable=True),
         sa.Column("ip", sa.String(45), nullable=True),
-        sa.Column("criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True),
-        sa.Column("criado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "criado_por", sa.BigInteger(), sa.ForeignKey("usuario.id"), nullable=True
+        ),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
     )
     op.create_index("idx_arte_aprovacao_versao", "arte_aprovacao", ["versao_id"])
 
@@ -69,8 +90,15 @@ def upgrade() -> None:
     op.create_table(
         "link_publico",
         sa.Column("id", sa.BigInteger(), primary_key=True),
-        sa.Column("filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False),
-        sa.Column("os_id", sa.BigInteger(), sa.ForeignKey("ordem_servico.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+        ),
+        sa.Column(
+            "os_id",
+            sa.BigInteger(),
+            sa.ForeignKey("ordem_servico.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("token", sa.String(64), nullable=False, unique=True),
         sa.Column(
             "tipo",
@@ -78,8 +106,15 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("expira_em", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("usado", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("criado_em", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "usado", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+        sa.Column(
+            "criado_em",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
     )
     op.create_index("idx_link_publico_os", "link_publico", ["os_id"])
 
