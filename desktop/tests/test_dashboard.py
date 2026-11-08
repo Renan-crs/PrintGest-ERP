@@ -317,7 +317,12 @@ def test_cabecalho_sem_duplicar_usuario_nem_daemon(app):
     assert not any("Daemon" in t for t in textos)
     assert "Sair" not in textos
     labels = [w.text() for w in principal.findChildren(QLabel)]
-    assert "● Servidor local" in labels
+    # O rótulo do servidor exibe o IP (redes locais sem IP dedicado) e guarda
+    # o endereço completo no tooltip.
+    servidor = principal._lbl_servidor
+    assert servidor.text().startswith("● ")
+    assert servidor.toolTip().startswith("Servidor local: ")
+    assert "● Servidor local" not in labels  # sem regressão ao rótulo antigo
     # menu de usuário único com iniciais + nome + perfil
     assert "AS" in principal._menu_usuario.text()
     assert "Ana Silva" in principal._menu_usuario.text()

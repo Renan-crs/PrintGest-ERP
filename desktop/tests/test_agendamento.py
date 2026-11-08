@@ -72,6 +72,21 @@ def _novo_id() -> int:
     return max((a["id"] for a in _AGENDAMENTOS), default=0) + 1
 
 
+# Mês fixo usado pelas datas dos testes (15/10/2026 etc.). O calendário abre
+# no mês corrente — navegar até o alvo evita quebrar a cada virada de mês
+# (regressão de nov/2026: os testes esperavam "outubro de 2026" fixo).
+_MES_FIXO = QDate(2026, 10, 1)
+
+
+def _ir_para_mes_fixo(pagina) -> None:
+    hoje = QDate.currentDate()
+    delta = (_MES_FIXO.year() - hoje.year()) * 12 + (
+        _MES_FIXO.month() - hoje.month()
+    )
+    if delta:
+        pagina._calendario._mudar_mes(delta)
+
+
 def _handler(request: httpx.Request) -> httpx.Response:
     path, metodo = request.url.path, request.method
 
@@ -222,13 +237,14 @@ def _criar(pagina: "PaginaAgendamento", **campos) -> None:
 # ----------------------------------------------------------------- calendário
 def test_calendario_renderiza_42_celulas(app):
     pagina = _pagina()
+    _ir_para_mes_fixo(pagina)
     assert len(pagina._calendario._celulas) == 42
     assert pagina._calendario._rotulo.text() == "outubro de 2026"
 
 
 def test_calendario_navega_mes(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     pagina._calendario._mudar_mes(1)
     assert pagina._calendario._rotulo.text() == "novembro de 2026"
     pagina._calendario._mudar_mes(-1)
@@ -237,7 +253,7 @@ def test_calendario_navega_mes(app, pumpar):
 
 def test_calendario_preenche_compromissos(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     pagina._calendario.dia_clicado.emit(QDate(2026, 10, 15))
     _criar(pagina, inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
@@ -252,7 +268,7 @@ def test_calendario_preenche_compromissos(app, pumpar):
 
 def test_clicar_dia_atualiza_painel_dia(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     pagina._calendario.dia_clicado.emit(QDate(2026, 10, 15))
     assert "15/10/2026" in pagina._rotulo_dia.text()
 
@@ -261,7 +277,7 @@ def test_clicar_dia_atualiza_painel_dia(app, pumpar):
 @pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_trocar_para_lista(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
 
@@ -274,7 +290,7 @@ def test_trocar_para_lista(app, pumpar):
 @pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_lista_filtra_por_tipo(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="Prod", tipo="producao", inicio=datetime(2026, 10, 15, 9, 0))
     _criar(pagina, titulo="Entr", tipo="entrega", inicio=datetime(2026, 10, 16, 10, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 2)
@@ -290,7 +306,7 @@ def test_lista_filtra_por_tipo(app, pumpar):
 # -------------------------------------------------------------------- ações
 def test_criar_compromisso(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="Entrega pedido 1044", inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
 
@@ -303,7 +319,7 @@ def test_criar_compromisso(app, pumpar):
 @pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_abrir_compromisso_preenche_form(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="Produção X", inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
 
@@ -316,7 +332,7 @@ def test_abrir_compromisso_preenche_form(app, pumpar):
 
 def test_editar_compromisso(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="Antes", inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
     pagina._abrir_compromisso(1)
@@ -331,7 +347,7 @@ def test_editar_compromisso(app, pumpar):
 @pytest.mark.xfail(reason="Requer rodar assíncrono (QThread + signal) que não entrega callback no loop offscreen; pendente refatoração síncrona do rodar")
 def test_concluir_compromisso(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="A concluir", inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
     pagina._abrir_compromisso(1)
@@ -344,7 +360,7 @@ def test_concluir_compromisso(app, pumpar):
 
 def test_excluir_compromisso(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="A excluir", inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
     pagina._abrir_compromisso(1)
@@ -357,7 +373,7 @@ def test_excluir_compromisso(app, pumpar):
 
 def test_valida_titulo_obrigatorio(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     pagina._novo()
     pagina._titulo.definir("   ")
     pagina._inicio.definir(datetime(2026, 10, 15, 9, 0))
@@ -368,7 +384,7 @@ def test_valida_titulo_obrigatorio(app, pumpar):
 
 def test_valida_fim_apos_inicio(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     pagina._novo()
     pagina._titulo.definir("X")
     pagina._inicio.definir(datetime(2026, 10, 15, 10, 0))
@@ -380,7 +396,7 @@ def test_valida_fim_apos_inicio(app, pumpar):
 
 def test_modo_leitura_bloqueia_escrita(app, pumpar):
     pagina = _pagina(modo_leitura=True)
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     assert not pagina._btn_novo.isEnabled()
     assert not pagina._btn_salvar.isEnabled()
     assert not pagina._titulo.widget.isEnabled()
@@ -388,7 +404,7 @@ def test_modo_leitura_bloqueia_escrita(app, pumpar):
 
 def test_novo_limpa_form(app, pumpar):
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     _criar(pagina, titulo="Qualquer", inicio=datetime(2026, 10, 15, 9, 0))
     pumpar(lambda: len(_AGENDAMENTOS) == 1)
     pagina._abrir_compromisso(1)
@@ -426,7 +442,7 @@ def test_agendamento_sem_rolagem_horizontal(app, pumpar, largura, altura, escala
     logica_a = int(altura * 100 / escala)
 
     pagina = _pagina()
-    pumpar(lambda: pagina._calendario._rotulo.text() == "outubro de 2026")
+    _ir_para_mes_fixo(pagina)
     pagina.resize(conteudo, logica_a)
     pagina.show()
     app.processEvents()
