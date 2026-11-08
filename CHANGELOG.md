@@ -9,6 +9,24 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.4.6] - 2026-11-08 — Reinserção de licença no modo leitura
+
+### Adicionado
+- **Inserir nova licença pelo modo leitura:** quando a licença está revogada
+  ou expirada, a tela de modo leitura passa a oferecer o botão
+  "Inserir nova licença" (F2), que abre a tela de ativação com a sessão
+  vigente. Antes o operador ficava preso no modo leitura — a única saída era
+  o script de suporte `limpar_licenca.py`.
+  Em licenças revogadas, o botão novo recebe o destaque primário ("Tentar
+  Renovar" fica secundário) e o diagnóstico explica que renovar não recupera
+  licença revogada — é preciso emitir uma licença nova no RedGest.
+
+### Interno
+- `ModoLeituraWindow` ganha o sinal `reativar`; o roteador conecta à
+  `AtivacaoWindow` (Contratos B e C) e, concluída a ativação, segue ao
+  dashboard normal.
+- 4 testes novos (`test_modoleitura.py`, `test_main.py`).
+
 ## [0.4.5] - 2026-11-04 — Senha de fábrica do admin e suporte Neon
 
 ### Alterado

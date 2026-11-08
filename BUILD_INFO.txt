@@ -1,17 +1,16 @@
 ================================================================================
-PrintGest ERP v0.4.5 - BUILD DE PRODUÇÃO
+PrintGest ERP v0.4.6 - BUILD DE PRODUÇÃO
 ================================================================================
 
-Data: 04/11/2026
+Data: 08/11/2026
 Status: ok. Backend funcionando com Neon Database
 Mudanças:
-  - Primeiro acesso do admin DESLIGADO (código e instalador): admin nasce
-    com a senha de fábrica (admin123) e deve trocá-la no primeiro login
-  - Script de suporte: scripts/reset_senha_admin.py (reset de senha, dry-run)
-  - Script de suporte: scripts/configurar_auth_neon.py (migrations + bootstrap
-    + validação de auth no Neon)
+  - Modo leitura: botão "Inserir nova licença" (F2) — licença revogada ou
+    expirada é substituída pela nova direto na UI, sem script de suporte
+  - Em licenças revogadas, a inserção da nova recebe destaque primário e o
+    diagnóstico explica que renovar não recupera licença revogada
 
-Instalador: PrintGest-Setup-0.4.5.exe
+Instalador: PrintGest-Setup-0.4.6.exe
 
 Para compilar, execute:
   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
