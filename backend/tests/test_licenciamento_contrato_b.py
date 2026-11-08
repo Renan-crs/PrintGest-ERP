@@ -184,8 +184,11 @@ def test_ativacao_guarda_credenciais_no_cofre(client, monkeypatch):
     assert corpo["hardware_profile"]  # §11.4: perfil sempre enviado
 
     lic = _licenca()
-    assert lic.client_secret != CLIENT_SECRET  # doc §9.4: nunca em texto puro
-    assert CLIENT_SECRET not in (lic.client_secret or "")
+    if cofre.disponivel():
+        # doc §9.4: nunca em texto puro (no Linux sem DPAPI o cofre cai em
+        # texto puro por design — ver cofre.disponivel).
+        assert lic.client_secret != CLIENT_SECRET
+        assert CLIENT_SECRET not in (lic.client_secret or "")
     assert cofre.revelar(lic.client_secret) == f"{CLIENT_ID}|{CLIENT_SECRET}"
     assert lic.client_id is None  # metade do par não fica em coluna aberta
     assert cofre.revelar(lic.chave_ativacao) == CODIGO

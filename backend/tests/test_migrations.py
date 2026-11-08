@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -9,7 +10,12 @@ from app.core import migrations
 from app.core.config import settings
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-TESTE_URL = "postgresql+psycopg://printgest:printgest@127.0.0.1:5432/printgest_test"
+# Mesmo critério do conftest: no CI a URL vem de DATABASE_URL (serviço
+# efêmero do workflow); local usa o Postgres portable da .dev.
+_URL = os.environ.get("DATABASE_URL", "").strip()
+if not _URL.startswith("postgresql"):
+    _URL = "postgresql://printgest:printgest@127.0.0.1:5432/printgest_test"
+TESTE_URL = _URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
 def test_migrations_congeladas_pela_api_python(monkeypatch):
