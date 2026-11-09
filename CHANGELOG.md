@@ -9,7 +9,23 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
-## [0.4.6] - 2026-11-08 — Reinserção de licença no modo leitura
+## [0.4.7] - 2026-11-08 — Credencial Neon rotacionada
+
+### Corrigido
+- **Credencial do Neon Database rotacionada** (resposta à exposição no histórico
+  público — purga do histórico já aplicada). Os arquivos de ambiente
+  (`backend/.env`, `backend/.env.neon`, `installer/env.instalacao*`) apontam
+  para a nova credencial, com a URL corrigida para o formato SQLAlchemy
+  (`postgresql+psycopg://user:senha@host/neondb?sslmode=require`).
+- Instalações novas com este pacote conectam ao Neon com a credencial atual.
+
+### Segurança
+- Purga do histórico do git: `backend/.env.neon` e `installer/env.instalacao.neon`
+  removidos de todos os commits (git-filter-repo + force push), verificado por
+  busca de conteúdo dos segredos em todo o histórico público.
+- `api_host` default do Local API Service agora é `127.0.0.1` (antes `0.0.0.0`).
+
+--- - 2026-11-08 — Reinserção de licença no modo leitura
 
 ### Adicionado
 - **Inserir nova licença pelo modo leitura:** quando a licença está revogada

@@ -1,16 +1,15 @@
 ================================================================================
-PrintGest ERP v0.4.6 - BUILD DE PRODUÇÃO
+PrintGest ERP v0.4.7 - BUILD DE PRODUÇÃO
 ================================================================================
 
 Data: 08/11/2026
-Status: ok. Backend funcionando com Neon Database
+Status: ok. Backend funcionando com Neon Database (credencial rotacionada)
 Mudanças:
-  - Modo leitura: botão "Inserir nova licença" (F2) — licença revogada ou
-    expirada é substituída pela nova direto na UI, sem script de suporte
-  - Em licenças revogadas, a inserção da nova recebe destaque primário e o
-    diagnóstico explica que renovar não recupera licença revogada
+  - Credencial Neon rotacionada e URL corrigida nos arquivos de ambiente
+  - Purga do histórico do git (segredos removidos de todos os commits)
+  - api_host default 127.0.0.1 (seguro por padrão)
 
-Instalador: PrintGest-Setup-0.4.6.exe
+Instalador: PrintGest-Setup-0.4.7.exe
 
 Para compilar, execute:
   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
