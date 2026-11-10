@@ -300,6 +300,7 @@ class PaginaCrud(QWidget):
         filtros = {}
         if self.CHAVE_FILTRO and self._filtro and not self.FILTRO_LOCAL:
             filtros[self.CHAVE_FILTRO] = self._filtro
+        self._tabela.carregando(True)
         tarefas.rodar(
             lambda: self._listar(q, offset, filtros),
             on_ok=_receber,

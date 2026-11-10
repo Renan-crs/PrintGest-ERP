@@ -5,8 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QPoint, QEvent, QRect, QRectF, QSize, Qt, QVariantAnimation
+from PySide6.QtGui import (
+    QColor,
+    QIcon,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -317,3 +325,154 @@ class FlowLayout(QLayout):
             x += hint.width() + self._espaco_h
             altura_linha = max(altura_linha, hint.height())
         return y + altura_linha + margens.bottom() - rect.y()
+
+
+# =============================================================================
+# Skeleton de carregamento
+# =============================================================================
+# Barras cinza-claras com brilho deslizante, pintadas sobre o contêiner (card
+# ou viewport da tabela) enquanto os dados chegam do banco/daemon. O fundo é
+# transparente: o skeleton não esconde a estrutura, ele a ANTICIPA. Com a
+# preferência "reduzir animações" do Windows, as barras ficam estáticas.
+
+_COR_BARRA = "#E9E9EE"
+_COR_BRILHO = QColor(255, 255, 255, 160)
+
+
+def animacoes_habilitadas() -> bool:
+    """Mesma preferência do Windows respeitada pela tela de ativação (D7)."""
+    try:
+        import ctypes
+        import ctypes.wintypes as wintypes
+
+        ligado = wintypes.BOOL()
+        ok = ctypes.windll.user32.SystemParametersInfoW(
+            0x1042, 0, ctypes.byref(ligado), 0  # SPI_GETCLIENTAREAANIMATION
+        )
+        return bool(ok and ligado.value)
+    except Exception:  # noqa: BLE001 — fora do Windows ou indisponível: liga
+        return True
+
+
+class SkeletonBase(QWidget):
+    """Blocos de carregamento com brilho animado, sobre um widget-pai.
+
+    A geometria acompanha o pai (event filter de resize) e `mostrar()`/
+    `ocultar()` controlam a exibição. Subclasses definem as barras em
+    `_especificar()` como retângulos absolutos `(x, y, w, h)`.
+    """
+
+    def __init__(self, pai: QWidget) -> None:
+        super().__init__(pai)
+        self._pai = pai
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        pai.installEventFilter(self)
+        self._fase = 0.0
+        self._animacao = QVariantAnimation(self)
+        self._animacao.setStartValue(0.0)
+        self._animacao.setEndValue(1.0)
+        self._animacao.setDuration(1400)
+        self._animacao.setLoopCount(-1)
+        self._animacao.valueChanged.connect(self._fase_mudou)
+        if animacoes_habilitadas():
+            self._animacao.start()
+
+    # ------------------------------------------------------------- controle
+
+    def eventFilter(self, obj, evento):  # noqa: N802 (API Qt)
+        if obj is self._pai and evento.type() == QEvent.Type.Resize:
+            self.setGeometry(self._pai.rect())
+        return False
+
+    def mostrar(self) -> None:
+        self.setGeometry(self._pai.rect())
+        self.show()
+        self.raise_()
+
+    def ocultar(self) -> None:
+        self.hide()
+
+    # -------------------------------------------------------------- pintura
+
+    def _especificar(self) -> list[tuple[float, float, float, float]]:
+        """Retângulos das barras em pixels absolutos (x, y, w, h)."""
+        raise NotImplementedError
+
+    def _fase_mudou(self, valor) -> None:
+        self._fase = float(valor)
+        self.update()
+
+    def paintEvent(self, evento) -> None:  # noqa: N802 (API Qt)
+        pintor = QPainter(self)
+        pintor.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        pintor.setPen(Qt.PenStyle.NoPen)
+        barras = self._especificar()
+        pintor.setBrush(QColor(_COR_BARRA))
+        caminho = QPainterPath()
+        for x, y, largura, altura in barras:
+            rect = QRectF(x, y, max(largura, 4), altura)
+            caminho.addRoundedRect(rect, 3, 3)
+            pintor.drawRoundedRect(rect, 3, 3)
+        # Brilho: faixa vertical que varre o widget, clipada às barras — o
+        # movimento fica no material, sem lavar o contêiner atrás.
+        if self._animacao.state() == QVariantAnimation.State.Running:
+            base = max(self.width() - 1, 1)
+            largura_brilho = max(base * 0.35, 60)
+            posicao = self._fase * (base + largura_brilho) - largura_brilho
+            gradiente = QLinearGradient(posicao, 0, posicao + largura_brilho, 0)
+            gradiente.setColorAt(0.0, QColor(255, 255, 255, 0))
+            gradiente.setColorAt(0.5, _COR_BRILHO)
+            gradiente.setColorAt(1.0, QColor(255, 255, 255, 0))
+            pintor.save()
+            pintor.setClipPath(caminho)
+            pintor.fillRect(self.rect(), gradiente)
+            pintor.restore()
+
+
+class SkeletonTabela(SkeletonBase):
+    """Linhas de skeleton sobre uma tabela/lista (padrão das listagens)."""
+
+    _ALTURA_LINHA = 30
+    _ALTURA_BARRA = 14
+
+    def __init__(self, pai: QWidget, linhas: int | None = None) -> None:
+        self._linhas_fixas = linhas
+        super().__init__(pai)
+
+    def _especificar(self) -> list[tuple[float, float, float, float]]:
+        total = self.height()
+        if self._linhas_fixas is not None:
+            quantidade = self._linhas_fixas
+        else:
+            quantidade = max(1, total // (self._ALTURA_LINHA + 2))
+        barras: list[tuple[float, float, float, float]] = []
+        for indice in range(quantidade):
+            y = 4 + indice * (self._ALTURA_LINHA + 2)
+            if y + self._ALTURA_BARRA > total:
+                break
+            largura = self.width()
+            # Imita o desenho da listagem: nº pequeno, descrição longa,
+            # duas colunas medianas — mesma leitura da tabela real.
+            barras.extend(
+                [
+                    (largura * 0.03, y, largura * 0.06, self._ALTURA_BARRA),
+                    (largura * 0.12, y, largura * 0.40, self._ALTURA_BARRA),
+                    (largura * 0.55, y, largura * 0.14, self._ALTURA_BARRA),
+                    (largura * 0.72, y, largura * 0.12, self._ALTURA_BARRA),
+                ]
+            )
+        return barras
+
+
+class SkeletonCartao(SkeletonBase):
+    """Skeleton de card de dado (título, valor e subtexto) do dashboard."""
+
+    def _especificar(self) -> list[tuple[float, float, float, float]]:
+        margem_x, margem_y = 14, 12
+        largura = max(self.width() - margem_x * 2, 40)
+        topo = margem_y
+        return [
+            (margem_x, topo, largura * 0.40, 10),            # título
+            (margem_x, topo + 18, largura * 0.70, 20),       # valor
+            (margem_x, topo + 46, largura * 0.52, 10),       # subtexto
+        ]

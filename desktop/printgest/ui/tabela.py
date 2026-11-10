@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from printgest.ui.widgets import SkeletonTabela
+
 LARGURA_MINIMA = 56
 
 
@@ -61,7 +63,28 @@ class TabelaDensa(QTableWidget):
         self._vazio.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._vazio.hide()
 
+        # Skeleton de carregamento: barras animadas no lugar dos dados enquanto
+        # a listagem chega do daemon/banco (o vazio só aparece DEPOIS, quando
+        # a resposta confirmar que não há registros).
+        self._skeleton = SkeletonTabela(self.viewport())
+        self._skeleton.hide()
+
     # -------------------------------------------------------------- conteúdo
+
+    def carregando(self, ligado: bool) -> None:
+        """Skeleton de carregamento da listagem.
+
+        `True` limpa as linhas (o conteúdo antigo não compete com as barras) e
+        mostra o skeleton; `preencher()`/`limpar()` desligam automaticamente —
+        quem carrega só precisa chamar `carregando(True)` antes da requisição.
+        """
+        if ligado:
+            self.setRowCount(0)
+            self._skeleton.setGeometry(self.viewport().rect())
+            self._skeleton.mostrar()
+            self._vazio.hide()
+        else:
+            self._skeleton.ocultar()
 
     def estado_vazio(self, texto: str) -> None:
         """Texto exibido centralizado quando a tabela não tem linhas."""
@@ -70,6 +93,7 @@ class TabelaDensa(QTableWidget):
 
     def preencher(self, linhas: list[dict]) -> None:
         """`linhas` são os objetos da API; as colunas pedem essas chaves via `chave_coluna`."""
+        self.carregando(False)
         self.setRowCount(0)
         self.setRowCount(len(linhas))
         for r, dado in enumerate(linhas):
@@ -131,11 +155,16 @@ class TabelaDensa(QTableWidget):
     def resizeEvent(self, evento) -> None:  # noqa: N802 (API Qt)
         super().resizeEvent(evento)
         self._vazio.setGeometry(self.viewport().rect())
+        self._skeleton.setGeometry(self.viewport().rect())
         self._ajustar_larguras()
 
     def _atualizar_vazio(self) -> None:
         self._vazio.setGeometry(self.viewport().rect())
-        self._vazio.setVisible(self.rowCount() == 0 and bool(self._vazio.text()))
+        self._vazio.setVisible(
+            self.rowCount() == 0
+            and bool(self._vazio.text())
+            and self._skeleton.isHidden()
+        )
 
     # -------------------------------------------------------------- seleção
 
@@ -160,4 +189,5 @@ class TabelaDensa(QTableWidget):
 
     def limpar(self) -> None:
         self.setRowCount(0)
+        self.carregando(False)
         self._atualizar_vazio()

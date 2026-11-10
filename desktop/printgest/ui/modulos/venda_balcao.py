@@ -1034,6 +1034,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 return
             self._recebidos(saida, offset)
 
+        self._tabela.carregando(True)
         tarefas.rodar(
             lambda: self._listar(q, offset, {}),
             on_ok=_receber,

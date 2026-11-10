@@ -59,6 +59,7 @@ from printgest.ui.modulos import criar_pagina
 from printgest.ui.widgets import (
     ElideLabel,
     FlowLayout,
+    SkeletonCartao,
     aplicar_estilo,
     aplicar_estado,
     estado_sucesso,
@@ -183,6 +184,11 @@ class PaginaInicial(QWidget):
         self._nivel = nivel
         self._modo_leitura = modo_leitura
         self._dias = 7
+        # Skeleton do primeiro carregamento do resumo: barras nos cards de
+        # dados até a resposta chegar; recargas seguintes mantêm os valores
+        # antigos (sem piscar) — doc quick-reference `loading-states`.
+        self._skeletons: list[SkeletonCartao] = []
+        self._resumo_recebido = False
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
@@ -310,6 +316,7 @@ class PaginaInicial(QWidget):
             vazio.addStretch(1)
             el.addWidget(self._vazio_entregas)
             self._vazio_entregas.setVisible(False)
+            self._skeletons.append(SkeletonCartao(entregas))
             layout.addWidget(entregas)
 
         # ------------------------------------- faturamento (gerente+)
@@ -356,6 +363,7 @@ class PaginaInicial(QWidget):
                 container.setAccessibleName(f"Faturamento {rotulo.lower()} por dia")
                 gl.addWidget(container)
             gl.addStretch(1)
+            self._skeletons.append(SkeletonCartao(grafico))
             layout.addWidget(grafico)
 
         # ------------------------------------------- estoque crítico (operador+)
@@ -375,6 +383,7 @@ class PaginaInicial(QWidget):
             self._btn_estoque.clicked.connect(lambda: self.navegar.emit("produto"))
             self._btn_estoque.setVisible(False)
             el.addWidget(self._btn_estoque)
+            self._skeletons.append(SkeletonCartao(estoque))
             layout.addWidget(estoque)
 
         layout.addStretch(1)
@@ -415,6 +424,11 @@ class PaginaInicial(QWidget):
         self._carregar_resumo()
 
     def _carregar_resumo(self) -> None:
+        if not self._resumo_recebido:
+            # Primeiro carregamento: skeleton nos cards de dados (recargas
+            # seguintes mantêm os valores antigos na tela, sem piscar).
+            for skeleton in self._skeletons:
+                skeleton.mostrar()
         rodar(
             lambda: self._api.resumo_dashboard(self._dias),
             on_ok=self._aplicar_resumo,
@@ -423,6 +437,9 @@ class PaginaInicial(QWidget):
         rodar(self._api.testar_comunicacao, on_ok=self._status_conexao, on_erro=self._sem_status)
 
     def _aplicar_resumo(self, dados) -> None:
+        self._resumo_recebido = True
+        for skeleton in self._skeletons:
+            skeleton.ocultar()
         if not isinstance(dados, dict):
             self._sem_resumo(str(dados))
             return
@@ -581,6 +598,9 @@ class PaginaInicial(QWidget):
         self.conexao_verificada.emit(False)
 
     def _sem_resumo(self, msg) -> None:
+        self._resumo_recebido = True
+        for skeleton in self._skeletons:
+            skeleton.ocultar()
         self._kpi_vendas_valor.setText("—")
         self._kpi_vendas_sub.setText("")
         if _eh_gerente_ou_mais(self._nivel):
@@ -639,8 +659,7 @@ class PaginaInicial(QWidget):
         rotulo.setObjectName("secaoForm")
         return rotulo
 
-    @staticmethod
-    def _cartao_kpi(titulo: str, valor: QLabel, sub: QLabel) -> QWidget:
+    def _cartao_kpi(self, titulo: str, valor: QLabel, sub: QLabel) -> QWidget:
         caixa = QWidget()
         caixa.setObjectName("cardLow")
         caixa.setMinimumWidth(230)
@@ -661,6 +680,9 @@ class PaginaInicial(QWidget):
         layout.addWidget(nome)
         layout.addWidget(valor)
         layout.addWidget(sub)
+        # Skeleton do primeiro carregamento: barras no lugar de valor/sub até o
+        # resumo chegar (`mostrar()`/`ocultar()` em `_carregar_resumo`).
+        self._skeletons.append(SkeletonCartao(caixa))
         return caixa
 
 
