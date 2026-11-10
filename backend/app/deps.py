@@ -60,9 +60,14 @@ def _autenticar(token: str, db: Session) -> Usuario:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário inativo ou inexistente.",
         )
-    # Expiração deslizante por inatividade: cada requisição renova o TTL.
-    sessao.expira_em = agora + timedelta(minutes=settings.session_ttl_minutes)
-    db.commit()
+    # Expiração deslizante ECONÔMICA por inatividade: o TTL renova a cada
+    # requisição, mas a gravação só acontece quando falta menos da metade do
+    # prazo. Antes, cada requisição fazia UPDATE+COMMIT — uma viagem extra ao
+    # Neon (WAN) por chamada, perceptível na lentidão geral do sistema.
+    restante = sessao.expira_em - agora
+    if restante < timedelta(minutes=settings.session_ttl_minutes / 2):
+        sessao.expira_em = agora + timedelta(minutes=settings.session_ttl_minutes)
+        db.commit()
     return usuario
 
 

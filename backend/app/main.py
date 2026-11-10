@@ -89,6 +89,12 @@ async def lifespan(_: FastAPI):
     aplicar_migrations()
     # Fase 1: garantia de empresa/filial/admin de fábrica no primeiro start.
     rodar_bootstrap()
+    # Mantém o banco (Neon) acordado: sem o ping, o scale-to-zero do compute
+    # derrubava as conexões do pool após ~5 min parado e a primeira ação do
+    # usuário esperava o cold start (lentidão ao salvar / sessão "perdida").
+    from app.db import iniciar_keepalive
+
+    iniciar_keepalive()
     # Fase 4: mantém a licença renovada; sem ativação, apenas recalcula o modo.
     tarefa_renovacao = asyncio.create_task(licensa_service.loop_renovacao())
     yield

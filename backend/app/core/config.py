@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
-    version: str = "0.4.7"
+    version: str = "0.4.8"
     env: str = "dev"
     # Seguro por padrão: bind apenas em localhost. O instalador fixa
     # 127.0.0.1; uma instalação que servira ESTAÇÕES em rede local sobrescreve
@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     )
     cors_origins: list[str] = []
     auto_migrate: bool = True
+    # Keep-alive do banco (Neon): ping `SELECT 1` a cada N segundos enquanto o
+    # daemon está no ar. O Neon suspende o compute após ~5 min sem atividade
+    # (scale-to-zero) e o *cold start* seguinte — somado às conexões do pool
+    # mortas — se manifestava como "sistema lento ao salvar" e sessão que o
+    # usuário precisava refazer. 120 s mantém o compute acordado; 0 desliga
+    # (ex.: banco sempre quente por outro motivo ou plano sem horas ociosas).
+    db_keepalive_segundos: int = 120
     session_ttl_minutes: int = 60
     login_max_falhas: int = 5
     bloqueio_minutos: int = 30

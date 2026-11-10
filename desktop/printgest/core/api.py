@@ -8,11 +8,15 @@ API — a UI só precisa apresentar a mensagem.
 from __future__ import annotations
 
 import os
+import time
 
 import httpx
 
 BASE_URL = "http://127.0.0.1:8000"
-TIMEOUT = 8.0
+# Folga para o daemon mediar com o banco na nuvem (Neon): quando o compute
+# acorda de scale-to-zero, a primeira requisição pode levar alguns segundos.
+# O keep-alive do daemon evita o caso, mas o timeout não pode ser o gargalo.
+TIMEOUT = 12.0
 
 _LIGADO = {"1", "true", "yes", "on", "sim"}
 
@@ -151,8 +155,8 @@ class Api:
         for chave, valor in params.items():
             if valor is not None and valor != "":
                 query[chave] = valor
-        resp = self._cliente.get(
-            f"/v1/{entidade}", params=query, headers=self._headers(self._token)
+        resp = self._enviar(
+            "get", f"/v1/{entidade}", params=query, headers=self._headers(self._token)
         )
         return self._paginar(self._resposta_completa(resp))
 
@@ -187,7 +191,8 @@ class Api:
 
     def atualizar_status(self, item_id: int, status: str) -> dict:
         """Avanço de status da O.S.: `PATCH /v1/os/{id}/status`."""
-        resp = self._cliente.patch(
+        resp = self._enviar(
+            "patch",
             f"/v1/os/{item_id}/status",
             json={"status": status},
             headers=self._headers(self._token),
@@ -351,7 +356,8 @@ class Api:
         params = {"q": q, "abaixo_minimo": abaixo_minimo}
         if categoria_id is not None:
             params["categoria_id"] = categoria_id
-        resp = self._cliente.get(
+        resp = self._enviar(
+            "get",
             "/v1/estoque/resumo",
             params=params,
             headers=self._headers(self._token),
@@ -369,7 +375,8 @@ class Api:
         params = {"limit": limit, "offset": offset}
         if tipo:
             params["tipo"] = tipo
-        resp = self._cliente.get(
+        resp = self._enviar(
+            "get",
             f"/v1/estoque/{produto_id}/kardex",
             params=params,
             headers=self._headers(self._token),
@@ -573,7 +580,8 @@ class Api:
         - data: str
         """
         tipo = "estacao" if modo_estacao() else "servidor"
-        resp = self._cliente.get(
+        resp = self._enviar(
+            "get",
             f"/v1/atualizacao/verificar?versao={versao_atual}&tipo={tipo}",
             timeout=5.0,
         )
@@ -612,7 +620,8 @@ class Api:
         self, os_id: int, item_id: int, cotacao_id: int
     ) -> dict:
         """`PUT .../cotacoes/{cotacao_id}/selecionar` — marca a escolhida."""
-        resp = self._cliente.put(
+        resp = self._enviar(
+            "put",
             f"/v1/os/{os_id}/itens/{item_id}/cotacoes/{cotacao_id}/selecionar",
             headers=self._headers(self._token),
         )
@@ -627,8 +636,8 @@ class Api:
         O estado (`sem_arte` / `aguardando_aprovacao` / `ajuste_solicitado` /
         `aprovada`) olha a decisão sobre a última versão enviada (§3.5).
         """
-        resp = self._cliente.get(
-            f"/v1/os/{os_id}/arte", headers=self._headers(self._token)
+        resp = self._enviar(
+            "get", f"/v1/os/{os_id}/arte", headers=self._headers(self._token)
         )
         return self._resposta_completa(resp)
 
@@ -670,10 +679,30 @@ class Api:
         """
         return self._post(f"/v1/os/{os_id}/arte/link", {}, self._token)
 
+    # ------------------------------------------------------------- transporte
+
+    def _enviar(self, verbo: str, caminho: str, **kwargs) -> httpx.Response:
+        """Requisição com **um** retry automático em falha de transporte.
+
+        Vale só para verbos idempotentes (GET/PUT/PATCH/DELETE): um timeout em
+        POST pode ter chegado ao daemon e gravado — repetir criaria duplicado,
+        então POST falha direto para o usuário decidir. O retry cobre o vaivém
+        daemon→banco na nuvem (conexão reciclada ou banco acordando).
+        """
+        tentativa = 0
+        while True:
+            try:
+                return getattr(self._cliente, verbo)(caminho, **kwargs)
+            except httpx.TransportError:
+                tentativa += 1
+                if tentativa > 1 or verbo not in {"get", "put", "patch", "delete"}:
+                    raise
+                time.sleep(0.8)
+
     def _get(
         self, path: str, token: str | None = None, params: dict | None = None
     ) -> dict:
-        resp = self._cliente.get(path, headers=self._headers(token), params=params)
+        resp = self._enviar("get", path, headers=self._headers(token), params=params)
         return self._tratar(resp)
 
     def _post(
@@ -686,23 +715,23 @@ class Api:
         return self._tratar(resp)
 
     def _put(self, path: str, payload: dict, token: str | None = None) -> dict:
-        resp = self._cliente.put(path, json=payload, headers=self._headers(token))
+        resp = self._enviar("put", path, json=payload, headers=self._headers(token))
         return self._tratar(resp)
 
     def _patch(self, path: str, payload: dict | None = None, token: str | None = None) -> dict:
-        resp = self._cliente.patch(
-            path, json=payload or {}, headers=self._headers(token)
+        resp = self._enviar(
+            "patch", path, json=payload or {}, headers=self._headers(token)
         )
         return self._tratar(resp)
 
     def _delete(self, path: str, token: str | None = None) -> None:
-        resp = self._cliente.delete(path, headers=self._headers(token))
+        resp = self._enviar("delete", path, headers=self._headers(token))
         if resp.status_code >= 400:
             raise ApiError(_detalhe(resp), resp.status_code)
 
     def _delete_data(self, path: str, token: str | None = None) -> dict:
         """DELETE que devolve o corpo `data` (ex.: remover membro de um cartão)."""
-        resp = self._cliente.delete(path, headers=self._headers(token))
+        resp = self._enviar("delete", path, headers=self._headers(token))
         return self._tratar(resp)
 
     @staticmethod
