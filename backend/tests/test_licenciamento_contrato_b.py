@@ -677,3 +677,96 @@ def test_perfil_de_hardware_tem_fallback_estavel(monkeypatch):
 
     assert perfil  # não vazio: o RedGest exige o perfil no hardware_bound
     assert "hostname" not in perfil  # doc §7: nunca hostname/MAC
+
+
+# ----------------------------------- substituição de licença (bug: continuidade)
+
+
+def test_ativar_licenca_nova_substitui_revogada_sem_reusar_instancia_antiga(
+    client, monkeypatch
+):
+    """Licença revogada + nova emitida (mesmo código, outra instância): `ativar`
+    deve fazer o handshake da licença nova, nunca `/validar` na instância
+    revogada antiga. Antes do fix, steps 1/2 reutilizavam as credenciais/ID da
+    instância antiga e o sistema tratava a licença nova como continuidade da
+    antiga (revogada)."""
+    _mock(monkeypatch, _resposta_ativacao())
+    assert _ativar(client).status_code == 200
+
+    # Simula estado local pós-revogação da instância antiga (ID distinto do novo).
+    lic = _licenca()
+    ent = dict(lic.entitlements or {})
+    ent["licenca_id"] = "ANTIGA"
+    _ajustar_licenca(
+        status=licensa_service.STATUS_REVOGADA,
+        entitlements=ent,
+        ultimo_erro="[RedGest] licença revogada",
+    )
+    licensa_service.ESTADO["modo_leitura"] = True
+
+    def roteado(request):
+        if "/ativar/" in request.url.path:
+            # Handshake da licença nova: instância diferente, mesmas credenciais
+            # de exemplo (o importante é o novo `id`/identidade).
+            return _resposta_ativacao(
+                id="NOVA", licenca_id="NOVA", client_secret="segredo-novo"
+            )
+        if "/validar/" in request.url.path:
+            # Não deve acontecer: provaria reuso da instância antiga.
+            return _resposta_validacao(
+                valida=False, motivo="licenca_revogada", licenca_id="ANTIGA"
+            )
+        return httpx.Response(404, json={"detail": "inesperado"})
+
+    registro = _mock(monkeypatch, roteado)
+    resp = _ativar(client)
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["estado"] == "ativa"
+    assert data["modo_leitura"] is False
+    # Foi ao handshake da licença nova, não ao /validar da instância antiga.
+    assert any("/ativar/" in r.url.path for r in registro)
+    assert not any("/validar/" in r.url.path for r in registro)
+    lic_nova = _licenca()
+    assert lic_nova.status == licensa_service.STATUS_ATIVA
+    assert (lic_nova.entitlements or {}).get("licenca_id") == "NOVA"
+    assert cofre.revelar(lic_nova.chave_ativacao) == CODIGO
+
+
+def test_ativar_licenca_nova_com_codigo_diferente_substitui_revogada(
+    client, monkeypatch
+):
+    """CNPJ igual, código DIFERENTE (licença nova emitida): mesmo com a local
+    revogada, o handshake da nova deve ocorrer e a identidade antiga não pode
+    permanecer."""
+    _mock(monkeypatch, _resposta_ativacao())
+    assert _ativar(client).status_code == 200
+
+    lic = _licenca()
+    ent = dict(lic.entitlements or {})
+    ent["licenca_id"] = "ANTIGA"
+    _ajustar_licenca(status=licensa_service.STATUS_REVOGADA, entitlements=ent)
+    licensa_service.ESTADO["modo_leitura"] = True
+
+    NOVO_CODIGO = "NOVA-LICENCA-2026"
+
+    def roteado(request):
+        if (
+            f"/ativar/{NOVO_CODIGO}" in request.url.path
+            or "/ativar/" in request.url.path
+        ):
+            return _resposta_ativacao(id=NOVO_CODIGO, licenca_id=NOVO_CODIGO)
+        if "/validar/" in request.url.path:
+            return _resposta_validacao(valida=False, motivo="licenca_revogada")
+        return httpx.Response(404, json={"detail": "inesperado"})
+
+    registro = _mock(monkeypatch, roteado)
+    resp = _ativar(client, codigo=NOVO_CODIGO)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["estado"] == "ativa"
+    assert any("/ativar/" in r.url.path for r in registro)
+    assert not any("/validar/" in r.url.path for r in registro)
+    assert (_licenca().entitlements or {}).get("licenca_id") == NOVO_CODIGO
+    assert cofre.revelar(_licenca().chave_ativacao) == NOVO_CODIGO

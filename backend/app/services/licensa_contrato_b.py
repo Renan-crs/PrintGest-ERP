@@ -228,8 +228,12 @@ def _persistir(db: Session, dados: dict, *, codigo: str, cnpj: str) -> Licenca:
     entitlements["contrato"] = "b"
     entitlements["cnpj"] = cnpj
     licenca_id = str(dados.get("licenca_id") or dados.get("id") or "").strip()
-    if licenca_id:
-        entitlements["licenca_id"] = licenca_id
+    # Nunca mantém o `licenca_id` de uma licença anterior: após a troca para uma
+    # licença nova (mesmo código, outra instância) isso faria a revalidação
+    # consultar a instância revogada. Sem ID explícito na resposta, usa o código.
+    entitlements["licenca_id"] = (
+        licenca_id or codigo or str(entitlements.get("licenca_id") or "").strip()
+    )
     if dados.get("client_id"):
         entitlements["client_id"] = dados["client_id"]
     if dados.get("entitlements"):
@@ -612,10 +616,21 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
             detail="Informe o código da licença entregue na contratação.",
         )
 
+    lic = svc._licenca_local(db)
+    # Licença em estado terminal (revogada/bloqueada/expirada): o usuário está
+    # inserindo uma licença nova (F2 em modo leitura). Não reutiliza as
+    # credenciais da instância antiga — que podem apontar para um `licenca_id`
+    # revogado mesmo quando o código é o mesmo — e vai direto ao handshake para
+    # obter credenciais da licença nova.
+    licenca_terminal = lic is not None and lic.status in (
+        svc.STATUS_REVOGADA,
+        svc.STATUS_BLOQUEADA,
+        svc.STATUS_EXPIRADA,
+    )
+
     # 1) A instalação já tem o par no cofre do banco para esta mesma licença:
     #    revalida (rotaciona o secret) em vez de tentar um novo handshake.
-    lic = svc._licenca_local(db)
-    if _linha_combina(lic, numero, codigo):
+    if not licenca_terminal and _linha_combina(lic, numero, codigo):
         material_linha = _material_da_linha(lic, codigo=codigo, cnpj=numero)
         if material_linha is not None:
             try:
@@ -629,7 +644,7 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
     # 2) Linha perdida (reinstalação/recriação do banco): reconstrói pelo cofre
     #    local da máquina, sem consumir um novo handshake.
     material = cofre_maquina.ler()
-    if _material_combina(material, numero, codigo):
+    if not licenca_terminal and _material_combina(material, numero, codigo):
         try:
             return _validar_com_material(db, material, cnpj=numero, codigo=codigo)
         except HTTPException as exc:
@@ -639,7 +654,7 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
             # handshake abaixo devolve a mensagem correta — normalmente "já
             # ativada", que vira a orientação de reset.
 
-    # 3) Primeira ativação nesta instalação.
+    # 3) Primeira ativação nesta instalação (ou substituição de licença terminal).
     corpo = {
         "cnpj": numero,
         "codigo_licenca": codigo,
