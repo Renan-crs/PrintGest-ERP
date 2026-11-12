@@ -24,7 +24,7 @@ O script nunca imprime a senha nem a connection string.
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -64,12 +64,12 @@ def main() -> int:
     BACKEND = RAIZ / "backend"
     sys.path.insert(0, str(BACKEND))
 
+    from app.bootstrap import rodar_bootstrap
     from app.core.config import settings
     from app.core.migrations import aplicar_migrations
     from app.core.security import verify_password
-    from app.bootstrap import rodar_bootstrap
     from app.db import SessionLocal
-    from app.models.core import Usuario
+    from app.services import tenants
 
     # 1. Validação P17 (produção recusa senha de fábrica 'admin123' e credencial
     # de banco padrão).
@@ -80,21 +80,19 @@ def main() -> int:
     aplicar_migrations()
     print("[2/4] Migrations Alembic aplicadas (upgrade head).")
 
-    # 3. Bootstrap idempotente (empresa, filial e admin de fábrica).
+    # 3. Bootstrap idempotente (empresa, filial e admin de fábrica do inquilino).
     empresa = rodar_bootstrap()
     print(
-        f"[3/4] Bootstrap ok — empresa '{empresa.nome_fantasia}' "
+        f"[3/4] Bootstrap ok — empresa '{empresa.razao_social}' "
         f"(CNPJ {empresa.cnpj})."
     )
 
     # 4. Validação do auth do admin (sem criar sessão, sem imprimir segredos).
+    # Multi-tenant: o admin é o DENTRO do inquilino (mesmo login pode existir
+    # em gráficas distintas do banco compartilhado).
     db = SessionLocal()
     try:
-        admin = (
-            db.query(Usuario)
-            .filter(Usuario.login == settings.admin_inicial_login)
-            .first()
-        )
+        admin = tenants.usuario_por_login(db, settings.admin_inicial_login)
         if not admin:
             print(
                 f"[4/4] ERRO: admin '{settings.admin_inicial_login}' não existe "
@@ -109,7 +107,7 @@ def main() -> int:
             senha_ok = verify_password(
                 settings.admin_inicial_senha, admin.senha_hash
             )
-        agora = datetime.now(timezone.utc)
+        agora = datetime.now(UTC)
         bloqueio_ativo = (
             admin.bloqueado_em is not None and admin.bloqueado_em > agora
         )

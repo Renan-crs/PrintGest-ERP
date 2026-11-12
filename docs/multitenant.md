@@ -28,6 +28,22 @@ unicidades globais → **por filial**: `usuario.login`, `cliente.cpf_cnpj`,
 
 ## Provisionar uma nova gráfica (checklist)
 
+O script `scripts/provisionar_cliente.ps1` automatiza o checklist:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\provisionar_cliente.ps1 `
+    -Cnpj 32667694000101 -RazaoSocial "Gráfica Exemplo Ltda" -Empacotar
+```
+
+Ele (1) grava `installer/env.instalacao` com o CNPJ/razão da gráfica e as
+credenciais compartilhadas (lidas do `backend/.env`), (2) valida com
+`scripts/configurar_auth_neon.py --env-file installer/env.instalacao`
+(conexão, migrations, bootstrap do inquilino e estado do admin) e (3) com
+`-Empacotar`, gera o instalador nomeado por CNPJ
+(`PrintGest-Setup-<versao>-<cnpj8>.exe`).
+
+Checklist manual equivalente:
+
 1. Copie `installer/env.instalacao.example` → `installer/env.instalacao`
    (ignorado pelo git) e preencha:
    - `PRINTGEST_DATABASE_URL` — credencial do banco compartilhado;
