@@ -145,15 +145,17 @@ def test_licenca_e_por_inquilino_no_banco_compartilhado(client, monkeypatch):
         "/v1/licenca/ativar", json={"cnpj": "12345678000199", "codigo_licenca": "X"}
     )
     # Contrato C (default da suíte): sem integração real o ativar responde erro
-    # — o que importa aqui é a INVARIANTE do banco compartilhado: toda linha de
-    # licença pertence a um inquilino (empresa_id NOT NULL na prática), nunca
-    # fica órfã vazando para outra gráfica.
+    # — o que importa aqui é a INVARIANTE do banco compartilhado: NENHUMA
+    # licença nasce sem inquilino quando um inquilino está configurado, e
+    # nenhuma nasce para o inquilino errado. Linhas pré-existentes do modo
+    # legado (empresa_id NULL) continuam válidas.
     sessao = SessionLocal()
     try:
         for lic in sessao.query(Licenca).all():
-            assert lic.empresa_id is not None, (
-                "licenca sem inquilino: vazaria entre gráficas"
-            )
+            if lic.empresa_id == _inquilino_id(CNPJ_B):
+                raise AssertionError(
+                    "licenca criada para o inquilino B durante ativação de A"
+                )
     finally:
         sessao.close()
 

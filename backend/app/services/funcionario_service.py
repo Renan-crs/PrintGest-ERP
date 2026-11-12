@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models.cadastros import Funcionario
 from app.models.core import Usuario
+from app.services import tenants
 
 
 def criar_com_usuario(
@@ -23,7 +24,7 @@ def criar_com_usuario(
     if not login:
         raise ValueError("O campo 'login' é obrigatório para cadastro de funcionário.")
 
-    if db.query(Usuario).filter(Usuario.login == login).first():
+    if tenants.usuario_por_login(db, login):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Já existe um usuário com o login '{login}'. Escolha outro.",

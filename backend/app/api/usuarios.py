@@ -4,20 +4,41 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 
 from app.core.security import hash_password
-from app.deps import RANK, DbDep, UsuarioDep, require_nivel
+from app.deps import RANK, DbDep, FilialDep, UsuarioDep, require_nivel
 from app.models.core import Usuario
 from app.models.enums import NivelAcesso
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
+from app.services import tenants
 from app.services.auth_service import revogar_sessoes
-from app.services.crud import atualizar, buscar_por_id, criar, desativar
+from app.services.crud import atualizar, criar, desativar
 
 router = APIRouter(
     prefix="/usuarios",
     tags=["usuários"],
     dependencies=[Depends(require_nivel(NivelAcesso.ADMIN))],
 )
+
+
+def _escopo(db: DbDep):
+    """Usuários do INQUILINO desta instalação (legado: todos)."""
+    consulta = db.query(Usuario)
+    filiais = tenants.filiais_do_tenant(db)
+    if filiais:
+        consulta = consulta.filter(Usuario.filial_id.in_(filiais))
+    return consulta
+
+
+def _buscar_no_escopo(db: DbDep, item_id: int) -> Usuario:
+    """Busca por id dentro do inquilino; 404 se não pertencer a ele."""
+    usuario = _escopo(db).filter(Usuario.id == item_id).first()
+    if usuario is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado.",
+        )
+    return usuario
 
 
 def _garantir_nao_auto_lockout(
@@ -52,7 +73,7 @@ def lista(
     limit: int = 50,
     offset: int = 0,
 ) -> ListaResponse[UsuarioOut]:
-    query = db.query(Usuario)
+    query = _escopo(db)
     termo = (q or "").strip()
     if termo:
         query = query.filter(
@@ -74,16 +95,19 @@ def lista(
 
 @router.get("/{item_id}")
 def detalhe(item_id: int, db: DbDep) -> ItemResponse[UsuarioOut]:
-    return ItemResponse(
-        data=UsuarioOut.model_validate(buscar_por_id(db, Usuario, item_id))
-    )
+    return ItemResponse(data=UsuarioOut.model_validate(_buscar_no_escopo(db, item_id)))
 
 
 @router.post("")
-def criar_usuario(body: UsuarioCreate, db: DbDep) -> ItemResponse[UsuarioOut]:
+def criar_usuario(
+    body: UsuarioCreate, db: DbDep, filial: FilialDep
+) -> ItemResponse[UsuarioOut]:
     dados = body.model_dump()
     senha = dados.pop("senha")
     dados["senha_hash"] = hash_password(senha)
+    # Multi-tenant: o usuário nasce NA filial do inquilino — o corpo do
+    # request não escolhe filial (mesma regra da factory de cadastros).
+    dados["filial_id"] = filial
     return ItemResponse(data=UsuarioOut.model_validate(criar(db, Usuario, dados)))
 
 
@@ -92,7 +116,10 @@ def atualizar_usuario(
     item_id: int, body: UsuarioUpdate, db: DbDep, usuario: UsuarioDep
 ) -> ItemResponse[UsuarioOut]:
     _garantir_nao_auto_lockout(db, usuario, item_id, body)
+    _buscar_no_escopo(db, item_id)  # 404 se fora do inquilino
     dados = body.model_dump(exclude_unset=True)
+    # Trocar de filial moveria o usuário para outro inquilino — proibido.
+    dados.pop("filial_id", None)
     redefine_senha = "senha" in dados
     if redefine_senha:
         dados["senha_hash"] = hash_password(dados.pop("senha"))
@@ -110,4 +137,5 @@ def remover(item_id: int, db: DbDep, usuario: UsuarioDep) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Você não pode excluir o próprio usuário.",
         )
+    _buscar_no_escopo(db, item_id)  # 404 se fora do inquilino
     desativar(db, Usuario, item_id)

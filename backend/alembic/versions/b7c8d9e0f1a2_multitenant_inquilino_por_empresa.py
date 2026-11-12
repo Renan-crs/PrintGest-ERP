@@ -9,8 +9,9 @@ instalacao (daemon) passa a declarar o inquilino que serve via
 `PRINTGEST_EMPRESA_CNPJ`, e o isolamento logico passa a ser:
 
 1) `licenca.empresa_id` — cada inquilino tem a propria linha de licenca no
-   banco compartilhado. Backfill: casa pelo `cnpj` ja gravado na linha;
-   fallback = primeira empresa (o bootstrap demo).
+   banco compartilhado. Backfill: casa pelo `cnpj` ja gravado na linha; sem
+   casamento, a linha fica NULL = "adotavel" (o inquilino a reivindica na
+   primeira leitura) — nunca atribuir a empresa errada.
 2) Unicidades globais viram unicidades POR FILIAL — dois inquilinos podem ter
    o mesmo CPF/CNPJ de cliente, codigo de produto ou login 'admin' sem
    conflito: usuario.login, cliente.cpf_cnpj, fornecedor.cpf_cnpj,
@@ -54,15 +55,14 @@ def upgrade() -> None:
         "fk_licenca_empresa", "licenca", "empresa", ["empresa_id"], ["id"]
     )
     op.create_index("idx_licenca_empresa", "licenca", ["empresa_id"])
-    # Backfill: casa pelo cnpj legado da linha; sem casamento, adota a
-    # primeira empresa (bootstrap demo) para nao deixar licenca orfa.
+    # Backfill: casa pelo cnpj legado da linha, quando a empresa já existir.
+    # Sem casamento, a linha fica NULL = "adotavel": o primeiro inquilino
+    # (PRINTGEST_EMPRESA_CNPJ) a ativar adota a linha na primeira leitura
+    # (`licensa_service._licenca_local`) — nunca atribuir a uma empresa
+    # arbitraria, ou a licenca migra para o inquilino errado.
     op.execute(
         "UPDATE licenca l SET empresa_id = e.id FROM empresa e "
         "WHERE e.cnpj = l.cnpj AND l.empresa_id IS NULL"
-    )
-    op.execute(
-        "UPDATE licenca SET empresa_id = (SELECT id FROM empresa ORDER BY id LIMIT 1) "
-        "WHERE empresa_id IS NULL"
     )
 
     # --- 2) unicidade por filial (escopo de inquilino) -----------------------
