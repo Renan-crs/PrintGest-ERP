@@ -18,7 +18,17 @@ como anuláveis, sem uso, para não quebrar bases já migradas.
 
 from datetime import datetime
 
-from sqlalchemy import CHAR, BigInteger, DateTime, Integer, String, Text, func
+from sqlalchemy import (
+    CHAR,
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,8 +37,12 @@ from app.db import Base
 
 class Licenca(Base):
     __tablename__ = "licenca"
+    __table_args__ = (Index("idx_licenca_empresa", "empresa_id"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Multi-tenant: banco compartilhado entre gráficas — a licença pertence ao
+    # inquilino (`empresa`) que a instalação declara via PRINTGEST_EMPRESA_CNPJ.
+    empresa_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("empresa.id"))
     licenca_redgest_id: Mapped[str | None] = mapped_column(
         String(40), nullable=True, unique=True
     )

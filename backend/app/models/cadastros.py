@@ -47,6 +47,8 @@ class Cliente(Base):
             name="ck_cliente_adiantamento_exclusivo",
         ),
         CheckConstraint("sinal_pct BETWEEN 0 AND 100", name="ck_cliente_sinal_pct"),
+        # Multi-tenant: documento único DENTRO da filial (inquilino), não global.
+        UniqueConstraint("filial_id", "cpf_cnpj", name="uq_cliente_filial_cpf_cnpj"),
         Index("idx_cliente_nome", "nome_razao"),
         Index(
             "idx_cliente_dt_nas",
@@ -63,7 +65,7 @@ class Cliente(Base):
     tipo_pessoa: Mapped[TipoPessoa] = mapped_column(
         pg_enum(TipoPessoa), nullable=False, server_default=TipoPessoa.PF.value
     )
-    cpf_cnpj: Mapped[str | None] = mapped_column(String(18), unique=True)
+    cpf_cnpj: Mapped[str | None] = mapped_column(String(18))
     inscricao_estadual: Mapped[str | None] = mapped_column(String(20))
     data_nascimento: Mapped[date | None] = mapped_column(Date)
     email: Mapped[str | None] = mapped_column(String(120))
@@ -99,7 +101,10 @@ class Cliente(Base):
 
 class Fornecedor(Base):
     __tablename__ = "fornecedor"
-    __table_args__ = (Index("idx_fornecedor_nome", "nome_razao"),)
+    __table_args__ = (
+        UniqueConstraint("filial_id", "cpf_cnpj", name="uq_fornecedor_filial_cpf_cnpj"),
+        Index("idx_fornecedor_nome", "nome_razao"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
@@ -109,7 +114,7 @@ class Fornecedor(Base):
     tipo_pessoa: Mapped[TipoPessoa] = mapped_column(
         pg_enum(TipoPessoa), nullable=False, server_default=TipoPessoa.PJ.value
     )
-    cpf_cnpj: Mapped[str | None] = mapped_column(String(18), unique=True)
+    cpf_cnpj: Mapped[str | None] = mapped_column(String(18))
     inscricao_estadual: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str | None] = mapped_column(String(120))
     telefone: Mapped[str | None] = mapped_column(String(20))
@@ -138,6 +143,7 @@ class Funcionario(Base):
         CheckConstraint(
             "comissao_pct BETWEEN 0 AND 100", name="ck_funcionario_comissao"
         ),
+        UniqueConstraint("filial_id", "cpf", name="uq_funcionario_filial_cpf"),
         Index("idx_funcionario_nome", "nome"),
     )
 
@@ -146,7 +152,7 @@ class Funcionario(Base):
         BigInteger, ForeignKey("filial.id"), nullable=False
     )
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
-    cpf: Mapped[str | None] = mapped_column(String(18), unique=True)
+    cpf: Mapped[str | None] = mapped_column(String(18))
     cargo: Mapped[str | None] = mapped_column(String(60))
     email: Mapped[str | None] = mapped_column(String(120))
     telefone: Mapped[str | None] = mapped_column(String(20))
@@ -214,6 +220,7 @@ class Produto(Base):
             "preco_custo >= 0 AND preco_venda >= 0", name="ck_produto_precos"
         ),
         CheckConstraint("estoque_minimo >= 0", name="ck_produto_estoque_minimo"),
+        UniqueConstraint("filial_id", "codigo", name="uq_produto_filial_codigo"),
         Index("idx_produto_nome", "nome"),
         Index("idx_produto_categoria", "categoria_id"),
         Index("idx_produto_codigo_busca", "codigo"),
@@ -226,7 +233,7 @@ class Produto(Base):
     categoria_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("produto_categoria.id")
     )
-    codigo: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
+    codigo: Mapped[str] = mapped_column(String(30), nullable=False)
     codigo_barras: Mapped[str | None] = mapped_column(String(30))
     nome: Mapped[str] = mapped_column(String(160), nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text)

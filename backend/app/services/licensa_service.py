@@ -60,6 +60,7 @@ from app.core import cofre
 from app.core.config import settings
 from app.db import SessionLocal
 from app.models.licenca import Licenca
+from app.services import tenants
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +433,35 @@ def _parse_chave(chave: str) -> str:
 
 # -------------------------------------------------------------------- estado
 def _licenca_local(db: Session) -> Licenca | None:
-    return db.query(Licenca).order_by(Licenca.id).first()
+    """Linha de licença do INQUILINO desta instalação (banco compartilhado).
+
+    Multi-tenant: cada gráfica tem sua licença (`licenca.empresa_id`). Sem
+    inquilino configurado (dev), vale a linha única do modo legado. Uma linha
+    legada sem `empresa_id` é adotada pelo inquilino na primeira leitura —
+    upgrade transparente da instalação que a ativou.
+    """
+    consulta = db.query(Licenca)
+    empresa_id = tenants.empresa_id_do_tenant(db)
+    if empresa_id is None:
+        return consulta.order_by(Licenca.id).first()
+    lic = consulta.filter(Licenca.empresa_id == empresa_id).order_by(Licenca.id).first()
+    if lic is None:
+        licada = (
+            db.query(Licenca)
+            .filter(Licenca.empresa_id.is_(None))
+            .order_by(Licenca.id)
+            .first()
+        )
+        if licada is not None:
+            licada.empresa_id = empresa_id
+            db.commit()
+            return licada
+    return lic
+
+
+def _empresa_tenant_id(db: Session) -> int | None:
+    """Id da empresa do inquilino (`None` no modo single-tenant legado)."""
+    return tenants.empresa_id_do_tenant(db)
 
 
 @functools.lru_cache(maxsize=8)
@@ -589,7 +618,7 @@ def _persistir_ok(db: Session, *, chave: str, fingerprint: str, dados: dict) -> 
     lic = _licenca_local(db)
     expira = _parse_dt(dados.get("expira_em"))
     if lic is None:
-        lic = Licenca()
+        lic = Licenca(empresa_id=_empresa_tenant_id(db))
         db.add(lic)
     # Doc §9.4: a chave de ativação vai para o cofre do SO, nunca em texto puro.
     lic.chave_ativacao = cofre.proteger(chave)

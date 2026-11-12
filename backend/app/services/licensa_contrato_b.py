@@ -206,7 +206,7 @@ def _persistir(db: Session, dados: dict, *, codigo: str, cnpj: str) -> Licenca:
     """Faz a linha local refletir uma resposta `valida=true` (ativação/revalidação)."""
     lic = svc._licenca_local(db)
     if lic is None:
-        lic = Licenca()
+        lic = Licenca(empresa_id=svc._empresa_tenant_id(db))
         db.add(lic)
     agora = svc._agora()
     grace = svc._parse_dt(dados.get("grace_deadline"))

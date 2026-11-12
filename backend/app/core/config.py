@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     admin_inicial_login: str = "admin"
     admin_inicial_senha: str = "admin123"
     admin_inicial_nome: str = "Administrador"
+    # ---------------------------------------------------------------- tenant
+    # Banco compartilhado entre gráficas (projeto Neon único): o INQUILINO que
+    # esta instalação serve é a empresa com este CNPJ. O bootstrap garante
+    # empresa + filial + admin dela, o login busca usuários dentro do
+    # inquilino e a licença é por inquilino (licenca.empresa_id).
+    # Vazio = modo single-tenant legado (dev/demo, comportamento de antes).
+    empresa_cnpj: str = ""
+    empresa_razao_social: str = ""
+    empresa_filial_nome: str = "Matriz"
     # Instalação nova: o admin nasce sem senha e o operador define a dele na
     # tela "Primeiro acesso" do login. Em dev/testes, desligue para manter a
     # senha de fábrica (`PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO=false`).

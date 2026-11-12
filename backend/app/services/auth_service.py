@@ -14,6 +14,7 @@ from app.core.security import (
 )
 from app.deps import verificar_bloqueio
 from app.models.core import Usuario, UsuarioSessao
+from app.services import tenants
 
 # Hash "neutro" usado para normalizar o tempo de resposta quando o login não
 # existe (evita timing oracle de enumeração de usuários — P16 §3.5).
@@ -26,7 +27,9 @@ _STATUS_PRIMEIRO_ACESSO = status.HTTP_407_PROXY_AUTHENTICATION_REQUIRED
 
 def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usuario]:
     agora = datetime.now(UTC)
-    usuario = db.query(Usuario).filter(Usuario.login == login_input).first()
+    # Multi-tenant: o login busca DENTRO do inquilino desta instalação — o
+    # mesmo 'admin' pode existir em gráficas distintas do banco compartilhado.
+    usuario = tenants.usuario_por_login(db, login_input)
     if not usuario:
         verify_password(senha, _HASH_NEUTRO)
         raise HTTPException(
@@ -77,7 +80,7 @@ def primeiro_acesso(
     if usuario_id:
         usuario = db.get(Usuario, usuario_id)
     else:
-        usuario = db.query(Usuario).filter(Usuario.login == login).first()
+        usuario = tenants.usuario_por_login(db, login)
     # A mesma mensagem para "não existe" e "já tem senha" evita confirmar quais
     # logins existem (enumeração) — o endpoint é público, como o /login.
     if not usuario or not usuario.primeiro_acesso:

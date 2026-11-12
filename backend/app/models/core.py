@@ -9,6 +9,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -90,6 +91,7 @@ class Filial(Base):
 class Usuario(Base):
     __tablename__ = "usuario"
     __table_args__ = (
+        UniqueConstraint("filial_id", "login", name="uq_usuario_filial_login"),
         Index("idx_usuario_nome", "nome"),
         Index("idx_usuario_funcionario", "funcionario_id"),
     )
@@ -97,7 +99,10 @@ class Usuario(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("filial.id"))
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
-    login: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    # Multi-tenant: o MESMO login pode existir em inquilinos diferentes — a
+    # unicidade é por filial (o daemon declara o inquilino via
+    # PRINTGEST_EMPRESA_CNPJ e o login busca dentro dele).
+    login: Mapped[str] = mapped_column(String(60), nullable=False)
     senha_hash: Mapped[str] = mapped_column(String(255), nullable=True)
     # M3 (§3.10): primeiro acesso - quando True, login sem senha válida pede nova senha
     primeiro_acesso: Mapped[bool] = mapped_column(

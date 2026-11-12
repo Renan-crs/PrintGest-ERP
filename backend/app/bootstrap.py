@@ -1,11 +1,19 @@
 """Bootstrap inicial: empresa, filial e usuário administrador de fábrica.
 
-Executado no startup do serviço e idempotente — só cria o que não existe
-(busca por CNPJ fixo e login 'admin'). Em instalações novas o admin nasce sem
-senha (`primeiro_acesso=True`) e o operador define a dele na tela de primeiro
-acesso. Em dev/testes, `PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO=false` mantém a
-senha de fábrica de `PRINTGEST_ADMIN_INICIAL_SENHA`.
+Executado no startup do serviço e idempotente. **Multi-tenant**: com
+`PRINTGEST_EMPRESA_CNPJ` no `.env`, o bootstrap garante a EMPRESA/FILIAL/ADMIN
+daquele inquilino no banco compartilhado (duas gráficas coexistem no mesmo
+banco, cada uma com seus dados isolados por `filial_id`). Sem a variável
+(dev/demo), mantém o comportamento histórico da empresa demo
+`11111111000111`.
+
+Em instalações novas o admin nasce sem senha (`primeiro_acesso=True`) e o
+operador define a dele na tela de primeiro acesso. Em dev/testes,
+`PRINTGEST_ADMIN_INICIAL_PRIMEIRO_ACESSO=false` mantém a senha de fábrica de
+`PRINTGEST_ADMIN_INICIAL_SENHA`.
 """
+
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import hash_password
@@ -14,32 +22,54 @@ from app.models.core import Empresa, Filial, Usuario
 from app.models.enums import NivelAcesso
 
 
+def _criar_empresa(db: Session, cnpj: str) -> Empresa:
+    if cnpj == "11111111000111":
+        empresa = Empresa(
+            razao_social="Gráfica Demo Ltda",
+            nome_fantasia="PrintGest",
+            cnpj=cnpj,
+            inscricao_estadual="ISENTO",
+            regime_tributario="Simples Nacional",
+            ambiente_fiscal="h",
+            cidade="São Paulo",
+            uf="SP",
+        )
+    else:
+        empresa = Empresa(
+            razao_social=settings.empresa_razao_social.strip() or f"Gráfica {cnpj}",
+            cnpj=cnpj,
+            inscricao_estadual="ISENTO",
+            ambiente_fiscal="h",
+        )
+    db.add(empresa)
+    db.flush()
+    return empresa
+
+
 def _empresa() -> Empresa:
     db = SessionLocal()
     try:
-        empresa = db.query(Empresa).filter(Empresa.cnpj == "11111111000111").first()
+        # Inquilino desta instalação: CNPJ do `.env` ou o demo do modo legado.
+        cnpj = (settings.empresa_cnpj or "").strip() or "11111111000111"
+        empresa = db.query(Empresa).filter(Empresa.cnpj == cnpj).first()
         if not empresa:
-            empresa = Empresa(
-                razao_social="Gráfica Demo Ltda",
-                nome_fantasia="PrintGest",
-                cnpj="11111111000111",
-                inscricao_estadual="ISENTO",
-                regime_tributario="Simples Nacional",
-                ambiente_fiscal="h",
-                cidade="São Paulo",
-                uf="SP",
-            )
-            db.add(empresa)
-            db.flush()
+            empresa = _criar_empresa(db, cnpj)
         filial = db.query(Filial).filter(Filial.empresa_id == empresa.id).first()
         if not filial:
             # A primeira unidade é a MATRIZ, não uma filial — o nome "Filial
             # Matriz" era contraditório na top bar (ou é matriz, ou é filial).
-            filial = Filial(empresa_id=empresa.id, nome="Matriz")
+            filial = Filial(
+                empresa_id=empresa.id,
+                nome=(settings.empresa_filial_nome or "Matriz").strip() or "Matriz",
+            )
             db.add(filial)
             db.flush()
+        # Multi-tenant: o MESMO login pode existir em inquilinos diferentes —
+        # o admin buscado é o DENTRO das filiais desta empresa.
         admin = (
             db.query(Usuario)
+            .join(Filial, Usuario.filial_id == Filial.id)
+            .filter(Filial.empresa_id == empresa.id)
             .filter(Usuario.login == settings.admin_inicial_login)
             .first()
         )
