@@ -609,16 +609,27 @@ def ativar(db: Session, *, cnpj: str, codigo_licenca: str) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CNPJ inválido. Informe os 14 dígitos do titular da licença.",
         )
-    # Multi-tenant: o instalador universal fixa o CNPJ do inquilino no .env.
-    # Ativar com outro CNPJ aqui aplicaria a licença de outrem nesta instalação.
+    # Multi-tenant (instalador universal): o inquilino é vinculado na PRIMEIRA
+    # ativação — o CNPJ digitado aqui (tela de ativação) define a gráfica da
+    # máquina e fica persistido no cofre local. Sem vínculo ainda, garante a
+    # empresa/filial do CNPJ antes de resolver a licença do inquilino.
     cnpj_tenant = svc.tenants.cnpj_do_tenant()
-    if cnpj_tenant and "".join(c for c in cnpj_tenant if c.isdigit()) != numero:
+    if not cnpj_tenant:
+        from app.bootstrap import garantir_empresa
+
+        garantir_empresa(db, numero)
+        db.commit()
+        # Persiste o vínculo na máquina (cofre local): a partir daqui o daemon
+        # resolve o inquilino pelo CNPJ, sem `PRINTGEST_EMPRESA_CNPJ` no .env.
+        cofre_maquina.salvar_tenant(numero)
+        cnpj_tenant = numero
+    if "".join(c for c in cnpj_tenant if c.isdigit()) != numero:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"O CNPJ informado não corresponde ao CNPJ instalado nesta "
-                f"máquina ({cnpj_tenant}). Refaça a instalação com o CNPJ "
-                "correto ou ative a licença na instalação da gráfica certa."
+                f"O CNPJ informado não corresponde ao CNPJ já vinculado a esta "
+                f"máquina ({cnpj_tenant}). Ative a licença na instalação da "
+                "gráfica certa."
             ),
         )
     codigo = _normalizar_codigo(codigo_licenca)

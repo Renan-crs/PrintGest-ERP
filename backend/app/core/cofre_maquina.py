@@ -93,3 +93,15 @@ def limpar() -> None:
         caminho().unlink(missing_ok=True)
     except OSError as exc:
         logger.warning("Não foi possível remover o cofre local da licença: %s", exc)
+
+
+def salvar_tenant(cnpj: str) -> None:
+    """Vincula a máquina ao inquilino (CNPJ) — base do instalador universal.
+
+    A primeira ativação grava o CNPJ aqui; o daemon passa a resolver o
+    inquilino pelo cofre local quando não há `PRINTGEST_EMPRESA_CNPJ` no `.env`.
+    Best-effort: falha de I/O não impede a ativação (o CNPJ segue no banco).
+    """
+    dados = ler()
+    dados["cnpj"] = "".join(c for c in cnpj if c.isdigit())
+    guardar(dados)

@@ -46,24 +46,36 @@ def _criar_empresa(db: Session, cnpj: str) -> Empresa:
     return empresa
 
 
+def garantir_empresa(db: Session, cnpj: str) -> tuple[Empresa, Filial]:
+    """Garante empresa + filial "Matriz" do CNPJ (multi-tenant).
+
+    Usada pelo bootstrap (inquilino do `.env`/cofre) e pela primeira ativação
+    (CNPJ digitado na tela de ativação — instalador universal).
+    """
+    empresa = db.query(Empresa).filter(Empresa.cnpj == cnpj).first()
+    if not empresa:
+        empresa = _criar_empresa(db, cnpj)
+    filial = db.query(Filial).filter(Filial.empresa_id == empresa.id).first()
+    if not filial:
+        # A primeira unidade é a MATRIZ, não uma filial — o nome "Filial
+        # Matriz" era contraditório na top bar (ou é matriz, ou é filial).
+        filial = Filial(
+            empresa_id=empresa.id,
+            nome=(settings.empresa_filial_nome or "Matriz").strip() or "Matriz",
+        )
+        db.add(filial)
+        db.flush()
+    return empresa, filial
+
+
 def _empresa() -> Empresa:
     db = SessionLocal()
     try:
-        # Inquilino desta instalação: CNPJ do `.env` ou o demo do modo legado.
-        cnpj = (settings.empresa_cnpj or "").strip() or "11111111000111"
-        empresa = db.query(Empresa).filter(Empresa.cnpj == cnpj).first()
-        if not empresa:
-            empresa = _criar_empresa(db, cnpj)
-        filial = db.query(Filial).filter(Filial.empresa_id == empresa.id).first()
-        if not filial:
-            # A primeira unidade é a MATRIZ, não uma filial — o nome "Filial
-            # Matriz" era contraditório na top bar (ou é matriz, ou é filial).
-            filial = Filial(
-                empresa_id=empresa.id,
-                nome=(settings.empresa_filial_nome or "Matriz").strip() or "Matriz",
-            )
-            db.add(filial)
-            db.flush()
+        # Inquilino desta instalação: `.env` → cofre local (1ª ativação) → demo.
+        from app.services import tenants
+
+        cnpj = tenants.cnpj_do_tenant() or "11111111000111"
+        empresa, filial = garantir_empresa(db, cnpj)
         # Multi-tenant: o MESMO login pode existir em inquilinos diferentes —
         # o admin buscado é o DENTRO das filiais desta empresa.
         admin = (

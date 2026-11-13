@@ -1,25 +1,35 @@
 """Inquilino (tenant) da instalação no banco compartilhado.
 
 O projeto Neon do PrintGest é ÚNICO e atende várias gráficas. O inquilino que
-esta instalação (daemon) serve é a `empresa` declarada em
-`PRINTGEST_EMPRESA_CNPJ` — o bootstrap garante empresa/filial/admin dela, o
-login busca usuários dentro do inquilino e a licença é por inquilino
-(`licenca.empresa_id`).
+esta instalação (daemon) serve é a `empresa` do CNPJ — nesta ordem:
 
-Sem `PRINTGEST_EMPRESA_CNPJ` (dev/demo), o sistema opera no modo single-tenant
-legado: todas as funções aqui devolvem "sem escopo" e o comportamento é o de
-antes (busca global).
+1. `PRINTGEST_EMPRESA_CNPJ` no `.env` (explícito; dev/instalador);
+2. o CNPJ gravado no cofre local da máquina na primeira ativação
+   (`cofre_maquina`, o mesmo arquivo de recuperação da licença) — é o que
+   faz o **instalador universal** funcionar: o CNPJ é informado na tela de
+   ativação do aplicativo (como a chave de produto do Office), não no
+   instalador;
+3. sem nenhum dos dois, modo single-tenant legado (dev/demo): todas as
+   funções devolvem "sem escopo" e o comportamento é o de antes.
 """
 
 from sqlalchemy.orm import Session
 
+from app.core import cofre_maquina
 from app.core.config import settings
 from app.models.core import Empresa, Filial, Usuario
 
 
 def cnpj_do_tenant() -> str:
-    """CNPJ do inquilino declarado no `.env` ('' = single-tenant legado)."""
-    return (settings.empresa_cnpj or "").strip()
+    """CNPJ do inquilino ('' = single-tenant legado).
+
+    Ordem: `.env` → cofre local da máquina (1ª ativação) → legado.
+    """
+    cnpj = (settings.empresa_cnpj or "").strip()
+    if cnpj:
+        return cnpj
+    material = cofre_maquina.ler()
+    return str(material.get("cnpj") or "").strip() if material else ""
 
 
 def _id_do_cnpj(db: Session, cnpj: str) -> int | None:
@@ -48,8 +58,8 @@ def filiais_do_tenant(db: Session) -> list[int]:
 def usuario_por_login(db: Session, login: str) -> Usuario | None:
     """Busca o usuário DENTRO do inquilino (mesmo login em gráficas distintas).
 
-    No modo legado (sem `PRINTGEST_EMPRESA_CNPJ`), busca global — o
-    `usuario.login` era globalmente único nas bases antigas.
+    No modo legado, busca global — o `usuario.login` era globalmente único nas
+    bases antigas.
     """
     consulta = db.query(Usuario).filter(Usuario.login == login)
     filiais = filiais_do_tenant(db)

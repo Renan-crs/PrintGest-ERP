@@ -177,6 +177,92 @@ def test_ativar_com_cnpj_de_outro_inquilino_e_recusado(client, monkeypatch):
     assert "não corresponde" in resp.json()["detail"]
 
 
+@pytest.fixture()
+def _redgest_b(monkeypatch):
+    """RedGest falso do Contrato B (resposta de ativação bem-sucedida)."""
+    import httpx
+
+    from app.services import licensa_service
+
+    resposta = httpx.Response(
+        200,
+        json={
+            "data": {
+                "id": "LIC-PRIMEIRA",
+                "client_id": "grafica_12345678000199",
+                "client_secret": "s3gr3d0-inicial",
+                "status": "ATIVA",
+                "plano": "PARCERIA",
+                "entitlements": {"cnpj_vinculado": "12345678000199"},
+                "data_inicio": "2026-11-13T00:00:00+00:00",
+                "data_fim": "2027-11-13T00:00:00+00:00",
+                "grace_deadline": "2026-11-16T00:00:00+00:00",
+                "modo": "hardware_bound",
+            }
+        },
+    )
+    transporte = httpx.MockTransport(lambda _req: resposta)
+    original = licensa_service._cliente_com_idempotencia
+
+    def cliente(chave_idempotencia: str):
+        return original(chave_idempotencia).__class__(
+            base_url="http://redgest.local",
+            timeout=settings.licenca_timeout_segundos,
+            transport=transporte,
+            headers={"Idempotency-Key": chave_idempotencia},
+        )
+
+    monkeypatch.setattr(licensa_service, "_cliente_com_idempotencia", cliente)
+
+
+def test_primeira_ativacao_vincula_inquilino_sem_env_nem_cofre(
+    client, monkeypatch, _redgest_b
+):
+    """Instalador universal: sem `.env` nem cofre, o CNPJ digitado na tela de
+    ativação vira o inquilino da máquina (persiste no cofre local)."""
+    from app.core import cofre_maquina
+    from app.db import SessionLocal
+    from app.models.core import Empresa
+    from app.models.licenca import Licenca
+
+    monkeypatch.setattr(settings, "empresa_cnpj", "")
+    monkeypatch.setattr(settings, "redgest_contrato", "b")
+    monkeypatch.setattr(settings, "licenca_desabilitada", False)
+    assert cofre_maquina.ler().get("cnpj") in (None, "")
+
+    resp = client.post(
+        "/v1/licenca/ativar",
+        json={"cnpj": CNPJ_A, "codigo_licenca": "PRIMEIRA-LICENCA"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["estado"] == "ativa"
+    # Inquilino vinculado e persistido no cofre local da máquina.
+    assert cofre_maquina.ler().get("cnpj") == CNPJ_A
+    sessao = SessionLocal()
+    try:
+        empresa = sessao.query(Empresa).filter(Empresa.cnpj == CNPJ_A).first()
+        assert empresa is not None
+        lic = sessao.query(Licenca).filter(Licenca.empresa_id == empresa.id).first()
+        assert lic is not None and lic.status == "ativa"
+    finally:
+        sessao.close()
+
+    # Segunda ativação com CNPJ alheio: recusada pelo vínculo.
+    resp2 = client.post(
+        "/v1/licenca/ativar",
+        json={"cnpj": CNPJ_B, "codigo_licenca": "OUTRA-LICENCA"},
+    )
+    assert resp2.status_code == 400
+    assert "não corresponde" in resp2.json()["detail"]
+
+    sessao = SessionLocal()
+    try:
+        _limpar_inquilinos(sessao, CNPJ_A)
+    finally:
+        sessao.close()
+
+
 @pytest.mark.usefixtures("_dois_inquilinos")
 def test_situacao_expoe_inquilino_instalado(client, monkeypatch):
     """A tela de ativação usa esses campos para pré-preencher o CNPJ."""

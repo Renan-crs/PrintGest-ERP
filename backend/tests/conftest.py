@@ -63,6 +63,23 @@ TEST_DB_URL = TEST_DB_URL_CRUA.replace("postgresql://", "postgresql+psycopg://",
 from app.core.config import settings
 
 
+@pytest.fixture(autouse=True)
+def _isolar_cofre_maquina(tmp_path_factory, monkeypatch):
+    """Isola o cofre local da máquina entre testes.
+
+    O inquilino pode vir do CNPJ gravado no cofre local (`tenants.cnpj_do_tenant`)
+    — sem isolamento, um teste contaminaria os seguintes (e vice-versa).
+    """
+    from app.core import cofre_maquina
+
+    monkeypatch.setattr(
+        settings,
+        "cofre_licenca_arquivo",
+        str(tmp_path_factory.mktemp("cofre") / "licenca.dat"),
+    )
+    cofre_maquina.limpar()
+
+
 def _criar_banco() -> None:
     if _ADMIN_CRUA is None:
         return  # CI: o banco do serviço já existe
