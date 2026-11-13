@@ -308,7 +308,9 @@ class _Roteador:
         contrato = ""
         if isinstance(sit, dict):
             contrato = str(sit.get("contrato") or "")
-        janela = AtivacaoWindow(self._api, token=token, contrato=contrato)
+        janela = AtivacaoWindow(
+            self._api, token=token, contrato=contrato, situacao=sit
+        )
         janela.ativada.connect(apos_ativacao or self._abrir_login)
         janela.saida.connect(QApplication.instance().quit)
         self._abrir(janela)

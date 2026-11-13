@@ -70,11 +70,20 @@ class AtivacaoWindow(QMainWindow):
     ativada = Signal()
     saida = Signal()
 
-    def __init__(self, api: Api, token: str | None = None, contrato: str = "c") -> None:
+    def __init__(
+        self,
+        api: Api,
+        token: str | None = None,
+        contrato: str = "c",
+        situacao: dict | None = None,
+    ) -> None:
         super().__init__()
         self._api = api
         self._token = token
         self._contrato_b = (contrato or "c").strip().lower() == "b"
+        # Inquilino instalado (CNPJ informado no assistente de instalação):
+        # pré-preenche o campo e evita ativar licença de outra gráfica.
+        self._tenant = situacao or {}
         self._passo = 1
         self._validando = False
         self._tentativa = 0
@@ -190,8 +199,21 @@ class AtivacaoWindow(QMainWindow):
             )
             self._campo_cnpj.returnPressed.connect(self._ativar)
             self._erro_cnpj = self._rotulo_erro()
+            # Instalador universal: o CNPJ já vem fixado na instalação.
+            cnpj_tenant = self._tenant.get("empresa_cnpj")
+            if cnpj_tenant:
+                self._campo_cnpj.setText(self._formatar_cnpj(cnpj_tenant))
             corpo.addWidget(self._campo_cnpj)
             corpo.addWidget(self._erro_cnpj)
+            razao = self._tenant.get("empresa_razao_social")
+            if cnpj_tenant:
+                rotulo_instalado = (
+                    f"Instalado para: {razao or '—'} · CNPJ {self._formatar_cnpj(cnpj_tenant)}"
+                )
+                lbl_instalado = EtiquetaQuebra(rotulo_instalado)
+                lbl_instalado.setObjectName("ajudaCampo")
+                lbl_instalado.setAccessibleName(f"Instalado para: {rotulo_instalado}")
+                corpo.addWidget(lbl_instalado)
 
             corpo.addSpacing(_GAP_ENTRE_GRUPOS)
             corpo.addWidget(self._rotulo("Código da licença"))

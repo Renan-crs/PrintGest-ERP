@@ -113,4 +113,61 @@ begin
       'PRINTGEST_MODO_ESTACAO=sim' + #13#10, False);
   end;
 end;
+#else
+var
+  PaginaTenant: TInputQueryWizardPage;
+
+function CnpjValido(const Valor: String): Boolean;
+var
+  i: Integer;
+begin
+  Result := Length(Valor) = 14;
+  if Result then
+    for i := 1 to Length(Valor) do
+      if not (Valor[i] in ['0'..'9']) then
+      begin
+        Result := False;
+        Break;
+      end;
+end;
+
+procedure InitializeWizard;
+begin
+  { Instalador UNIVERSAL (como Office/Corel): a identidade da gráfica é
+    informada na instalação, não embutida no pacote. O .env embutido não tem
+    CNPJ; o assistente grava o inquilino no .env da instalação. }
+  PaginaTenant := CreateInputQueryPage(wpWelcome,
+    'Gráfica (inquilino)',
+    'Identifique a gráfica atendida por este servidor',
+    'O mesmo instalador atende todas as gráficas. Informe o CNPJ da gráfica ' +
+    '(como a chave de produto de um programa licenciado) — ele fica gravado ' +
+    'no .env da instalação e define o inquilino dos dados.');
+  PaginaTenant.Add('CNPJ da gráfica (14 dígitos):', False);
+  PaginaTenant.Add('Razão social (opcional):', False);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = PaginaTenant.ID then
+  begin
+    if not CnpjValido(Trim(PaginaTenant.Values[0])) then
+    begin
+      MsgBox('CNPJ inválido: informe os 14 dígitos, somente números.', mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    { Grava o inquilino no .env da instalação (o Local API Service le ao subir). }
+    SaveStringToFile(ExpandConstant('{app}\PrintGestAPI\.env'),
+      'PRINTGEST_EMPRESA_CNPJ=' + Trim(PaginaTenant.Values[0]) + #13#10 +
+      'PRINTGEST_EMPRESA_RAZAO_SOCIAL=' + Trim(PaginaTenant.Values[1]) + #13#10,
+      True);
+  end;
+end;
 #endif

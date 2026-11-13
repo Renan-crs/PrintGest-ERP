@@ -88,8 +88,10 @@ if ($ehServidor) {
     $contrato = Ler-Chave (Get-Content $envBase) "PRINTGEST_REDGEST_CONTRATO"
     $apiChave = Ler-Chave (Get-Content $envBase) "PRINTGEST_REDGEST_API_KEY"
     
+    # Instalador UNIVERSAL: o CNPJ/razao da gráfica NÃO vai no .env embutido —
+    # o assistente de instalação pergunta e grava no .env da instalação.
     $linhas = @(Get-Content $envBase | Where-Object {
-        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV|DATABASE_URL)\s*='
+        $_ -notmatch '^\s*PRINTGEST_(PG_EMBARCADO|API_HOST|ENV|DATABASE_URL|EMPRESA_CNPJ|EMPRESA_RAZAO_SOCIAL|EMPRESA_FILIAL_NOME)\s*='
     })
     
     # Extrair DATABASE_URL se existir (apenas o valor, sem o nome da variável)
@@ -155,7 +157,10 @@ if ($ehServidor) {
     }
     $conteudo = @($dbUrlVar) + $linhas + @(
         "",
-        "# Instalacao empacotada (gerado por scripts/empacotar.ps1)"
+        "# Instalacao empacotada (gerado por scripts/empacotar.ps1)",
+        "# Inquilino (PRINTGEST_EMPRESA_CNPJ) e gravado pelo assistente de",
+        "# instalacao no .env desta pasta - instalador universal para todas",
+        "# as graficas."
     ) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
     $conteudo | Set-Content -Path (Join-Path $dist "PrintGestAPI\.env") -Encoding utf8
 } else {

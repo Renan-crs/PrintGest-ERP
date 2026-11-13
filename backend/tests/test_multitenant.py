@@ -160,6 +160,32 @@ def test_licenca_e_por_inquilino_no_banco_compartilhado(client, monkeypatch):
         sessao.close()
 
 
+@pytest.mark.usefixtures("_dois_inquilinos")
+def test_ativar_com_cnpj_de_outro_inquilino_e_recusado(client, monkeypatch):
+    """O instalador fixa o CNPJ; ativar com CNPJ alheio não aplica a licença
+    de outra gráfica nesta instalação."""
+    monkeypatch.setattr(settings, "empresa_cnpj", CNPJ_A)
+    monkeypatch.setattr(settings, "redgest_contrato", "b")
+    monkeypatch.setattr(settings, "licenca_desabilitada", False)
+
+    resp = client.post(
+        "/v1/licenca/ativar",
+        json={"cnpj": CNPJ_B, "codigo_licenca": "CODIGO-X"},
+    )
+
+    assert resp.status_code == 400
+    assert "não corresponde" in resp.json()["detail"]
+
+
+@pytest.mark.usefixtures("_dois_inquilinos")
+def test_situacao_expoe_inquilino_instalado(client, monkeypatch):
+    """A tela de ativação usa esses campos para pré-preencher o CNPJ."""
+    monkeypatch.setattr(settings, "empresa_cnpj", CNPJ_A)
+    sit = client.get("/v1/licenca").json()["data"]
+    assert sit["empresa_cnpj"] == CNPJ_A
+    assert sit["empresa_razao_social"]  # fallback "Gráfica <CNPJ>" do bootstrap
+
+
 def test_bootstrap_tenant_e_idempotente(client, monkeypatch):
     """Bootstrap repetido não duplica empresa/filial/admin do inquilino."""
     from app import bootstrap

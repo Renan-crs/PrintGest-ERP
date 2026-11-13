@@ -59,6 +59,7 @@ from sqlalchemy.orm import Session
 from app.core import cofre
 from app.core.config import settings
 from app.db import SessionLocal
+from app.models.core import Empresa
 from app.models.licenca import Licenca
 from app.services import tenants
 
@@ -464,6 +465,21 @@ def _empresa_tenant_id(db: Session) -> int | None:
     return tenants.empresa_id_do_tenant(db)
 
 
+def dados_do_tenant(db: Session) -> dict:
+    """Inquilino da instalação para a UI (`None` no modo legado).
+
+    A tela de ativação usa para mostrar "instalado para" e pré-preencher o
+    CNPJ — o instalador universal pergunta o CNPJ na instalação.
+    """
+    empresa_id = _empresa_tenant_id(db)
+    if empresa_id is None:
+        return {}
+    empresa = db.get(Empresa, empresa_id)
+    if empresa is None:
+        return {}
+    return {"empresa_cnpj": empresa.cnpj, "empresa_razao_social": empresa.razao_social}
+
+
 @functools.lru_cache(maxsize=8)
 def _abrir_chave(guardada: str) -> str:
     """Abre a chave no cofre do SO (cacheado por valor guardado)."""
@@ -610,6 +626,7 @@ def situacao(db: Session) -> dict:
         "ultima_validacao": lic.ultima_validacao if lic else None,
         "ultima_tentativa_em": lic.ultima_tentativa_em if lic else None,
         "ultimo_erro": lic.ultimo_erro if lic else None,
+        **dados_do_tenant(db),
     }
 
 

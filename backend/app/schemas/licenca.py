@@ -51,3 +51,6 @@ class LicencaSituacaoOut(BaseModel):
     ultima_validacao: datetime | None = None
     ultima_tentativa_em: datetime | None = None
     ultimo_erro: str | None = None
+    # Multi-tenant: inquilino instalado (None no modo legado/dev).
+    empresa_cnpj: str | None = None
+    empresa_razao_social: str | None = None
