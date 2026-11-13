@@ -724,8 +724,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         col_d.addWidget(titulo_pag)
 
         self._cliente = CampoCombo("Cliente", [(None, "Consumidor final")])
-        self._cliente_nome_avulso = CampoTexto(
-            "Nome do cliente", placeholder="Cliente não cadastrado (opcional)"
+        self._cliente_nome_avulso = CampoTexto("Nome do cliente")
+        self._cliente_nome_avulso.widget.setPlaceholderText(
+            "Cliente não cadastrado (opcional)"
         )
         self._vendedor = CampoCombo("Vendedor", [])
         self._vendedor.widget.setPlaceholderText("Selecione o vendedor")
