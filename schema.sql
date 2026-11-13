@@ -367,6 +367,7 @@ CREATE TABLE venda_balcao (
     numero             INTEGER NOT NULL DEFAULT nextval('seq_venda_numero'),
     status             status_venda NOT NULL DEFAULT 'ok',
     cliente_id         BIGINT REFERENCES cliente (id),   -- NULL = consumidor final
+    cliente_nome_avulso VARCHAR(160),                         -- cliente informado no PDV (não cadastrado)
     vendedor_id        BIGINT REFERENCES funcionario (id),
     operador_caixa     BIGINT REFERENCES usuario (id),
     data_venda         DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -375,6 +376,8 @@ CREATE TABLE venda_balcao (
     valor_total        NUMERIC(14,2) NOT NULL DEFAULT 0,
     forma_pagamento    forma_pagamento NOT NULL,
     parcelas           INTEGER NOT NULL DEFAULT 1,        -- parcelamento (fiado/cartão)
+    valor_recebido     NUMERIC(14,2),                     -- valor entregue (dinheiro)
+    troco              NUMERIC(14,2),                     -- troco registrado
     caixa_id           BIGINT REFERENCES caixa (id),                        -- preenchido no lançamento do caixa
     documento_fiscal_id BIGINT REFERENCES documento_fiscal (id),          -- lançado após emissão (6.1)
     observacoes        TEXT,

@@ -72,7 +72,9 @@ def _totais(itens: list[VendaBalcaoItem], desconto: Decimal) -> tuple[Decimal, D
 
 def _para_out(venda: VendaBalcao) -> VendaOut:
     dados = {c.name: getattr(venda, c.name) for c in venda.__table__.columns}
-    dados["cliente_nome"] = venda.cliente.nome_razao if venda.cliente else None
+    nome_avulso = (getattr(venda, "cliente_nome_avulso", None) or "").strip() or None
+    dados["cliente_nome"] = venda.cliente.nome_razao if venda.cliente else nome_avulso
+    dados["cliente_nome_avulso"] = nome_avulso
     dados["vendedor_nome"] = venda.vendedor.nome if venda.vendedor else None
     dados["operador_caixa_nome"] = venda.operador.nome if venda.operador else None
     dados["itens"] = [
@@ -164,10 +166,25 @@ def criar(
     itens = _montar_itens(dados.itens)
     valor_itens, valor_total = _totais(itens, dados.desconto)
 
+    cliente_nome_avulso = (dados.cliente_nome_avulso or "").strip() or None
+    if dados.cliente_id:
+        cliente_nome_avulso = None
+
+    valor_recebido = None
+    troco = None
+    if dados.valor_recebido is not None:
+        valor_recebido = _q(dados.valor_recebido)
+    if dados.forma_pagamento == FormaPagamento.DINHEIRO and valor_recebido is not None:
+        troco_calc = valor_recebido - valor_total
+        troco = _q(troco_calc) if troco_calc > 0 else Decimal("0.00")
+    elif dados.troco is not None:
+        troco = _q(dados.troco)
+
     venda = VendaBalcao(
         filial_id=filial_id,
         status=StatusVenda.OK,
         cliente_id=dados.cliente_id,
+        cliente_nome_avulso=cliente_nome_avulso,
         vendedor_id=dados.vendedor_id,
         operador_caixa=usuario_id,
         data_venda=dados.data_venda,
@@ -176,6 +193,8 @@ def criar(
         valor_total=valor_total,
         forma_pagamento=dados.forma_pagamento,
         parcelas=dados.parcelas,
+        valor_recebido=valor_recebido,
+        troco=troco,
         observacoes=dados.observacoes,
         itens=itens,
     )

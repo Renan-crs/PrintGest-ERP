@@ -14,6 +14,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from datetime import date, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +24,7 @@ from app.api import api
 from app.bootstrap import rodar_bootstrap
 from app.core.config import settings
 from app.core.migrations import aplicar_migrations
-from app.services import gating, licensa_service
+from app.services import financeiro_service, gating, licensa_service
 
 logger = logging.getLogger("printgest")
 
@@ -81,6 +82,35 @@ def _caminho_permitido(path: str) -> bool:
     return path.startswith(_CAMINHOS_PERMITIDOS)
 
 
+async def _loop_fechamento_automatico_caixa() -> None:
+    """Fecha caixas abertos automaticamente às 23:00 (hora local) se não fechados."""
+    ultimo_dia: date | None = None
+    while True:
+        try:
+            agora = datetime.now()
+            if agora.hour == 23 and agora.minute == 0 and ultimo_dia != agora.date():
+                from app.db import SessionLocal
+
+                db = SessionLocal()
+                try:
+                    fechados = financeiro_service.fechar_caixas_abertos_automaticamente(
+                        db
+                    )
+                    ultimo_dia = agora.date()
+                    if fechados:
+                        logger.info(
+                            "Fechamento automático de caixa às 23:00: %s caixa(s) fechado(s).",
+                            fechados,
+                        )
+                finally:
+                    db.close()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Falha no fechamento automático de caixa")
+        await asyncio.sleep(30)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # P17: falha cedo quando defaults de desenvolvimento estão ativos em produção.
@@ -97,7 +127,9 @@ async def lifespan(_: FastAPI):
     iniciar_keepalive()
     # Fase 4: mantém a licença renovada; sem ativação, apenas recalcula o modo.
     tarefa_renovacao = asyncio.create_task(licensa_service.loop_renovacao())
+    tarefa_fechamento = asyncio.create_task(_loop_fechamento_automatico_caixa())
     yield
+    tarefa_fechamento.cancel()
     tarefa_renovacao.cancel()
 
 

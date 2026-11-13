@@ -420,6 +420,7 @@ class VendaBalcao(Base):
         pg_enum(StatusVenda), nullable=False, server_default=StatusVenda.OK.value
     )
     cliente_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("cliente.id"))
+    cliente_nome_avulso: Mapped[str | None] = mapped_column(String(160), nullable=True)
     vendedor_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("funcionario.id")
     )
@@ -436,6 +437,10 @@ class VendaBalcao(Base):
         pg_enum(FormaPagamento), nullable=False
     )
     parcelas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    valor_recebido: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2), nullable=True
+    )
+    troco: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     caixa_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("caixa.id"))
     documento_fiscal_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("documento_fiscal.id")

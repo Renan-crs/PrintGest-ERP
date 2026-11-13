@@ -24,11 +24,16 @@ class VendaItemIn(BaseModel):
 
 class VendaCreate(BaseModel):
     cliente_id: int | None = None
+    # Nome informado no PDV para cliente não cadastrado (consumidor identificado).
+    cliente_nome_avulso: str | None = Field(default=None, max_length=160)
     vendedor_id: int | None = None
     data_venda: date = Field(default_factory=date.today)
     desconto: Decimal = Field(default=Decimal(0), ge=0)
     forma_pagamento: FormaPagamento
     parcelas: int = Field(default=1, ge=1)
+    # Valor entregue pelo cliente (dinheiro) e troco calculado/registrado.
+    valor_recebido: Decimal | None = Field(default=None, ge=0)
+    troco: Decimal | None = Field(default=None, ge=0)
     observacoes: str | None = None
     # Confirmação do recebimento antecipado (exigido pelo cliente, quando houver).
     pagamento_confirmado: bool = False
@@ -53,6 +58,7 @@ class VendaOut(ORMModel):
     status: StatusVenda
     cliente_id: int | None = None
     cliente_nome: str | None = None
+    cliente_nome_avulso: str | None = None
     vendedor_id: int | None = None
     vendedor_nome: str | None = None
     operador_caixa: int | None = None
@@ -63,6 +69,8 @@ class VendaOut(ORMModel):
     valor_total: Decimal
     forma_pagamento: FormaPagamento
     parcelas: int
+    valor_recebido: Decimal | None = None
+    troco: Decimal | None = None
     caixa_id: int | None = None
     documento_fiscal_id: int | None = None
     observacoes: str | None = None

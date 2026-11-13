@@ -22,6 +22,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCompleter,
+    QDialog,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -723,6 +724,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         col_d.addWidget(titulo_pag)
 
         self._cliente = CampoCombo("Cliente", [(None, "Consumidor final")])
+        self._cliente_nome_avulso = CampoTexto(
+            "Nome do cliente", placeholder="Cliente não cadastrado (opcional)"
+        )
         self._vendedor = CampoCombo("Vendedor", [])
         self._vendedor.widget.setPlaceholderText("Selecione o vendedor")
         self._vendedor.widget.setCurrentIndex(-1)
@@ -732,6 +736,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._desconto = CampoValor("Desconto")
 
         self._campo_cliente = _campo_rotulado("Cliente", self._cliente.widget)
+        self._campo_cliente_avulso = _campo_rotulado(
+            "Cliente (não cadastrado)", self._cliente_nome_avulso.widget
+        )
         self._campo_vendedor = _campo_rotulado("Vendedor", self._vendedor.widget)
         self._campo_forma = _campo_rotulado(
             "Forma de pagamento", self._forma.widget
@@ -747,12 +754,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         grade.setHorizontalSpacing(16)
         grade.setVerticalSpacing(12)
         grade.addWidget(self._campo_cliente, 0, 0, 1, 2)
-        grade.addWidget(self._campo_vendedor, 1, 0, 1, 2)
-        grade.addWidget(self._campo_forma, 2, 0)
-        grade.addWidget(self._campo_parcelas, 2, 1)
-        grade.addWidget(self._campo_recebido, 3, 0)
-        grade.addWidget(self._campo_troco, 3, 1)
-        grade.addWidget(self._campo_desconto, 4, 0)
+        grade.addWidget(self._campo_cliente_avulso, 1, 0, 1, 2)
+        grade.addWidget(self._campo_vendedor, 2, 0, 1, 2)
+        grade.addWidget(self._campo_forma, 3, 0)
+        grade.addWidget(self._campo_parcelas, 3, 1)
+        grade.addWidget(self._campo_recebido, 4, 0)
+        grade.addWidget(self._campo_troco, 4, 1)
+        grade.addWidget(self._campo_desconto, 5, 0)
         grade.setColumnStretch(0, 1)
         grade.setColumnStretch(1, 1)
         col_d.addLayout(grade)
@@ -916,11 +924,19 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     # ----------------------------------------------------------- interação
 
     def _conectar_campos(self) -> None:
-        self._cliente.widget.currentIndexChanged.connect(self._cliente_mudou)
+        self._cliente.widget.currentIndexChanged.connect(self._ao_mudar_cliente)
         self._forma.widget.currentIndexChanged.connect(self._forma_mudou)
         self._desconto.edicao.textChanged.connect(self._recalcular_totais)
         self._recebido.edicao.textChanged.connect(self._atualizar_troco)
         self._itens_editor.alterado.connect(self._recalcular_totais)
+
+    def _ao_mudar_cliente(self) -> None:
+        self._cliente_mudou()
+        # Nome avulso só faz sentido quando não há cliente cadastrado selecionado.
+        tem_cadastrado = self._cliente.valor() is not None
+        self._cliente_nome_avulso.habilitar(not tem_cadastrado)
+        if tem_cadastrado:
+            self._cliente_nome_avulso.definir("")
 
     def _forma_mudou(self) -> None:
         forma = self._forma.valor()
@@ -984,6 +1000,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _limpar_form(self) -> None:
         self._itens_editor.limpar()
         self._cliente.definir(None)
+        self._cliente_nome_avulso.definir("")
+        self._cliente_nome_avulso.habilitar(True)
         self._vendedor.definir(None)
         self._forma.definir(_FORMA_DINHEIRO)
         self._parcelas.definir("1")
@@ -992,7 +1010,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._pagamento_confirmado.definir(False)
         self._nfce.definir(False)
         self._forma_mudou()
-        self._cliente_mudou()
+        self._ao_mudar_cliente()
 
     # ------------------------------------------------------------- abas
 
@@ -1063,23 +1081,118 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _montar_acoes_linhas(self) -> None:
         coluna = self.CHAVES.index("acoes")
         for linha, dado in enumerate(self._linhas):
+            caixa = QWidget()
+            h = QHBoxLayout(caixa)
+            h.setContentsMargins(4, 0, 4, 0)
+            h.setSpacing(4)
+            btn_ver = QPushButton("Ver")
+            btn_ver.setObjectName("acaoLinha")
+            btn_ver.clicked.connect(
+                lambda _=False, vid=dado.get("id"): self._ver_detalhes(vid)
+            )
+            h.addWidget(btn_ver)
             if dado.get("status") == "ok" and not self._modo_leitura:
-                botao = QPushButton("Cancelar")
-                botao.setObjectName("acaoLinha")
-                estado_danger(botao)
-                botao.clicked.connect(
+                btn_cancelar = QPushButton("Cancelar")
+                btn_cancelar.setObjectName("acaoLinha")
+                estado_danger(btn_cancelar)
+                btn_cancelar.clicked.connect(
                     lambda _=False, alvo=dado: self._cancelar_venda(alvo)
                 )
-                self._tabela.setCellWidget(linha, coluna, botao)
-            else:
-                vazio = QLabel("—")
-                vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                estado_muted(vazio)
-                self._tabela.setCellWidget(linha, coluna, vazio)
+                h.addWidget(btn_cancelar)
+            h.addStretch(1)
+            self._tabela.setCellWidget(linha, coluna, caixa)
             for c in range(len(self.CHAVES)):
                 item = self._tabela.item(linha, c)
                 if item is not None:
                     item.setToolTip(item.text())
+
+    def _ver_detalhes(self, venda_id) -> None:
+        if venda_id is None:
+            return
+
+        def ok(dado: dict) -> None:
+            venda = dado.get("data", dado) if isinstance(dado, dict) else dado
+            self._mostrar_dialogo_detalhes(venda)
+
+        def erro(msg: str) -> None:
+            QMessageBox.warning(self, "Venda", msg)
+
+        tarefas.rodar(lambda: self._api.obter("vendas", venda_id), on_ok=ok, on_erro=erro)
+
+    def _mostrar_dialogo_detalhes(self, venda: dict) -> None:
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Venda Nº {venda.get('numero', '')}")
+        dlg.resize(760, 520)
+        layout = QVBoxLayout(dlg)
+
+        grade = QGridLayout()
+        campos = [
+            ("Data", formatar_data_iso(venda.get("data_venda"))),
+            ("Cliente", venda.get("cliente_nome") or "Consumidor final"),
+            ("Vendedor", venda.get("vendedor_nome") or "—"),
+            ("Operador", venda.get("operador_caixa_nome") or "—"),
+            ("Status", _ROTULO_STATUS.get(str(venda.get("status") or ""), str(venda.get("status") or ""))),
+            ("Pagamento", _ROTULO_PAGAMENTO.get(str(venda.get("forma_pagamento") or ""), str(venda.get("forma_pagamento") or ""))),
+            ("Parcelas", str(venda.get("parcelas") or 1)),
+            ("Valor itens", formatar_moeda(venda.get("valor_itens"))),
+            ("Desconto", formatar_moeda(venda.get("desconto"))),
+            ("Total", formatar_moeda(venda.get("valor_total"))),
+            ("Valor recebido", formatar_moeda(venda.get("valor_recebido")) if venda.get("valor_recebido") is not None else "—"),
+            ("Troco", formatar_moeda(venda.get("troco")) if venda.get("troco") is not None else "—"),
+        ]
+        for i, (rotulo, valor) in enumerate(campos):
+            lbl_r = QLabel(f"<b>{rotulo}:</b>")
+            lbl_v = QLabel(str(valor))
+            lbl_v.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            grade.addWidget(lbl_r, i // 2, (i % 2) * 2)
+            grade.addWidget(lbl_v, i // 2, (i % 2) * 2 + 1)
+        layout.addLayout(grade)
+
+        obs = venda.get("observacoes")
+        if obs:
+            lbl_obs = QLabel(f"<b>Observações:</b> {obs}")
+            lbl_obs.setWordWrap(True)
+            layout.addWidget(lbl_obs)
+
+        lbl_itens = QLabel("<b>Itens / produtos vendidos</b>")
+        layout.addWidget(lbl_itens)
+        tabela = QTableWidget(0, 5)
+        tabela.setHorizontalHeaderLabels(["Descrição", "Qtd", "Valor unit.", "Desconto", "Total"])
+        tabela.verticalHeader().setVisible(False)
+        tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        cab = tabela.horizontalHeader()
+        cab.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col in range(1, 5):
+            cab.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        itens = venda.get("itens") or []
+        tabela.setRowCount(len(itens))
+        produtos = getattr(self._itens_editor, "_produtos", {}) or {}
+        for r, it in enumerate(itens):
+            pid = it.get("produto_id")
+            nome_prod = (produtos.get(pid) or {}).get("nome") if pid else None
+            desc = (
+                it.get("descricao_avulsa")
+                or nome_prod
+                or (f"Produto #{pid}" if pid else "—")
+            )
+            vals = [
+                str(desc),
+                _texto_numero(it.get("quantidade")),
+                formatar_moeda(it.get("valor_unitario")),
+                formatar_moeda(it.get("desconto")),
+                formatar_moeda(it.get("valor_total")),
+            ]
+            for c, v in enumerate(vals):
+                item = QTableWidgetItem(v)
+                if c > 0:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                tabela.setItem(r, c, item)
+        layout.addWidget(tabela, 1)
+
+        btn = QPushButton("Fechar")
+        btn.clicked.connect(dlg.accept)
+        layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignRight)
+        dlg.exec()
 
     def _cancelar_venda(self, dado: dict) -> None:
         resposta = QMessageBox.question(
@@ -1121,8 +1234,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             parcelas = int((self._parcelas.valor() or "1").strip() or "1")
         else:
             parcelas = 1
-        return {
+        payload = {
             "cliente_id": self._cliente.valor(),
+            "cliente_nome_avulso": (self._cliente_nome_avulso.valor() or "").strip() or None,
             "vendedor_id": self._vendedor.valor(),
             "desconto": str(_dec(self._desconto.valor())),
             "forma_pagamento": forma,
@@ -1130,6 +1244,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             "pagamento_confirmado": self._pagamento_confirmado.valor(),
             "itens": self._itens_editor.valor(),
         }
+        if forma == _FORMA_DINHEIRO:
+            recebido = _dec(self._recebido.valor())
+            if recebido > 0:
+                payload["valor_recebido"] = str(recebido)
+                troco = recebido - self._total_venda
+                payload["troco"] = str(troco if troco > 0 else Decimal("0"))
+        return payload
 
     def _salvar(self) -> None:
         if self._modo_leitura:
@@ -1204,6 +1325,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._btn_cancelar.setEnabled(ligado)
         for campo in (
             self._cliente,
+            self._cliente_nome_avulso,
             self._vendedor,
             self._forma,
             self._parcelas,
@@ -1214,6 +1336,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         ):
             campo.habilitar(ligado)
         self._itens_editor.habilitar(ligado)
+        self._ao_mudar_cliente()
         self._atualizar_estado_finalizar()
 
     # ------------------------------------------------------------ atalhos

@@ -326,3 +326,31 @@ def baixar_conta_pagar(
     item = {c.name: getattr(conta, c.name) for c in ContaPagar.__table__.columns}
     item["fornecedor_nome"] = nome
     return item
+
+
+def fechar_caixas_abertos_automaticamente(db: Session) -> int:
+    """Fecha todos os caixas abertos (fechamento automático programado).
+
+    Usa `valor_informado = valor_esperado` (diferença zero) quando não houve
+    conferência manual. Retorna a quantidade de caixas fechados.
+    """
+    abertos = db.query(Caixa).filter(Caixa.status == StatusCaixa.ABERTO).all()
+    fechados = 0
+    agora = datetime.now(UTC)
+    for caixa in abertos:
+        entradas, saidas = _totais(db, caixa)
+        esperado = _q(caixa.valor_abertura) + entradas - saidas
+        caixa.valor_esperado = esperado
+        caixa.valor_informado = esperado
+        caixa.diferenca = _q(Decimal(0))
+        caixa.status = StatusCaixa.FECHADO
+        caixa.data_fechamento = agora
+        caixa.closed_user_id = caixa.usuario_id
+        nota = "Fechamento automático às 23:00 (sem conferência manual)."
+        caixa.observacoes = (
+            f"{caixa.observacoes}\n{nota}".strip() if caixa.observacoes else nota
+        )
+        fechados += 1
+    if fechados:
+        db.commit()
+    return fechados
