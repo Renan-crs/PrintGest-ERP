@@ -94,6 +94,8 @@ class Api:
         )
         self._token: str | None = None
         self._usuario: dict | None = None
+        # Último status HTTP recebido (qualquer thread; leitura tolerante).
+        self.ultimo_status: int | None = None
 
     @property
     def base_url_display(self) -> str:
@@ -515,6 +517,14 @@ class Api:
     def situacao_licenca(self, token: str | None = None) -> dict:
         return self._get("/v1/licenca", token)
 
+    def validar_sessao(self) -> dict:
+        """Valida o token no servidor (`GET /v1/auth/me` exige autenticação).
+
+        Usado na restauração da sessão salva: `/v1/licenca` não autentica, então
+        um token morto passaria pela checagem e só quebraria depois.
+        """
+        return self._get("/v1/auth/me", self._token)
+
     # A ativação conversa com o RedGest, que em plano gratuito acorda em 30–60 s
     # (PRD §4.3: timeout ≥ 90 s). O timeout padrão do cliente (8 s) serviria só
     # para o daemon local — aqui a chamada atravessa daemon + RedGest.
@@ -738,8 +748,10 @@ class Api:
     def _headers(token: str | None) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"} if token else {}
 
-    @staticmethod
-    def _tratar(resp: httpx.Response) -> dict:
+    def _tratar(self, resp: httpx.Response) -> dict:
+        # Último status HTTP visto — a restauração de sessão usa para
+        # distinguir token recusado (401) de daemon indisponível (transporte).
+        self.ultimo_status = resp.status_code
         if resp.status_code >= 400:
             raise ApiError(_detalhe(resp), resp.status_code)
         return resp.json()["data"]

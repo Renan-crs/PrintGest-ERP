@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     # usuário precisava refazer. 120 s mantém o compute acordado; 0 desliga
     # (ex.: banco sempre quente por outro motivo ou plano sem horas ociosas).
     db_keepalive_segundos: int = 120
-    session_ttl_minutes: int = 60
+    # Sessão de usuário (regra de produto): repetir login APENAS ao reiniciar o
+    # computador ou no "Sair". O TTL é deslizante (renova quando falta menos da
+    # metade — `deps._autenticar`), então 7 dias na prática não expulsa por
+    # inatividade no expediente; encerra sessões abandonadas por semanas.
+    # Revogação imediata continua existindo: Sair, troca/reset de senha e
+    # revogação admin (`usuario_sessao.encerrada`).
+    session_ttl_minutes: int = 60 * 24 * 7
     login_max_falhas: int = 5
     bloqueio_minutos: int = 30
     admin_inicial_login: str = "admin"

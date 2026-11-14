@@ -128,13 +128,14 @@ class _Roteador:
 
     def iniciar(self) -> None:
         """Ponto de entrada: o serial precede o login (gate de instalação).
-        
-        Verifica primeiro se há sessão salva localmente (não expira entre
-        reinicializações). Se houver, tenta restaurar a sessão antes de pedir
-        login novamente.
+
+        Sessão persistente (regra de produto): login se repete apenas quando o
+        **computador reinicia** (`sessao.tempo_boot` muda) ou o usuário clica em
+        **Sair**. Fechar/abrir o programa, inatividade e reinício do daemon não
+        pedem login de novo.
         """
-        # Primeiro verifica se há sessão salva (sessão persiste entre reinicições)
-        if not self._licenca_desabilitada and not self._estacao:
+        # Sessão salva (servidor e estação; dev não persiste).
+        if not self._licenca_desabilitada:
             sessao = carregar_sessao()
             if sessao:
                 self._sessao_salva = True
@@ -145,20 +146,51 @@ class _Roteador:
                 self._api.autenticar(
                     {"token": sessao["token"], "usuario": sessao["usuario"]}
                 )
-                # Verifica rapidamente se a sessão ainda é válida
+                # O daemon pode estar acordando (Neon/cold start): espera
+                # saúde antes do probe — um erro de transporte NÃO pode destruir
+                # a sessão salva.
+                _aguardar_daemon_pronto(10.0)
+                # Valida o token no servidor (`/v1/auth/me` exige autenticação;
+                # `/v1/licenca` não valida token e deixaria token morto passar).
                 rodar(
-                    lambda: self._api.situacao_licenca(self._token),
-                    on_ok=self._situacao_com_sessao,
-                    on_erro=self._sessao_invalida,
+                    self._api.validar_sessao,
+                    on_ok=self._sessao_validada,
+                    on_erro=self._falha_restauracao,
                 )
                 return
-        
+
         # Fluxo normal (sem sessão salva ou modo desenvolvimento)
         if self._licenca_desabilitada or self._estacao:
             self._abrir_login()
             return
         self._verificar_licenca()
-    
+
+    def _sessao_validada(self, usuario: dict) -> None:
+        """Token confirmado pelo servidor: segue para o dashboard."""
+        if self._estacao:
+            # Na estação a licença é do servidor (modo leitura chega como 423);
+            # abre direto — sem tela de ativação/renovação local.
+            self._abrir_dashboard(False)
+            return
+        rodar(
+            lambda: self._api.situacao_licenca(self._token),
+            on_ok=self._situacao_com_sessao,
+            on_erro=self._sem_daemon,
+        )
+
+    def _falha_restauracao(self, msg: str) -> None:
+        """Falha ao validar a sessão salva na abertura.
+
+        Token recusado (401: sessão encerrada/revogada no servidor) → limpa e
+        pede login. Erro de transporte (daemon caído/rede) → mantém a sessão e
+        oferece tentar de novo — destruir a cópia aqui devolvia o usuário à
+        tela de login a cada boot frio do daemon.
+        """
+        if getattr(self._api, "ultimo_status", None) == 401:
+            self._sessao_invalida(msg)
+            return
+        self._sem_daemon(msg)
+
     def _situacao_com_sessao(self, sit: dict) -> None:
         """Trata a situação quando a sessão foi restaurada com sucesso."""
         status = sit["status"]
@@ -174,11 +206,12 @@ class _Roteador:
             self._abrir_modo_leitura(sit)
         else:
             self._abrir_dashboard(False, sit=sit)
-    
+
     def _sessao_invalida(self, msg: str) -> None:
         """A sessão salva está expirada ou inválida - limpa e abre login."""
         limpar_sessao()
         self._token = None
+        self._api.encerrar_sessao()
         self._sessao_salva = False
         QMessageBox.information(
             None, "Sessão encerrada",
@@ -238,9 +271,10 @@ class _Roteador:
     def _pos_login(self, dados: dict) -> None:
         self._token = dados["token"]
         self._api.autenticar(dados)
-        
-        # Salvar sessão para persistência entre reinicializações
-        if not self._licenca_desabilitada and not self._estacao:
+
+        # Sessão persistente (servidor e estação): repetir login só ao reiniciar
+        # o computador ou no "Sair". Dev (licença desabilitada) não persiste.
+        if not self._licenca_desabilitada:
             salvar_sessao(dados["token"], dados["usuario"])
         
         if self._licenca_desabilitada:
