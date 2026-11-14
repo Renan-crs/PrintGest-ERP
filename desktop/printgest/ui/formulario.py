@@ -262,6 +262,7 @@ class CampoArea(CampoForm):
     def __init__(self, rotulo: str, valor="", linhas: int = 3) -> None:
         super().__init__(rotulo)
         self._area = QPlainTextEdit(valor)
+        self._area.setProperty("formCampo", "true")
         self._area.setMinimumHeight(20 + linhas * 16)
         self._area.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
@@ -347,6 +348,8 @@ class CampoDataHora(CampoForm):
         self._data = QDateEdit()
         self._data.setCalendarPopup(True)
         self._data.setDisplayFormat("dd/MM/yyyy")
+        # Largura mínima: com o painel estreito o ano era truncado ("13/11/20").
+        self._data.setMinimumWidth(110)
         self._data.setDate(QDate.currentDate())
         self._hora = QTimeEdit()
         self._hora.setDisplayFormat("HH:mm")

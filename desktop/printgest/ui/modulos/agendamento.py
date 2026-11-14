@@ -658,6 +658,10 @@ class PaginaAgendamento(QWidget):
         g3 = grade_campos()
         dispor_campos(g3, [self._campo_os, self._status])
         grade.addLayout(g3)
+        # O status nasce oculto (só aparece ao editar); `visivel()` precisa
+        # rodar DEPOIS de `dispor_campos`, senão só o combo é escondido e o
+        # rótulo fica órfão na grade (achado da revisão de telas).
+        self._status.visivel(False)
         g4 = grade_campos()
         dispor_campos(g4, [self._descricao.larga()])
         grade.addLayout(g4)
@@ -675,7 +679,7 @@ class PaginaAgendamento(QWidget):
         estado_erro(self._btn_excluir)
         self._btn_excluir.clicked.connect(self._excluir)
         cancelar, self._btn_cancelar = botao_com_atalho("Cancelar", "Esc")
-        salvar, self._btn_salvar = botao_com_atalho("Salvar Alterações", "F10", "primary")
+        salvar, self._btn_salvar = botao_com_atalho("Salvar", "F10", "primary")
         rl.addWidget(self._btn_concluir)
         rl.addWidget(self._btn_excluir)
         rl.addWidget(cancelar)
@@ -693,6 +697,7 @@ class PaginaAgendamento(QWidget):
             return
         self._editando_id = None
         self._form_titulo.setText(self.ROTULO_NOVO)
+        self._btn_salvar.setText("Salvar")
         self._titulo.definir("")
         self._tipo.definir("producao")
         self._inicio.definir(datetime.now().replace(second=0, microsecond=0))
@@ -717,6 +722,7 @@ class PaginaAgendamento(QWidget):
     def _receber_compromisso(self, dado: dict) -> None:
         self._editando_id = dado.get("id")
         self._form_titulo.setText(f"Agendamento Nº {self._editando_id}")
+        self._btn_salvar.setText("Salvar Alterações")
         self._titulo.definir(dado.get("titulo") or "")
         self._tipo.definir(dado.get("tipo") or "producao")
         self._inicio.definir(dado.get("data_hora_inicio"))

@@ -200,6 +200,13 @@ def caixa_admin(_banco_teste):
             criado = True
         yield caixa
         if criado:
+            # Vendas podem referenciar o caixa (`venda.caixa_id`) — desvincula
+            # antes de remover (FK venda_balcao_caixa_id_fkey).
+            from app.models.movimento import VendaBalcao
+
+            db.query(VendaBalcao).filter(VendaBalcao.caixa_id == caixa.id).update(
+                {VendaBalcao.caixa_id: None}
+            )
             db.query(MovimentoCaixa).filter(
                 MovimentoCaixa.caixa_id == caixa.id
             ).delete()

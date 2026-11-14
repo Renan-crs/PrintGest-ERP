@@ -105,7 +105,22 @@ QWidget#botaoKbd, QWidget#cardBaixo, QWidget#caixaForma { background: transparen
 QWidget#passo { background-color: %surface-muted%; border: 1px solid %borda%; border-radius: 6px; }
 QWidget#passo[passoAtivo="true"] { background-color: %primary-container%; border: 1px solid %primary%; }
 
+/* Área de texto informativa (fora de formulários): sem caixa, texto muted. */
 QPlainTextEdit { background: transparent; border: none; color: %texto-muted%; font-size: 12px; }
+
+/* Campo de formulário (CampoArea — Descrição/Observações): mesma caixa do
+   QLineEdit; a regra global acima o apagava (achado da revisão de telas). */
+QPlainTextEdit[formCampo="true"] {
+    background-color: %canvas%;
+    border: 1px solid %borda%;
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: %texto%;
+    font-size: 13px;
+    selection-background-color: %primary-container%;
+}
+QPlainTextEdit[formCampo="true"]:hover { border-color: %borda-forte%; }
+QPlainTextEdit[formCampo="true"]:focus { border: 1px solid %primary%; }
 
 /* Selos: pílula cheia, sem contorno pesado (§16 simplicidade). */
 QLabel[badge] {

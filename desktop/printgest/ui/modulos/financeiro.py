@@ -129,7 +129,6 @@ class PaginaCaixa(QWidget):
             [3, 2, 6, 3],
         )
         self._tabela.formata = self._formatar_mov
-        self._tabela.estado_vazio("Sem movimentos — abra o caixa à direita (F6).")
         col.addWidget(self._tabela, 1)
         self._paginador = Paginador()
         self._paginador.mudou.connect(self._carregar_extrato)
@@ -248,6 +247,13 @@ class PaginaCaixa(QWidget):
         self._painel_fechamento.setVisible(aberto)
         self._titulo_painel.setText(
             "Abertura de Caixa" if not aberto else "Movimento & Fechamento"
+        )
+        # Estado vazio do extrato coerente com o status (não pedir para abrir
+        # o caixa quando ele já está aberto — achado da revisão de telas).
+        self._tabela.estado_vazio(
+            "Sem movimentos - abra o caixa à direita (F6)."
+            if not aberto
+            else "Nenhum movimento registrado neste caixa ainda."
         )
 
         if aberto:

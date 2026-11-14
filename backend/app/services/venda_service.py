@@ -17,7 +17,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.cadastros import Cliente, MovimentoEstoque, Produto, ProdutoEstoque
-from app.models.enums import FormaPagamento, OrigemMov, StatusVenda, TipoMovEstoque
+from app.models.enums import (
+    FormaPagamento,
+    OrigemMov,
+    StatusCaixa,
+    StatusVenda,
+    TipoMovCaixa,
+    TipoMovEstoque,
+)
+from app.models.financeiro import Caixa, MovimentoCaixa
 from app.models.movimento import VendaBalcao, VendaBalcaoItem
 from app.schemas.venda import (
     VendaCreate,
@@ -156,6 +164,46 @@ def _baixar_estoque(
         )
 
 
+def _registrar_no_caixa(
+    db: Session,
+    *,
+    filial_id: int,
+    usuario_id: int,
+    venda: VendaBalcao,
+) -> None:
+    """Lança a venda no caixa aberto do operador (entrada do valor total).
+
+    FIADO não entra no caixa (não houve recebimento — a conta fica a receber);
+    as demais formas entraram no caixa no momento da venda. Preenche
+    `venda.caixa_id` para o extrato rastrear o documento de origem.
+    """
+    if venda.forma_pagamento == FormaPagamento.FIADO:
+        return
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.filial_id == filial_id,
+            Caixa.usuario_id == usuario_id,
+            Caixa.status == StatusCaixa.ABERTO,
+        )
+        .first()
+    )
+    if caixa is None:
+        return  # a rota já exige caixa aberto; resguardo para chamadas internas
+    venda.caixa_id = caixa.id
+    db.add(
+        MovimentoCaixa(
+            caixa_id=caixa.id,
+            tipo=TipoMovCaixa.ENTRADA,
+            venda_balcao_id=venda.id,
+            descricao=f"Venda de balcão Nº {venda.numero} "
+            f"({FormaPagamento(venda.forma_pagamento).value})",
+            valor=_q(venda.valor_total),
+            usuario_id=usuario_id,
+        )
+    )
+
+
 def criar(
     db: Session,
     *,
@@ -214,6 +262,7 @@ def criar(
                 venda_balcao_id=venda.id,
             )
         _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
+        _registrar_no_caixa(db, filial_id=filial_id, usuario_id=usuario_id, venda=venda)
         db.commit()
     except HTTPException:
         db.rollback()
@@ -299,4 +348,30 @@ def cancelar(db: Session, *, filial_id: int, venda_id: int) -> None:
         )
     venda.status = StatusVenda.CANCELADO
     _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=None)
+    _estornar_caixa(db, venda=venda, filial_id=filial_id)
     db.commit()
+
+
+def _estornar_caixa(db: Session, *, venda: VendaBalcao, filial_id: int) -> None:
+    """Estorna a entrada da venda cancelada no caixa (se ainda estiver aberto).
+
+    Se o caixa da venda já foi fechado, não há como alterar o fechamento — o
+    ajuste fica na conferência (o operador lança sangria) ou no próximo caixa.
+    """
+    if venda.caixa_id is None or venda.valor_total <= 0:
+        return
+    caixa = db.get(Caixa, venda.caixa_id)
+    if caixa is None or caixa.status != StatusCaixa.ABERTO:
+        return
+    if venda.forma_pagamento == FormaPagamento.FIADO:
+        return
+    db.add(
+        MovimentoCaixa(
+            caixa_id=caixa.id,
+            tipo=TipoMovCaixa.SAIDA,
+            venda_balcao_id=venda.id,
+            descricao=f"Estorno — venda de balcão Nº {venda.numero} cancelada",
+            valor=_q(venda.valor_total),
+            usuario_id=None,
+        )
+    )
