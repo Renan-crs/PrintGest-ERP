@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
-    version: str = "0.5.2"
+    version: str = "0.5.3"
     env: str = "dev"
     # Seguro por padrão: bind apenas em localhost. O instalador fixa
     # 127.0.0.1; uma instalação que servira ESTAÇÕES em rede local sobrescreve
