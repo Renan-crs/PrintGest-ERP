@@ -16,7 +16,14 @@ from datetime import date, timedelta
 
 import httpx
 import pytest
-from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QToolButton, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QToolButton,
+    QWidget,
+)
 
 from printgest.core.api import Api
 from printgest.ui.tela_principal import TelaPrincipal
@@ -111,14 +118,19 @@ def test_sem_texto_cortado_nas_resolucoes(app, pumpar, largura, altura):
             )
 
 
-def test_grid_de_kpis_reflui(app, pumpar):
+def test_kpis_ocupam_a_linha_inteira(app, pumpar):
+    """KPIs em largura total (revisão P1#7): 4 cards para admin, um por trecho."""
     principal = _principal()
     inicio = principal._pagina_inicio
-    pumpar(lambda: inicio._kpi_vendas_valor.text() != "—")
+    pumpar(lambda: inicio._kpi_vendas_valor.text() != "-")
     grade = inicio._grade_kpi
-    assert grade.count() == 3
-    # mais estreito → mais linhas → mais alto que em uma linha larga
-    assert grade.heightForWidth(360) > grade.heightForWidth(1600)
+    # Vendas hoje, A receber, A pagar, O.S. em produção (admin/gerente)
+    assert grade.count() == 4
+    for i in range(grade.count()):
+        cartao = grade.itemAt(i).widget()
+        assert cartao.sizePolicy().horizontalPolicy() == (
+            QSizePolicy.Policy.Expanding
+        )
 
 
 def test_rotulos_de_grupo_alinhados_aos_itens(app):

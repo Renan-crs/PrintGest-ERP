@@ -28,6 +28,22 @@ class DashboardEntregaOut(BaseModel):
     atrasada: bool = False
 
 
+class DashboardPendenciasOut(BaseModel):
+    """Bloco "o que preciso fazer agora" da home (revisão de telas).
+
+    Campos financeiros (`contas_pagar_hoje`, `nfce_rejeitadas`) só vêm para
+    >= GERENTE; os demais são do operador+.
+    """
+
+    orcamentos_aguardando_aprovacao: int = 0
+    artes_aguardando_cliente: int = 0
+    os_prontas_retirada: int = 0
+    contas_pagar_hoje: Decimal | None = None
+    nfce_rejeitadas: int | None = None
+    caixa_aberto: bool = False
+    caixa_saldo: Decimal | None = None
+
+
 class DashboardResumoOut(BaseModel):
     filial_nome: str | None = None
     vendas_hoje_qtd: int = 0
@@ -41,8 +57,10 @@ class DashboardResumoOut(BaseModel):
     projetos_atrasados: int | None = None
     estoque_abaixo_minimo: int | None = None
     entregas_hoje: list[DashboardEntregaOut] | None = None
+    pendencias: DashboardPendenciasOut | None = None
     # gerencial (>= GERENTE)
     a_receber_vence_hoje: Decimal | None = None
     a_receber_atrasado: Decimal | None = None
+    a_pagar_vence_hoje: Decimal | None = None
     faturamento_previsto: list[DashboardVendaDiaOut] | None = None
     vendas_7_dias: list[DashboardVendaDiaOut] | None = None

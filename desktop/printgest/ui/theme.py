@@ -423,6 +423,9 @@ QProgressBar#barraTolerancia::chunk { background-color: %atencao%; }
    o único diferenciador (quick-reference §10 `color-guidance`/`pattern-texture`),
    por isso cada série tem rótulo textual e o previsto é mais claro + contornado. */
 QProgressBar#barraRealizado::chunk { background-color: %primary%; }
+/* Linha de base do gráfico de faturamento: fio de cabelo, como os cards. */
+QFrame#linhaBaseGrafico { color: %borda%; background-color: %borda%; max-height: 1px; border: none; }
+QFrame#divisorHojeGrafico { color: %borda-forte%; background-color: %borda-forte%; max-width: 1px; border: none; }
 QProgressBar#barraPrevisto {
     background-color: %surface%;
     border: 1px dashed %borda-forte%;

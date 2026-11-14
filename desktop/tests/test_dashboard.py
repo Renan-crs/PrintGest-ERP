@@ -130,10 +130,10 @@ def test_admin_ve_cards_reais_e_filial_no_cabecalho(app, pumpar):
     # atraso não depende só da cor: o texto carrega o aviso (§1 color-not-only)
     assert inicio._lista_entregas.item(1).text().startswith("⚠ Atrasada · ")
 
-    # faturamento realizado × previsto com 7 dias
+    # faturamento: gráfico único — 13 colunas de dias (7 realizado + 6 previstos,
+    # hoje é par) + 1 divisor "hoje"
     assert inicio._combo_dias.currentData() == 7
-    assert len(inicio._barras_realizado) == 7
-    assert len(inicio._barras_previsto) == 7
+    assert inicio._container_barras.layout().count() == 14
 
     # filial chega no cabeçalho pelo signal do resumo
     assert principal._lbl_filial.text() == "Matriz"
@@ -163,12 +163,13 @@ def test_kpis_pluralizam_corretamente(app, pumpar):
 def test_combo_dias_recarrega_faturamento(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     inicio = principal._pagina_inicio
-    pumpar(lambda: len(inicio._barras_realizado) == 7)
+    pumpar(lambda: inicio._container_barras.layout() is not None
+           and inicio._container_barras.layout().count() == 14)
 
     inicio._combo_dias.setCurrentIndex(1)  # 30 dias
-    pumpar(lambda: len(inicio._barras_realizado) == 30)
+    # 59 colunas de dias + 1 divisor "hoje"
+    pumpar(lambda: inicio._container_barras.layout().count() == 60)
     assert inicio._combo_dias.currentData() == 30
-    assert len(inicio._barras_previsto) == 30
 
 
 def test_caixa_ve_apenas_cards_de_vendas(app, pumpar):
@@ -183,11 +184,11 @@ def test_caixa_ve_apenas_cards_de_vendas(app, pumpar):
     assert not hasattr(inicio, "_lbl_estoque")
     assert not hasattr(inicio, "_lista_entregas")
     assert not hasattr(inicio, "_combo_dias")
-    assert not hasattr(inicio, "_barras_realizado")
+    assert not hasattr(inicio, "_container_barras")
 
-    # acesso rápido do caixa: Nova venda + Emitir NFC-e
+    # acesso rápido do caixa: Nova venda (com atalho visível) + Emitir NFC-e
     textos = [b.text() for b in inicio._botoes_rapidos]
-    assert textos == ["Nova venda", "Emitir NFC-e"]
+    assert textos == ["Nova venda  (F5)", "Emitir NFC-e"]
 
     # a lateral não duplica mais as ações de criação
     botoes = _textos_botoes(principal)
@@ -206,10 +207,15 @@ def test_operador_ve_cards_operacionais_mas_nao_gerenciais(app, pumpar):
     assert "4" in inicio._lbl_estoque.text()
     assert not hasattr(inicio, "_kpi_receber_valor")  # gerencial oculto
     assert not hasattr(inicio, "_combo_dias")
-    assert not hasattr(inicio, "_barras_realizado")
+    assert not hasattr(inicio, "_container_barras")
 
     textos = [b.text() for b in inicio._botoes_rapidos]
-    assert textos == ["Nova venda", "Nova OS/Orçamento", "Novo cliente"]
+    assert textos == [
+        "Nova venda  (F5)",
+        "Nova O.S.",
+        "Novo orçamento",
+        "Novo cliente  (F2)",
+    ]
 
 
 def test_estoque_critico_zerado_estado_neutro(app, pumpar):
@@ -254,9 +260,9 @@ def test_entregas_vazias_mostram_estado_vazio_com_acao(app, pumpar):
         w.text() for w in inicio._vazio_entregas.findChildren(QLabel)
     ]
     assert "Nenhuma entrega para hoje ou atrasada." in textos
-    # há uma ação de recuperação visível, não só um texto morto
+    # Sem itens: sem link solto na borda (P1#9) — o convite é só texto
     acoes = [b for b in inicio._vazio_entregas.findChildren(QPushButton)]
-    assert acoes and acoes[0].text() == "Ver Ordens de Serviço"
+    assert not acoes
 
 
 def test_faturamento_vazio_mostra_convite(app, pumpar):
@@ -274,18 +280,24 @@ def test_faturamento_vazio_mostra_convite(app, pumpar):
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}})
     principal = TelaPrincipal(api, usuario=api.usuario, base_url="127.0.0.1:8000")
     inicio = principal._pagina_inicio
-    pumpar(lambda: "sem movimenta" in inicio._lbl_grafico.text().lower())
-    assert "Sem movimentação no período" in inicio._lbl_grafico.text()
+    pumpar(lambda: "sem vendas" in inicio._lbl_grafico.text().lower())
+    assert "Sem vendas nos últimos 7 dias" in inicio._lbl_grafico.text()
 
 
 def test_acesso_rapido_navega_para_cliente(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
-    pumpar(lambda: principal._pagina_inicio._kpi_vendas_valor.text() != "—")
+    pumpar(lambda: principal._pagina_inicio._kpi_vendas_valor.text() != "-")
     botoes = {b.text(): b for b in principal._pagina_inicio._botoes_rapidos}
-    assert set(botoes) == {"Nova venda", "Nova OS/Orçamento", "Novo cliente", "Emitir NFC-e"}
+    assert set(botoes) == {
+        "Nova venda  (F5)",
+        "Nova O.S.",
+        "Novo orçamento",
+        "Novo cliente  (F2)",
+        "Emitir NFC-e",
+    }
     navegados = []
     principal.navegado.connect(lambda item_id: navegados.append(item_id))
-    botoes["Novo cliente"].click()
+    botoes["Novo cliente  (F2)"].click()
     pumpar(lambda: principal._stack_paginas.currentWidget() is not principal._pagina_inicio)
     assert principal._stack_paginas.currentWidget() is principal._paginas["cliente"]
     assert navegados == ["cliente"]
@@ -299,14 +311,14 @@ def test_modo_leitura_banner_e_licenca_vermelha(app, pumpar):
     banners = [w for w in principal.findChildren(QLabel) if w.objectName() == "bannerLeitura"]
     assert len(banners) == 1
     assert "modo leitura" in banners[0].text().lower()
-    assert principal._lbl_licenca.text() == "● Licença"
+    assert principal._lbl_licenca.text() == "● Modo leitura"
     assert principal._lbl_licenca.property("role") == "erro"
 
 
 def test_licenca_ativa_verde(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     pumpar(lambda: principal._lbl_licenca.property("role") == "success")
-    assert principal._lbl_licenca.text() == "● Licença"
+    assert principal._lbl_licenca.text() == "● Licença ativa"
     assert principal._lbl_licenca.property("role") == "success"
 
 
@@ -344,8 +356,8 @@ def test_cabecalho_nao_repete_perfil_igual_ao_nome(app):
 def test_servidor_local_deixa_ip_apenas_no_tooltip(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     pumpar(lambda: "online" in principal._lbl_conexao.text())
-    # Server indicator now shows IP in text (for small print shops on network)
-    assert principal._lbl_servidor.text() == "● 127.0.0.1"
+    # Estado legível no texto; IP só no tooltip (sem duplicar com o rodapé)
+    assert principal._lbl_servidor.text() in ("● online", "○ offline")
     assert "127.0.0.1:8000" in principal._lbl_servidor.toolTip()
 
 
@@ -372,8 +384,8 @@ def test_atalhos_de_criacao_so_no_acesso_rapido(app):
     assert "Nova Venda Balcão" not in botoes
     assert "Nova OS" not in botoes
     rapidos = [b.text() for b in principal._pagina_inicio._botoes_rapidos]
-    assert "Nova venda" in rapidos
-    assert "Nova OS/Orçamento" in rapidos
+    assert "Nova O.S." in rapidos
+    assert "Novo orçamento" in rapidos
 
 
 def test_rodape_relogio_estacao_e_conexao(app, pumpar):

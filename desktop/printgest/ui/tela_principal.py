@@ -58,7 +58,6 @@ from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
 from printgest.ui.widgets import (
     ElideLabel,
-    FlowLayout,
     SkeletonCartao,
     aplicar_estilo,
     aplicar_estado,
@@ -89,6 +88,20 @@ def _eh_gerente_ou_mais(nivel: str) -> bool:
 
 def _eh_operador_ou_mais(nivel: str) -> bool:
     return tem_acesso(nivel, "operador")
+
+
+class CartaoClique(QWidget):
+    """Cartão clicável (KPI da home): cursor de mão + sinal no mouse press."""
+
+    clicado = Signal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, evento) -> None:  # noqa: N802 (API do Qt)
+        super().mousePressEvent(evento)
+        self.clicado.emit()
 
 
 def _momento(valor: object) -> datetime | None:
@@ -230,28 +243,89 @@ class PaginaInicial(QWidget):
         self._kpi_vendas_valor = ElideLabel("—")
         self._kpi_vendas_sub = ElideLabel("")
 
-        grade = FlowLayout(espaco_h=12, espaco_v=12)
+        # Linha de estado do resumo: quando os dados chegaram + retry em falha
+        # (revisão de telas P0#1: zero real x carregando/falha).
+        estado_resumo = QWidget()
+        er_linha = QHBoxLayout(estado_resumo)
+        er_linha.setContentsMargins(0, 0, 0, 0)
+        er_linha.setSpacing(8)
+        self._lbl_atualizado = QLabel("")
+        estado_muted(self._lbl_atualizado)
+        er_linha.addWidget(self._lbl_atualizado)
+        er_linha.addStretch(1)
+        self._btn_retry_resumo = QPushButton("Tentar novamente")
+        self._btn_retry_resumo.setProperty("link", "true")
+        self._btn_retry_resumo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_retry_resumo.setVisible(False)
+        self._btn_retry_resumo.clicked.connect(self._carregar_resumo)
+        er_linha.addWidget(self._btn_retry_resumo)
+        layout.addWidget(estado_resumo)
+
+        # KPIs em largura total (cards com stretch igual), clicáveis para o
+        # detalhe do módulo correspondente (revisão de telas P1#7).
+        grade = QHBoxLayout()
+        grade.setSpacing(12)
         self._grade_kpi = grade
         grade.addWidget(
-            self._cartao_kpi("Vendas hoje", self._kpi_vendas_valor, self._kpi_vendas_sub)
+            self._cartao_kpi(
+                "Vendas hoje", self._kpi_vendas_valor, self._kpi_vendas_sub, "pdv"
+            ),
+            1,
         )
         if _eh_gerente_ou_mais(nivel):
             self._kpi_receber_valor = ElideLabel("—")
             self._kpi_receber_sub = ElideLabel("")
+            self._kpi_pagar_valor = ElideLabel("—")
+            self._kpi_pagar_sub = ElideLabel("")
             grade.addWidget(
-                self._cartao_kpi("A receber", self._kpi_receber_valor, self._kpi_receber_sub)
+                self._cartao_kpi(
+                    "A receber",
+                    self._kpi_receber_valor,
+                    self._kpi_receber_sub,
+                    "financeiro",
+                ),
+                1,
+            )
+            grade.addWidget(
+                self._cartao_kpi(
+                    "A pagar", self._kpi_pagar_valor, self._kpi_pagar_sub, "financeiro"
+                ),
+                1,
             )
         if _eh_operador_ou_mais(nivel):
             self._kpi_projetos_valor = ElideLabel("—")
             self._kpi_projetos_sub = ElideLabel("")
             grade.addWidget(
                 self._cartao_kpi(
-                    "Projetos em produção",
+                    "O.S. em produção",
                     self._kpi_projetos_valor,
                     self._kpi_projetos_sub,
-                )
+                    "os",
+                ),
+                1,
             )
         layout.addLayout(grade)
+
+        # -------------------------------- "O que preciso fazer agora" (P1#6)
+        if _eh_operador_ou_mais(nivel):
+            pendencias = QWidget()
+            pendencias.setObjectName("card")
+            pl = QVBoxLayout(pendencias)
+            pl.setContentsMargins(16, 12, 16, 12)
+            pl.setSpacing(8)
+            pl.addWidget(self._cabecalho_card("O que preciso fazer agora"))
+            self._lista_pendencias = QListWidget()
+            self._lista_pendencias.setMinimumHeight(96)
+            self._lista_pendencias.setAccessibleName("Pendências do dia")
+            self._lista_pendencias.itemClicked.connect(self._abrir_pendencia)
+            pl.addWidget(self._lista_pendencias)
+            self._vazio_pendencias = QLabel("Tudo em dia por aqui. 🎉")
+            self._vazio_pendencias.setObjectName("vazioCard")
+            self._vazio_pendencias.setWordWrap(True)
+            self._vazio_pendencias.setVisible(False)
+            pl.addWidget(self._vazio_pendencias)
+            self._skeletons.append(SkeletonCartao(pendencias))
+            layout.addWidget(pendencias)
 
         # ---------------------------------------------------- acesso rápido
         rapido = QWidget()
@@ -266,8 +340,11 @@ class PaginaInicial(QWidget):
         # Uma ação principal por tela (quick-reference §4 `primary-action`): só o
         # primeiro atalho recebe o preenchimento de acento; os demais ficam
         # secundários, para o olho não disputar quatro pesos iguais.
-        for indice, (rotulo, destino) in enumerate(self._atajos_rapidos(nivel)):
-            botao = QPushButton(rotulo)
+        for indice, (rotulo, destino, tecla) in enumerate(self._atajos_rapidos(nivel)):
+            # Atalho visível no próprio botão (revisão de telas P1#8): não
+            # depende do rodapé; ações mistas viram dois botões.
+            texto = f"{rotulo}  ({tecla})" if tecla else rotulo
+            botao = QPushButton(texto)
             # Primeiro atalho é primário, os demais são secundários
             if indice == 0:
                 estado_primario(botao)
@@ -299,74 +376,24 @@ class PaginaInicial(QWidget):
             )
             el.addWidget(self._lista_entregas)
             # Estado vazio com convite à ação: nunca um card em branco
-            # (quick-reference §8 `empty-states`).
+            # (quick-reference §8 `empty-states`). Padding respi­rado e sem
+            # link solto na borda (revisão de telas P1#9).
             self._vazio_entregas = QWidget()
             vazio = QVBoxLayout(self._vazio_entregas)
-            vazio.setContentsMargins(0, 4, 0, 0)
+            vazio.setContentsMargins(0, 10, 0, 10)
             vazio.setSpacing(6)
             msg = QLabel("Nenhuma entrega para hoje ou atrasada.")
             msg.setObjectName("vazioCard")
             msg.setWordWrap(True)
             vazio.addWidget(msg)
-            ver_os = QPushButton("Ver Ordens de Serviço")
-            ver_os.setProperty("link", "true")
-            ver_os.setCursor(Qt.CursorShape.PointingHandCursor)
-            ver_os.clicked.connect(lambda: self.navegar.emit("os"))
-            vazio.addWidget(ver_os)
             vazio.addStretch(1)
             el.addWidget(self._vazio_entregas)
             self._vazio_entregas.setVisible(False)
             self._skeletons.append(SkeletonCartao(entregas))
             layout.addWidget(entregas)
 
-        # ------------------------------------- faturamento (gerente+)
-        if _eh_gerente_ou_mais(nivel):
-            grafico = QWidget()
-            grafico.setObjectName("card")
-            grafico.setMinimumHeight(220)
-            gl = QVBoxLayout(grafico)
-            gl.setContentsMargins(16, 12, 16, 12)
-            gl.setSpacing(8)
-            gl.addWidget(self._cabecalho_card("Faturamento"))
-            topo = QHBoxLayout()
-            subtitulo = QLabel("Realizado × previsto")
-            estado_muted(subtitulo)
-            topo.addWidget(subtitulo)
-            topo.addStretch(1)
-            self._combo_dias = QComboBox()
-            self._combo_dias.addItem("7 dias", 7)
-            self._combo_dias.addItem("30 dias", 30)
-            self._combo_dias.currentIndexChanged.connect(self._mudar_dias)
-            topo.addWidget(self._combo_dias)
-            ver = QPushButton("Ver relatórios →")
-            estado_ghost(ver)
-            ver.clicked.connect(lambda: self.navegar.emit("relatorios"))
-            topo.addWidget(ver)
-            gl.addLayout(topo)
-            self._lbl_grafico = ElideLabel("")
-            estado_muted(self._lbl_grafico)
-            gl.addWidget(self._lbl_grafico)
-            self._barras_realizado: list[tuple[QProgressBar, QLabel]] = []
-            self._barras_previsto: list[tuple[QProgressBar, QLabel]] = []
-            self._container_realizado = QWidget()
-            self._container_previsto = QWidget()
-            for container, rotulo, marca in (
-                (self._container_realizado, "Realizado", "#barraRealizado"),
-                (self._container_previsto, "Previsto", "#barraPrevisto"),
-            ):
-                legenda = QLabel(rotulo)
-                legenda.setObjectName("legendaSerie")
-                gl.addWidget(legenda)
-                caixas = QHBoxLayout(container)
-                caixas.setSpacing(6)
-                container.setMinimumHeight(70)
-                container.setAccessibleName(f"Faturamento {rotulo.lower()} por dia")
-                gl.addWidget(container)
-            gl.addStretch(1)
-            self._skeletons.append(SkeletonCartao(grafico))
-            layout.addWidget(grafico)
-
         # ------------------------------------------- estoque crítico (operador+)
+        # Acima do gráfico: é acionável e não deve cair abaixo da dobra (P1#6).
         if _eh_operador_ou_mais(nivel):
             estoque = QWidget()
             estoque.setObjectName("card")
@@ -385,6 +412,52 @@ class PaginaInicial(QWidget):
             el.addWidget(self._btn_estoque)
             self._skeletons.append(SkeletonCartao(estoque))
             layout.addWidget(estoque)
+
+        # ------------------------------------- faturamento (gerente+)
+        # Um único gráfico com barras pareadas por dia (Realizado | Previsto)
+        # + linha de base — substitui as duas séries empilhadas (P0#2/#3).
+        if _eh_gerente_ou_mais(nivel):
+            grafico = QWidget()
+            grafico.setObjectName("card")
+            grafico.setMinimumHeight(220)
+            gl = QVBoxLayout(grafico)
+            gl.setContentsMargins(16, 12, 16, 12)
+            gl.setSpacing(8)
+            gl.addWidget(self._cabecalho_card("Faturamento"))
+            topo = QHBoxLayout()
+            legenda_r = QLabel("■ Realizado")
+            legenda_r.setObjectName("legendaSerie")
+            topo.addWidget(legenda_r)
+            legenda_p = QLabel("□ Previsto")
+            legenda_p.setObjectName("legendaSerie")
+            topo.addWidget(legenda_p)
+            topo.addStretch(1)
+            self._combo_dias = QComboBox()
+            self._combo_dias.addItem("7 dias", 7)
+            self._combo_dias.addItem("30 dias", 30)
+            self._combo_dias.currentIndexChanged.connect(self._mudar_dias)
+            topo.addWidget(self._combo_dias)
+            ver = QPushButton("Ver relatórios →")
+            estado_ghost(ver)
+            ver.clicked.connect(lambda: self.navegar.emit("relatorios"))
+            topo.addWidget(ver)
+            gl.addLayout(topo)
+            self._lbl_grafico = ElideLabel("")
+            estado_muted(self._lbl_grafico)
+            gl.addWidget(self._lbl_grafico)
+            self._container_barras = QWidget()
+            self._container_barras.setMinimumHeight(120)
+            self._container_barras.setAccessibleName(
+                "Faturamento realizado e previsto por dia"
+            )
+            gl.addWidget(self._container_barras, 1)
+            # Linha de base: dias zerados não ficam "flutuando" sem referência.
+            base = QFrame()
+            base.setFrameShape(QFrame.Shape.HLine)
+            base.setObjectName("linhaBaseGrafico")
+            gl.addWidget(base)
+            self._skeletons.append(SkeletonCartao(grafico))
+            layout.addWidget(grafico)
 
         layout.addStretch(1)
 
@@ -410,14 +483,16 @@ class PaginaInicial(QWidget):
         return f"{turno}, {nome}!"
 
     @staticmethod
-    def _atajos_rapidos(nivel: str) -> list[tuple[str, str]]:
+    def _atajos_rapidos(nivel: str) -> list[tuple[str, str, str | None]]:
+        """Ações rápidas: (rótulo, destino, tecla global visível ou None)."""
         atalhos = [
-            ("Nova venda", "pdv"),
-            ("Nova OS/Orçamento", "os"),
-            ("Novo cliente", "cliente"),
-            ("Emitir NFC-e", "fiscal"),
+            ("Nova venda", "pdv", "F5"),
+            ("Nova O.S.", "os", None),
+            ("Novo orçamento", "orcamento", None),
+            ("Novo cliente", "cliente", "F2"),
+            ("Emitir NFC-e", "fiscal", None),
         ]
-        return [(rotulo, d) for rotulo, d in atalhos if pode_abrir(nivel, d)]
+        return [(rotulo, d, t) for rotulo, d, t in atalhos if pode_abrir(nivel, d)]
 
     def _mudar_dias(self) -> None:
         self._dias = int(self._combo_dias.currentData() or 7)
@@ -450,6 +525,10 @@ class PaginaInicial(QWidget):
         self._kpi_vendas_sub.setText(
             f"{self._plural(qtd_hoje, 'venda', 'vendas')} · ontem: {qtd_ontem}"
         )
+        # Dado fresco com carimbo de hora (P0#1): distingue zero real de
+        # carregando/falha e diz quando foi a última leitura.
+        self._lbl_atualizado.setText(f"Atualizado às {datetime.now().strftime('%H:%M')}")
+        self._btn_retry_resumo.setVisible(False)
 
         if dados.get("filial_nome"):
             self.filial_obtida.emit(dados["filial_nome"])
@@ -459,6 +538,8 @@ class PaginaInicial(QWidget):
             self._kpi_receber_sub.setText(
                 f"atrasado: {self._moeda(dados.get('a_receber_atrasado'))}"
             )
+            self._kpi_pagar_valor.setText(self._moeda(dados.get("a_pagar_vence_hoje")))
+            self._kpi_pagar_sub.setText("vence hoje")
             self._preencher_faturamento(
                 dados.get("vendas_7_dias"), dados.get("faturamento_previsto")
             )
@@ -473,6 +554,7 @@ class PaginaInicial(QWidget):
             )
             self._aplicar_estoque(dados.get("estoque_abaixo_minimo"))
             self._aplicar_entregas(dados.get("entregas_hoje"))
+            self._aplicar_pendencias(dados.get("pendencias"))
 
     def _aplicar_estoque(self, abaixo) -> None:
         if abaixo is None:
@@ -527,60 +609,153 @@ class PaginaInicial(QWidget):
         return f"{cliente} · {servico} · {prazo} · {status}"
 
     def _preencher_faturamento(self, realizado, previsto) -> None:
-        self._preencher_barras(
-            self._container_realizado, self._barras_realizado, realizado, "Realizado", False
-        )
-        self._preencher_barras(
-            self._container_previsto, self._barras_previsto, previsto, "Previsto", True
-        )
-        vazio = (not isinstance(realizado, list) or not realizado) and (
-            not isinstance(previsto, list) or not previsto
-        )
-        self._lbl_grafico.setText(
-            "Sem movimentação no período — as barras aparecem quando houver vendas ou "
-            "contas a receber."
-            if vazio
-            else ""
-        )
-        self._lbl_grafico.setVisible(bool(vazio))
+        """Um gráfico único (P0#2/#3): faixa de dias com realizado à esquerda,
+        divisor "hoje", previsto à direita — substitui as duas séries empilhadas.
 
-    def _preencher_barras(self, container, barras_ref, serie, rotulo, previsto) -> None:
-        barras_ref.clear()
+        Cada coluna tem rótulo centralizado; barras carregam série+valor no
+        tooltip/acessibilidade; dias zerados ficam apoiados na linha de base.
+        """
+        container = self._container_barras
+        # Na primeira carga não há layout: cria; nas recargas, limpa as colunas
+        # antigas sem recriar o layout (QHBoxLayout não pode ser substituído).
+        if container.layout() is None:
+            QHBoxLayout(container)
         while container.layout().count():
             item = container.layout().takeAt(0)
             if item.widget() is not None:
                 item.widget().deleteLater()
-        if not isinstance(serie, list) or not serie:
+
+        hoje = datetime.now().date()
+        colunas: dict[str, dict[str, int]] = {}
+        for v in realizado if isinstance(realizado, list) else []:
+            if isinstance(v, dict):
+                colunas.setdefault(self._chave_dia(v.get("data")), {})[
+                    "barraRealizado"
+                ] = self._num(v.get("valor"))
+        for v in previsto if isinstance(previsto, list) else []:
+            if isinstance(v, dict):
+                colunas.setdefault(self._chave_dia(v.get("data")), {})[
+                    "barraPrevisto"
+                ] = self._num(v.get("valor"))
+
+        vazio = not colunas or all(
+            not valores or max(valores.values()) == 0 for valores in colunas.values()
+        )
+        self._lbl_grafico.setText(
+            f"Sem vendas nos últimos {self._dias} dias." if vazio else ""
+        )
+        self._lbl_grafico.setVisible(bool(vazio))
+        if vazio:
             return
-        valores = [self._num(v.get("valor")) for v in serie if isinstance(v, dict)]
-        maior = max(valores) if valores else 0
-        for v in serie:
-            if not isinstance(v, dict):
-                continue
-            caixa = QWidget()
-            col = QVBoxLayout(caixa)
-            col.setContentsMargins(0, 0, 0, 0)
-            col.setSpacing(2)
-            barra = QProgressBar()
-            # Duas séries no mesmo card: a identidade não pode vir só da cor —
-            # cada barra carrega o nome da série e o valor exato no tooltip
-            # (quick-reference §10 `color-guidance`, `direct-labeling`).
-            barra.setObjectName("barraPrevisto" if previsto else "barraRealizado")
-            barra.setOrientation(Qt.Orientation.Vertical)
-            barra.setTextVisible(False)
-            barra.setRange(0, max(1, int(maior)))
-            barra.setValue(self._num(v.get("valor")))
-            dia_txt = self._dia_curto(v.get("data"))
-            valor_txt = self._moeda(v.get("valor"))
-            barra.setAccessibleName(f"{rotulo} {dia_txt}: {valor_txt}")
-            barra.setToolTip(f"{rotulo} · {dia_txt} · {valor_txt}")
+
+        maior = max(
+            max(valores.values()) for valores in colunas.values() if valores
+        )
+        linha = container.layout()
+        for chave in sorted(colunas):
+            valores = colunas[chave]
+            dia_txt = self._dia_curto(chave)
+            coluna = QVBoxLayout()
+            coluna.setContentsMargins(0, 0, 0, 0)
+            coluna.setSpacing(2)
+            coluna.addWidget(self._barra_serie(valores, dia_txt, maior), 1)
             dia = QLabel(dia_txt)
             estado_muted(dia)
             dia.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            col.addWidget(barra, 1)
-            col.addWidget(dia)
-            container.layout().addWidget(caixa)
-            barras_ref.append((barra, dia))
+            coluna.addWidget(dia)
+            caixa = QWidget()
+            caixa.setLayout(coluna)
+            linha.addWidget(caixa, 1)
+            # Divisor "hoje": termina a faixa de realizado, começa a prevista.
+            if chave == self._chave_dia(hoje.isoformat()):
+                divisor = QFrame()
+                divisor.setFrameShape(QFrame.Shape.VLine)
+                divisor.setObjectName("divisorHojeGrafico")
+                linha.addWidget(divisor)
+
+    def _barra_serie(self, valores: dict[str, int], dia_txt: str, maior: int) -> QWidget:
+        """Par de barras (Realizado | Previsto) de um dia, empilhadas numa célula."""
+        par = QHBoxLayout()
+        par.setContentsMargins(0, 0, 0, 0)
+        par.setSpacing(2)
+        for marca, rotulo in (
+            ("barraRealizado", "Realizado"),
+            ("barraPrevisto", "Previsto"),
+        ):
+            barra = QProgressBar()
+            barra.setObjectName(marca)
+            barra.setOrientation(Qt.Orientation.Vertical)
+            barra.setTextVisible(False)
+            barra.setRange(0, max(1, int(maior)))
+            barra.setValue(valores.get(marca, 0))
+            valor_txt = self._moeda(valores.get(marca, 0))
+            barra.setAccessibleName(f"{rotulo} {dia_txt}: {valor_txt}")
+            barra.setToolTip(f"{rotulo} · {dia_txt} · {valor_txt}")
+            par.addWidget(barra, 1)
+            if marca not in valores:
+                barra.setVisible(False)  # dia só de uma série (passado/futuro)
+        celula = QWidget()
+        celula.setLayout(par)
+        return celula
+
+    @staticmethod
+    def _chave_dia(data) -> str:
+        return str(data or "")[:10]
+
+    def _aplicar_pendencias(self, dados) -> None:
+        """Bloco "O que preciso fazer agora" (P1#6): só o que tem ação."""
+        if not hasattr(self, "_lista_pendencias"):
+            return
+        self._lista_pendencias.clear()
+        p = dados if isinstance(dados, dict) else {}
+        linhas: list[tuple[str, str]] = []
+
+        if self._int(p.get("caixa_aberto")) == 0 and p.get("caixa_aberto") is not None:
+            linhas.append(("Caixa fechado — abra para registrar vendas", "financeiro"))
+        saldo = p.get("caixa_saldo")
+        if p.get("caixa_aberto"):
+            linhas.append(
+                (f"Caixa aberto · saldo {self._moeda(saldo)}", "financeiro")
+            )
+        n = self._int(p.get("orcamentos_aguardando_aprovacao"))
+        if n:
+            linhas.append(
+                (self._plural(n, "orçamento aguardando aprovação", "orçamentos aguardando aprovação"), "os")
+            )
+        n = self._int(p.get("artes_aguardando_cliente"))
+        if n:
+            linhas.append(
+                (self._plural(n, "arte aguardando o cliente", "artes aguardando o cliente"), "os")
+            )
+        n = self._int(p.get("os_prontas_retirada"))
+        if n:
+            linhas.append(
+                (self._plural(n, "O.S. pronta para retirada", "O.S. prontas para retirada"), "os")
+            )
+        pagar = p.get("contas_pagar_hoje")
+        if pagar is not None and self._num(pagar) > 0:
+            linhas.append((f"Contas a pagar hoje: {self._moeda(pagar)}", "financeiro"))
+        n = self._int(p.get("nfce_rejeitadas"))
+        if n:
+            linhas.append(
+                (self._plural(n, "NFC-e rejeitada — reemitir", "NFC-e rejeitadas — reemitir"), "fiscal")
+            )
+
+        if not linhas:
+            self._lista_pendencias.setVisible(False)
+            self._vazio_pendencias.setVisible(True)
+            return
+        self._vazio_pendencias.setVisible(False)
+        self._lista_pendencias.setVisible(True)
+        for texto, destino in linhas:
+            item = QListWidgetItem(texto)
+            item.setData(Qt.ItemDataRole.UserRole, destino)
+            self._lista_pendencias.addItem(item)
+
+    def _abrir_pendencia(self, item: QListWidgetItem) -> None:
+        destino = item.data(Qt.ItemDataRole.UserRole)
+        if destino:
+            self.navegar.emit(destino)
 
     def _status_conexao(self, conectado: bool) -> None:
         if conectado or self._modo_leitura:
@@ -601,11 +776,18 @@ class PaginaInicial(QWidget):
         self._resumo_recebido = True
         for skeleton in self._skeletons:
             skeleton.ocultar()
+        # Falha ≠ zero real: valores saem da tela e entra o convite a retry
+        # (revisão de telas P0#1) — nunca "R$ 0,00" sem dado.
+        self._lbl_atualizado.setText("")
+        self._btn_retry_resumo.setVisible(True)
+        self._btn_retry_resumo.setToolTip(f"Motivo: {msg}")
         self._kpi_vendas_valor.setText("—")
         self._kpi_vendas_sub.setText("")
         if _eh_gerente_ou_mais(self._nivel):
             self._kpi_receber_valor.setText("—")
             self._kpi_receber_sub.setText("")
+            self._kpi_pagar_valor.setText("—")
+            self._kpi_pagar_sub.setText("")
             self._lbl_grafico.setText(
                 "Não foi possível carregar o faturamento. Verifique o servidor local."
             )
@@ -659,12 +841,15 @@ class PaginaInicial(QWidget):
         rotulo.setObjectName("secaoForm")
         return rotulo
 
-    def _cartao_kpi(self, titulo: str, valor: QLabel, sub: QLabel) -> QWidget:
-        caixa = QWidget()
-        caixa.setObjectName("cardLow")
-        caixa.setMinimumWidth(230)
-        caixa.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-        layout = QVBoxLayout(caixa)
+    def _cartao_kpi(
+        self, titulo: str, valor: QLabel, sub: QLabel, destino: str | None = None
+    ) -> QWidget:
+        cartao = CartaoClique()
+        cartao.setObjectName("cardLow")
+        # Largura total da linha (stretch no layout do chamador) — sem mínimo
+        # fixo que deixava a linha vazia em telas largas (P1#7).
+        cartao.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        layout = QVBoxLayout(cartao)
         layout.setContentsMargins(14, 10, 14, 10)
         layout.setSpacing(2)
         nome = ElideLabel(titulo)
@@ -673,17 +858,21 @@ class PaginaInicial(QWidget):
         # O cartão inteiro é um grupo semântico: o leitor de tela lê
         # "título · valor · subtexto" numa passada, sem depender da cor ou da
         # posição visual (quick-reference §1 `voiceover-sr`, `color-not-only`).
-        caixa.setAccessibleName(titulo)
+        cartao.setAccessibleName(titulo)
         valor.setAccessibleName(f"{titulo}: valor")
         sub.setAccessibleName(f"{titulo}: detalhe")
         sub.setProperty("role", "muted")
         layout.addWidget(nome)
         layout.addWidget(valor)
         layout.addWidget(sub)
+        if destino:
+            # KPI clicável: abre o módulo do detalhe (P1#7).
+            cartao.setToolTip(f"Abrir {titulo.lower()}")
+            cartao.clicado.connect(lambda d=destino: self.navegar.emit(d))
         # Skeleton do primeiro carregamento: barras no lugar de valor/sub até o
         # resumo chegar (`mostrar()`/`ocultar()` em `_carregar_resumo`).
-        self._skeletons.append(SkeletonCartao(caixa))
-        return caixa
+        self._skeletons.append(SkeletonCartao(cartao))
+        return cartao
 
 
 class TelaPrincipal(QMainWindow):
@@ -783,10 +972,10 @@ class TelaPrincipal(QMainWindow):
         estado_muted(self._lbl_filial)
         linha.addWidget(self._lbl_filial)
 
-        # Indicador do servidor local — mostra IP no texto (necessário para redes locais
-        # de pequenas gráficas que não têm IP dedicado).
+        # Indicador do servidor local — estado legível ("online"/"offline"),
+        # IP fica só no tooltip (duplicava com o rodapé; revisão P0#4/P2#14).
         server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
-        self._lbl_servidor = QLabel(f"● {server_ip}")
+        self._lbl_servidor = QLabel("● verificando…")
         estado_muted(self._lbl_servidor)
         self._lbl_servidor.setToolTip(f"Servidor local: {self._base_url}")
         linha.addWidget(self._lbl_servidor)
@@ -901,13 +1090,36 @@ class TelaPrincipal(QMainWindow):
             # o indicador e o banner de tolerância não "somem" da tela.
             self._situacao_licenca = sit
         self._detalhe_licenca = self._detalhe_texto(sit, self._modo_leitura)
-        self._lbl_licenca.setText("● Licença")
+        self._lbl_licenca.setText(self._texto_indicador_licenca(sit, self._modo_leitura))
         self._lbl_licenca.setProperty(
             "role", self._estilo_licenca(sit, self._modo_leitura)
         )
-        self._lbl_licenca.setToolTip(self._texto_licenca(sit, self._modo_leitura))
+        self._lbl_licenca.setToolTip(self._detalhe_licenca)
         aplicar_estilo(self._lbl_licenca)
         self._atualizar_tolerancia()
+
+    @staticmethod
+    def _texto_indicador_licenca(sit: dict, modo_leitura: bool) -> str:
+        """Texto do indicador com informação, não só um ponto (P0#4).
+
+        Estado + prazo quando legível: "Licença · 29 d", "Tolerância", "Leitura".
+        """
+        if modo_leitura or sit.get("modo_leitura") or sit.get("estado") in (
+            "leitura",
+            "revogada",
+        ):
+            return "● Modo leitura"
+        if sit.get("estado") == "tolerancia":
+            restante = tempo_restante(sit.get("tolerancia_expira_em"))
+            return f"● Tolerância{f' · {restante}' if restante else ''}"
+        fim = _momento(sit.get("expira_em"))
+        if fim is not None:
+            dias = (fim - _agora_utc()).days
+            if dias >= 0:
+                return f"● Licença · {dias} d"
+        if sit.get("status") == "ativa" or sit.get("estado") == "ativa":
+            return "● Licença ativa"
+        return "● Licença"
 
     def _atualizar_tolerancia(self) -> None:
         """Mostra/atualiza o banner de tolerância a partir da situação conhecida.
@@ -1202,7 +1414,10 @@ class TelaPrincipal(QMainWindow):
         )
 
     def _pintar_conexao(self, ok: bool) -> None:
+        # Estado legível no cabeçalho E no rodapé (P0#4): o ponto verde/vermelho
+        # vem com a palavra, e o IP fica no tooltip do cabeçalho.
         self._lbl_conexao.setText("● online" if ok else "○ offline")
+        self._lbl_servidor.setText("● online" if ok else "○ offline")
         if ok:
             estado_sucesso(self._lbl_conexao)
             estado_sucesso(self._lbl_servidor)

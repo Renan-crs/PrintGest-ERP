@@ -12,7 +12,7 @@ Recupera, para a filial do usuário:
     dias (dias sem movimento entram zerados — sem inventar números).
 """
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func
@@ -21,20 +21,25 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.deps import RANK
 from app.models.core import Filial
 from app.models.enums import (
+    ModeloFiscal,
     NivelAcesso,
     StatusConta,
+    StatusFiscal,
     StatusOs,
     StatusVenda,
+    TipoLinkPublico,
     TipoOs,
 )
-from app.models.financeiro import ContaReceber
-from app.models.movimento import OrdemServico, VendaBalcao
+from app.models.financeiro import ContaPagar, ContaReceber
+from app.models.fiscal import DocumentoFiscal
+from app.models.movimento import LinkPublico, OrdemServico, VendaBalcao
 from app.schemas.dashboard import (
     DashboardEntregaOut,
+    DashboardPendenciasOut,
     DashboardResumoOut,
     DashboardVendaDiaOut,
 )
-from app.services import estoque_service
+from app.services import estoque_service, financeiro_service
 
 _NAO_ENTREGUE = (StatusOs.ENTREGUE, StatusOs.CANCELADO, StatusOs.CONVERTIDO)
 
@@ -50,6 +55,71 @@ def _contar_os(db: Session, filial_id: int, status: StatusOs) -> int:
             OrdemServico.filial_id == filial_id,
             OrdemServico.tipo == TipoOs.OS,
             OrdemServico.status == status,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _contar_orcamentos_aguardando_aprovacao(db: Session, filial_id: int) -> int:
+    """Orçamentos (tipo `orcamento`) com prova enviada aguardando decisão."""
+    return (
+        db.query(func.count(OrdemServico.id))
+        .filter(
+            OrdemServico.filial_id == filial_id,
+            OrdemServico.tipo == TipoOs.ORCAMENTO,
+            OrdemServico.status == StatusOs.AGUARDANDO_APROVACAO,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _artes_aguardando_cliente(db: Session, filial_id: int, agora: datetime) -> int:
+    """Links de prova enviados ao cliente, ainda válidos e não decididos."""
+    return (
+        db.query(func.count(LinkPublico.id))
+        .filter(
+            LinkPublico.filial_id == filial_id,
+            LinkPublico.tipo == TipoLinkPublico.PROVA,
+            LinkPublico.usado.is_(False),
+            LinkPublico.expira_em > agora,
+        )
+        .scalar()
+        or 0
+    )
+
+
+def _somar_saldo_pagar(
+    db: Session, filial_id: int, *, no_dia: date | None = None
+) -> Decimal:
+    filtros = [
+        ContaPagar.filial_id == filial_id,
+        ContaPagar.status == StatusConta.ABERTA,
+    ]
+    if no_dia is not None:
+        filtros.append(ContaPagar.vencimento == no_dia)
+    saldo = (
+        db.query(
+            func.coalesce(
+                func.sum(ContaPagar.valor - func.coalesce(ContaPagar.valor_pago, 0)),
+                0,
+            )
+        )
+        .filter(*filtros)
+        .scalar()
+        or 0
+    )
+    return _money(saldo)
+
+
+def _nfce_rejeitadas(db: Session, filial_id: int) -> int:
+    return (
+        db.query(func.count(DocumentoFiscal.id))
+        .filter(
+            DocumentoFiscal.filial_id == filial_id,
+            DocumentoFiscal.modelo == ModeloFiscal.NFCE,
+            DocumentoFiscal.status == StatusFiscal.REJEITADO,
         )
         .scalar()
         or 0
@@ -217,7 +287,12 @@ def _entregas_do_dia(
 
 
 def resumo(
-    db: Session, *, filial_id: int, nivel: NivelAcesso, dias: int = 7
+    db: Session,
+    *,
+    filial_id: int,
+    nivel: NivelAcesso,
+    dias: int = 7,
+    usuario_id: int | None = None,
 ) -> DashboardResumoOut:
     filial = db.get(Filial, filial_id)
     hoje = date.today()
@@ -228,6 +303,37 @@ def resumo(
 
     operacional = RANK.get(nivel, 0) >= RANK[NivelAcesso.OPERADOR]
     gerencial = RANK.get(nivel, 0) >= RANK[NivelAcesso.GERENTE]
+
+    # "O que preciso fazer agora": pendências acionáveis do fluxo (revisão de
+    # telas da home). O caixa é o do operador logado (não há caixa "da filial").
+    pendencias = None
+    if operacional:
+        caixa = (
+            financeiro_service.caixa_aberto(
+                db, filial_id=filial_id, usuario_id=usuario_id
+            )
+            if usuario_id
+            else None
+        )
+        pendencias = DashboardPendenciasOut(
+            orcamentos_aguardando_aprovacao=_contar_orcamentos_aguardando_aprovacao(
+                db, filial_id
+            ),
+            artes_aguardando_cliente=_artes_aguardando_cliente(
+                db, filial_id, datetime.now(UTC)
+            ),
+            os_prontas_retirada=_contar_os(db, filial_id, StatusOs.PRONTA),
+            contas_pagar_hoje=(
+                _somar_saldo_pagar(db, filial_id, no_dia=hoje) if gerencial else None
+            ),
+            nfce_rejeitadas=(_nfce_rejeitadas(db, filial_id) if gerencial else None),
+            caixa_aberto=caixa is not None,
+            caixa_saldo=(
+                financeiro_service.caixa_out(db, caixa)["saldo_atual"]
+                if caixa is not None
+                else None
+            ),
+        )
 
     return DashboardResumoOut(
         filial_nome=filial.nome if filial else None,
@@ -248,11 +354,15 @@ def resumo(
             estoque_service.resumo(db, filial_id).abaixo_minimo if operacional else None
         ),
         entregas_hoje=_entregas_do_dia(db, filial_id, hoje) if operacional else None,
+        pendencias=pendencias,
         # gerencial (>= GERENTE)
         a_receber_vence_hoje=_somar_saldo_receber(db, filial_id, no_dia=hoje)
         if gerencial
         else None,
         a_receber_atrasado=_somar_saldo_receber(db, filial_id, antes_de=hoje)
+        if gerencial
+        else None,
+        a_pagar_vence_hoje=_somar_saldo_pagar(db, filial_id, no_dia=hoje)
         if gerencial
         else None,
         faturamento_previsto=_previsto_por_dia(db, filial_id, hoje, dias)

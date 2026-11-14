@@ -28,5 +28,6 @@ def resumo_dashboard(
         filial_id=filial,
         nivel=usuario.nivel_acesso,
         dias=dias,
+        usuario_id=usuario.id,
     )
     return ItemResponse(data=dados)
