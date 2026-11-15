@@ -88,6 +88,13 @@ def _para_out(os: OrdemServico) -> OsOut:
     dados["cliente_nome"] = os.cliente.nome_razao if os.cliente else None
     dados["vendedor_nome"] = os.vendedor.nome if os.vendedor else None
     dados["atendente_nome"] = os.atendente.nome if os.atendente else None
+    valor_total = Decimal(dados.get("valor_total") or 0)
+    valor_sinal = dados.get("valor_sinal")
+    if valor_sinal is not None:
+        saldo = valor_total - Decimal(valor_sinal)
+        dados["saldo"] = saldo if saldo > 0 else Decimal("0.00")
+    else:
+        dados["saldo"] = valor_total
     itens_out = []
     for item in os.itens:
         saida = OsItemOut.model_validate(item)
@@ -137,6 +144,8 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
         valor_itens=valor_itens,
         valor_total=valor_total,
         forma_pagamento=dados.forma_pagamento,
+        valor_sinal=dados.valor_sinal,
+        forma_sinal=dados.forma_sinal,
         observacoes=dados.observacoes,
         criado_por=usuario_id,
         itens=itens,
@@ -183,7 +192,14 @@ def atualizar(
 
     campos = dados.model_dump(exclude_unset=True)
 
-    for campo in ("cliente_id", "vendedor_id", "atendente_id", "forma_pagamento"):
+    for campo in (
+        "cliente_id",
+        "vendedor_id",
+        "atendente_id",
+        "forma_pagamento",
+        "valor_sinal",
+        "forma_sinal",
+    ):
         if campo in campos:
             setattr(os_obj, campo, campos[campo])
     if "data_previsao_entrega" in campos:
@@ -348,6 +364,8 @@ def converter_em_os(
         valor_itens=orcamento.valor_itens,
         valor_total=orcamento.valor_total,
         forma_pagamento=orcamento.forma_pagamento,
+        valor_sinal=orcamento.valor_sinal,
+        forma_sinal=orcamento.forma_sinal,
         observacoes=orcamento.observacoes,
         criado_por=orcamento.criado_por,
         itens=[

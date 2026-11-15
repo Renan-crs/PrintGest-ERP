@@ -55,16 +55,31 @@ def listar(
     status: StatusOs | None = None,
     tipo: TipoOs | None = None,
     q: str | None = None,
+    atrasada: bool | None = None,
+    entrega_hoje: bool | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> ListaResponse[OsOut]:
+    from datetime import date
+
     limite = min(max(limit, 1), 200)
     desloc = max(offset, 0)
+    hoje = date.today()
     base = db.query(OrdemServico).filter(OrdemServico.filial_id == filial)
     if status:
         base = base.filter(OrdemServico.status == status)
     if tipo:
         base = base.filter(OrdemServico.tipo == tipo)
+    if atrasada:
+        base = base.filter(
+            OrdemServico.data_previsao_entrega.isnot(None),
+            OrdemServico.data_previsao_entrega < hoje,
+            ~OrdemServico.status.in_(
+                [StatusOs.ENTREGUE, StatusOs.CANCELADO, StatusOs.CONVERTIDO]
+            ),
+        )
+    if entrega_hoje:
+        base = base.filter(OrdemServico.data_previsao_entrega == hoje)
     termo = (q or "").strip()
     if termo:
         base = base.outerjoin(Cliente, OrdemServico.cliente_id == Cliente.id).filter(

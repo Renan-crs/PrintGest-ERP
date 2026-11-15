@@ -49,6 +49,8 @@ class OsCreate(BaseModel):
     data_previsao_entrega: date | None = None
     desconto: Decimal = Field(default=Decimal(0), ge=0)
     forma_pagamento: FormaPagamento | None = None
+    valor_sinal: Decimal | None = Field(default=None, ge=0)
+    forma_sinal: FormaPagamento | None = None
     observacoes: str | None = None
     # Confirmação do recebimento antecipado (exigido pelo cliente, quando houver).
     pagamento_confirmado: bool = False
@@ -64,6 +66,8 @@ class OsUpdate(BaseModel):
     data_previsao_entrega: date | None = None
     desconto: Decimal | None = Field(default=None, ge=0)
     forma_pagamento: FormaPagamento | None = None
+    valor_sinal: Decimal | None = Field(default=None, ge=0)
+    forma_sinal: FormaPagamento | None = None
     observacoes: str | None = None
     itens: list[OsItemIn] | None = None
 
@@ -193,6 +197,9 @@ class OsOut(ORMModel):
     valor_itens: Decimal
     valor_total: Decimal
     forma_pagamento: FormaPagamento | None = None
+    valor_sinal: Decimal | None = None
+    forma_sinal: FormaPagamento | None = None
+    saldo: Decimal | None = None
     observacoes: str | None = None
     criado_por: int | None = None
     created_at: datetime

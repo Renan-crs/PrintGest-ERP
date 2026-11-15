@@ -167,11 +167,20 @@ class Api:
         q: str = "",
         status: str | None = None,
         tipo: str | None = None,
+        atrasada: bool | None = None,
+        entrega_hoje: bool | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
         return self.listar_com_filtros(
-            "os", q=q, status=status, tipo=tipo, limit=limit, offset=offset
+            "os",
+            q=q,
+            status=status,
+            tipo=tipo,
+            atrasada=atrasada,
+            entrega_hoje=entrega_hoje,
+            limit=limit,
+            offset=offset,
         )
 
     def listar_vendas(

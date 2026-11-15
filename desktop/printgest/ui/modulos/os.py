@@ -12,12 +12,16 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCompleter,
     QFileDialog,
     QInputDialog,
     QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMenu,
     QMessageBox,
     QPushButton,
@@ -654,6 +658,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         ("pronta", "Prontas"),
         ("entregue", "Entregues"),
         ("cancelado", "Canceladas"),
+        ("__atrasada", "Atrasadas"),
+        ("__entrega_hoje", "Entrega hoje"),
     ]
 
     def __init__(self, api, modo_leitura: bool = False) -> None:
@@ -669,26 +675,71 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._vendedor = CampoCombo("Vendedor", [])
         self._atendente = CampoCombo("Atendente", [])
         self._previsao = CampoData("Previsão de Entrega")
-        # P1#11: placeholders explícitos (evita campos "vazios sem contexto").
-        self._cliente.widget.setPlaceholderText("Selecione o cliente")
-        self._vendedor.widget.setPlaceholderText("Selecione o vendedor")
-        self._atendente.widget.setPlaceholderText("Selecione o atendente")
         self._forma = CampoCombo("Forma de Pagamento", FORMAS_PAGAMENTO)
+        self._valor_sinal = CampoValor("Sinal (valor)")
+        self._forma_sinal = CampoCombo("Forma do Sinal", FORMAS_PAGAMENTO)
         self._desconto = CampoValor("Desconto")
         self._obs = CampoArea("Observações", linhas=2)
-        self._pagamento_confirmado = CampoCheck(
-            "Pagamento já recebido"
-        )
+        self._pagamento_confirmado = CampoCheck("Pagamento já recebido")
         self._itens = GradeItens("", api=self._api)
         # P0#2 (refino): em tela cheia, a grade de itens precisa de área útil.
-        self._itens.setMinimumHeight(320)
+        self._itens.setMinimumHeight(340)
+        self._itens._tabela.setMinimumHeight(220)
+
+        # P1#11: combos pesquisáveis (digitação filtra opções).
+        for campo, placeholder in (
+            (self._cliente, "Buscar/selecionar cliente"),
+            (self._vendedor, "Buscar/selecionar vendedor"),
+            (self._atendente, "Buscar/selecionar atendente"),
+        ):
+            combo = campo.widget
+            combo.setEditable(True)
+            combo.setInsertPolicy(combo.InsertPolicy.NoInsert)
+            combo.setPlaceholderText(placeholder)
+            comp = combo.completer()
+            if comp is not None:
+                comp.setFilterMode(Qt.MatchFlag.MatchContains)
+                comp.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+
+        # Ação rápida "Novo cliente" inline (P1#11).
+        self._btn_novo_cliente = QPushButton("Novo cliente")
+        self._btn_novo_cliente.setObjectName("acaoLinha")
+        self._btn_novo_cliente.clicked.connect(self._novo_cliente_inline)
+        cliente_widget = QWidget()
+        linha_cli = QHBoxLayout(cliente_widget)
+        linha_cli.setContentsMargins(0, 0, 0, 0)
+        linha_cli.setSpacing(6)
+        linha_cli.addWidget(self._cliente.widget, 1)
+        linha_cli.addWidget(self._btn_novo_cliente)
+
+        class _CampoClienteWrap:
+            largo = False
+            def __init__(self, campo, widget):
+                self._campo = campo
+                self.rotulo_widget = campo.rotulo_widget
+                self.widget = widget
+            def valor(self):
+                return self._campo.valor()
+            def definir(self, v):
+                return self._campo.definir(v)
+            def habilitar(self, ligado: bool):
+                self._campo.habilitar(ligado)
+                self.widget.setEnabled(ligado)
+            def obrigatorio(self):
+                self._campo.obrigatorio()
+                return self
+
+        self._cliente_campo = _CampoClienteWrap(self._cliente, cliente_widget)
+
         return [
-            ("Cliente & Equipe", [self._cliente, self._vendedor, self._atendente]),
+            ("Cliente & Equipe", [self._cliente_campo, self._vendedor, self._atendente]),
             (
                 "Prazos & Financeiro",
                 [
                     self._previsao,
                     self._forma,
+                    self._valor_sinal,
+                    self._forma_sinal,
                     self._desconto,
                     self._obs,
                     self._pagamento_confirmado,
@@ -700,11 +751,64 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     def _conectar_campos(self) -> None:
         self._cliente.widget.currentIndexChanged.connect(self._ao_mudar_cliente_os)
         self._desconto.edicao.textChanged.connect(self._atualizar_totais_os)
+        if hasattr(self._valor_sinal, "edicao"):
+            self._valor_sinal.edicao.textChanged.connect(self._atualizar_totais_os)
         self._itens.alterado.connect(self._atualizar_totais_os)
 
     def _ao_mudar_cliente_os(self) -> None:
         self._cliente_mudou()
         self._atualizar_totais_os()
+
+    def _novo_cliente_inline(self) -> None:
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Novo cliente")
+        form = QFormLayout(dlg)
+        nome = QLineEdit(); nome.setPlaceholderText("Nome / Razão social")
+        doc = QLineEdit(); doc.setPlaceholderText("CPF/CNPJ (opcional)")
+        tel = QLineEdit(); tel.setPlaceholderText("Telefone (opcional)")
+        form.addRow("Nome*", nome)
+        form.addRow("Documento", doc)
+        form.addRow("Telefone", tel)
+        botoes = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        form.addRow(botoes)
+        botoes.rejected.connect(dlg.reject)
+
+        def salvar():
+            n = nome.text().strip()
+            if not n:
+                QMessageBox.warning(dlg, "Cliente", "Informe o nome do cliente.")
+                return
+            payload = {"nome_razao": n, "tipo_pessoa": "PF"}
+            if doc.text().strip():
+                payload["cpf_cnpj"] = doc.text().strip()
+            if tel.text().strip():
+                payload["telefone"] = tel.text().strip()
+            try:
+                criado = self._api.criar("clientes", payload)
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(dlg, "Cliente", str(exc))
+                return
+            dado = criado.get("data", criado) if isinstance(criado, dict) else {}
+            cid = dado.get("id")
+            rot = dado.get("nome_razao") or n
+            if cid is not None:
+                self._cliente_flags[cid] = (
+                    bool(dado.get("pagamento_adiantado")),
+                    bool(dado.get("sinal")),
+                    dado.get("sinal_pct"),
+                )
+                combo = self._cliente.widget
+                idx = combo.findData(cid)
+                if idx < 0:
+                    combo.addItem(rot, cid)
+                    idx = combo.findData(cid)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+            self._carregar_clientes_flags()
+            dlg.accept()
+
+        botoes.accepted.connect(salvar)
+        dlg.exec()
 
     def _rodape_pos_acoes(self, layout: QHBoxLayout) -> None:
         # P0#2 (refino): totais fixos no rodapé do formulário.
@@ -732,20 +836,26 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         total = subtotal - desconto
         if total < 0:
             total = Decimal("0")
-        # P1#10 (parcial): exibe saldo estimado quando há exigência de adiantamento/sinal.
         saldo_txt = ""
         try:
-            exigencia = self._exigencia_pendente()
-            if exigencia:
-                adiantado, sinal, pct = self._cliente_flags.get(self._cliente.valor(), (False, False, None))
-                if sinal and pct is not None:
-                    sinal_val = (total * (para_decimal(pct) or Decimal("0")) / Decimal("100")).quantize(Decimal("0.01"))
-                    saldo = total - sinal_val
-                    if saldo < 0:
-                        saldo = Decimal("0")
-                    saldo_txt = f" · Sinal {formatar_moeda(str(sinal_val))} · Saldo {formatar_moeda(str(saldo))}"
-                elif adiantado:
-                    saldo_txt = f" · Saldo {formatar_moeda('0')}"
+            sinal_informado = para_decimal(self._valor_sinal.valor()) if hasattr(self, "_valor_sinal") else None
+            if sinal_informado is not None:
+                saldo = total - sinal_informado
+                if saldo < 0:
+                    saldo = Decimal("0")
+                saldo_txt = f" · Sinal {formatar_moeda(str(sinal_informado))} · Saldo {formatar_moeda(str(saldo))}"
+            else:
+                exigencia = self._exigencia_pendente()
+                if exigencia:
+                    adiantado, sinal, pct = self._cliente_flags.get(self._cliente.valor(), (False, False, None))
+                    if sinal and pct is not None:
+                        sinal_val = (total * (para_decimal(pct) or Decimal("0")) / Decimal("100")).quantize(Decimal("0.01"))
+                        saldo = total - sinal_val
+                        if saldo < 0:
+                            saldo = Decimal("0")
+                        saldo_txt = f" · Sinal {formatar_moeda(str(sinal_val))} · Saldo {formatar_moeda(str(saldo))}"
+                    elif adiantado:
+                        saldo_txt = f" · Saldo {formatar_moeda('0')}"
         except Exception:
             saldo_txt = ""
         self._lbl_totais_os.setText(
@@ -758,16 +868,57 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         from datetime import date
 
         self._desconto.definir(None)
+        if hasattr(self, "_valor_sinal"):
+            self._valor_sinal.definir(None)
+        if hasattr(self, "_forma_sinal"):
+            self._forma_sinal.definir(None)
         self._pagamento_confirmado.definir(False)
         # P1#9: previsão com data como padrão (não "Sem data" marcado).
         self._previsao.definir(date.today().isoformat())
+        # P1#11: padrões vendedor/atendente pelo usuário logado (quando houver correspondência).
+        self._aplicar_padrao_usuario()
         self._cliente_mudou()
+        self._atualizar_totais_os()
+
+    def _aplicar_padrao_usuario(self) -> None:
+        try:
+            usuario = (self._api.usuario() or {}) if hasattr(self._api, "usuario") else {}
+        except Exception:
+            usuario = {}
+        nome = str(usuario.get("nome") or "").strip().lower()
+        login = str(usuario.get("login") or "").strip().lower()
+        if not nome and not login:
+            return
+        for campo in (self._vendedor, self._atendente):
+            if not hasattr(campo, "widget"):
+                continue
+            combo = campo.widget
+            for i in range(combo.count()):
+                rot = str(combo.itemText(i) or "").strip().lower()
+                if rot and (rot == nome or rot == login):
+                    combo.setCurrentIndex(i)
+                    break
 
     # ---------------------------------------------------------------- busca
 
     def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        status = self._filtro or None
+        atrasada = None
+        entrega_hoje = None
+        if self._filtro == "__atrasada":
+            status = None
+            atrasada = True
+        elif self._filtro == "__entrega_hoje":
+            status = None
+            entrega_hoje = True
         return self._api.listar_os(
-            q=q, status=self._filtro or None, tipo=self.TIPO, limit=LOTE, offset=offset
+            q=q,
+            status=status,
+            tipo=self.TIPO,
+            atrasada=atrasada,
+            entrega_hoje=entrega_hoje,
+            limit=LOTE,
+            offset=offset,
         )
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
@@ -799,6 +950,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         atendentes = [r for r in dados if r.get("e_atendente")] or dados
         self._vendedor.alterar_opcoes([(r["id"], r["nome"]) for r in vendedores])
         self._atendente.alterar_opcoes([(r["id"], r["nome"]) for r in atendentes])
+        if self._editando_id is None:
+            self._aplicar_padrao_usuario()
 
     def _preencher_campos(self, dado: dict) -> None:
         self._cliente.definir(dado.get("cliente_id"))
@@ -806,10 +959,15 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._atendente.definir(dado.get("atendente_id"))
         self._previsao.definir(dado.get("data_previsao_entrega"))
         self._forma.definir(dado.get("forma_pagamento"))
+        if hasattr(self, "_valor_sinal"):
+            self._valor_sinal.definir(dado.get("valor_sinal"))
+        if hasattr(self, "_forma_sinal"):
+            self._forma_sinal.definir(dado.get("forma_sinal"))
         self._desconto.definir(dado.get("desconto"))
         self._obs.definir(dado.get("observacoes"))
         self._pagamento_confirmado.definir(False)
         self._itens.definir(dado.get("itens") or [])
+        self._atualizar_totais_os()
 
     # ---------------------------------------------------------------- salvar
 
@@ -837,6 +995,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             "data_previsao_entrega": data_iso(self._previsao.valor()),
             "desconto": str(self._desconto.valor() or "0"),
             "forma_pagamento": self._forma.valor(),
+            "valor_sinal": (str(self._valor_sinal.valor()) if hasattr(self, "_valor_sinal") and self._valor_sinal.valor() is not None else None),
+            "forma_sinal": (self._forma_sinal.valor() if hasattr(self, "_forma_sinal") else None),
             "observacoes": limpo(self._obs.valor()),
             "pagamento_confirmado": self._pagamento_confirmado.valor(),
             "itens": self._itens.valor(),

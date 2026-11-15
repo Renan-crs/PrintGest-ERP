@@ -101,6 +101,10 @@ class OrdemServico(Base):
     forma_pagamento: Mapped[FormaPagamento | None] = mapped_column(
         pg_enum(FormaPagamento)
     )
+    valor_sinal: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    forma_sinal: Mapped[FormaPagamento | None] = mapped_column(
+        pg_enum(FormaPagamento)
+    )
     # M3 (PRD v3.0 §3.10): refação — O.S. filha vinculada à original, com
     # motivo, responsável e custo, separando erro da gráfica de erro do cliente.
     refacao_origem_id: Mapped[int | None] = mapped_column(
