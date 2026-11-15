@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -632,7 +634,7 @@ class DialogoArte(QDialog):
 class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ENTIDADE = "os"
     TIPO = "os"
-    ROTULO_PAGINA = "Gestão de Ordens de Serviço (O.S.)"
+    ROTULO_PAGINA = "Ordens de Serviço"
     ROTULO_NOVO = "Nova Ordem de Serviço"
     GRUPO_LISTA = "FILA OPERACIONAL"
     LUGAR_BUSCA = "Buscar por Nº da O.S. ou nome do cliente..."
@@ -771,13 +773,45 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     # ------------------------------------------------------- ações de status
 
     def _acao_extra(self):
+        """P0#1 (revisão PDV+Hist+OS): máx. 3 ações visíveis no rodapé.
+
+        Avançar/Arte/Cancelar ficam em "Mais ações"; os botões reais são
+        mantidos (ocultos, filhos do container) para compatibilidade com testes
+        e com o bloqueio de modo leitura do PaginaCrud.
+        """
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
         avancar, self._btn_avancar = botao_com_atalho("Avançar Status", "F7")
         self._btn_avancar.clicked.connect(self._avancar_status)
         arte, self._btn_arte = botao_com_atalho("Arte", "F11")
         self._btn_arte.clicked.connect(self._abrir_arte)
-        cancelar, self._btn_cancelar_os = botao_com_atalho("Cancelar Projeto", "F8", "danger")
+        cancelar, self._btn_cancelar_os = botao_com_atalho(
+            "Cancelar Projeto", "F8", "danger"
+        )
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
-        return [avancar, arte, cancelar]
+        for oculto in (avancar, arte, cancelar):
+            oculto.setVisible(False)
+            layout.addWidget(oculto)
+
+        btn_mais = QToolButton()
+        btn_mais.setText("Mais ações")
+        btn_mais.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        btn_mais.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        menu = QMenu(btn_mais)
+        act_avancar = menu.addAction("Avançar status")
+        act_avancar.triggered.connect(self._btn_avancar.click)
+        act_arte = menu.addAction("Arte (M3)")
+        act_arte.triggered.connect(self._btn_arte.click)
+        menu.addSeparator()
+        act_cancelar = menu.addAction("Cancelar projeto")
+        act_cancelar.triggered.connect(self._btn_cancelar_os.click)
+        btn_mais.setMenu(menu)
+        layout.addWidget(btn_mais)
+        self._btn_mais_acoes = btn_mais
+        return [container]
 
     def _abrir_arte(self) -> None:
         """Diálogo de arte, prova e aprovação da O.S. selecionada (M3, §3.5)."""
@@ -865,15 +899,42 @@ class PaginaOrcamento(PaginaOS):
     ]
 
     def _acao_extra(self):
+        """Orçamento: ações secundárias agrupadas em menu para caber no rodapé."""
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
         converter, self._btn_converter = botao_com_atalho(
             "Converter em O.S.", "F9", "primary"
         )
         self._btn_converter.clicked.connect(self._converter_em_os)
+        layout.addWidget(converter)
+
         cotacoes, self._btn_cotacoes = botao_com_atalho("Cotações", "F10")
         self._btn_cotacoes.clicked.connect(self._abrir_cotacoes)
-        cancelar, self._btn_cancelar_os = botao_com_atalho("Cancelar Orçamento", "F8")
+        cancelar, self._btn_cancelar_os = botao_com_atalho(
+            "Cancelar Orçamento", "F8"
+        )
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
-        return [converter, cotacoes, cancelar]
+        for oculto in (cotacoes, cancelar):
+            oculto.setVisible(False)
+            layout.addWidget(oculto)
+
+        btn_mais = QToolButton()
+        btn_mais.setText("Mais ações")
+        btn_mais.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        btn_mais.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        menu = QMenu(btn_mais)
+        act_cot = menu.addAction("Cotações")
+        act_cot.triggered.connect(self._btn_cotacoes.click)
+        menu.addSeparator()
+        act_cancelar = menu.addAction("Cancelar orçamento")
+        act_cancelar.triggered.connect(self._btn_cancelar_os.click)
+        btn_mais.setMenu(menu)
+        layout.addWidget(btn_mais)
+        self._btn_mais_acoes = btn_mais
+        return [container]
 
     def _abrir_cotacoes(self) -> None:
         """Diálogo de cotações para o item de fornecedor selecionado na grade."""

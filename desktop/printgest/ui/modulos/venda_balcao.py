@@ -792,8 +792,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             self._desconto,
         ):
             # Altura mínima por controle: o QSS de padding não corta mais a
-            # metade inferior do texto (P0#1).
-            campo.widget.setMinimumHeight(36)
+            # metade inferior do texto (P0#1/P0#4 da revisão PDV+Hist+OS).
+            campo.widget.setMinimumHeight(40)
+            # Campos de valor/texto expõem o editor interno (QLineEdit).
+            if hasattr(campo, "edicao"):
+                campo.edicao.setMinimumHeight(40)
 
         self._campo_cliente = _campo_rotulado("Cliente", self._cliente.widget)
         self._campo_vendedor = _campo_rotulado("Vendedor", self._vendedor.widget)
@@ -851,6 +854,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._lbl_troco_rotulo.setObjectName("labelForm")
         col.addWidget(self._lbl_troco_rotulo)
         self._lbl_troco = QLabel("R$ 0,00")
+        self._lbl_troco.setObjectName("valorDestaque")
         estado_sucesso(self._lbl_troco)
         col.addWidget(self._lbl_troco)
         return caixa
@@ -982,6 +986,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         cab.setSectionResizeMode(
             self.CHAVES.index("cliente_nome"), QHeaderView.ResizeMode.Stretch
         )
+        # P0#3 (revisão PDV+Hist+OS): ações legíveis e com alvo de clique viável.
+        col_acoes = self.CHAVES.index("acoes")
+        cab.setSectionResizeMode(col_acoes, QHeaderView.ResizeMode.Fixed)
+        self._tabela.setColumnWidth(col_acoes, 170)
 
         self._vazio = QLabel("Nenhuma venda encontrada. Clique em Nova venda (F6).")
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1067,7 +1075,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         recebido = _dec(self._recebido.valor())
         troco = recebido - self._total_venda
         if recebido > 0 and troco < 0:
-            # Dinheiro entregue não cobre o total (revisão nº 7): aviso claro.
+            # Dinheiro entregue não cobre o total: aviso claro.
             self._lbl_troco_rotulo.setText("FALTA")
             self._lbl_troco.setText(formatar_moeda(str(-troco)))
             estado_atencao(self._lbl_troco)
@@ -1075,6 +1083,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             self._lbl_troco_rotulo.setText("TROCO")
             self._lbl_troco.setText(formatar_moeda(str(troco if troco > 0 else 0)))
             estado_sucesso(self._lbl_troco)
+        # P0#6 (revisão PDV+Hist+OS): em dinheiro, recebido >= total implica
+        # pagamento concluído no ato — reflete no indicador de confirmação.
+        if self._forma.valor() == _FORMA_DINHEIRO and recebido > 0 and troco >= 0 and self._total_venda > 0:
+            self._pagamento_confirmado.definir(True)
         aplicar_estilo(self._lbl_troco)
 
     def _atualizar_estado_finalizar(self) -> None:
@@ -1178,10 +1190,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         for linha, dado in enumerate(self._linhas):
             caixa = QWidget()
             h = QHBoxLayout(caixa)
-            h.setContentsMargins(4, 0, 4, 0)
-            h.setSpacing(4)
+            h.setContentsMargins(6, 4, 6, 4)
+            h.setSpacing(6)
             btn_ver = QPushButton("Ver")
             btn_ver.setObjectName("acaoLinha")
+            btn_ver.setMinimumHeight(30)
             btn_ver.clicked.connect(
                 lambda _=False, vid=dado.get("id"): self._ver_detalhes(vid)
             )
@@ -1189,6 +1202,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             if dado.get("status") == "ok" and not self._modo_leitura:
                 btn_cancelar = QPushButton("Cancelar")
                 btn_cancelar.setObjectName("acaoLinha")
+                btn_cancelar.setMinimumHeight(30)
                 estado_danger(btn_cancelar)
                 btn_cancelar.clicked.connect(
                     lambda _=False, alvo=dado: self._cancelar_venda(alvo)
@@ -1293,14 +1307,18 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         resposta = QMessageBox.question(
             self,
             "Cancelar venda",
-            f"Cancelar a venda Nº {dado.get('numero')}?",
+            f"Cancelar a venda Nº {dado.get('numero')}?\n\n"
+            "Ação sensível: pode impactar caixa/estoque conforme regras do sistema. "
+            "Confirme apenas se tiver certeza.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
         if resposta != QMessageBox.StandardButton.Yes:
             return
         tarefas.rodar(
             lambda: self._api.excluir("vendas", dado["id"]),
             on_ok=lambda _out: self.recarregar(self._busca.texto()),
-            on_erro=self._erro_carga,
+            on_erro=lambda msg: QMessageBox.warning(self, "Cancelar venda", msg),
         )
 
     # ------------------------------------------------------------ salvar
@@ -1409,7 +1427,14 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             numero = dado.get("numero")
             return "" if numero is None else str(numero)
         if chave == "data_venda":
-            return formatar_data_iso(dado.get("data_venda"))
+            valor = dado.get("data_venda")
+            texto = formatar_data_iso(valor)
+            bruto = str(valor or "")
+            # Se vier ISO com horário, exibe data + hora (P1#14).
+            if "T" in bruto and len(bruto) >= 16:
+                hora = bruto[11:16]
+                return f"{texto} {hora}" if texto else hora
+            return texto
         if chave == "cliente_nome":
             return dado.get("cliente_nome") or "Consumidor final"
         if chave == "forma_pagamento":
