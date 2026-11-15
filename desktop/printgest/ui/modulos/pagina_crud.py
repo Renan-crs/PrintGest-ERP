@@ -140,9 +140,8 @@ class PaginaCrud(QWidget):
         if self.FILTROS:
             filtros = QWidget()
             self._filtros_widget = filtros
-            fluxo = QHBoxLayout(filtros)
-            fluxo.setContentsMargins(0, 0, 0, 0)
-            fluxo.setSpacing(8)
+            # FlowLayout: filtros quebram linha em telas estreitas (P1#8 OS).
+            fluxo = FlowLayout(filtros, margem=0, espaco_h=8, espaco_v=8)
             for valor, rotulo in self.FILTROS:
                 botao = QPushButton(rotulo)
                 botao.setCheckable(True)
@@ -152,7 +151,6 @@ class PaginaCrud(QWidget):
                 botao.clicked.connect(lambda _=False, v=valor: self._aplicar_filtro(v))
                 self._btn_filtros[valor] = botao
                 fluxo.addWidget(botao)
-            fluxo.addStretch(1)
             layout.addWidget(filtros, 0)
         return caixa
 

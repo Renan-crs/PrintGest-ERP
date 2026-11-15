@@ -701,6 +701,15 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.addWidget(titulo)
         linha.addStretch(1)
 
+        # P1#16 (PDV+Hist+OS): controle segmentado Venda | Histórico.
+        self._botao_venda = QPushButton("Venda")
+        self._botao_venda.setCheckable(True)
+        self._botao_venda.setChecked(True)
+        self._botao_venda.setObjectName("chaveRapida")
+        self._botao_venda.setToolTip("Nova venda")
+        self._botao_venda.clicked.connect(self._ir_para_venda)
+        linha.addWidget(self._botao_venda)
+
         self._botao_historico = QPushButton("Histórico")
         self._botao_historico.setCheckable(True)
         self._botao_historico.setObjectName("chaveRapida")
@@ -1127,11 +1136,15 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
     def _ir_para_venda(self) -> None:
         self._vistas.setCurrentIndex(0)
+        if hasattr(self, "_botao_venda"):
+            self._botao_venda.setChecked(True)
         self._botao_historico.setChecked(False)
         self._verificar_caixa()
 
     def _ir_para_historico(self) -> None:
         self._vistas.setCurrentIndex(1)
+        if hasattr(self, "_botao_venda"):
+            self._botao_venda.setChecked(False)
         self._botao_historico.setChecked(True)
         self._busca.focar()
 

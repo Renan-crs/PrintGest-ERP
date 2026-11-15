@@ -679,6 +679,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             "Pagamento já recebido"
         )
         self._itens = GradeItens("", api=self._api)
+        # P0#2 (refino): em tela cheia, a grade de itens precisa de área útil.
+        self._itens.setMinimumHeight(320)
         return [
             ("Cliente & Equipe", [self._cliente, self._vendedor, self._atendente]),
             (
