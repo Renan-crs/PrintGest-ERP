@@ -639,8 +639,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     GRUPO_LISTA = "FILA OPERACIONAL"
     LUGAR_BUSCA = "Buscar por Nº da O.S. ou nome do cliente..."
     CAMPO_NOME = "cliente_nome"
-    CHAVES = ["id", "numero", "cliente_nome", "status", "data_previsao_entrega", "valor_total"]
-    COLUNAS = ["O.S.", "Nº", "Cliente", "Status", "Prazo", "Total"]
+    # P1#12: remove redundância O.S./Nº e acrescenta entrada + indicador de arte.
+    CHAVES = ["numero", "cliente_nome", "status", "data_emissao", "data_previsao_entrega", "valor_total", "arte_pendente"]
+    COLUNAS = ["Nº", "Cliente", "Status", "Entrada", "Prazo", "Total", "Arte"]
     CHAVE_FILTRO = "status"
     # P0#2 (revisão PDV+Hist+OS): em 1024px o formulário ocupa a tela inteira.
     FORM_EM_TELA_CHEIA = True
@@ -697,7 +698,61 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         ]
 
     def _conectar_campos(self) -> None:
-        self._cliente.widget.currentIndexChanged.connect(self._cliente_mudou)
+        self._cliente.widget.currentIndexChanged.connect(self._ao_mudar_cliente_os)
+        self._desconto.edicao.textChanged.connect(self._atualizar_totais_os)
+        self._itens.alterado.connect(self._atualizar_totais_os)
+
+    def _ao_mudar_cliente_os(self) -> None:
+        self._cliente_mudou()
+        self._atualizar_totais_os()
+
+    def _rodape_pos_acoes(self, layout: QHBoxLayout) -> None:
+        # P0#2 (refino): totais fixos no rodapé do formulário.
+        self._lbl_totais_os = QLabel("Itens R$ 0,00 · Desconto R$ 0,00 · Total R$ 0,00")
+        estado_muted(self._lbl_totais_os)
+        self._lbl_totais_os.setWordWrap(False)
+        layout.insertWidget(0, self._lbl_totais_os, 1)
+        self._atualizar_totais_os()
+
+    def _atualizar_totais_os(self) -> None:
+        if not hasattr(self, "_lbl_totais_os") or not hasattr(self, "_itens"):
+            return
+        from decimal import Decimal
+        from printgest.ui.formulario import formatar_moeda, para_decimal
+
+        subtotal = Decimal("0")
+        for item in self._itens.valor():
+            qtd = para_decimal(item.get("quantidade")) or Decimal("0")
+            unit = para_decimal(item.get("valor_unitario")) or Decimal("0")
+            desc_item = para_decimal(item.get("desconto")) or Decimal("0")
+            subtotal += (qtd * unit) - desc_item
+        if subtotal < 0:
+            subtotal = Decimal("0")
+        desconto = para_decimal(self._desconto.valor()) or Decimal("0")
+        total = subtotal - desconto
+        if total < 0:
+            total = Decimal("0")
+        # P1#10 (parcial): exibe saldo estimado quando há exigência de adiantamento/sinal.
+        saldo_txt = ""
+        try:
+            exigencia = self._exigencia_pendente()
+            if exigencia:
+                adiantado, sinal, pct = self._cliente_flags.get(self._cliente.valor(), (False, False, None))
+                if sinal and pct is not None:
+                    sinal_val = (total * (para_decimal(pct) or Decimal("0")) / Decimal("100")).quantize(Decimal("0.01"))
+                    saldo = total - sinal_val
+                    if saldo < 0:
+                        saldo = Decimal("0")
+                    saldo_txt = f" · Sinal {formatar_moeda(str(sinal_val))} · Saldo {formatar_moeda(str(saldo))}"
+                elif adiantado:
+                    saldo_txt = f" · Saldo {formatar_moeda('0')}"
+        except Exception:
+            saldo_txt = ""
+        self._lbl_totais_os.setText(
+            f"Itens {formatar_moeda(str(subtotal))} · "
+            f"Desconto {formatar_moeda(str(desconto))} · "
+            f"Total {formatar_moeda(str(total))}{saldo_txt}"
+        )
 
     def _padroes_do_form(self) -> None:
         from datetime import date
@@ -722,6 +777,11 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             return formatar_moeda(dado.get("valor_total"))
         if chave == "data_previsao_entrega":
             return formatar_data_iso(dado.get("data_previsao_entrega"))
+        if chave == "data_emissao":
+            return formatar_data_iso(dado.get("data_emissao") or dado.get("created_at"))
+        if chave == "arte_pendente":
+            status = str(dado.get("status") or "")
+            return "Pendente" if status in {"aguardando_arte", "aguardando_aprovacao"} else "—"
         return super()._formatar_texto(dado, chave)
 
     # ------------------------------------------------------------ carregar

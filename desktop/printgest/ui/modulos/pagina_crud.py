@@ -249,7 +249,11 @@ class PaginaCrud(QWidget):
         rodape.setObjectName("rodape")
         rl = QHBoxLayout(rodape)
         rl.setContentsMargins(16, 10, 16, 10)
-        rl.addStretch(1)
+        self._rodape_esquerda = QHBoxLayout()
+        self._rodape_esquerda.setContentsMargins(0, 0, 0, 0)
+        self._rodape_esquerda.setSpacing(12)
+        rl.addLayout(self._rodape_esquerda, 1)
+        rl.addStretch(0)
         self._acoes_extra = self._acao_extra()
         for botao in self._acoes_extra:
             rl.addWidget(botao)
@@ -257,6 +261,7 @@ class PaginaCrud(QWidget):
         salvar, self._btn_salvar = botao_com_atalho("Salvar", "F10", "primary")
         rl.addWidget(cancelar)
         rl.addWidget(salvar)
+        self._rodape_pos_acoes(rl)
 
         self._btn_cancelar.clicked.connect(self._limpar_form)
         self._btn_salvar.clicked.connect(self._salvar)
@@ -271,6 +276,9 @@ class PaginaCrud(QWidget):
     def _acao_extra(self) -> list:
         """Hook: subclasse acrescenta ações ao rodapé do formulário (ex.: Avançar Status)."""
         return []
+
+    def _rodape_pos_acoes(self, layout: QHBoxLayout) -> None:
+        """Hook: subclasse adiciona widgets ao rodapé (ex.: totais fixos)."""
 
     def _badges_barra(self) -> list:
         """Hook: subclasse anexa badges de KPI à barra de título (ex.: itens, valor)."""

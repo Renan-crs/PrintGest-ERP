@@ -153,7 +153,9 @@ def test_carrega_grade_so_de_os(app, pumpar, pagina):
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     assert pagina._total == 2
     assert "de 2 registros" in pagina._paginador._info.text()
-    assert pagina._tabela.item(0, 2).text() == "Ana"
+    # P1#12: colunas [Nº, Cliente, Status, Entrada, Prazo, Total, Arte]
+    assert pagina._tabela.item(0, 1).text() == "Ana"
+    assert pagina._tabela.item(0, 2).text() == "ABERTO"
     assert pagina._formatar_texto({"status": "aberto"}, "status") == "ABERTO"
 
 
