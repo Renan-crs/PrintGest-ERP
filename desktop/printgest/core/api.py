@@ -188,6 +188,9 @@ class Api:
         q: str = "",
         status_venda: str | None = None,
         forma_pagamento: str | None = None,
+        operador_id: int | None = None,
+        data_inicio: str | None = None,
+        data_fim: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
@@ -196,6 +199,9 @@ class Api:
             q=q,
             status_venda=status_venda,
             forma_pagamento=forma_pagamento,
+            operador_id=operador_id,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
             limit=limit,
             offset=offset,
         )

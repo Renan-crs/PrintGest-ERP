@@ -30,8 +30,10 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
+    QToolButton,
     QScrollArea,
     QStackedWidget,
     QTableWidget,
@@ -73,7 +75,7 @@ from printgest.ui.widgets import (
 )
 
 # Formas que aceitam parcelamento (mostram o campo "Parcelas").
-_FORMAS_PARCELAVEIS = {"cartao_credito", "boleto", "fiado"}
+FORMAS_PAGAMENTO_PARCELAVEIS = {"cartao_credito", "boleto", "fiado"}
 # Troco só faz sentido em dinheiro.
 _FORMA_DINHEIRO = "dinheiro"
 
@@ -971,12 +973,27 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             self._btn_filtros[valor] = botao
             linha.addWidget(botao)
 
+        self._filtro_forma = ""
+        self._combo_forma_hist = QComboBox()
+        self._combo_forma_hist.addItem("Todas as formas", "")
+        for v, r in FORMAS_PAGAMENTO:
+            self._combo_forma_hist.addItem(r, v)
+        self._combo_forma_hist.currentIndexChanged.connect(
+            lambda: self._aplicar_filtro_forma(self._combo_forma_hist.currentData() or "")
+        )
+        linha.addWidget(self._combo_forma_hist)
+
         # Exportação pertence ao Histórico (P1#6), não ao cabeçalho do PDV.
         self._btn_exportar = QPushButton(self.ROTULO_EXPORTAR)
         self._btn_exportar.setEnabled(False)
         self._btn_exportar.clicked.connect(self._exportar)
         linha.addWidget(self._btn_exportar)
         col.addWidget(barra)
+
+        self._lbl_resumo_hist = QLabel("")
+        self._lbl_resumo_hist.setObjectName("textoMuted")
+        self._lbl_resumo_hist.setWordWrap(True)
+        col.addWidget(self._lbl_resumo_hist)
 
         card = QWidget()
         card.setObjectName("card")
@@ -998,7 +1015,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         # P0#3 (revisão PDV+Hist+OS): ações legíveis e com alvo de clique viável.
         col_acoes = self.CHAVES.index("acoes")
         cab.setSectionResizeMode(col_acoes, QHeaderView.ResizeMode.Fixed)
-        self._tabela.setColumnWidth(col_acoes, 170)
+        self._tabela.setColumnWidth(col_acoes, 120)
 
         self._vazio = QLabel("Nenhuma venda encontrada. Clique em Nova venda (F6).")
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1046,7 +1063,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
     def _forma_mudou(self) -> None:
         forma = self._forma.valor()
-        parcelavel = forma in _FORMAS_PARCELAVEIS
+        parcelavel = forma in FORMAS_PAGAMENTO_PARCELAVEIS
         self._campo_parcelas.setVisible(parcelavel)
         dinheiro = forma == _FORMA_DINHEIRO
         self._campo_recebido.setVisible(dinheiro)
@@ -1156,9 +1173,17 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             botao.setChecked(v == valor)
         self.recarregar(self._busca.texto())
 
+    def _aplicar_filtro_forma(self, valor: str) -> None:
+        self._filtro_forma = valor or ""
+        self.recarregar(self._busca.texto())
+
     def _listar(self, q: str, offset: int, filtros: dict) -> dict:
         return self._api.listar_vendas(
-            q=q, status_venda=self._filtro or None, limit=LOTE, offset=offset
+            q=q,
+            status_venda=self._filtro or None,
+            forma_pagamento=(self._filtro_forma or None) if hasattr(self, "_filtro_forma") else None,
+            limit=LOTE,
+            offset=offset,
         )
 
     def recarregar(self, q: str = "", offset: int | None = None) -> None:
@@ -1186,10 +1211,37 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._tabela.preencher(self._linhas)
         self._paginador.atualizar(self._total, offset, LOTE)
         self._montar_acoes_linhas()
+        self._atualizar_resumo_historico()
         self._pilha_lista.setCurrentWidget(
             self._tabela if self._total else self._vazio
         )
         self._btn_exportar.setEnabled(self._total > 0)
+
+    def _atualizar_resumo_historico(self) -> None:
+        if not hasattr(self, "_lbl_resumo_hist"):
+            return
+        totais: dict[str, Decimal] = {}
+        qtd_ok = 0
+        for v in self._linhas:
+            if str(v.get("status")) != "ok":
+                continue
+            qtd_ok += 1
+            forma = str(v.get("forma_pagamento") or "")
+            totais[forma] = totais.get(forma, Decimal("0")) + _dec(v.get("valor_total"))
+        if not totais:
+            self._lbl_resumo_hist.setText("Resumo (página): sem vendas finalizadas.")
+            return
+        partes = []
+        for forma, rot in FORMAS_PAGAMENTO:
+            if forma in totais:
+                partes.append(f"{rot}: {formatar_moeda(str(totais[forma]))}")
+        # formas fora do mapa
+        for forma, val in totais.items():
+            if forma not in dict(FORMAS_PAGAMENTO):
+                partes.append(f"{forma}: {formatar_moeda(str(val))}")
+        self._lbl_resumo_hist.setText(
+            "Resumo (página, finalizadas): " + " · ".join(partes) + f" · Vendas: {qtd_ok}"
+        )
 
     def _erro_carga(self, msg: str) -> None:
         self._tabela.limpar()
@@ -1208,6 +1260,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             h = QHBoxLayout(caixa)
             h.setContentsMargins(6, 4, 6, 4)
             h.setSpacing(6)
+            # P1#14: ação principal visível + ações secundárias agrupadas em ⋯
             btn_ver = QPushButton("Ver")
             btn_ver.setObjectName("acaoLinha")
             btn_ver.setMinimumHeight(30)
@@ -1215,15 +1268,19 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 lambda _=False, vid=dado.get("id"): self._ver_detalhes(vid)
             )
             h.addWidget(btn_ver)
+            btn_mais = QToolButton()
+            btn_mais.setText("⋯")
+            btn_mais.setObjectName("acaoLinha")
+            btn_mais.setMinimumHeight(30)
+            btn_mais.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            menu = QMenu(btn_mais)
+            act_ver = menu.addAction("Ver detalhes")
+            act_ver.triggered.connect(lambda _=False, vid=dado.get("id"): self._ver_detalhes(vid))
             if dado.get("status") == "ok" and not self._modo_leitura:
-                btn_cancelar = QPushButton("Cancelar")
-                btn_cancelar.setObjectName("acaoLinha")
-                btn_cancelar.setMinimumHeight(30)
-                estado_danger(btn_cancelar)
-                btn_cancelar.clicked.connect(
-                    lambda _=False, alvo=dado: self._cancelar_venda(alvo)
-                )
-                h.addWidget(btn_cancelar)
+                act_cancelar = menu.addAction("Cancelar venda")
+                act_cancelar.triggered.connect(lambda _=False, alvo=dado: self._cancelar_venda(alvo))
+            btn_mais.setMenu(menu)
+            h.addWidget(btn_mais)
             h.addStretch(1)
             self._tabela.setCellWidget(linha, coluna, caixa)
             # P1#13: valores/datas alinhados à direita para leitura consistente.
@@ -1349,7 +1406,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _validar(self):
         if not self._forma.valor():
             return ("Informe a forma de pagamento.", self._forma)
-        if self._forma.valor() in _FORMAS_PARCELAVEIS:
+        if self._forma.valor() in FORMAS_PAGAMENTO_PARCELAVEIS:
             parcelas = (self._parcelas.valor() or "").strip()
             if not parcelas.isdigit() or int(parcelas) < 1:
                 return ("Parcelas deve ser um número maior que zero.", self._parcelas)
@@ -1382,7 +1439,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
     def _payload(self) -> dict:
         forma = self._forma.valor()
-        if forma in _FORMAS_PARCELAVEIS:
+        if forma in FORMAS_PAGAMENTO_PARCELAVEIS:
             parcelas = int((self._parcelas.valor() or "1").strip() or "1")
         else:
             parcelas = 1

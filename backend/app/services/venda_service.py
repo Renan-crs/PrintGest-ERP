@@ -301,6 +301,7 @@ def listar(
     q: str | None = None,
     status_venda: StatusVenda | None = None,
     forma_pagamento: FormaPagamento | None = None,
+    operador_id: int | None = None,
     data_inicio: date | None = None,
     data_fim: date | None = None,
     limit: int = 50,
@@ -311,6 +312,8 @@ def listar(
         base = base.filter(VendaBalcao.status == status_venda)
     if forma_pagamento:
         base = base.filter(VendaBalcao.forma_pagamento == forma_pagamento)
+    if operador_id:
+        base = base.filter(VendaBalcao.operador_caixa == operador_id)
     if data_inicio:
         base = base.filter(VendaBalcao.data_venda >= data_inicio)
     if data_fim:

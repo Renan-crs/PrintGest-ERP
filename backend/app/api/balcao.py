@@ -5,6 +5,8 @@ de balcão e movimentação de caixa apenas" (PRD §5 RBAC), logo PODE registrar
 cancelar vendas de balcão; o cancelamento estorna o estoque automaticamente.
 """
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
@@ -35,6 +37,9 @@ def listar(
     filial: FilialDep,
     status_venda: StatusVenda | None = None,
     forma_pagamento: FormaPagamento | None = None,
+    operador_id: int | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
     q: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -44,6 +49,9 @@ def listar(
         filial_id=filial,
         status_venda=status_venda,
         forma_pagamento=forma_pagamento,
+        operador_id=operador_id,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
         q=q,
         limit=limit,
         offset=offset,
