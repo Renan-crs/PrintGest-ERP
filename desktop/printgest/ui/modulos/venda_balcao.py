@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QCompleter,
+    QDateEdit,
     QDialog,
     QFrame,
     QGridLayout,
@@ -632,9 +633,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         "forma_pagamento",
         "valor_total",
         "status",
+        "fiscal",
         "acoes",
     ]
-    COLUNAS = ["Nº", "Data", "Cliente", "Pagamento", "Total", "Status", "Ações"]
+    COLUNAS = ["Nº", "Data", "Cliente", "Pagamento", "Total", "Status", "Fiscal", "Ações"]
     CHAVE_FILTRO = "status"
     FILTROS = [
         ("", "Todas"),
@@ -983,6 +985,25 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         )
         linha.addWidget(self._combo_forma_hist)
 
+        # P1#15 (parcial): filtros por período.
+        from PySide6.QtCore import QDate
+        self._data_ini_hist = QDateEdit()
+        self._data_ini_hist.setCalendarPopup(True)
+        self._data_ini_hist.setDisplayFormat("dd/MM/yyyy")
+        self._data_ini_hist.setSpecialValueText("De")
+        self._data_ini_hist.setDate(QDate(2000, 1, 1))
+        self._data_fim_hist = QDateEdit()
+        self._data_fim_hist.setCalendarPopup(True)
+        self._data_fim_hist.setDisplayFormat("dd/MM/yyyy")
+        self._data_fim_hist.setSpecialValueText("Até")
+        self._data_fim_hist.setDate(QDate(2000, 1, 1))
+        for w in (self._data_ini_hist, self._data_fim_hist):
+            w.setMinimumDate(QDate(2000, 1, 1))
+            w.setMaximumDate(QDate(2100, 12, 31))
+            w.dateChanged.connect(lambda *_: self.recarregar(self._busca.texto()))
+        linha.addWidget(self._data_ini_hist)
+        linha.addWidget(self._data_fim_hist)
+
         # Exportação pertence ao Histórico (P1#6), não ao cabeçalho do PDV.
         self._btn_exportar = QPushButton(self.ROTULO_EXPORTAR)
         self._btn_exportar.setEnabled(False)
@@ -1012,7 +1033,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         cab.setSectionResizeMode(
             self.CHAVES.index("cliente_nome"), QHeaderView.ResizeMode.Stretch
         )
-        # P0#3 (revisão PDV+Hist+OS): ações legíveis e com alvo de clique viável.
+        if "fiscal" in self.CHAVES:
+            col_fiscal = self.CHAVES.index("fiscal")
+            cab.setSectionResizeMode(col_fiscal, QHeaderView.ResizeMode.Fixed)
+            self._tabela.setColumnWidth(col_fiscal, 70)
+        # P0#3/P1#14: ações compactas (menu ⋯).
         col_acoes = self.CHAVES.index("acoes")
         cab.setSectionResizeMode(col_acoes, QHeaderView.ResizeMode.Fixed)
         self._tabela.setColumnWidth(col_acoes, 120)
@@ -1178,10 +1203,22 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self.recarregar(self._busca.texto())
 
     def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        data_inicio = None
+        data_fim = None
+        if hasattr(self, "_data_ini_hist"):
+            d = self._data_ini_hist.date()
+            if d.isValid() and d.year() > 2000:
+                data_inicio = d.toString("yyyy-MM-dd")
+        if hasattr(self, "_data_fim_hist"):
+            d = self._data_fim_hist.date()
+            if d.isValid() and d.year() > 2000:
+                data_fim = d.toString("yyyy-MM-dd")
         return self._api.listar_vendas(
             q=q,
             status_venda=self._filtro or None,
             forma_pagamento=(self._filtro_forma or None) if hasattr(self, "_filtro_forma") else None,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
             limit=LOTE,
             offset=offset,
         )
@@ -1255,6 +1292,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         col_num = self.CHAVES.index("numero")
         col_total = self.CHAVES.index("valor_total")
         col_data = self.CHAVES.index("data_venda")
+        col_fiscal = self.CHAVES.index("fiscal") if "fiscal" in self.CHAVES else -1
         for linha, dado in enumerate(self._linhas):
             caixa = QWidget()
             h = QHBoxLayout(caixa)
@@ -1283,13 +1321,17 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             h.addWidget(btn_mais)
             h.addStretch(1)
             self._tabela.setCellWidget(linha, coluna, caixa)
-            # P1#13: valores/datas alinhados à direita para leitura consistente.
+            # P1#13/#14: valores/datas alinhados à direita; fiscal centralizado.
             for c in (col_num, col_total, col_data):
                 item = self._tabela.item(linha, c)
                 if item is not None:
                     item.setTextAlignment(
                         Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
                     )
+            if col_fiscal >= 0:
+                item = self._tabela.item(linha, col_fiscal)
+                if item is not None:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             for c in range(len(self.CHAVES)):
                 item = self._tabela.item(linha, c)
                 if item is not None:
@@ -1530,6 +1572,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             if valor == "cancelado":
                 return f"○ {rotulo}"
             return rotulo
+        if chave == "fiscal":
+            # NFC-e/fiscal: não implementado neste módulo; exibe estado neutro.
+            return "—"
         valor = dado.get(chave, "")
         return "" if valor is None else str(valor)
 

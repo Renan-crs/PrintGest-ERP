@@ -592,8 +592,17 @@ class CampoValor(CampoForm):
     def __init__(self, rotulo: str, valor="", prefixo: str = "R$") -> None:
         super().__init__(rotulo)
         self._prefixo = prefixo
-        self._edicao = QLineEdit(valor)
+
+        class _EdicaoValor(QLineEdit):
+            def focusInEvent(self, event):  # noqa: N802
+                super().focusInEvent(event)
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(0, self.selectAll)
+
+        self._edicao = _EdicaoValor(valor)
         self._edicao.setMinimumWidth(80)
+        self._edicao.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         caixa = QWidget()
         linha = QHBoxLayout(caixa)
         linha.setContentsMargins(0, 0, 0, 0)
