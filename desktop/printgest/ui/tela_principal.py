@@ -895,6 +895,8 @@ class TelaPrincipal(QMainWindow):
         self._base_url = base_url
         self._paginas: dict[str, QWidget] = {}
         self._colapsada = False
+        # Colapso automático por largura (P0#2 da revisão do PDV): 0 = manual.
+        self._colapso_automatico = False
         self._detalhe_licenca = "Licença ainda não verificada."
 
         self.setWindowTitle(APP_NAME)
@@ -1291,6 +1293,20 @@ class TelaPrincipal(QMainWindow):
         # "Acesso rápido" do Início — evita duplicar ações com rótulos diferentes.
         return lateral
 
+    def resizeEvent(self, evento) -> None:  # noqa: N802 (API do Qt)
+        super().resizeEvent(evento)
+        # P0#2 (revisão PDV): abaixo de ~1280 px o layout de duas colunas do
+        # PDV não cabe — a sidebar recolhe automaticamente para o trilho de 64
+        # px. O toque manual do operador vence (só re-automatiza ao voltar da
+        # largura estreita para a larga depois de um colapso automático).
+        estreita = self.width() < 1280
+        if estreita and not self._colapsada:
+            self._colapso_automatico = True
+            self._alternar_colapso()
+        elif not estreita and self._colapsada and self._colapso_automatico:
+            self._colapso_automatico = False
+            self._alternar_colapso()
+
     def _alternar_colapso(self) -> None:
         """Colapsa/expande a barra lateral com largura animada (§4, §5).
 
@@ -1299,6 +1315,8 @@ class TelaPrincipal(QMainWindow):
         movimento ou plataforma offscreen — aplica o estado final de imediato.
         """
         self._colapsada = not self._colapsada
+        if not self._colapsada:
+            self._colapso_automatico = False
         largura_final = 64 if self._colapsada else 224
         self._btn_colapso.setText("»" if self._colapsada else "«")
 

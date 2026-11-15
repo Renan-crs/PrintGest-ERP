@@ -153,8 +153,8 @@ def _adicionar_item(pagina, codigo="B015"):
 
 
 def test_abre_na_visao_nova_venda(app, pagina):
+    """Abre na vista Nova venda; só há alternância Histórico no topo (P1#6)."""
     assert pagina._vistas.currentIndex() == 0
-    assert pagina._botao_venda.isChecked() is True
     assert pagina._botao_historico.isChecked() is False
 
 
@@ -358,20 +358,6 @@ def test_cancelar_venda_exclui_registro(app, pumpar, pagina, monkeypatch):
     assert _ESCRITAS[-1][1] == "10"
 
 
-def test_nova_os_emite_navegacao(app):
-    pagina = PaginaVendaBalcao(_api(), nivel="operador")
-    recebidos: list[str] = []
-    pagina.navegar.connect(recebidos.append)
-    assert not pagina._btn_nova_os.isHidden()
-    pagina._btn_nova_os.click()
-    assert recebidos == ["os"]
-
-
-def test_caixa_nao_ve_nova_os(app):
-    pagina = PaginaVendaBalcao(_api(), nivel="caixa")
-    assert pagina._btn_nova_os.isHidden()
-
-
 def test_remover_item_atualiza_grade(app, pumpar, pagina):
     pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
     _adicionar_item(pagina)
@@ -385,18 +371,27 @@ def test_remover_item_atualiza_grade(app, pumpar, pagina):
 # --- M0 (PRD v3.0 §2): PDV não opera com caixa fechado ------------------------
 
 
-def test_banner_de_caixa_fechado_orienta_e_leva_a_tela_de_abertura(app, pumpar, monkeypatch):
-    """Caixa fechado: banner visível + botão navega para abrir o caixa."""
+def test_banner_de_caixa_fechado_orienta_e_abre_modal_sem_sair_do_pdv(app, pumpar, monkeypatch):
+    """P0#3: caixa fechado bloqueia a venda e oferece Abrir caixa no próprio PDV."""
+    from PySide6.QtWidgets import QDialog
+
     _CAIXA_ABERTO["valor"] = False
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
     api.autenticar({"token": "t", "usuario": {"id": 1, "nome": "Ana", "login": "ana"}})
     pagina = PaginaVendaBalcao(api, nivel="admin")
     pumpar(lambda: not pagina._banner_caixa.isHidden())
 
+    # Formulário bloqueado enquanto o caixa estiver fechado.
+    assert pagina._caixa_fechado is True
+    assert pagina._btn_salvar.isEnabled() is False
+    assert "Abra o caixa" in pagina._btn_salvar.toolTip()
+
     alvo = []
     pagina.navegar.connect(alvo.append)
+    # Evita bloquear o teste: o modal é aberto, mas cancelado.
+    monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Rejected)
     pagina._banner_caixa.findChild(QPushButton).click()
-    assert alvo == ["caixa"]  # admin pode abrir a tela de caixa direto
+    assert alvo == []  # abre modal no PDV, não navega para outra tela
 
 
 def test_banner_de_caixa_sumindo_quando_o_caixa_esta_aberto(app, pumpar):
@@ -424,17 +419,18 @@ def test_banner_reaparece_ao_voltar_para_a_venda(app, pumpar, monkeypatch):
 
 
 def test_estado_vazio_da_lista_de_itens_orienta(app, pumpar, pagina):
-    """Sem itens: mensagem + atalhos no lugar do vazio (revisão nº 1)."""
+    """Sem itens: overlay com instrução + chips; cabeçalhos sempre visíveis (P1#7/#8)."""
     pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
     editor = pagina._itens_editor
-    assert editor._pilha_itens.currentIndex() == 1  # estado vazio visível
-    assert "Busque um produto ou serviço" in editor._pilha_itens.currentWidget().findChild(QLabel).text()
+    assert not editor._vazio_itens.isHidden()  # overlay por cima da tabela
+    assert not editor._tabela.horizontalHeader().isHidden()  # cabeçalho fixo
+    assert "Busque um produto/serviço" in editor._vazio_itens.findChild(QLabel).text()
 
     _adicionar_item(pagina)
-    assert editor._pilha_itens.currentIndex() == 0  # tabela de volta
+    assert editor._vazio_itens.isHidden()  # tabela de volta
     assert editor._tabela.rowCount() == 1
     editor._remover_linha(0)
-    assert editor._pilha_itens.currentIndex() == 1  # vazio de novo
+    assert not editor._vazio_itens.isHidden()  # vazio de novo
 
 
 def test_busca_sem_chip_enter_e_placeholder_curto(app, pumpar, pagina):
@@ -569,7 +565,7 @@ def test_resumo_tem_desconto_e_total_em_destaque(app, pumpar, pagina):
     pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
     _adicionar_item(pagina)
     pagina._desconto.definir("25")
-    assert pagina._lbl_desconto_totais.text() == "R$ 25,00"
+    assert pagina._lbl_desconto_totais.text() == "-R$ 25,00"
     assert pagina._lbl_subtotal.text() == "R$ 100,00"
     assert pagina._lbl_total.text() == "R$ 75,00"
     assert pagina._lbl_total.objectName() == "totalPdv"

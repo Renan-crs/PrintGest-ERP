@@ -147,8 +147,15 @@ def test_pdv_sem_rolagem_horizontal_e_acao_visivel(app, pumpar, largura, altura)
         )
         assert not tabela.horizontalScrollBar().isVisible()
 
-    # 2) a visão "Nova venda" não tem QScrollArea (sem rolagem aninhada).
-    assert pagina._vista_venda.findChildren(QScrollArea) == []
+    # 2) P0#1: painel direito rola verticalmente com rodapé fixo (sem rolagem
+    # horizontal aninhada que corte conteúdo).
+    scrolls = pagina._vista_venda.findChildren(QScrollArea)
+    assert scrolls, "painel direito deve ter QScrollArea para caber em 1024x768"
+    for rolagem in scrolls:
+        assert (
+            rolagem.horizontalScrollBarPolicy()
+            == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
 
     # 3) o botão principal fica inteiro dentro da janela.
     botao = pagina._btn_salvar

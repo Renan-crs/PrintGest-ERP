@@ -21,8 +21,10 @@ from PySide6.QtCore import QStringListModel, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QCompleter,
     QDialog,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -30,6 +32,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -48,14 +51,26 @@ from printgest.ui.formulario import (
     CampoCombo,
     CampoTexto,
     CampoValor,
+    em_volta,
     formatar_data_iso,
     formatar_moeda,
+    limpo,
     para_decimal,
+    rotulo_secao,
 )
 from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.paginador import LOTE, Paginador
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import aplicar_estilo, botao_com_atalho, estado_primario, estado_sucesso, estado_erro, estado_muted, estado_atencao, estado_danger
+from printgest.ui.widgets import (
+    aplicar_estilo,
+    estado_primario,
+    estado_sucesso,
+    estado_erro,
+    estado_muted,
+    estado_atencao,
+    estado_danger,
+    estado_secundario,
+)
 
 # Formas que aceitam parcelamento (mostram o campo "Parcelas").
 _FORMAS_PARCELAVEIS = {"cartao_credito", "boleto", "fiado"}
@@ -89,13 +104,17 @@ def _texto_moeda_editavel(valor) -> str:
 
 
 def _campo_rotulado(rotulo: str, widget: QWidget) -> QWidget:
-    """Rótulo acima do campo (padrão dos formulários do sistema)."""
+    """Rótulo acima do campo (padrão dos formulários do sistema).
+
+    Rótulo em caixa normal (não UPPERCASE) — hierarquia sem gritar e contraste
+    legível (revisão PDV P1#11).
+    """
     caixa = QWidget()
     caixa.setObjectName("caixaForma")  # fundo transparente: sem faixa cinza
     col = QVBoxLayout(caixa)
     col.setContentsMargins(0, 0, 0, 0)
     col.setSpacing(4)
-    label = QLabel(rotulo.upper())
+    label = QLabel(rotulo)
     label.setObjectName("labelForm")
     col.addWidget(label)
     col.addWidget(widget)
@@ -140,10 +159,12 @@ class EditorItensVenda(QWidget):
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(8)
         col.addWidget(self._barra_editor())
-        self._pilha_itens = QStackedWidget()
-        self._pilha_itens.addWidget(self._tabela_itens())
-        self._pilha_itens.addWidget(self._estado_vazio_itens())
-        col.addWidget(self._pilha_itens, 1)
+        col.addWidget(self._tabela_itens(), 1)
+        # Estado vazio como OVERLAY sobre a tabela: os cabeçalhos de coluna
+        # ficam sempre visíveis, mesmo sem itens (P1#7).
+        self._vazio_itens = self._estado_vazio_itens()
+        self._vazio_itens.setParent(self._tabela.viewport())
+        self._vazio_itens.raise_()
 
         if api is not None:
             self.carregar(api)
@@ -160,6 +181,7 @@ class EditorItensVenda(QWidget):
         self._entrada = QLineEdit()
         self._entrada.setPlaceholderText("Código, nome ou código de barras")
         self._entrada.setClearButtonEnabled(True)
+        self._entrada.setMinimumHeight(40)
         self._entrada.returnPressed.connect(self._adicionar_pela_busca)
         self._completer = QCompleter(self)
         self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -174,15 +196,19 @@ class EditorItensVenda(QWidget):
         linha.addWidget(rotulo)
         self._qtd_add = QLineEdit("1")
         self._qtd_add.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self._qtd_add.setFixedWidth(56)
+        self._qtd_add.setFixedWidth(64)
+        self._qtd_add.setMinimumHeight(40)
+        self._qtd_add.setToolTip("Quantidade (aceita casas decimais, ex.: 2,5)")
         linha.addWidget(self._qtd_add)
 
         self._btn_adicionar = QPushButton("Adicionar")
         estado_primario(self._btn_adicionar)
+        self._btn_adicionar.setMinimumHeight(40)
         self._btn_adicionar.clicked.connect(self._adicionar_pela_busca)
         linha.addWidget(self._btn_adicionar)
 
         self._btn_avulso = QPushButton("Item avulso")
+        self._btn_avulso.setMinimumHeight(40)
         self._btn_avulso.setToolTip(
             "Adiciona um item sem produto, usando o texto digitado como descrição"
         )
@@ -191,23 +217,26 @@ class EditorItensVenda(QWidget):
         return caixa
 
     def _estado_vazio_itens(self) -> QWidget:
-        """Sem itens: orientação no lugar do vazio de ~600 px (revisão nº 1)."""
+        """Instrução única com chips de atalho fixos (P1#8) — overlay da tabela."""
         caixa = QWidget()
         col = QVBoxLayout(caixa)
-        col.setContentsMargins(0, 0, 0, 0)
+        col.setContentsMargins(12, 24, 12, 24)
         col.addStretch(2)
-        titulo = QLabel("Busque um produto ou serviço para adicionar")
+        titulo = QLabel("🔍 Busque um produto/serviço e pressione Enter para adicionar")
         titulo.setObjectName("vazioTabela")
+        titulo.setWordWrap(True)
         titulo.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         col.addWidget(titulo, 0, Qt.AlignmentFlag.AlignHCenter)
-        dica = QLabel("Ctrl+F busca · F9 finaliza a venda · Esc descarta tudo")
-        dica.setObjectName("vazioTabela")
-        dica.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        col.addWidget(dica, 0, Qt.AlignmentFlag.AlignHCenter)
-        avulso = QLabel("Sem produto? Use “Item avulso” para lançar uma descrição livre.")
-        avulso.setObjectName("vazioTabela")
-        avulso.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        col.addWidget(avulso, 0, Qt.AlignmentFlag.AlignHCenter)
+        chips = QHBoxLayout()
+        chips.setSpacing(6)
+        chips.addStretch(1)
+        for texto in ("Ctrl+F busca", "F9 finaliza", "Esc limpa (com confirmação)"):
+            chip = QLabel(texto)
+            chip.setProperty("badge", "true")
+            aplicar_estilo(chip)
+            chips.addWidget(chip)
+        chips.addStretch(1)
+        col.addLayout(chips, 0)
         col.addStretch(3)
         return caixa
 
@@ -215,6 +244,8 @@ class EditorItensVenda(QWidget):
         self._tabela = QTableWidget(0, len(self._CABECALHOS))
         self._tabela.setHorizontalHeaderLabels(self._CABECALHOS)
         self._tabela.verticalHeader().setVisible(False)
+        # Linhas de 40 px: alvo de toque confortável e leitura sem aperto (P1#7).
+        self._tabela.verticalHeader().setDefaultSectionSize(40)
         self._tabela.setShowGrid(False)
         self._tabela.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -502,9 +533,22 @@ class EditorItensVenda(QWidget):
             )
             self._tabela.setCellWidget(linha, self._COL_REM, botao)
         self._montando = False
-        # Estado vazio da lista: orientação no lugar do branco (revisão nº 1).
-        self._pilha_itens.setCurrentIndex(0 if self._itens else 1)
+        # Overlay do vazio por cima da tabela: cabeçalhos sempre visíveis.
+        self._vazio_itens.setVisible(not self._itens)
+        self._reposicionar_vazio()
         self._recalcular()
+
+    def _reposicionar_vazio(self) -> None:
+        """Ancora o overlay de vazio sobre a área útil da tabela."""
+        if not hasattr(self, "_vazio_itens") or not hasattr(self, "_tabela"):
+            return
+        viewport = self._tabela.viewport()
+        self._vazio_itens.setGeometry(viewport.rect())
+        self._vazio_itens.raise_()
+
+    def resizeEvent(self, evento) -> None:  # noqa: N802 (API do Qt)
+        super().resizeEvent(evento)
+        self._reposicionar_vazio()
 
     def _recalcular(self) -> None:
         self.alterado.emit()
@@ -609,6 +653,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._seq = 0
         self._filtro = ""
         self._total_venda = Decimal("0")
+        self._caixa_fechado = False  # resolvido em `_verificar_caixa` (P0#3)
         self._iniciar_condicao_pagamento()
 
         layout = QVBoxLayout(self)
@@ -628,9 +673,6 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._vistas.addWidget(self._vista_historico)
         layout.addWidget(self._vistas, 1)
 
-        if self._nivel is not None and not pode_abrir(self._nivel, "os"):
-            self._btn_nova_os.hide()
-
         self._conectar_campos()
         self._aplicar_modo_leitura()
         self._instalar_atalhos()
@@ -643,6 +685,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     # -------------------------------------------------------------- topo
 
     def _barra_titulo(self) -> QWidget:
+        """Cabeçalho mínimo (P1#6): título + alternância Nova venda/Histórico.
+
+        "Nova venda" repetida dentro do próprio PDV, "Nova OS/Orçamento" (outro
+        fluxo) e "Exportar Excel" (relatório) saem daqui — a exportação vive na
+        vista Histórico, junto dos filtros.
+        """
         caixa = QWidget()
         linha = QHBoxLayout(caixa)
         linha.setContentsMargins(0, 0, 0, 0)
@@ -653,30 +701,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.addWidget(titulo)
         linha.addStretch(1)
 
-        self._botao_venda = QPushButton("Nova venda")
-        self._botao_venda.setCheckable(True)
-        self._botao_venda.setObjectName("chaveRapida")
-        self._botao_venda.setChecked(True)
-        self._botao_venda.setToolTip("Nova venda (F6)")
-        self._botao_venda.clicked.connect(self._ir_para_venda)
-        linha.addWidget(self._botao_venda)
-
         self._botao_historico = QPushButton("Histórico")
         self._botao_historico.setCheckable(True)
         self._botao_historico.setObjectName("chaveRapida")
         self._botao_historico.setToolTip("Histórico de vendas")
         self._botao_historico.clicked.connect(self._ir_para_historico)
         linha.addWidget(self._botao_historico)
-
-        linha.addSpacing(6)
-        self._btn_nova_os = QPushButton("Nova OS/Orçamento")
-        self._btn_nova_os.clicked.connect(lambda: self.navegar.emit("os"))
-        linha.addWidget(self._btn_nova_os)
-
-        self._btn_exportar = QPushButton(self.ROTULO_EXPORTAR)
-        self._btn_exportar.setEnabled(False)
-        self._btn_exportar.clicked.connect(self._exportar)
-        linha.addWidget(self._btn_exportar)
         return caixa
 
     # ------------------------------------------------------- vista venda
@@ -711,23 +741,40 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         col_e.addWidget(self._itens_editor, 1)
         linha.addWidget(esquerda, 3)
 
-        # Coluna direita (~40%, mínimo 360): pagamento e totais, sem rolagem.
+        # Coluna direita (340–380 px): campos roláveis + Total/ações FIXOS no
+        # rodapé do cartão — o painel inteiro nunca é cortado em 1024×768
+        # (revisão PDV P0#1).
         direita = QWidget()
         direita.setObjectName("card")
-        direita.setMinimumWidth(360)
+        direita.setMinimumWidth(340)
+        direita.setMaximumWidth(380)
         col_d = QVBoxLayout(direita)
         col_d.setContentsMargins(16, 14, 16, 14)
-        col_d.setSpacing(12)
+        col_d.setSpacing(10)
 
-        titulo_pag = QLabel("PAGAMENTO")
-        titulo_pag.setObjectName("labelForm")
+        titulo_pag = rotulo_secao("Pagamento")
         col_d.addWidget(titulo_pag)
 
+        rolagem = QScrollArea()
+        rolagem.setWidgetResizable(True)
+        rolagem.setFrameShape(QFrame.Shape.NoFrame)
+        rolagem.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        formulario = QWidget()
+        col_f = QVBoxLayout(formulario)
+        col_f.setContentsMargins(0, 0, 0, 0)
+        col_f.setSpacing(10)
+
         self._cliente = CampoCombo("Cliente", [(None, "Consumidor final")])
-        self._cliente_nome_avulso = CampoTexto("Nome do cliente")
-        self._cliente_nome_avulso.widget.setPlaceholderText(
-            "Cliente não cadastrado (opcional)"
+        # Um único campo de cliente (P1#9): combo pesquisável; nome que não
+        # casar com um cadastro vai como cliente avulso no payload.
+        self._cliente.widget.setEditable(True)
+        self._cliente.widget.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._completer_clientes = QCompleter(self)
+        self._completer_clientes.setCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
         )
+        self._completer_clientes.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._cliente.widget.setCompleter(self._completer_clientes)
         self._vendedor = CampoCombo("Vendedor", [])
         self._vendedor.widget.setPlaceholderText("Selecione o vendedor")
         self._vendedor.widget.setCurrentIndex(-1)
@@ -736,10 +783,19 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._recebido = CampoValor("Valor recebido")
         self._desconto = CampoValor("Desconto")
 
+        for campo in (
+            self._cliente,
+            self._vendedor,
+            self._forma,
+            self._parcelas,
+            self._recebido,
+            self._desconto,
+        ):
+            # Altura mínima por controle: o QSS de padding não corta mais a
+            # metade inferior do texto (P0#1).
+            campo.widget.setMinimumHeight(36)
+
         self._campo_cliente = _campo_rotulado("Cliente", self._cliente.widget)
-        self._campo_cliente_avulso = _campo_rotulado(
-            "Cliente (não cadastrado)", self._cliente_nome_avulso.widget
-        )
         self._campo_vendedor = _campo_rotulado("Vendedor", self._vendedor.widget)
         self._campo_forma = _campo_rotulado(
             "Forma de pagamento", self._forma.widget
@@ -752,28 +808,33 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._campo_troco = self._montar_troco()
 
         grade = QGridLayout()
-        grade.setHorizontalSpacing(16)
-        grade.setVerticalSpacing(12)
+        grade.setHorizontalSpacing(12)
+        grade.setVerticalSpacing(10)
         grade.addWidget(self._campo_cliente, 0, 0, 1, 2)
-        grade.addWidget(self._campo_cliente_avulso, 1, 0, 1, 2)
-        grade.addWidget(self._campo_vendedor, 2, 0, 1, 2)
-        grade.addWidget(self._campo_forma, 3, 0)
-        grade.addWidget(self._campo_parcelas, 3, 1)
-        grade.addWidget(self._campo_recebido, 4, 0)
-        grade.addWidget(self._campo_troco, 4, 1)
-        grade.addWidget(self._campo_desconto, 5, 0)
+        grade.addWidget(self._campo_vendedor, 1, 0, 1, 2)
+        grade.addWidget(self._campo_forma, 2, 0)
+        grade.addWidget(self._campo_parcelas, 2, 1)
+        grade.addWidget(self._campo_recebido, 3, 0)
+        grade.addWidget(self._campo_troco, 3, 1)
+        grade.addWidget(self._campo_desconto, 4, 0)
         grade.setColumnStretch(0, 1)
         grade.setColumnStretch(1, 1)
-        col_d.addLayout(grade)
+        col_f.addLayout(grade)
 
-        self._pagamento_confirmado = CampoCheck("Pagamento já recebido")
-        col_d.addWidget(self._pagamento_confirmado.widget)
+        self._pagamento_confirmado = CampoCheck("Adiantamento/sinal já recebido")
+        self._pagamento_confirmado.widget.setToolTip(
+            "Marque quando o cliente exige pagamento antecipado (adiantamento "
+            "total ou sinal) e o valor já foi recebido."
+        )
+        col_f.addWidget(self._pagamento_confirmado.widget)
         self._nfce = CampoCheck("Emitir NFC-e ao finalizar")
-        col_d.addWidget(self._nfce.widget)
+        col_f.addWidget(self._nfce.widget)
+        col_f.addStretch(1)
+        rolagem.setWidget(formulario)
+        col_d.addWidget(rolagem, 1)
 
-        # Resumo colado à barra de ações (revisão nº 7): o total é o dado mais
-        # importante da tela e fica imediatamente acima do botão primário.
-        col_d.addStretch(1)
+        # Resumo colado à barra de ações (revisão nº 7): Total e botões ficam
+        # SEMPRE visíveis, fora da rolagem (P0#1/P2#12).
         col_d.addWidget(self._montar_totais())
         col_d.addWidget(self._montar_acoes())
 
@@ -820,6 +881,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha_desc.addStretch(1)
         linha_desc.addWidget(self._lbl_desconto_totais)
         col.addLayout(linha_desc)
+        # (P2#12) O sinal negativo é setado em `_recalcular_totais`.
 
         linha2 = QHBoxLayout()
         rotulo2 = QLabel("Total")
@@ -833,22 +895,39 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         return caixa
 
     def _montar_acoes(self) -> QWidget:
+        """Ações com o atalho DENTRO do botão (P2#13): nada de chips soltos.
+
+        Esc NÃO descarta a venda às cegas: com itens em andamento pede
+        confirmação (P0#4).
+        """
         caixa = QWidget()
         caixa.setObjectName("caixaForma")
         linha = QHBoxLayout(caixa)
         linha.setContentsMargins(0, 0, 0, 0)
         linha.setSpacing(8)
         linha.addStretch(1)
-        cancelar, self._btn_cancelar = botao_com_atalho("Cancelar", "Esc")
-        finalizar, self._btn_salvar = botao_com_atalho(
-            "Finalizar venda", "F9", "primary"
-        )
-        self._btn_salvar.setToolTip("Finalizar venda (F9)")
-        self._btn_cancelar.clicked.connect(self._limpar_form)
+        self._btn_cancelar = QPushButton("Cancelar (Esc)")
+        estado_secundario(self._btn_cancelar)
+        self._btn_cancelar.setToolTip("Descarta a venda em andamento (pede confirmação)")
+        self._btn_salvar = QPushButton("Finalizar venda (F9)")
+        estado_primario(self._btn_salvar)
+        self._btn_cancelar.clicked.connect(self._descartar_se_houver_itens)
         self._btn_salvar.clicked.connect(self._salvar)
-        linha.addWidget(cancelar)
-        linha.addWidget(finalizar)
+        linha.addWidget(self._btn_cancelar)
+        linha.addWidget(self._btn_salvar)
         return caixa
+
+    def _descartar_se_houver_itens(self) -> None:
+        """Esc/Cancelar não perdem a venda com um toque acidental (P0#4)."""
+        if self._itens_editor.valor():
+            resposta = QMessageBox.question(
+                self,
+                "Descartar venda",
+                "Há itens na venda em andamento.\nDeseja realmente descartá-la?",
+            )
+            if resposta != QMessageBox.StandardButton.Yes:
+                return
+        self._limpar_form()
 
     # ----------------------------------------------------- vista histórico
 
@@ -878,6 +957,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             botao.clicked.connect(lambda _=False, v=valor: self._aplicar_filtro(v))
             self._btn_filtros[valor] = botao
             linha.addWidget(botao)
+
+        # Exportação pertence ao Histórico (P1#6), não ao cabeçalho do PDV.
+        self._btn_exportar = QPushButton(self.ROTULO_EXPORTAR)
+        self._btn_exportar.setEnabled(False)
+        self._btn_exportar.clicked.connect(self._exportar)
+        linha.addWidget(self._btn_exportar)
         col.addWidget(barra)
 
         card = QWidget()
@@ -932,12 +1017,15 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._itens_editor.alterado.connect(self._recalcular_totais)
 
     def _ao_mudar_cliente(self) -> None:
+        # Combo único e pesquisável (P1#9): o nome digitado que NÃO casar com
+        # um cadastro é resolvido como cliente avulso no payload.
         self._cliente_mudou()
-        # Nome avulso só faz sentido quando não há cliente cadastrado selecionado.
-        tem_cadastrado = self._cliente.valor() is not None
-        self._cliente_nome_avulso.habilitar(not tem_cadastrado)
-        if tem_cadastrado:
-            self._cliente_nome_avulso.definir("")
+
+    def _clientes_flags_recebidos(self, saida: dict) -> None:
+        super()._clientes_flags_recebidos(saida)
+        # Completer do combo pesquisável aponta para o modelo atualizado (P1#9).
+        self._completer_clientes.setModel(self._cliente.widget.model())
+        self._completer_clientes.setCompletionRole(Qt.ItemDataRole.DisplayRole)
 
     def _forma_mudou(self) -> None:
         forma = self._forma.valor()
@@ -960,10 +1048,16 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             total = Decimal("0")
         self._total_venda = total
         self._lbl_subtotal.setText(formatar_moeda(str(subtotal)))
-        self._lbl_desconto_totais.setText(formatar_moeda(str(desconto)))
+        # Desconto com sinal (P2#12): o efeito no total fica explícito.
+        self._lbl_desconto_totais.setText(
+            f"-{formatar_moeda(str(desconto))}" if desconto > 0 else formatar_moeda("0")
+        )
         self._lbl_total.setText(formatar_moeda(str(total)))
         n = len(self._itens_editor.valor())
-        self._lbl_resumo_itens.setText(f"{n} {'item' if n == 1 else 'itens'}")
+        # Itens + subtotal na mesma linha (P1#7).
+        self._lbl_resumo_itens.setText(
+            f"{n} {'item' if n == 1 else 'itens'} · subtotal {formatar_moeda(str(subtotal))}"
+        )
         self._atualizar_troco()
         self._atualizar_estado_finalizar()
 
@@ -984,13 +1078,16 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         aplicar_estilo(self._lbl_troco)
 
     def _atualizar_estado_finalizar(self) -> None:
-        """Finalizar desabilitado sem itens (revisão nº 4) e no modo leitura."""
+        """Finalizar desabilitado SEMPRE com o motivo explícito (P0#5)."""
         if not hasattr(self, "_btn_salvar"):
             return
         n = len(self._itens_editor.valor())
         if self._modo_leitura:
             self._btn_salvar.setEnabled(False)
             self._btn_salvar.setToolTip("Modo leitura: venda bloqueada pela licença")
+        elif getattr(self, "_caixa_fechado", False):
+            self._btn_salvar.setEnabled(False)
+            self._btn_salvar.setToolTip("Abra o caixa para registrar vendas")
         elif n == 0:
             self._btn_salvar.setEnabled(False)
             self._btn_salvar.setToolTip("Adicione ao menos 1 item")
@@ -1001,8 +1098,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _limpar_form(self) -> None:
         self._itens_editor.limpar()
         self._cliente.definir(None)
-        self._cliente_nome_avulso.definir("")
-        self._cliente_nome_avulso.habilitar(True)
+        # Combo editável: volta ao padrão "Consumidor final" no texto também.
+        if self._cliente.widget.isEditable():
+            self._cliente.widget.setEditText("Consumidor final")
         self._vendedor.definir(None)
         self._forma.definir(_FORMA_DINHEIRO)
         self._parcelas.definir("1")
@@ -1017,15 +1115,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
     def _ir_para_venda(self) -> None:
         self._vistas.setCurrentIndex(0)
-        self._botao_venda.setChecked(True)
         self._botao_historico.setChecked(False)
         self._verificar_caixa()
-        if not self._modo_leitura:
-            self._itens_editor.focar_busca()
 
     def _ir_para_historico(self) -> None:
         self._vistas.setCurrentIndex(1)
-        self._botao_venda.setChecked(False)
         self._botao_historico.setChecked(True)
         self._busca.focar()
 
@@ -1223,11 +1317,27 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         exigencia = self._exigencia_pendente()
         if exigencia:
             return (
-                f"O cliente exige {exigencia}. Marque 'Pagamento já recebido' "
-                "para finalizar a venda.",
+                f"O cliente exige {exigencia}. Marque 'Adiantamento/sinal já "
+                "recebido' para finalizar a venda.",
                 self._pagamento_confirmado,
             )
         return None
+
+    def _cliente_do_combo(self) -> tuple[int | None, str | None]:
+        """Resolve o campo único de cliente (P1#9).
+
+        Texto que casa exatamente com um cadastro → `cliente_id`; texto livre
+        (≠ "Consumidor final") → `cliente_nome_avulso`; vazio → (None, None).
+        """
+        texto = self._cliente.widget.currentText().strip()
+        if not texto or texto.casefold() == "consumidor final":
+            return None, None
+        combo = self._cliente.widget
+        for i in range(combo.count()):
+            rotulo = str(combo.itemText(i) or "").strip()
+            if rotulo and rotulo.casefold() == texto.casefold():
+                return combo.itemData(i), None
+        return None, texto
 
     def _payload(self) -> dict:
         forma = self._forma.valor()
@@ -1235,9 +1345,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             parcelas = int((self._parcelas.valor() or "1").strip() or "1")
         else:
             parcelas = 1
+        cliente_id, cliente_avulso = self._cliente_do_combo()
         payload = {
-            "cliente_id": self._cliente.valor(),
-            "cliente_nome_avulso": (self._cliente_nome_avulso.valor() or "").strip() or None,
+            "cliente_id": cliente_id,
+            "cliente_nome_avulso": cliente_avulso,
             "vendedor_id": self._vendedor.valor(),
             "desconto": str(_dec(self._desconto.valor())),
             "forma_pagamento": forma,
@@ -1326,7 +1437,6 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._btn_cancelar.setEnabled(ligado)
         for campo in (
             self._cliente,
-            self._cliente_nome_avulso,
             self._vendedor,
             self._forma,
             self._parcelas,
@@ -1337,15 +1447,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         ):
             campo.habilitar(ligado)
         self._itens_editor.habilitar(ligado)
-        self._ao_mudar_cliente()
         self._atualizar_estado_finalizar()
 
     # ------------------------------------------------------------ atalhos
 
     def _instalar_atalhos(self) -> None:
         # Atalhos da página ficam restritos à própria página (foco dentro dela):
-        # assim F6/F9 não disparam enquanto outra tela está ativa (ex.: F9 numa
-        # venda em andamento finalizaria o registro às escondidas).
+        # assim F6/F9/Esc não disparam enquanto outra tela está ativa.
         atalho_nova = QShortcut(QKeySequence("F6"), self)
         atalho_nova.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         atalho_nova.activated.connect(self._ir_para_venda)
@@ -1353,6 +1461,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         atalho_finalizar = QShortcut(QKeySequence("F9"), self)
         atalho_finalizar.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         atalho_finalizar.activated.connect(self._salvar)
+
+        # Esc pergunta antes de descartar uma venda com itens (P0#4).
+        atalho_esc = QShortcut(QKeySequence("Esc"), self)
+        atalho_esc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        atalho_esc.activated.connect(self._descartar_se_houver_itens)
 
         # Ctrl+F foca a busca da visão ativa: na venda, resta ao widget da vista
         # (WidgetWithChildrenShortcut); no histórico, o próprio `CampoBusca`.
@@ -1377,42 +1490,135 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         )
 
     def _montar_banner_caixa(self) -> QWidget:
+        """Estado do caixa no topo do PDV (P0#3).
+
+        Fechado: banner de aviso com **Abrir caixa** como botão PRIMÁRIO ao
+        lado do texto (abre modal com valor de troco). Aberto: chip discreto
+        "Caixa aberto · desde HH:MM".
+        """
         self._banner_caixa = QWidget()
         self._banner_caixa.setObjectName("bannerAviso")
         linha = QHBoxLayout(self._banner_caixa)
         linha.setContentsMargins(12, 8, 12, 8)
         linha.setSpacing(10)
-        rotulo = QLabel("Caixa fechado — abra o caixa antes de registrar vendas.")
-        estado_atencao(rotulo)
-        linha.addWidget(rotulo, 1)
-        botao = QPushButton("Abrir caixa")
-        botao.setObjectName("acaoLinha")
-        botao.clicked.connect(self._abrir_tela_caixa)
-        linha.addWidget(botao)
+        self._lbl_estado_caixa = QLabel(
+            "Caixa fechado — abra o caixa antes de registrar vendas."
+        )
+        estado_atencao(self._lbl_estado_caixa)
+        linha.addWidget(self._lbl_estado_caixa, 1)
+        self._btn_abrir_caixa = QPushButton("Abrir caixa")
+        estado_primario(self._btn_abrir_caixa)
+        self._btn_abrir_caixa.clicked.connect(self._abrir_caixa_modal)
+        linha.addWidget(self._btn_abrir_caixa)
         self._banner_caixa.setVisible(False)
         return self._banner_caixa
 
-    def _abrir_tela_caixa(self) -> None:
-        alvo = "caixa" if pode_abrir(self._nivel, "caixa") else "financeiro"
-        self.navegar.emit(alvo)
+    def _abrir_caixa_modal(self) -> None:
+        """Abre o caixa sem sair do PDV: modal com valor inicial (troco)."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Abrir caixa")
+        dlg.setMinimumWidth(360)
+        col = QVBoxLayout(dlg)
+        aviso = QLabel(
+            "Informe o valor inicial de troco no gaveta. O caixa fica aberto "
+            "para o seu usuário até o fechamento (manual ou automático às 23:00)."
+        )
+        aviso.setWordWrap(True)
+        col.addWidget(aviso)
+        campo = CampoValor("Valor inicial (troco)")
+        campo.definir("0")
+        col.addWidget(em_volta(campo))
+        linha = QHBoxLayout()
+        linha.addStretch(1)
+        btn_cancelar = QPushButton("Cancelar")
+        estado_secundario(btn_cancelar)
+        btn_cancelar.clicked.connect(dlg.reject)
+        btn_abrir = QPushButton("Abrir caixa")
+        estado_primario(btn_abrir)
+        btn_abrir.clicked.connect(dlg.accept)
+        linha.addWidget(btn_cancelar)
+        linha.addWidget(btn_abrir)
+        col.addLayout(linha)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        def ok(_saida) -> None:
+            QMessageBox.information(
+                self, "Caixa aberto", "Caixa aberto — bom trabalho!"
+            )
+            self._verificar_caixa()
+
+        def erro(msg: str) -> None:
+            QMessageBox.warning(self, "Abrir caixa", msg)
+
+        tarefas.rodar(
+            lambda: self._api.abrir_caixa(
+                {
+                    "valor_abertura": str(_dec(campo.valor())),
+                    "observacoes": limpo("Aberto pelo PDV"),
+                }
+            ),
+            on_ok=ok,
+            on_erro=erro,
+        )
 
     def _verificar_caixa(self) -> None:
-        """Consulta o caixa do vendedor logado; `None` = fechado → banner."""
+        """Consulta o caixa do vendedor logado; `None` = fechado → bloqueia."""
         if self._modo_leitura or not self._api.autenticado:
             return
 
         def ok(caixa) -> None:
-            self._banner_caixa.setVisible(caixa is None)
+            fechado = caixa is None
+            self._banner_caixa.setVisible(fechado)
+            if fechado:
+                self._lbl_estado_caixa.setText(
+                    "Caixa fechado — abra o caixa antes de registrar vendas."
+                )
+            else:
+                abertura = (caixa or {}).get("data_abertura") or ""
+                desde = str(abertura)[11:16] if len(str(abertura)) >= 16 else ""
+                self._lbl_estado_caixa.setText(
+                    f"Caixa aberto{f' · desde {desde}' if desde else ''}"
+                )
+                self._lbl_estado_caixa.setProperty("badgeStyle", "success")
+                aplicar_estilo(self._lbl_estado_caixa)
+            self._aplicar_bloqueio_caixa(fechado)
 
         def erro(_msg) -> None:
-            # Sem resposta do daemon: o banner fica como está — quem bloqueia
+            # Sem resposta do daemon: o estado fica como está — quem bloqueia
             # é o servidor (409 com a mensagem clara no Finalizar).
             pass
 
         tarefas.rodar(self._api.caixa_atual, ok, erro)
 
+    def _aplicar_bloqueio_caixa(self, fechado: bool) -> None:
+        """Caixa fechado bloqueia a venda INTEIRA (P0#3), não só o Finalizar."""
+        self._caixa_fechado = fechado
+        ligado = not fechado and not self._modo_leitura
+        self._itens_editor.habilitar(ligado)
+        for campo in (
+            self._cliente,
+            self._vendedor,
+            self._forma,
+            self._parcelas,
+            self._recebido,
+            self._desconto,
+            self._pagamento_confirmado,
+            self._nfce,
+        ):
+            campo.habilitar(ligado)
+        self._atualizar_estado_finalizar()
+        if not fechado and self._vistas.currentIndex() == 0:
+            self._itens_editor.focar_busca()
+
     def showEvent(self, evento) -> None:  # noqa: N802 (API do Qt)
         super().showEvent(evento)
         self._verificar_caixa()
-        if self._vistas.currentIndex() == 0 and not self._modo_leitura:
+        # Foco na busca só com caixa aberto (P0#3: fechado, o foco não deve
+        # sugerir digitar numa venda bloqueada).
+        if (
+            self._vistas.currentIndex() == 0
+            and not self._modo_leitura
+            and not self._caixa_fechado
+        ):
             self._itens_editor.focar_busca()
