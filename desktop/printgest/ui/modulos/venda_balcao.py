@@ -1200,6 +1200,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
     def _montar_acoes_linhas(self) -> None:
         coluna = self.CHAVES.index("acoes")
+        col_num = self.CHAVES.index("numero")
+        col_total = self.CHAVES.index("valor_total")
+        col_data = self.CHAVES.index("data_venda")
         for linha, dado in enumerate(self._linhas):
             caixa = QWidget()
             h = QHBoxLayout(caixa)
@@ -1223,6 +1226,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 h.addWidget(btn_cancelar)
             h.addStretch(1)
             self._tabela.setCellWidget(linha, coluna, caixa)
+            # P1#13: valores/datas alinhados à direita para leitura consistente.
+            for c in (col_num, col_total, col_data):
+                item = self._tabela.item(linha, c)
+                if item is not None:
+                    item.setTextAlignment(
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
             for c in range(len(self.CHAVES)):
                 item = self._tabela.item(linha, c)
                 if item is not None:
@@ -1457,7 +1467,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             return formatar_moeda(dado.get("valor_total"))
         if chave == "status":
             valor = str(dado.get("status") or "")
-            return _ROTULO_STATUS.get(valor, valor.upper())
+            rotulo = _ROTULO_STATUS.get(valor, valor.upper())
+            if valor == "ok":
+                return f"● {rotulo}"
+            if valor == "cancelado":
+                return f"○ {rotulo}"
+            return rotulo
         valor = dado.get(chave, "")
         return "" if valor is None else str(valor)
 

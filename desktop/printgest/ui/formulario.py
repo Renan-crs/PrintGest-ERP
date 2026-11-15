@@ -293,17 +293,36 @@ class CampoData(CampoForm):
         self._data.setSpecialValueText(" ")
         self._aceita_sem_data = aceita_sem_data
         caixa = QWidget()
-        linha = QHBoxLayout(caixa)
+        col = QVBoxLayout(caixa)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(4)
+        linha = QHBoxLayout()
         linha.setContentsMargins(0, 0, 0, 0)
         linha.setSpacing(8)
         linha.addWidget(self._data, 1)
         if aceita_sem_data:
             linha.addWidget(self._sem)
             self._sem.toggled.connect(self._sem_data_mudou)
+        col.addLayout(linha)
+        # P1#9 (OS): atalhos rápidos de previsão.
+        atalhos = QHBoxLayout()
+        atalhos.setContentsMargins(0, 0, 0, 0)
+        atalhos.setSpacing(4)
+        for texto, dias in (("Hoje", 0), ("Amanhã", 1), ("+3 dias", 3)):
+            btn = QPushButton(texto)
+            btn.setObjectName("acaoLinha")
+            btn.clicked.connect(lambda _=False, d=dias: self._definir_relativo(d))
+            atalhos.addWidget(btn)
+        atalhos.addStretch(1)
+        col.addLayout(atalhos)
         self._caixa = caixa
         # Padrão dos cadastros: data opcional e vazia (sem data gravada).
         self._sem.setChecked(aceita_sem_data)
         self._sem_data_mudou(aceita_sem_data)
+
+    def _definir_relativo(self, dias: int) -> None:
+        alvo = QDate.currentDate().addDays(dias)
+        self.definir(alvo.toString("yyyy-MM-dd"))
 
     @property
     def widget(self) -> QWidget:
