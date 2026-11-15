@@ -668,6 +668,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._vendedor = CampoCombo("Vendedor", [])
         self._atendente = CampoCombo("Atendente", [])
         self._previsao = CampoData("Previsão de Entrega")
+        # P1#11: placeholders explícitos (evita campos "vazios sem contexto").
+        self._cliente.widget.setPlaceholderText("Selecione o cliente")
+        self._vendedor.widget.setPlaceholderText("Selecione o vendedor")
+        self._atendente.widget.setPlaceholderText("Selecione o atendente")
         self._forma = CampoCombo("Forma de Pagamento", FORMAS_PAGAMENTO)
         self._desconto = CampoValor("Desconto")
         self._obs = CampoArea("Observações", linhas=2)
@@ -694,8 +698,12 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._cliente.widget.currentIndexChanged.connect(self._cliente_mudou)
 
     def _padroes_do_form(self) -> None:
+        from datetime import date
+
         self._desconto.definir(None)
         self._pagamento_confirmado.definir(False)
+        # P1#9: previsão com data como padrão (não "Sem data" marcado).
+        self._previsao.definir(date.today().isoformat())
         self._cliente_mudou()
 
     # ---------------------------------------------------------------- busca
