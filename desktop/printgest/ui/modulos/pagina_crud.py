@@ -57,6 +57,9 @@ class PaginaCrud(QWidget):
     CAMPO_NOME = "nome_razao"
     ROTULO_EXPORTAR = "Exportar Excel"
     VAZIO = "Nenhum registro encontrado. Clique em {novo} (F6)."
+    # Quando True, edição/novo ocupa a área inteira e a lista cede lugar
+    # (útil para formulários complexos em 1024x768).
+    FORM_EM_TELA_CHEIA = False
 
     def __init__(self, api: Api, modo_leitura: bool = False) -> None:
         super().__init__()
@@ -74,7 +77,8 @@ class PaginaCrud(QWidget):
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(10)
         layout.addWidget(self._barra_titulo())
-        layout.addWidget(self._barra_busca())
+        self._barra_busca_widget = self._barra_busca()
+        layout.addWidget(self._barra_busca_widget)
         layout.addWidget(self._split(), 1)
 
         self._montar_form()
@@ -191,25 +195,42 @@ class PaginaCrud(QWidget):
         self._painel_form.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._painel_col.addWidget(self._painel_form, 1)
 
-        # Largura útil para a grade de 2 colunas; a lista fica com o restante.
-        painel.setMinimumWidth(520)
+        if self.FORM_EM_TELA_CHEIA:
+            painel.setMinimumWidth(0)
+        else:
+            # Largura útil para a grade de 2 colunas; a lista fica com o restante.
+            painel.setMinimumWidth(520)
         divisor.addWidget(painel)
 
         divisor.setStretchFactor(0, 1)
         divisor.setStretchFactor(1, 0)
         divisor.setSizes([700, 520])
+        self._divisor = divisor
+        self._painel_lista = esquerda
+        self._painel_direito = painel
         return divisor
 
     def _montar_form(self) -> None:
         conteudo = QWidget()
-        conteudo.setMinimumWidth(460)
+        if not self.FORM_EM_TELA_CHEIA:
+            conteudo.setMinimumWidth(460)
         self._form_grade = QVBoxLayout(conteudo)
         self._form_grade.setContentsMargins(16, 14, 16, 14)
         self._form_grade.setSpacing(10)
 
+        topo_form = QHBoxLayout()
+        topo_form.setContentsMargins(0, 0, 0, 0)
+        topo_form.setSpacing(8)
+        self._btn_voltar_lista = QPushButton("← Voltar")
+        self._btn_voltar_lista.setObjectName("acaoLinha")
+        self._btn_voltar_lista.setVisible(False)
+        self._btn_voltar_lista.clicked.connect(self._voltar_para_lista)
+        topo_form.addWidget(self._btn_voltar_lista)
+
         self._form_titulo = ElideLabel(self.ROTULO_NOVO)
         self._form_titulo.setObjectName("titulo")
-        self._form_grade.addWidget(self._form_titulo)
+        topo_form.addWidget(self._form_titulo, 1)
+        self._form_grade.addLayout(topo_form)
 
         if self._modo_leitura:
             aviso = QLabel("Modo leitura: consulta habilitada, escrita bloqueada.")
@@ -336,6 +357,24 @@ class PaginaCrud(QWidget):
             return
         self._carregar_no_form(dado)
 
+    def _entrar_form_cheio(self) -> None:
+        """Modo OS/1024px: formulário ocupa a tela inteira, lista cede lugar."""
+        if not self.FORM_EM_TELA_CHEIA:
+            return
+        self._btn_voltar_lista.setVisible(True)
+        self._barra_busca_widget.setVisible(False)
+        self._painel_lista.setVisible(False)
+
+    def _sair_form_cheio(self) -> None:
+        if not self.FORM_EM_TELA_CHEIA:
+            return
+        self._btn_voltar_lista.setVisible(False)
+        self._barra_busca_widget.setVisible(True)
+        self._painel_lista.setVisible(True)
+
+    def _voltar_para_lista(self) -> None:
+        self._limpar_form()
+
     def _carregar_no_form(self, dado: dict) -> None:
         self._editando_id = dado.get("id")
         rotulo = self._rotulo_registro(dado)
@@ -344,6 +383,7 @@ class PaginaCrud(QWidget):
             titulo = f"{titulo}: {rotulo}"
         self._form_titulo.setText(titulo)
         self._preencher_campos(dado)
+        self._entrar_form_cheio()
 
     def _rotulo_registro(self, dado: dict) -> str:
         for chave in (self.CAMPO_NOME, "nome", "descricao", "id"):
@@ -359,12 +399,13 @@ class PaginaCrud(QWidget):
         raise NotImplementedError
 
     def _novo(self) -> None:
-        self._limpar_form()
+        self._limpar_form(interno=True)
+        self._entrar_form_cheio()
         primeiro = self._campos()[0]
         if getattr(primeiro, "widget", None) is not None:
             primeiro.widget.setFocus()
 
-    def _limpar_form(self) -> None:
+    def _limpar_form(self, interno: bool = False) -> None:
         self._editando_id = None
         self._form_titulo.setText(self.ROTULO_NOVO)
         for campo in self._campos():
@@ -373,6 +414,8 @@ class PaginaCrud(QWidget):
             else:
                 campo.definir(None)
         self._padroes_do_form()
+        if not interno:
+            self._sair_form_cheio()
 
     def _padroes_do_form(self) -> None:
         """Subclasse: valores padrão aplicados depois de limpar os campos."""

@@ -642,6 +642,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     CHAVES = ["id", "numero", "cliente_nome", "status", "data_previsao_entrega", "valor_total"]
     COLUNAS = ["O.S.", "Nº", "Cliente", "Status", "Prazo", "Total"]
     CHAVE_FILTRO = "status"
+    # P0#2 (revisão PDV+Hist+OS): em 1024px o formulário ocupa a tela inteira.
+    FORM_EM_TELA_CHEIA = True
     FILTROS = [
         ("", "Todas"),
         ("aberto", "Abertas"),
