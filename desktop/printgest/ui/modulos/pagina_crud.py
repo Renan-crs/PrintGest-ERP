@@ -89,10 +89,13 @@ class PaginaCrud(QWidget):
     # ----------------------------------------------------------- construção
 
     def _instalar_atalhos(self) -> None:
-        """Atalhos do cadastro: F6 = Novo (nesta tela), F10 = Salvar, Esc = cancelar."""
+        """Atalhos do cadastro: F6 = Novo, F10 = Salvar, Esc = cancelar, Ctrl+F = busca."""
         QShortcut(QKeySequence("F6"), self, self._novo)
         QShortcut(QKeySequence("F10"), self, self._salvar)
         QShortcut(QKeySequence("Esc"), self, self._limpar_form)
+        atalho_busca = QShortcut(QKeySequence("Ctrl+F"), self)
+        atalho_busca.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        atalho_busca.activated.connect(self._busca.focar)
 
     def _campos(self) -> list:
         todos: list = []

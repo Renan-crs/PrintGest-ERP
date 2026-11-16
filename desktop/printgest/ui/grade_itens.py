@@ -217,6 +217,11 @@ class GradeItens(QWidget):
         self._qtd.setText("1")
         self._check_fornecedor.setChecked(False)
         self._atualizar()
+        # fluxo contínuo: prepara próximo item
+        if self._combo_produto.currentData() is None:
+            self._descricao.setFocus()
+        else:
+            self._combo_produto.setFocus()
 
     def _remover(self) -> None:
         linha = self._tabela.currentRow()
