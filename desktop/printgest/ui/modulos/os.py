@@ -887,14 +887,20 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             usuario = (self._api.usuario() or {}) if hasattr(self._api, "usuario") else {}
         except Exception:
             usuario = {}
+        funcionario_id = usuario.get("funcionario_id")
         nome = str(usuario.get("nome") or "").strip().lower()
         login = str(usuario.get("login") or "").strip().lower()
-        if not nome and not login:
+        if not (funcionario_id or nome or login):
             return
         for campo in (self._vendedor, self._atendente):
             if not hasattr(campo, "widget"):
                 continue
             combo = campo.widget
+            if funcionario_id is not None:
+                idx = combo.findData(funcionario_id)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+                    continue
             for i in range(combo.count()):
                 rot = str(combo.itemText(i) or "").strip().lower()
                 if rot and (rot == nome or rot == login):

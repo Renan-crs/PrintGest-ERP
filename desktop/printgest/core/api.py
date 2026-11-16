@@ -206,6 +206,30 @@ class Api:
             offset=offset,
         )
 
+    def resumo_vendas(
+        self,
+        q: str = "",
+        status_venda: str | None = None,
+        forma_pagamento: str | None = None,
+        operador_id: int | None = None,
+        data_inicio: str | None = None,
+        data_fim: str | None = None,
+    ) -> dict:
+        params = {"q": q}
+        for k, v in {
+            "status_venda": status_venda,
+            "forma_pagamento": forma_pagamento,
+            "operador_id": operador_id,
+            "data_inicio": data_inicio,
+            "data_fim": data_fim,
+        }.items():
+            if v is not None and v != "":
+                params[k] = v
+        resp = self._enviar(
+            "get", "/v1/vendas/resumo", params=params, headers=self._headers(self._token)
+        )
+        return self._resposta_completa(resp)
+
     def atualizar_status(self, item_id: int, status: str) -> dict:
         """Avanço de status da O.S.: `PATCH /v1/os/{id}/status`."""
         resp = self._enviar(
@@ -516,8 +540,8 @@ class Api:
     def atualizar(self, entidade: str, item_id: int, payload: dict) -> dict:
         return self._put(f"/v1/{entidade}/{item_id}", payload, self._token)
 
-    def excluir(self, entidade: str, item_id: int) -> None:
-        self._delete(f"/v1/{entidade}/{item_id}", self._token)
+    def excluir(self, entidade: str, item_id: int, payload: dict | None = None) -> None:
+        self._delete(f"/v1/{entidade}/{item_id}", self._token, json=payload)
 
     def login(self, login: str, senha: str) -> dict:
         return self._post("/v1/auth/login", {"login": login, "senha": senha})
@@ -749,14 +773,22 @@ class Api:
         )
         return self._tratar(resp)
 
-    def _delete(self, path: str, token: str | None = None) -> None:
-        resp = self._enviar("delete", path, headers=self._headers(token))
+    def _delete(self, path: str, token: str | None = None, json: dict | None = None) -> None:
+        headers = self._headers(token)
+        if json is not None:
+            resp = self._cliente.request("DELETE", path, headers=headers, json=json)
+        else:
+            resp = self._enviar("delete", path, headers=headers)
         if resp.status_code >= 400:
             raise ApiError(_detalhe(resp), resp.status_code)
 
-    def _delete_data(self, path: str, token: str | None = None) -> dict:
+    def _delete_data(self, path: str, token: str | None = None, json: dict | None = None) -> dict:
         """DELETE que devolve o corpo `data` (ex.: remover membro de um cartão)."""
-        resp = self._enviar("delete", path, headers=self._headers(token))
+        headers = self._headers(token)
+        if json is not None:
+            resp = self._cliente.request("DELETE", path, headers=headers, json=json)
+        else:
+            resp = self._enviar("delete", path, headers=headers)
         return self._tratar(resp)
 
     @staticmethod

@@ -122,6 +122,8 @@ def pagina():
 
 
 def _sem_dialogos(monkeypatch):
+    from PySide6.QtWidgets import QInputDialog
+
     class Falso:
         StandardButton = QMessageBox.StandardButton
 
@@ -141,7 +143,13 @@ def _sem_dialogos(monkeypatch):
         def critical(*_a, **_k):
             return None
 
+    class FalsoInput:
+        @staticmethod
+        def getMultiLineText(*_a, **_k):
+            return ("", True)
+
     monkeypatch.setattr("printgest.ui.modulos.venda_balcao.QMessageBox", Falso)
+    monkeypatch.setattr("printgest.ui.modulos.venda_balcao.QInputDialog", FalsoInput)
 
 
 def _adicionar_item(pagina, codigo="B015"):
@@ -353,7 +361,7 @@ def test_venda_confirmada_envia_pagamento_confirmado(app, pumpar, pagina):
 def test_cancelar_venda_exclui_registro(app, pumpar, pagina, monkeypatch):
     _sem_dialogos(monkeypatch)
     pumpar(lambda: pagina._tabela.rowCount() == 1)
-    pagina._cancelar_venda(pagina._linhas[0])
+    pagina._cancelar_venda(pagina._linhas[0], motivo="Teste")
     pumpar(lambda: any(e[0] == "DELETE" for e in _ESCRITAS))
     assert _ESCRITAS[-1][1] == "10"
 

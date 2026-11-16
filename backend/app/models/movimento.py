@@ -450,6 +450,9 @@ class VendaBalcao(Base):
         BigInteger, ForeignKey("documento_fiscal.id")
     )
     observacoes: Mapped[str | None] = mapped_column(Text)
+    motivo_cancelamento: Mapped[str | None] = mapped_column(Text)
+    cancelado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

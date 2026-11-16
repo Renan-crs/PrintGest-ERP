@@ -7,7 +7,7 @@ cancelar vendas de balcão; o cancelamento estorna o estoque automaticamente.
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
 from app.models.enums import (
@@ -17,7 +17,7 @@ from app.models.enums import (
 )
 from app.models.movimento import VendaBalcao
 from app.schemas.common import ItemResponse, ListaResponse, MetaPaginacao
-from app.schemas.venda import VendaCreate, VendaOut
+from app.schemas.venda import VendaCancelIn, VendaCreate, VendaOut, VendaResumoOut
 from app.services import financeiro_service, venda_service
 
 router = APIRouter(
@@ -85,6 +85,31 @@ def criar(
     )
 
 
+@router.get("/resumo")
+def resumo(
+    db: DbDep,
+    filial: FilialDep,
+    status_venda: StatusVenda | None = None,
+    forma_pagamento: FormaPagamento | None = None,
+    operador_id: int | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+    q: str | None = None,
+) -> ItemResponse[VendaResumoOut]:
+    return ItemResponse(
+        data=venda_service.resumo(
+            db,
+            filial_id=filial,
+            status_venda=status_venda,
+            forma_pagamento=forma_pagamento,
+            operador_id=operador_id,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            q=q,
+        )
+    )
+
+
 @router.get("/{venda_id}")
 def buscar(venda_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[VendaOut]:
     return ItemResponse(
@@ -93,5 +118,15 @@ def buscar(venda_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[VendaOut
 
 
 @router.delete("/{venda_id}", status_code=status.HTTP_204_NO_CONTENT)
-def cancelar(venda_id: int, db: DbDep, filial: FilialDep) -> None:
+def cancelar(
+    venda_id: int,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+    body: VendaCancelIn | None = Body(default=None),
+) -> None:
+    motivo = body.motivo if body else None
+    venda_service.cancelar(
+        db, filial_id=filial, venda_id=venda_id, usuario_id=usuario.id, motivo=motivo
+    )
     venda_service.cancelar(db, filial_id=filial, venda_id=venda_id)

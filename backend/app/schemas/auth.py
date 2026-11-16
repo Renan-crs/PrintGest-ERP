@@ -26,6 +26,7 @@ class UsuarioSessaoOut(ORMModel):
     login: str
     nivel_acesso: NivelAcesso
     filial_id: int | None = None
+    funcionario_id: int | None = None
 
 
 class LoginOut(BaseModel):

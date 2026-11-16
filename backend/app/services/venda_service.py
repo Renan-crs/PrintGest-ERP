@@ -342,7 +342,16 @@ def listar(
     return [_para_out(v) for v in itens], total
 
 
-def cancelar(db: Session, *, filial_id: int, venda_id: int) -> None:
+def cancelar(
+    db: Session,
+    *,
+    filial_id: int,
+    venda_id: int,
+    usuario_id: int | None = None,
+    motivo: str | None = None,
+) -> None:
+    from datetime import datetime, timezone
+
     venda = buscar(db, venda_id, filial_id=filial_id)
     if venda.status == StatusVenda.CANCELADO:
         raise HTTPException(
@@ -350,9 +359,66 @@ def cancelar(db: Session, *, filial_id: int, venda_id: int) -> None:
             detail="Venda de balcão já cancelada.",
         )
     venda.status = StatusVenda.CANCELADO
-    _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=None)
+    venda.motivo_cancelamento = (motivo or "").strip() or None
+    venda.cancelado_em = datetime.now(timezone.utc)
+    venda.cancelado_por = usuario_id
+    _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
     _estornar_caixa(db, venda=venda, filial_id=filial_id)
     db.commit()
+
+
+def resumo(
+    db: Session,
+    *,
+    filial_id: int,
+    q: str | None = None,
+    status_venda: StatusVenda | None = None,
+    forma_pagamento: FormaPagamento | None = None,
+    operador_id: int | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+) -> dict:
+    base = db.query(VendaBalcao).filter(VendaBalcao.filial_id == filial_id)
+    if status_venda:
+        base = base.filter(VendaBalcao.status == status_venda)
+    if forma_pagamento:
+        base = base.filter(VendaBalcao.forma_pagamento == forma_pagamento)
+    if operador_id:
+        base = base.filter(VendaBalcao.operador_caixa == operador_id)
+    if data_inicio:
+        base = base.filter(VendaBalcao.data_venda >= data_inicio)
+    if data_fim:
+        base = base.filter(VendaBalcao.data_venda <= data_fim)
+    if q:
+        termo = f"%{q.strip()}%"
+        base = base.outerjoin(Cliente, VendaBalcao.cliente_id == Cliente.id).filter(
+            or_(
+                Cliente.nome_razao.ilike(termo),
+                cast(VendaBalcao.numero, String).ilike(termo),
+            )
+        )
+    from sqlalchemy import func as sa_func
+
+    total = base.with_entities(sa_func.coalesce(sa_func.sum(VendaBalcao.valor_total), 0)).scalar()
+    quantidade = base.with_entities(sa_func.count(VendaBalcao.id)).scalar() or 0
+    linhas = (
+        base.with_entities(
+            VendaBalcao.forma_pagamento,
+            sa_func.count(VendaBalcao.id),
+            sa_func.coalesce(sa_func.sum(VendaBalcao.valor_total), 0),
+        )
+        .group_by(VendaBalcao.forma_pagamento)
+        .all()
+    )
+    por_forma = [
+        {
+            "forma_pagamento": str(fp.value if hasattr(fp, "value") else fp),
+            "quantidade": int(qtd or 0),
+            "total": tot or 0,
+        }
+        for fp, qtd, tot in linhas
+    ]
+    return {"quantidade": int(quantidade), "total": total or 0, "por_forma": por_forma}
 
 
 def _estornar_caixa(db: Session, *, venda: VendaBalcao, filial_id: int) -> None:

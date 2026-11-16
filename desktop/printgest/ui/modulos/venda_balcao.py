@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QMessageBox,
+    QInputDialog,
     QPushButton,
     QToolButton,
     QScrollArea,
@@ -1283,6 +1284,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._paginador.atualizar(self._total, offset, LOTE)
         self._montar_acoes_linhas()
         self._atualizar_resumo_historico()
+        self._atualizar_resumo_consolidado(self._busca.texto() if hasattr(self, "_busca") else "")
         self._pilha_lista.setCurrentWidget(
             self._tabela if self._total else self._vazio
         )
@@ -1306,12 +1308,59 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         for forma, rot in FORMAS_PAGAMENTO:
             if forma in totais:
                 partes.append(f"{rot}: {formatar_moeda(str(totais[forma]))}")
-        # formas fora do mapa
         for forma, val in totais.items():
             if forma not in dict(FORMAS_PAGAMENTO):
                 partes.append(f"{forma}: {formatar_moeda(str(val))}")
         self._lbl_resumo_hist.setText(
             "Resumo (página, finalizadas): " + " · ".join(partes) + f" · Vendas: {qtd_ok}"
+        )
+
+    def _atualizar_resumo_consolidado(self, q: str = "") -> None:
+        if not hasattr(self, "_lbl_resumo_hist"):
+            return
+        # Consolidado respeita os mesmos filtros; status "ok" por padrão no resumo.
+        data_inicio = None
+        data_fim = None
+        if hasattr(self, "_data_ini_hist"):
+            d = self._data_ini_hist.date()
+            if d.isValid() and d.year() > 2000:
+                data_inicio = d.toString("yyyy-MM-dd")
+        if hasattr(self, "_data_fim_hist"):
+            d = self._data_fim_hist.date()
+            if d.isValid() and d.year() > 2000:
+                data_fim = d.toString("yyyy-MM-dd")
+        status_venda = self._filtro or "ok"
+
+        def _ok(resp: dict) -> None:
+            if not hasattr(self, "_lbl_resumo_hist"):
+                return
+            data = resp.get("data", resp) if isinstance(resp, dict) else {}
+            por_forma = data.get("por_forma") or []
+            if not por_forma and not data.get("quantidade"):
+                return
+            partes = []
+            mapa = {f: r for f, r in FORMAS_PAGAMENTO}
+            for item in por_forma:
+                forma = str(item.get("forma_pagamento") or "")
+                rot = mapa.get(forma, forma.upper())
+                partes.append(f"{rot}: {formatar_moeda(str(item.get('total') or 0))}")
+            qtd = data.get("quantidade", 0)
+            total = data.get("total", 0)
+            texto = "Resumo (filtro, finalizadas): " + (" · ".join(partes) if partes else formatar_moeda(str(total)))
+            texto += f" · Vendas: {qtd} · Total: {formatar_moeda(str(total))}"
+            self._lbl_resumo_hist.setText(texto)
+
+        tarefas.rodar(
+            lambda: self._api.resumo_vendas(
+                q=q,
+                status_venda=status_venda,
+                forma_pagamento=(self._filtro_forma or None) if hasattr(self, "_filtro_forma") else None,
+                operador_id=(self._filtro_operador if hasattr(self, "_filtro_operador") else None),
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+            ),
+            on_ok=_ok,
+            on_erro=lambda _m: None,
         )
 
     def _erro_carga(self, msg: str) -> None:
@@ -1459,7 +1508,17 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignRight)
         dlg.exec()
 
-    def _cancelar_venda(self, dado: dict) -> None:
+    def _cancelar_venda(self, dado: dict, motivo: str | None = None) -> None:
+        if motivo is None:
+            motivo_informado, ok = QInputDialog.getMultiLineText(
+                self,
+                "Cancelar venda",
+                f"Informe o motivo do cancelamento da venda Nº {dado.get('numero')}:",
+                "",
+            )
+            if not ok:
+                return
+            motivo = (motivo_informado or "").strip() or None
         resposta = QMessageBox.question(
             self,
             "Cancelar venda",
@@ -1471,8 +1530,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         )
         if resposta != QMessageBox.StandardButton.Yes:
             return
+        payload = {"motivo": motivo} if motivo else None
         tarefas.rodar(
-            lambda: self._api.excluir("vendas", dado["id"]),
+            lambda: self._api.excluir("vendas", dado["id"], payload=payload),
             on_ok=lambda _out: self.recarregar(self._busca.texto()),
             on_erro=lambda msg: QMessageBox.warning(self, "Cancelar venda", msg),
         )

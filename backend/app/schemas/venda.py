@@ -51,6 +51,22 @@ class VendaItemOut(ORMModel):
     valor_total: Decimal
 
 
+class VendaCancelIn(BaseModel):
+    motivo: str | None = Field(default=None, max_length=500)
+
+
+class VendaResumoForma(BaseModel):
+    forma_pagamento: str
+    quantidade: int
+    total: Decimal
+
+
+class VendaResumoOut(BaseModel):
+    quantidade: int
+    total: Decimal
+    por_forma: list[VendaResumoForma] = Field(default_factory=list)
+
+
 class VendaOut(ORMModel):
     id: int
     filial_id: int
@@ -74,6 +90,9 @@ class VendaOut(ORMModel):
     caixa_id: int | None = None
     documento_fiscal_id: int | None = None
     observacoes: str | None = None
+    motivo_cancelamento: str | None = None
+    cancelado_em: datetime | None = None
+    cancelado_por: int | None = None
     criado_por: int | None = None
     created_at: datetime
     updated_at: datetime
