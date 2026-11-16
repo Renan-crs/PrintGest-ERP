@@ -128,17 +128,23 @@ class GradeItens(QWidget):
         self._unit.setPlaceholderText("Unit. R$")
         self._unit.setMinimumWidth(80)
         self._unit.setMaximumWidth(110)
+        self._unit.setAlignment(Qt.AlignmentFlag.AlignRight)
         linha2.addWidget(self._unit)
 
         self._desconto = QLineEdit()
         self._desconto.setPlaceholderText("Desc. R$")
         self._desconto.setMinimumWidth(60)
         self._desconto.setMaximumWidth(80)
+        self._desconto.setAlignment(Qt.AlignmentFlag.AlignRight)
         linha2.addWidget(self._desconto)
 
         botao = QPushButton("Adicionar")
+        botao.setToolTip("Adicionar item (Enter nos campos)")
         estado_primario(botao)
         botao.clicked.connect(self._adicionar)
+        # Enter nos campos de edição adiciona o item (refinamento de fluxo)
+        for w in (self._descricao, self._qtd, self._dimensoes, self._unit, self._desconto):
+            w.returnPressed.connect(self._adicionar)
         botao.setMinimumWidth(100)
         linha2.addWidget(botao)
 

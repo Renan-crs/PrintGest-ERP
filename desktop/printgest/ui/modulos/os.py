@@ -664,7 +664,13 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
 
     def __init__(self, api, modo_leitura: bool = False) -> None:
         self._rotulos_filtro_base = {v: r for v, r in self.FILTROS}
+        self._contadores_os = {"atrasada": None, "entrega_hoje": None}
         super().__init__(api, modo_leitura)
+        self._lbl_contadores_os = QLabel("")
+        estado_muted(self._lbl_contadores_os)
+        self._lbl_contadores_os.setWordWrap(True)
+        if getattr(self, "_filtros_widget", None) is not None and self._filtros_widget.layout() is not None:
+            self._filtros_widget.layout().addWidget(self._lbl_contadores_os)
         self._carregar_clientes_flags()
         self._carregar_funcionarios()
         self._atualizar_contadores_os()
@@ -952,12 +958,21 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         def _aplicar(atrasada, entrega_hoje):
             tot_a = (atrasada or {}).get("total")
             tot_h = (entrega_hoje or {}).get("total")
+            self._contadores_os["atrasada"] = tot_a
+            self._contadores_os["entrega_hoje"] = tot_h
             if "__atrasada" in self._btn_filtros and tot_a is not None:
                 base = self._rotulos_filtro_base.get("__atrasada", "Atrasadas")
                 self._btn_filtros["__atrasada"].setText(f"{base} ({tot_a})")
             if "__entrega_hoje" in self._btn_filtros and tot_h is not None:
                 base = self._rotulos_filtro_base.get("__entrega_hoje", "Entrega hoje")
                 self._btn_filtros["__entrega_hoje"].setText(f"{base} ({tot_h})")
+            if hasattr(self, "_lbl_contadores_os"):
+                partes = []
+                if tot_a is not None:
+                    partes.append(f"Atrasadas: {tot_a}")
+                if tot_h is not None:
+                    partes.append(f"Entrega hoje: {tot_h}")
+                self._lbl_contadores_os.setText(" · ".join(partes))
 
         # duas consultas leves em paralelo (sequenciais via callbacks)
         def ok_atrasada(r1):
