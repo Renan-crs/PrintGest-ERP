@@ -1318,7 +1318,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _atualizar_resumo_consolidado(self, q: str = "") -> None:
         if not hasattr(self, "_lbl_resumo_hist"):
             return
-        # Consolidado respeita os mesmos filtros; status "ok" por padrão no resumo.
+        # Consolidado respeita os mesmos filtros selecionados.
         data_inicio = None
         data_fim = None
         if hasattr(self, "_data_ini_hist"):
@@ -1329,14 +1329,16 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             d = self._data_fim_hist.date()
             if d.isValid() and d.year() > 2000:
                 data_fim = d.toString("yyyy-MM-dd")
-        status_venda = self._filtro or "ok"
+        status_venda = self._filtro or None
 
         def _ok(resp: dict) -> None:
             if not hasattr(self, "_lbl_resumo_hist"):
                 return
             data = resp.get("data", resp) if isinstance(resp, dict) else {}
             por_forma = data.get("por_forma") or []
-            if not por_forma and not data.get("quantidade"):
+            qtd = data.get("quantidade", 0)
+            total = data.get("total", 0)
+            if not por_forma and not qtd:
                 return
             partes = []
             mapa = {f: r for f, r in FORMAS_PAGAMENTO}
@@ -1344,9 +1346,14 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 forma = str(item.get("forma_pagamento") or "")
                 rot = mapa.get(forma, forma.upper())
                 partes.append(f"{rot}: {formatar_moeda(str(item.get('total') or 0))}")
-            qtd = data.get("quantidade", 0)
-            total = data.get("total", 0)
-            texto = "Resumo (filtro, finalizadas): " + (" · ".join(partes) if partes else formatar_moeda(str(total)))
+            escopo = "filtro"
+            if status_venda == "ok":
+                escopo = "filtro, finalizadas"
+            elif status_venda == "cancelado":
+                escopo = "filtro, canceladas"
+            elif status_venda is None:
+                escopo = "filtro, todas"
+            texto = f"Resumo ({escopo}): " + (" · ".join(partes) if partes else formatar_moeda(str(total)))
             texto += f" · Vendas: {qtd} · Total: {formatar_moeda(str(total))}"
             self._lbl_resumo_hist.setText(texto)
 
