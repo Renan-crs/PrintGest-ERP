@@ -706,18 +706,18 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.addStretch(1)
 
         # P1#16 (PDV+Hist+OS): controle segmentado Venda | Histórico.
-        self._botao_venda = QPushButton("Venda")
+        self._botao_venda = QPushButton("Venda (F6)")
         self._botao_venda.setCheckable(True)
         self._botao_venda.setChecked(True)
         self._botao_venda.setObjectName("chaveRapida")
-        self._botao_venda.setToolTip("Nova venda")
+        self._botao_venda.setToolTip("Nova venda (F6)")
         self._botao_venda.clicked.connect(self._ir_para_venda)
         linha.addWidget(self._botao_venda)
 
         self._botao_historico = QPushButton("Histórico")
         self._botao_historico.setCheckable(True)
         self._botao_historico.setObjectName("chaveRapida")
-        self._botao_historico.setToolTip("Histórico de vendas")
+        self._botao_historico.setToolTip("Histórico de vendas (Ctrl+F para buscar)")
         self._botao_historico.clicked.connect(self._ir_para_historico)
         linha.addWidget(self._botao_historico)
         return caixa
@@ -925,9 +925,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.addStretch(1)
         self._btn_cancelar = QPushButton("Cancelar (Esc)")
         estado_secundario(self._btn_cancelar)
-        self._btn_cancelar.setToolTip("Descarta a venda em andamento (pede confirmação)")
+        self._btn_cancelar.setToolTip("Descartar venda em andamento (Esc) — pede confirmação se houver itens")
         self._btn_salvar = QPushButton("Finalizar venda (F9)")
         estado_primario(self._btn_salvar)
+        self._btn_salvar.setToolTip("Finalizar venda (F9)")
         self._btn_cancelar.clicked.connect(self._descartar_se_houver_itens)
         self._btn_salvar.clicked.connect(self._salvar)
         linha.addWidget(self._btn_cancelar)
