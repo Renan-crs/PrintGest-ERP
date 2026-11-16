@@ -674,6 +674,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._carregar_clientes_flags()
         self._carregar_funcionarios()
         self._atualizar_contadores_os()
+        # Consistência de ação principal no fluxo de OS
+        if hasattr(self, "_btn_salvar"):
+            self._btn_salvar.setToolTip("Salvar ordem de serviço (F10)")
 
     # ----------------------------------------------------------- formulário
 
@@ -691,9 +694,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._obs = CampoArea("Observações", linhas=2)
         self._pagamento_confirmado = CampoCheck("Pagamento já recebido")
         self._itens = GradeItens("", api=self._api)
-        # P0#2 (refino): em tela cheia, a grade de itens precisa de área útil.
-        self._itens.setMinimumHeight(340)
-        self._itens._tabela.setMinimumHeight(220)
+        # P0#2 (refino): em tela cheia, a grade de itens precisa de área útil
+        # sem comprimir o restante do formulário em 1024x768.
+        self._itens.setMinimumHeight(260)
+        self._itens._tabela.setMinimumHeight(170)
 
         # P1#11: combos pesquisáveis (digitação filtra opções).
         for campo, placeholder in (
@@ -823,7 +827,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         # P0#2 (refino): totais fixos no rodapé do formulário.
         self._lbl_totais_os = QLabel("Itens R$ 0,00 · Desconto R$ 0,00 · Total R$ 0,00")
         estado_muted(self._lbl_totais_os)
-        self._lbl_totais_os.setWordWrap(False)
+        self._lbl_totais_os.setWordWrap(True)
+        self._lbl_totais_os.setToolTip(
+            "Resumo financeiro: itens, desconto, total e (quando aplicável) sinal/saldo"
+        )
         layout.insertWidget(0, self._lbl_totais_os, 1)
         self._atualizar_totais_os()
 

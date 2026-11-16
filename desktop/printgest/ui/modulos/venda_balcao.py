@@ -1193,6 +1193,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._pagamento_confirmado.definir(False)
         self._nfce.definir(False)
         self._forma_mudou()
+        if hasattr(self, "_itens_editor"):
+            self._itens_editor.focar_busca()
         self._ao_mudar_cliente()
 
     # ------------------------------------------------------------- abas
@@ -1673,6 +1675,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         numero = (dado or {}).get("numero")
         self._limpar_form()
         self.recarregar(self._busca.texto())
+        # feedback de fluxo: prepara próxima venda imediatamente
+        self._itens_editor.focar_busca()
         if emitir_nfce:
             QMessageBox.information(
                 self,
