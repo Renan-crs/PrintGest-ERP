@@ -663,9 +663,11 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     ]
 
     def __init__(self, api, modo_leitura: bool = False) -> None:
+        self._rotulos_filtro_base = {v: r for v, r in self.FILTROS}
         super().__init__(api, modo_leitura)
         self._carregar_clientes_flags()
         self._carregar_funcionarios()
+        self._atualizar_contadores_os()
 
     # ----------------------------------------------------------- formulário
 
@@ -920,6 +922,42 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             limit=LOTE,
             offset=offset,
         )
+
+    def _recebidos(self, q: str, offset: int, saida: dict) -> None:
+        super()._recebidos(q, offset, saida)
+        self._atualizar_contadores_os(q)
+
+    def _atualizar_contadores_os(self, q: str = "") -> None:
+        if not hasattr(self, "_btn_filtros"):
+            return
+
+        def _buscar(flag: str):
+            try:
+                params = {"q": q, "tipo": self.TIPO, "limit": 1, "offset": 0}
+                if flag == "atrasada":
+                    params["atrasada"] = True
+                elif flag == "entrega_hoje":
+                    params["entrega_hoje"] = True
+                return self._api.listar_com_filtros("os", **params)
+            except Exception:
+                return {"total": None}
+
+        def _aplicar(atrasada, entrega_hoje):
+            tot_a = (atrasada or {}).get("total")
+            tot_h = (entrega_hoje or {}).get("total")
+            if "__atrasada" in self._btn_filtros and tot_a is not None:
+                base = self._rotulos_filtro_base.get("__atrasada", "Atrasadas")
+                self._btn_filtros["__atrasada"].setText(f"{base} ({tot_a})")
+            if "__entrega_hoje" in self._btn_filtros and tot_h is not None:
+                base = self._rotulos_filtro_base.get("__entrega_hoje", "Entrega hoje")
+                self._btn_filtros["__entrega_hoje"].setText(f"{base} ({tot_h})")
+
+        # duas consultas leves em paralelo (sequenciais via callbacks)
+        def ok_atrasada(r1):
+            def ok_hoje(r2):
+                _aplicar(r1, r2)
+            tarefas.rodar(lambda: _buscar("entrega_hoje"), on_ok=ok_hoje, on_erro=lambda _m: _aplicar(r1, {"total": None}))
+        tarefas.rodar(lambda: _buscar("atrasada"), on_ok=ok_atrasada, on_erro=lambda _m: None)
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
         if chave == "status":

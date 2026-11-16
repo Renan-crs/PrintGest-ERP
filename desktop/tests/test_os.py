@@ -163,9 +163,9 @@ def test_filtro_por_status_vai_ao_daemon(app, pumpar, pagina):
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     pagina._btn_filtros["producao"].click()
     pumpar(lambda: pagina._tabela.rowCount() == 1)
-    params = _GETS[-1].url.params
-    assert params["status"] == "producao"
-    assert params["tipo"] == "os"
+    # Contadores disparam consultas auxiliares; valida a requisição de filtro.
+    params_list = [r.url.params for r in _GETS]
+    assert any(p.get("status") == "producao" and p.get("tipo") == "os" for p in params_list)
 
 
 def test_selecionar_linha_preenche_formulario(app, pumpar, pagina):

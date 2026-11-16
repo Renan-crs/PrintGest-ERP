@@ -985,7 +985,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         )
         linha.addWidget(self._combo_forma_hist)
 
-        # P1#15 (parcial): filtros por período.
+        # P1#15 (parcial): filtros por período e operador.
         from PySide6.QtCore import QDate
         self._data_ini_hist = QDateEdit()
         self._data_ini_hist.setCalendarPopup(True)
@@ -1003,6 +1003,20 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             w.dateChanged.connect(lambda *_: self.recarregar(self._busca.texto()))
         linha.addWidget(self._data_ini_hist)
         linha.addWidget(self._data_fim_hist)
+
+        self._filtro_operador = None
+        self._combo_operador_hist = QComboBox()
+        self._combo_operador_hist.addItem("Todos operadores", None)
+        self._combo_operador_hist.currentIndexChanged.connect(
+            lambda: self._aplicar_filtro_operador(self._combo_operador_hist.currentData())
+        )
+        linha.addWidget(self._combo_operador_hist)
+        # carrega operadores (usuarios) se permitido; falha silenciosa
+        tarefas.rodar(
+            lambda: self._api.listar("usuarios", limit=200),
+            on_ok=self._operadores_recebidos,
+            on_erro=lambda _m: None,
+        )
 
         # Exportação pertence ao Histórico (P1#6), não ao cabeçalho do PDV.
         self._btn_exportar = QPushButton(self.ROTULO_EXPORTAR)
@@ -1202,6 +1216,24 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._filtro_forma = valor or ""
         self.recarregar(self._busca.texto())
 
+    def _aplicar_filtro_operador(self, valor) -> None:
+        self._filtro_operador = valor
+        self.recarregar(self._busca.texto())
+
+    def _operadores_recebidos(self, saida: dict) -> None:
+        if not hasattr(self, "_combo_operador_hist"):
+            return
+        atual = self._combo_operador_hist.currentData()
+        self._combo_operador_hist.blockSignals(True)
+        self._combo_operador_hist.clear()
+        self._combo_operador_hist.addItem("Todos operadores", None)
+        for u in saida.get("data", []):
+            nome = u.get("nome") or u.get("login") or str(u.get("id"))
+            self._combo_operador_hist.addItem(str(nome), u.get("id"))
+        idx = self._combo_operador_hist.findData(atual)
+        self._combo_operador_hist.setCurrentIndex(idx if idx >= 0 else 0)
+        self._combo_operador_hist.blockSignals(False)
+
     def _listar(self, q: str, offset: int, filtros: dict) -> dict:
         data_inicio = None
         data_fim = None
@@ -1217,6 +1249,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             q=q,
             status_venda=self._filtro or None,
             forma_pagamento=(self._filtro_forma or None) if hasattr(self, "_filtro_forma") else None,
+            operador_id=(self._filtro_operador if hasattr(self, "_filtro_operador") else None),
             data_inicio=data_inicio,
             data_fim=data_fim,
             limit=LOTE,
