@@ -1062,6 +1062,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             col_fiscal = self.CHAVES.index("fiscal")
             cab.setSectionResizeMode(col_fiscal, QHeaderView.ResizeMode.Fixed)
             self._tabela.setColumnWidth(col_fiscal, 64)
+            item_hdr = self._tabela.horizontalHeaderItem(col_fiscal)
+            if item_hdr is not None:
+                item_hdr.setToolTip("NFC-e/Fiscal não disponível neste módulo")
         # P0#3/P1#14: ações compactas (menu ⋯).
         col_acoes = self.CHAVES.index("acoes")
         cab.setSectionResizeMode(col_acoes, QHeaderView.ResizeMode.Fixed)

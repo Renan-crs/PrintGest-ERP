@@ -155,8 +155,8 @@ def test_carrega_grade_so_de_os(app, pumpar, pagina):
     assert "de 2 registros" in pagina._paginador._info.text()
     # P1#12: colunas [Nº, Cliente, Status, Entrada, Prazo, Total, Arte]
     assert pagina._tabela.item(0, 1).text() == "Ana"
-    assert pagina._tabela.item(0, 2).text() == "ABERTO"
-    assert pagina._formatar_texto({"status": "aberto"}, "status") == "ABERTO"
+    assert pagina._tabela.item(0, 2).text() == "Aberta"
+    assert pagina._formatar_texto({"status": "aberto"}, "status") == "Aberta"
 
 
 def test_filtro_por_status_vai_ao_daemon(app, pumpar, pagina):

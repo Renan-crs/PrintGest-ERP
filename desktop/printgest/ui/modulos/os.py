@@ -997,7 +997,18 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
         if chave == "status":
-            return str(dado.get("status", "")).upper()
+            valor = str(dado.get("status", "") or "")
+            rotulos = {
+                "aberto": "Aberta",
+                "aguardando_arte": "Aguardando arte",
+                "aguardando_aprovacao": "Aguardando aprovação",
+                "producao": "Em produção",
+                "pronta": "Pronta",
+                "entregue": "Entregue",
+                "cancelado": "Cancelada",
+                "convertido": "Convertida",
+            }
+            return rotulos.get(valor, valor.replace("_", " ").strip().capitalize() or "")
         if chave == "valor_total":
             return formatar_moeda(dado.get("valor_total"))
         if chave == "data_previsao_entrega":
