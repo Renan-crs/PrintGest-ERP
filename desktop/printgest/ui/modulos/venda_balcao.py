@@ -1425,7 +1425,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             for c in range(len(self.CHAVES)):
                 item = self._tabela.item(linha, c)
                 if item is not None:
-                    item.setToolTip(item.text())
+                    dica = item.text()
+                    if c == self.CHAVES.index("status") and str(dado.get("status")) == "cancelado":
+                        motivo = (dado.get("motivo_cancelamento") or "").strip()
+                        if motivo:
+                            dica = f"{dica}\nMotivo: {motivo}"
+                    item.setToolTip(dica)
 
     def _ver_detalhes(self, venda_id) -> None:
         if venda_id is None:

@@ -963,9 +963,15 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             if "__atrasada" in self._btn_filtros and tot_a is not None:
                 base = self._rotulos_filtro_base.get("__atrasada", "Atrasadas")
                 self._btn_filtros["__atrasada"].setText(f"{base} ({tot_a})")
+                self._btn_filtros["__atrasada"].setToolTip(
+                    "Ordens com previsão vencida e ainda não concluídas"
+                )
             if "__entrega_hoje" in self._btn_filtros and tot_h is not None:
                 base = self._rotulos_filtro_base.get("__entrega_hoje", "Entrega hoje")
                 self._btn_filtros["__entrega_hoje"].setText(f"{base} ({tot_h})")
+                self._btn_filtros["__entrega_hoje"].setToolTip(
+                    "Ordens com previsão de entrega para hoje"
+                )
             if hasattr(self, "_lbl_contadores_os"):
                 partes = []
                 if tot_a is not None:
