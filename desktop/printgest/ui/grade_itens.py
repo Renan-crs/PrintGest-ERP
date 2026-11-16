@@ -62,7 +62,12 @@ class GradeItens(QWidget):
         layout.setSpacing(8)
 
         self._tabela = TabelaDensa(_CHAVES, _ROTULOS)
-        self._tabela.setMinimumHeight(140)
+        self._tabela.setMinimumHeight(160)
+        cab = self._tabela.horizontalHeader()
+        cab.setSectionResizeMode(0, cab.ResizeMode.ResizeToContents)  # #
+        cab.setSectionResizeMode(1, cab.ResizeMode.Stretch)          # descrição
+        for col in (2, 3, 4, 5, 6, 7):
+            cab.setSectionResizeMode(col, cab.ResizeMode.ResizeToContents)
         layout.addWidget(self._tabela)
 
         layout.addWidget(self._barra_editor())

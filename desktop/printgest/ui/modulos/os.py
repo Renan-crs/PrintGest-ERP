@@ -972,7 +972,24 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         if chave == "valor_total":
             return formatar_moeda(dado.get("valor_total"))
         if chave == "data_previsao_entrega":
-            return formatar_data_iso(dado.get("data_previsao_entrega"))
+            from datetime import date
+
+            valor = dado.get("data_previsao_entrega")
+            texto = formatar_data_iso(valor)
+            if not texto:
+                return ""
+            try:
+                dt = date.fromisoformat(str(valor)[:10])
+            except Exception:
+                return texto
+            status = str(dado.get("status") or "")
+            if status not in {"entregue", "cancelado", "convertido"}:
+                hoje = date.today()
+                if dt < hoje:
+                    return f"{texto} (Atrasada)"
+                if dt == hoje:
+                    return f"{texto} (Hoje)"
+            return texto
         if chave == "data_emissao":
             return formatar_data_iso(dado.get("data_emissao") or dado.get("created_at"))
         if chave == "arte_pendente":
