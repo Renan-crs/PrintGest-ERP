@@ -1025,6 +1025,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._btn_exportar.setEnabled(False)
         self._btn_exportar.clicked.connect(self._exportar)
         linha.addWidget(self._btn_exportar)
+
+        btn_limpar = QPushButton("Limpar filtros")
+        btn_limpar.setToolTip("Limpar busca, status, forma, operador e período")
+        btn_limpar.clicked.connect(self._limpar_filtros_historico)
+        linha.addWidget(btn_limpar)
         col.addWidget(barra)
 
         self._lbl_resumo_hist = QLabel("")
@@ -1235,6 +1240,32 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         idx = self._combo_operador_hist.findData(atual)
         self._combo_operador_hist.setCurrentIndex(idx if idx >= 0 else 0)
         self._combo_operador_hist.blockSignals(False)
+
+    def _limpar_filtros_historico(self) -> None:
+        from PySide6.QtCore import QDate
+
+        if hasattr(self, "_busca"):
+            self._busca.definir("")
+        self._aplicar_filtro("ok")
+        if hasattr(self, "_combo_forma_hist"):
+            self._combo_forma_hist.blockSignals(True)
+            self._combo_forma_hist.setCurrentIndex(0)
+            self._combo_forma_hist.blockSignals(False)
+            self._filtro_forma = ""
+        if hasattr(self, "_combo_operador_hist"):
+            self._combo_operador_hist.blockSignals(True)
+            self._combo_operador_hist.setCurrentIndex(0)
+            self._combo_operador_hist.blockSignals(False)
+            self._filtro_operador = None
+        if hasattr(self, "_data_ini_hist"):
+            self._data_ini_hist.blockSignals(True)
+            self._data_ini_hist.setDate(QDate(2000, 1, 1))
+            self._data_ini_hist.blockSignals(False)
+        if hasattr(self, "_data_fim_hist"):
+            self._data_fim_hist.blockSignals(True)
+            self._data_fim_hist.setDate(QDate(2000, 1, 1))
+            self._data_fim_hist.blockSignals(False)
+        self.recarregar("")
 
     def _listar(self, q: str, offset: int, filtros: dict) -> dict:
         data_inicio = None

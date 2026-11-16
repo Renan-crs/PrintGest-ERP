@@ -393,6 +393,12 @@ class PaginaCrud(QWidget):
         self._form_titulo.setText(titulo)
         self._preencher_campos(dado)
         self._entrar_form_cheio()
+        # refinamento: ao abrir registro, foca o primeiro campo editável
+        for campo in self._campos():
+            widget = getattr(campo, "widget", None)
+            if widget is not None and widget.isEnabled():
+                widget.setFocus()
+                break
 
     def _rotulo_registro(self, dado: dict) -> str:
         for chave in (self.CAMPO_NOME, "nome", "descricao", "id"):
