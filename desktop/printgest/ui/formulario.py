@@ -397,10 +397,20 @@ class CampoDataHora(CampoForm):
             self._data.setDate(QDate.currentDate())
             self._hora.setTime(QTime(9, 0))
             return
+        from datetime import date
+
         if isinstance(valor, datetime):
             dt = valor
+        elif isinstance(valor, date):
+            dt = datetime(valor.year, valor.month, valor.day, 9, 0)
         else:
-            dt = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+            texto = str(valor).replace("Z", "+00:00")
+            try:
+                dt = datetime.fromisoformat(texto)
+            except ValueError:
+                # aceita "YYYY-MM-DD"
+                d = date.fromisoformat(texto[:10])
+                dt = datetime(d.year, d.month, d.day, 9, 0)
             if dt.tzinfo is not None:
                 dt = dt.astimezone().replace(tzinfo=None)
         self._data.setDate(QDate(dt.year, dt.month, dt.day))

@@ -173,7 +173,7 @@ def test_selecionar_linha_preenche_formulario(app, pumpar, pagina):
     pagina._tabela.selectRow(0)
     pumpar(lambda: pagina._editando_id == 1)
     assert pagina._cliente.valor() == 1
-    assert pagina._previsao.valor().isoformat() == "2026-09-25"
+    assert pagina._previsao.valor().date().isoformat() == "2026-09-25"
     assert pagina._forma.valor() == "pix"
     itens = pagina._itens.valor()
     assert len(itens) == 1

@@ -1454,6 +1454,14 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             ("Valor recebido", formatar_moeda(venda.get("valor_recebido")) if venda.get("valor_recebido") is not None else "—"),
             ("Troco", formatar_moeda(venda.get("troco")) if venda.get("troco") is not None else "—"),
         ]
+        if str(venda.get("status") or "") == "cancelado":
+            cancelado_em = venda.get("cancelado_em")
+            if cancelado_em:
+                cancelado_em = str(cancelado_em).replace("T", " ")[:16]
+            campos.extend([
+                ("Cancelado em", cancelado_em or "—"),
+                ("Motivo cancelamento", venda.get("motivo_cancelamento") or "—"),
+            ])
         for i, (rotulo, valor) in enumerate(campos):
             lbl_r = QLabel(f"<b>{rotulo}:</b>")
             lbl_v = QLabel(str(valor))

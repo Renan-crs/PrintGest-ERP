@@ -41,7 +41,7 @@ from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
     CampoCombo,
-    CampoData,
+    CampoDataHora,
     CampoTexto,
     CampoValor,
     data_iso,
@@ -676,7 +676,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._cliente = CampoCombo("Cliente", []).obrigatorio()
         self._vendedor = CampoCombo("Vendedor", [])
         self._atendente = CampoCombo("Atendente", [])
-        self._previsao = CampoData("Previsão de Entrega")
+        # P1#9: data + hora (backend persiste data; hora melhora UX de planejamento)
+        self._previsao = CampoDataHora("Previsão de Entrega", obrigatorio=False)
         self._forma = CampoCombo("Forma de Pagamento", FORMAS_PAGAMENTO)
         self._valor_sinal = CampoValor("Sinal (valor)")
         self._forma_sinal = CampoCombo("Forma do Sinal", FORMAS_PAGAMENTO)
@@ -867,7 +868,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         )
 
     def _padroes_do_form(self) -> None:
-        from datetime import date
+        from datetime import datetime
 
         self._desconto.definir(None)
         if hasattr(self, "_valor_sinal"):
@@ -875,8 +876,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         if hasattr(self, "_forma_sinal"):
             self._forma_sinal.definir(None)
         self._pagamento_confirmado.definir(False)
-        # P1#9: previsão com data como padrão (não "Sem data" marcado).
-        self._previsao.definir(date.today().isoformat())
+        # P1#9: previsão com data/hora padrão.
+        self._previsao.definir(datetime.now().replace(hour=9, minute=0, second=0, microsecond=0))
         # P1#11: padrões vendedor/atendente pelo usuário logado (quando houver correspondência).
         self._aplicar_padrao_usuario()
         self._cliente_mudou()
@@ -1001,7 +1002,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._cliente.definir(dado.get("cliente_id"))
         self._vendedor.definir(dado.get("vendedor_id"))
         self._atendente.definir(dado.get("atendente_id"))
-        self._previsao.definir(dado.get("data_previsao_entrega"))
+        previsao = dado.get("data_previsao_entrega")
+        if isinstance(previsao, str) and len(previsao) == 10:
+            previsao = f"{previsao}T09:00:00"
+        self._previsao.definir(previsao)
         self._forma.definir(dado.get("forma_pagamento"))
         if hasattr(self, "_valor_sinal"):
             self._valor_sinal.definir(dado.get("valor_sinal"))
@@ -1036,7 +1040,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             "cliente_id": self._cliente.valor(),
             "vendedor_id": self._vendedor.valor(),
             "atendente_id": self._atendente.valor(),
-            "data_previsao_entrega": data_iso(self._previsao.valor()),
+            "data_previsao_entrega": (
+                self._previsao.valor().date().isoformat() if self._previsao.valor() else None
+            ),  # backend persiste data; UI permite hora (P1#9)
             "desconto": str(self._desconto.valor() or "0"),
             "forma_pagamento": self._forma.valor(),
             "valor_sinal": (str(self._valor_sinal.valor()) if hasattr(self, "_valor_sinal") and self._valor_sinal.valor() is not None else None),
