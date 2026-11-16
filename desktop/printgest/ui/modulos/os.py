@@ -646,6 +646,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     # P1#12: remove redundância O.S./Nº e acrescenta entrada + indicador de arte.
     CHAVES = ["numero", "cliente_nome", "status", "data_emissao", "data_previsao_entrega", "valor_total", "arte_pendente"]
     COLUNAS = ["Nº", "Cliente", "Status", "Entrada", "Prazo", "Total", "Arte"]
+    PESOS = [1, 4, 2, 2, 2, 2, 1]
     CHAVE_FILTRO = "status"
     # P0#2 (revisão PDV+Hist+OS): em 1024px o formulário ocupa a tela inteira.
     FORM_EM_TELA_CHEIA = True

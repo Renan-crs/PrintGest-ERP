@@ -29,7 +29,7 @@ from printgest.ui.formulario import CampoValor, formatar_moeda, para_decimal
 from printgest.ui.tabela import TabelaDensa
 
 _CHAVES = ["seq", "descricao", "tipo", "quantidade", "dimensoes", "valor_unitario", "desconto", "valor_total"]
-_ROTULOS = ["#", "Especificação", "Tipo", "Quant.", "Dimensões", "Unit.", "Desc.", "Total"]
+_ROTULOS = ["#", "Especificação", "Tipo", "Qtd.", "Dimensões", "Unit.", "Desc.", "Total"]
 
 _AVULSO = None  # data do combo de produtos: "descrever serviço avulso"
 

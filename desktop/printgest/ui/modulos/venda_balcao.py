@@ -1054,14 +1054,18 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         cab.setSectionResizeMode(
             self.CHAVES.index("cliente_nome"), QHeaderView.ResizeMode.Stretch
         )
+        # Ajustes para legibilidade em 1024px (colunas-chave sem clipping excessivo)
+        for chave in ("numero", "data_venda", "forma_pagamento", "valor_total", "status"):
+            if chave in self.CHAVES:
+                cab.setSectionResizeMode(self.CHAVES.index(chave), QHeaderView.ResizeMode.ResizeToContents)
         if "fiscal" in self.CHAVES:
             col_fiscal = self.CHAVES.index("fiscal")
             cab.setSectionResizeMode(col_fiscal, QHeaderView.ResizeMode.Fixed)
-            self._tabela.setColumnWidth(col_fiscal, 70)
+            self._tabela.setColumnWidth(col_fiscal, 64)
         # P0#3/P1#14: ações compactas (menu ⋯).
         col_acoes = self.CHAVES.index("acoes")
         cab.setSectionResizeMode(col_acoes, QHeaderView.ResizeMode.Fixed)
-        self._tabela.setColumnWidth(col_acoes, 120)
+        self._tabela.setColumnWidth(col_acoes, 116)
 
         self._vazio = QLabel("Nenhuma venda encontrada. Clique em Nova venda (F6).")
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
