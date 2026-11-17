@@ -19,6 +19,7 @@ com `QApplication` offscreen e API falsa (`httpx.MockTransport`), sem backend:
 | Botão "Ver" da grade cortado | `pdv_historico_*`: "Ver" e "⋯" inteiros |
 | Cabeçalho "Valor unit." elidido para "or ur" | `pdv_*`: "Unit." legível |
 | Barra de itens do PDV cortada em 125% | `pdv_1024x768_125.png`: barra em duas linhas |
+| Aba anterior sobreposta ao trocar Configurações (deleteLater assíncrono) | `integracoes_1024x768_100.png`: aba limpa, formulário rolável |
 
 ## Reprodução
 

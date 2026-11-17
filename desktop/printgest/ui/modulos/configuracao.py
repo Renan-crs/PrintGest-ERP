@@ -808,6 +808,9 @@ class PaginaConfiguracoes(QWidget):
         _rotulo, classe = self._abas[indice]
         pagina = classe(self._api, modo_leitura=self._modo_leitura)
         if self._atual is not None:
+            # P3: esconde ANTES do deleteLater — sem isso a aba anterior
+            # permanece desenhada sobre a nova por um ciclo do event loop.
+            self._atual.setVisible(False)
             self._corpo_layout.removeWidget(self._atual)
             self._atual.deleteLater()
         self._corpo_layout.addWidget(pagina)

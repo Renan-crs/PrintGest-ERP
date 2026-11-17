@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
+    QScrollArea,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -92,10 +93,18 @@ class PaginaIntegracoes(QWidget):
         self._tabela.itemSelectionChanged.connect(self._selecionado)
         cab = self._tabela.horizontalHeader()
         cab.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        col.addWidget(self._tabela, 1)
+        # Formulário longo: tabela limitada e formulário rolável (1024×768).
+        self._tabela.setMinimumHeight(140)
+        self._tabela.setMaximumHeight(240)
+        col.addWidget(self._tabela, 0)
 
+        rolagem = QScrollArea()
+        rolagem.setWidgetResizable(True)
+        rolagem.setFrameShape(QScrollArea.Shape.NoFrame)
+        rolagem.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._form = self._montar_form()
-        col.addWidget(self._form)
+        rolagem.setWidget(self._form)
+        col.addWidget(rolagem, 1)
 
     def _montar_form(self) -> QWidget:
         card = QWidget()
