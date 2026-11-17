@@ -614,6 +614,38 @@ class Api:
             self._token,
         )
 
+    # ---------------------------------------- consolidação PRD v3.3 (§5.3/5.6)
+
+    def publicar_mestre(self, payload: dict) -> dict:
+        return self._post(
+            "/v1/plataforma/consolidacao/mestres/publicar", payload, self._token
+        )
+
+    def descer_mestres(self) -> dict:
+        return self._post(
+            "/v1/plataforma/consolidacao/mestres/descer", {}, self._token
+        )
+
+    def conflitos_clientes(self) -> dict:
+        return self._get(
+            "/v1/plataforma/consolidacao/conflitos", self._token
+        )
+
+    def resolver_conflito_cliente(self, payload: dict) -> dict:
+        return self._post(
+            "/v1/plataforma/consolidacao/conflitos/resolver", payload, self._token
+        )
+
+    def relatorio_consolidado(self, de: str | None = None, ate: str | None = None) -> dict:
+        params = {}
+        if de:
+            params["de"] = de
+        if ate:
+            params["ate"] = ate
+        return self._get(
+            "/v1/plataforma/consolidacao/relatorio", self._token, params or None
+        )
+
     # --------------------------------------------------------- configuração
 
     def empresa(self) -> dict:

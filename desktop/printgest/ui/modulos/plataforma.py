@@ -8,7 +8,7 @@ espelho no Neon.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -426,3 +426,94 @@ class PaginaBackup(_PaginaSimples):
             lambda _: self._carregar(),
             self._erro,
         )
+
+
+class PaginaConsolidacao(_PaginaSimples):
+    TITULO = "Consolidação"
+    SUBTITULO = (
+        "Cadastros mestres descem da matriz, relatórios são lidos do Neon e "
+        "duplicatas de clientes vão para a fila de conflitos."
+    )
+
+    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
+        super().__init__(api, modo_leitura)
+        linha = QHBoxLayout()
+        self._btn_descer = QPushButton("Descer mestres")
+        estado_secundario(self._btn_descer)
+        self._btn_descer.clicked.connect(self._descer)
+        self._btn_relatorio = QPushButton("Atualizar relatório")
+        estado_secundario(self._btn_relatorio)
+        self._btn_relatorio.clicked.connect(self._carregar_relatorio)
+        self._btn_conflitos = QPushButton("Atualizar conflitos")
+        estado_secundario(self._btn_conflitos)
+        self._btn_conflitos.clicked.connect(self._carregar_conflitos)
+        linha.addStretch(1)
+        linha.addWidget(self._btn_descer)
+        linha.addWidget(self._btn_relatorio)
+        linha.addWidget(self._btn_conflitos)
+        self._corpo.addLayout(linha)
+
+        self._lbl_mestres = QLabel("Mestres: —")
+        self._lbl_mestres.setAlignment(Qt.AlignmentFlag.AlignTop)
+        estado_muted(self._lbl_mestres)
+        self._corpo.addWidget(self._lbl_mestres)
+
+        self._lbl_relatorio = QLabel("Relatório: —")
+        self._lbl_relatorio.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._lbl_relatorio.setWordWrap(True)
+        estado_muted(self._lbl_relatorio)
+        self._corpo.addWidget(self._lbl_relatorio)
+
+        self._lbl_conflitos = QLabel("Conflitos: —")
+        self._lbl_conflitos.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._lbl_conflitos.setWordWrap(True)
+        estado_muted(self._lbl_conflitos)
+        self._corpo.addWidget(self._lbl_conflitos, 1)
+        self._carregar_relatorio()
+        self._carregar_conflitos()
+
+    def _descer(self) -> None:
+        if self._modo_leitura:
+            return
+
+        def ok(saida: dict) -> None:
+            dados = saida.get("data", saida) if isinstance(saida, dict) else {}
+            aplicados = dados.get("aplicados") or {}
+            self._lbl_mestres.setText(
+                "Mestres aplicados: "
+                + (", ".join(f"{k}: {v}" for k, v in aplicados.items()) or "nenhum")
+            )
+            estado_sucesso(self._lbl_mestres)
+
+        tarefas.rodar(self._api.descer_mestres, ok, self._erro)
+
+    def _carregar_relatorio(self) -> None:
+        def ok(saida: dict) -> None:
+            dados = saida.get("data", saida) if isinstance(saida, dict) else {}
+            linhas = [f"Atualizado em: {_quando(dados.get('ultima_atualizacao'))}"]
+            for item in dados.get("por_filial") or []:
+                linhas.append(
+                    f"Filial {item.get('filial_id')}: {item.get('quantidade')} vendas · "
+                    f"R$ {item.get('total')}"
+                )
+            linhas.append(f"Total geral: R$ {dados.get('total_geral', '0')}")
+            linhas.append(str(dados.get("observacao") or ""))
+            self._lbl_relatorio.setText("<br>".join(linhas))
+
+        tarefas.rodar(self._api.relatorio_consolidado, ok, self._erro)
+
+    def _carregar_conflitos(self) -> None:
+        def ok(saida: dict) -> None:
+            dados = saida.get("data", saida) if isinstance(saida, dict) else {}
+            itens = dados.get("itens") or []
+            if not itens:
+                self._lbl_conflitos.setText("Nenhum conflito de cliente.")
+            else:
+                self._lbl_conflitos.setText(
+                    "<br>".join(
+                        f"• {i.get('documento')} — filiais {i.get('filiais')}"
+                        for i in itens
+                    )
+                )
+
+        tarefas.rodar(self._api.conflitos_clientes, ok, self._erro)

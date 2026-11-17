@@ -48,6 +48,7 @@ from app.models.movimento import (
     VendaBalcao,
     VendaBalcaoItem,
 )
+from app.models.consolidacao import SyncEstado
 from app.models.plataforma import (
     BackupConfig,
     Estacao,
@@ -103,6 +104,7 @@ __all__ = [
     "StatusOs",
     "StatusPedido",
     "StatusVenda",
+    "SyncEstado",
     "TermoBackup",
     "TipoLista",
     "TipoMovEstoque",

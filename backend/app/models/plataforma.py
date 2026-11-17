@@ -43,7 +43,7 @@ class EventoSync(Base):
         String(36), nullable=False, default=lambda: str(uuid4())
     )
     filial_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("filial.id"), nullable=False
+        BigInteger, ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
     )
     entidade: Mapped[str] = mapped_column(String(60), nullable=False)
     entidade_id: Mapped[int | None] = mapped_column(BigInteger)
@@ -67,7 +67,7 @@ class Estacao(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("filial.id"), nullable=False
+        BigInteger, ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
     )
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -105,7 +105,7 @@ class BackupConfig(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("filial.id"), nullable=False
+        BigInteger, ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
     )
     horario: Mapped[str] = mapped_column(String(5), nullable=False, server_default="02:00")
     retencao_dias: Mapped[int] = mapped_column(
@@ -133,7 +133,7 @@ class TermoBackup(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     filial_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("filial.id"), nullable=False
+        BigInteger, ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
     )
     versao: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="1.0"

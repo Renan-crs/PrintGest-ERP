@@ -43,6 +43,7 @@ def test_menu_v21_tem_nove_ids_com_niveis_explícitos():
         "relatorios",
         "configuracoes",
         "filiais",
+        "consolidacao",
     }
     grupos = [_g for _g, _itens in MENU]
     assert grupos == ["Operação", "Cadastros", "Gestão", "Relatórios", "Sistema"]

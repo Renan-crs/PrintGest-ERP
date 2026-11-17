@@ -51,6 +51,7 @@ from printgest.ui.formulario import (
 from printgest.ui.modulos.integracoes import PaginaIntegracoes
 from printgest.ui.modulos.plataforma import (
     PaginaBackup,
+    PaginaConsolidacao,
     PaginaDiagnostico,
     PaginaEstacoes,
 )
@@ -767,6 +768,7 @@ class PaginaConfiguracoes(QWidget):
             ("estacoes", "Estações", PaginaEstacoes),
             ("backup", "Backup", PaginaBackup),
             ("diagnostico", "Diagnóstico", PaginaDiagnostico),
+            ("consolidacao", "Consolidação", PaginaConsolidacao),
         ]
         # RBAC não hierárquico: o item interno é visível só ao admin.
         self._abas = [

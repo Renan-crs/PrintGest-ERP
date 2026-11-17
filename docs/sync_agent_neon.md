@@ -35,10 +35,28 @@ Schema + RLS aplicados em **branch isolada** (`sync-agent-teste`, projeto
 linha da filial 1 e bloqueia a da filial 2; `uuid` impediu duplicata no
 reenvio. Testes Python com conexão psycopg mockada: nenhum acesso real ao Neon.
 
-## Limites atuais (próxima fase)
+## Consolidação de leitura (implementada)
 
-- A tabela consolidada guarda os **eventos** (fonte da verdade por dono). A
-  **descida de cadastros mestres** e os **relatórios consolidados** ainda não
-  consomem essa tabela — são o próximo passo (RF-SY-05/06, RF-FL-04).
-- A fila de conflitos de clientes (desduplicação por CPF/CNPJ) depende dessa
-  consolidação e também fica para a próxima fase.
+- **Mestres**: `consolidado.mestre` (tabela + trigger em
+  `backend/sql/consolidacao_leitura.sql`) guarda produtos/fornecedores
+  publicados pela matriz com `versao`. A filial desce por `versao > cursor`
+  (`sinc_estado`) e aplica no banco local (RF-SY-05) — sem alterar orçamentos
+  já emitidos (RF-SY-06). Clientes, produtos e fornecedores em item geram
+  evento de sync **na mesma transação** (RF-SY-01).
+- **Relatórios**: view `consolidado.vw_vendas` → `GET .../consolidacao/relatorio`,
+  com faturamento por filial e rótulo de defasagem (§5.6).
+- **Conflitos de clientes**: duplicatas por CPF/CNPJ entre filiais aparecem em
+  `GET .../consolidacao/conflitos`; a Gerente da matriz resolve com
+  `POST .../conflitos/resolver` (RF-FL-04).
+- Telas Admin: **Configurações > Consolidação** e **Filiais**.
+
+Tudo validado em branch isolada (`sync-agent-teste`) e com psycopg mockado nos
+testes — nenhum acesso real ao Neon nos testes automatizados.
+
+## Limites restantes
+
+- **Sync Agent de mestres** depende da MATRIZ publicar (`POST
+  .../consolidacao/mestres/publicar`) — a publicação é explícita, não automática
+  em todos os cadastros ainda.
+- A resolução de conflito registra a decisão no Neon; a **desduplicação
+  automática** dos cadastros locais das filiais será feita na próxima iteração.

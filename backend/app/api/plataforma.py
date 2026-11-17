@@ -27,6 +27,7 @@ from app.services import (
     backup_service,
     diagnostico_service,
     estacao_service,
+    consolidacao_service,
     filial_service,
     sync_service,
 )
@@ -173,6 +174,69 @@ def status_sync_neon(db: DbDep, filial: FilialDep, _=admin):
 @router.post("/sync/executar", response_model=ItemResponse[dict])
 def executar_sync(db: DbDep, filial: FilialDep, _=admin):
     return ItemResponse(data=sync_service.sincronizar(db, filial_id=filial))
+
+
+# ------------------------------------------------------------- consolidação
+
+
+@router.post("/consolidacao/mestres/publicar", response_model=ItemResponse[dict])
+def publicar_mestre(
+    payload: dict, db: DbDep, filial: FilialDep, usuario: UsuarioDep, _=admin
+):
+    return ItemResponse(
+        data=consolidacao_service.publicar_mestre(
+            db,
+            filial_id=filial,
+            entidade=str(payload.get("entidade") or ""),
+            chave=str(payload.get("chave") or ""),
+            payload=payload,
+        )
+    )
+
+
+@router.post("/consolidacao/mestres/descer", response_model=ItemResponse[dict])
+def descer_mestres(db: DbDep, filial: FilialDep, _=admin):
+    return ItemResponse(
+        data=consolidacao_service.descer_mestres(db, filial_id=filial)
+    )
+
+
+@router.get("/consolidacao/conflitos", response_model=ItemResponse[dict])
+def conflitos(db: DbDep, filial: FilialDep, _=admin):
+    return ItemResponse(
+        data=consolidacao_service.conflitos(db, filial_id=filial)
+    )
+
+
+@router.post("/consolidacao/conflitos/resolver", response_model=ItemResponse[dict])
+def resolver_conflito(
+    payload: dict, db: DbDep, filial: FilialDep, usuario: UsuarioDep, _=admin
+):
+    return ItemResponse(
+        data=consolidacao_service.resolver_conflito(
+            db,
+            filial_id=filial,
+            documento=str(payload.get("documento") or ""),
+            filial_escolhida=int(payload["filial_escolhida"]),
+            uuid_escolhido=str(payload.get("uuid_escolhido") or ""),
+            usuario_id=usuario.id,
+        )
+    )
+
+
+@router.get("/consolidacao/relatorio", response_model=ItemResponse[dict])
+def relatorio_consolidado(
+    db: DbDep,
+    filial: FilialDep,
+    de: str | None = None,
+    ate: str | None = None,
+    _=admin,
+):
+    return ItemResponse(
+        data=consolidacao_service.relatorio_vendas(
+            db, filial_id=filial, de=de, ate=ate
+        )
+    )
 
 
 # ------------------------------------------------------------- diagnóstico

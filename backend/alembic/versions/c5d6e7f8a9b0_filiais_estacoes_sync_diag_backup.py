@@ -38,7 +38,7 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column("uuid", sa.String(36), nullable=False),
         sa.Column(
-            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
         ),
         sa.Column("entidade", sa.String(60), nullable=False),
         sa.Column("entidade_id", sa.BigInteger(), nullable=True),
@@ -62,7 +62,7 @@ def upgrade() -> None:
         "estacao",
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column(
-            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
         ),
         sa.Column("nome", sa.String(120), nullable=False),
         sa.Column("fingerprint", sa.String(64), nullable=False),
@@ -108,7 +108,7 @@ def upgrade() -> None:
         "backup_config",
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column(
-            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
         ),
         sa.Column(
             "horario", sa.String(5), nullable=False, server_default="02:00"
@@ -138,7 +138,7 @@ def upgrade() -> None:
         "termo_backup",
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column(
-            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id"), nullable=False
+            "filial_id", sa.BigInteger(), sa.ForeignKey("filial.id", ondelete="CASCADE"), nullable=False
         ),
         sa.Column("versao", sa.String(20), nullable=False, server_default="1.0"),
         sa.Column("aceito", sa.Boolean(), nullable=False),

@@ -4,7 +4,7 @@ Busca textual é sempre aplicada sobre colunas indexadas (ver models), com ILIKE
 padrão exigido pelas listas do sistema (busca rápida por código/nome/documento).
 """
 
-from typing import Any, TypeVar
+from typing import Any, Callable, TypeVar
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
@@ -69,10 +69,18 @@ def buscar_por_id(
     return item
 
 
-def criar(db: Session, model: type[ModelT], dados: dict[str, Any]) -> ModelT:
+def criar(
+    db: Session,
+    model: type[ModelT],
+    dados: dict[str, Any],
+    ao_salvar: Callable[[Session, ModelT], None] | None = None,
+) -> ModelT:
     item = model(**dados)
     db.add(item)
     try:
+        db.flush()  # id disponível para o evento na mesma transação
+        if ao_salvar is not None:
+            ao_salvar(db, item)
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -91,12 +99,15 @@ def atualizar(
     dados: dict[str, Any],
     *,
     filial_id: int | None = None,
+    ao_salvar: Callable[[Session, ModelT], None] | None = None,
 ) -> ModelT:
     item = buscar_por_id(db, model, item_id, filial_id=filial_id)
     if "filial_id" in dados:
         dados.pop("filial_id")
     for campo, valor in dados.items():
         setattr(item, campo, valor)
+    if ao_salvar is not None:
+        ao_salvar(db, item)
     try:
         db.commit()
     except IntegrityError as exc:

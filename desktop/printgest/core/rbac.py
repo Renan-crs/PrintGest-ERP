@@ -65,6 +65,7 @@ MENU = [
         [
             {"id": "configuracoes", "rotulo": "Configurações", "niveis": ["admin"]},
             {"id": "filiais", "rotulo": "Filiais", "niveis": ["admin"]},
+            {"id": "consolidacao", "rotulo": "Consolidação", "niveis": ["admin"]},
         ],
     ),
 ]

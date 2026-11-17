@@ -57,6 +57,41 @@ def criar_router_crud(
     def _out(item: ModelT) -> OutT:
         return schema_out.model_validate(item)
 
+    def _registrar_sync(db, item: ModelT, operacao: str) -> None:
+        """Emite evento de consolidação na MESMA transação (RF-SY-01).
+
+        Clientes alimentam a fila de conflitos (RF-FL-04); produtos e
+        fornecedores são cadastros mestres quando publicados pela matriz.
+        """
+        from app.models.cadastros import Cliente, Fornecedor, Produto
+        from app.services import filial_service
+
+        if isinstance(item, Cliente):
+            entidade, payload = "cliente", {
+                "id": item.id,
+                "nome_razao": item.nome_razao,
+                "cpf_cnpj": item.cpf_cnpj,
+                "tipo_pessoa": str(item.tipo_pessoa.value),
+            }
+        elif isinstance(item, (Produto, Fornecedor)):
+            entidade = "mestre:produto" if isinstance(item, Produto) else "mestre:fornecedor"
+            payload = {
+                "chave": item.codigo if isinstance(item, Produto) else item.cpf_cnpj,
+                "id": item.id,
+                "nome": item.nome if isinstance(item, Produto) else item.nome_razao,
+                "preco_venda": str(item.preco_venda) if isinstance(item, Produto) else None,
+            }
+        else:
+            return
+        filial_service.registrar_evento(
+            db,
+            filial_id=item.filial_id,
+            entidade=entidade,
+            entidade_id=item.id,
+            operacao=operacao,
+            payload=payload,
+        )
+
     @router.get("")
     def lista(
         request: Request,
@@ -103,7 +138,14 @@ def criar_router_crud(
         filial: FilialDep,  # type: ignore[valid-type]
     ) -> ItemResponse[OutT]:
         return ItemResponse(
-            data=_out(criar(db, model, _normalizar(filial, body.model_dump())))
+            data=_out(
+                criar(
+                    db,
+                    model,
+                    _normalizar(filial, body.model_dump()),
+                    ao_salvar=lambda sess, obj: _registrar_sync(sess, obj, "CRS"),
+                )
+            )
         )
 
     @router.put("/{item_id}")
@@ -120,7 +162,16 @@ def criar_router_crud(
                 detail="Nenhum dado recebido para atualização.",
             )
         return ItemResponse(
-            data=_out(atualizar(db, model, item_id, dados, filial_id=filial))
+            data=_out(
+                atualizar(
+                    db,
+                    model,
+                    item_id,
+                    dados,
+                    filial_id=filial,
+                    ao_salvar=lambda sess, obj: _registrar_sync(sess, obj, "UPD"),
+                )
+            )
         )
 
     @router.delete("/{item_id}", status_code=204)
