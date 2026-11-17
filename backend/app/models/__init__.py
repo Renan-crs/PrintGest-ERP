@@ -48,10 +48,18 @@ from app.models.movimento import (
     VendaBalcao,
     VendaBalcaoItem,
 )
+from app.models.plataforma import (
+    BackupConfig,
+    Estacao,
+    EventoSync,
+    LicencaEvento,
+    TermoBackup,
+)
 from app.models.projetos import Cartao, CartaoMembro, Quadro, QuadroLista
 
 __all__ = [
     "Agendamento",
+    "BackupConfig",
     "Base",
     "Caixa",
     "Cartao",
@@ -61,6 +69,8 @@ __all__ = [
     "ContaReceber",
     "DocumentoFiscal",
     "Empresa",
+    "Estacao",
+    "EventoSync",
     "Filial",
     "FormaPagamento",
     "Fornecedor",
@@ -68,6 +78,7 @@ __all__ = [
     "IntegracaoEvento",
     "Funcionario",
     "Licenca",
+    "LicencaEvento",
     "ModeloFiscal",
     "MovimentoCaixa",
     "MovimentoEstoque",
@@ -92,6 +103,7 @@ __all__ = [
     "StatusOs",
     "StatusPedido",
     "StatusVenda",
+    "TermoBackup",
     "TipoLista",
     "TipoMovEstoque",
     "TipoOs",

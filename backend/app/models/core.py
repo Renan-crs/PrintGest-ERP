@@ -68,6 +68,10 @@ class Filial(Base):
     )
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     cnpj: Mapped[str | None] = mapped_column(CHAR(14))
+    # PRD v3.3 §5.7: vínculo com a instalação do RedGest e papel MATRIZ/FILIAL,
+    # definidos na ativação (o produto não decide o papel localmente).
+    instalacao_id: Mapped[str | None] = mapped_column(String(40))
+    papel: Mapped[str | None] = mapped_column(String(10))
     logradouro: Mapped[str | None] = mapped_column(String(160))
     numero: Mapped[str | None] = mapped_column(String(12))
     complemento: Mapped[str | None] = mapped_column(String(80))

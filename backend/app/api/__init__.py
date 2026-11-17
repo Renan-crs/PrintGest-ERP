@@ -9,6 +9,7 @@ from app.api import (
     financeiro,
     fiscal,
     integracoes,
+    plataforma,
     projetos,
 )
 from app.api.auth import router as auth_router
@@ -28,6 +29,7 @@ financeiro.registrar(api)
 fiscal.registrar(api)
 config.registrar(api)
 integracoes.registrar(api)
+plataforma.registrar(api)
 projetos.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)
