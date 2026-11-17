@@ -58,9 +58,12 @@ Name: "icone_area_trabalho"; Description: "Criar atalho na área de trabalho"; G
 [Files]
 ; Desktop para ambos os modos; backend apenas para Servidor.
 ; PostgreSQL REMOVIDO - usando Neon em nuvem (v0.3.4)
-Source: "..\build\dist\PrintGest\*"; DestDir: "{app}\PrintGest"; Flags: ignoreversion recursesubdirs createallsubdirs
+; NUNCA distribuir dados do cliente: .env (tenant/credenciais locais), cofres
+; cifrados (licenca.dat/integracoes.dat) e dumps ficam FORA do pacote.
+; `ignoreversion` preserva o que já existe quando o arquivo é idêntico.
+Source: "..\build\dist\PrintGest\*"; DestDir: "{app}\PrintGest"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env,.env.*,*.dat,*.dump,*.log,backups\*"
 #ifndef ModoEstacao
-Source: "..\build\dist\PrintGestAPI\*"; DestDir: "{app}\PrintGestAPI"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\build\dist\PrintGestAPI\*"; DestDir: "{app}\PrintGestAPI"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env,.env.*,*.dat,*.dump,*.log,backups\*,logs\*"
 Source: "..\build\pacote\LEIA-ME.txt"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 
@@ -79,9 +82,12 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/IM PrintGest.exe /F"; Flags: runhi
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM PrintGestAPI.exe /F"; Flags: runhidden; RunOnceId: "EncerraAPI"
 
 [UninstallDelete]
-; Logs do backend
+; Logs do backend (úteis para suporte, mas descartáveis na desinstalação).
 Type: filesandordirs; Name: "{app}\PrintGestAPI\logs"
-Type: filesandordirs; Name: "{app}\PrintGestAPI"
+; Os binários instalados são removidos pelo próprio Inno Setup. Não há
+; "filesandordirs" para {app}\PrintGestAPI: arquivos criados em runtime
+; (.env com o tenant, cofres *.dat, dumps e backups) NÃO são apagados na
+; desinstalação nem na atualização — nenhuma versão perde dados do cliente.
 #else
 [UninstallDelete]
 ; Estacao: o .env com o endereco do servidor e gravado pelo assistente.
@@ -89,6 +95,37 @@ Type: files; Name: "{app}\PrintGest\.env"
 #endif
 
 [Code]
+{ ---------------------------------------------------------------------------
+  Atualização segura (PRD v3.3): ao instalar uma versão MAIS NOVA sobre uma
+  instalação existente, o Local API Service e o desktop DEVEM ser encerrados
+  antes de substituir os binários — arquivos .exe/.dll em uso não podem ser
+  sobrescritos no Windows. Os dados do cliente NUNCA são apagados: esta função
+  apenas fecha processos; não toca em .env, cofres, banco ou backups.
+  --------------------------------------------------------------------------- }
+function EncerrarProcesso(const Nome: string);
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'),
+    '/IM ' + Nome + ' /F', '', SW_HIDE, ewWaitUntilTerminated, 10000);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  VersaoAtual: string;
+begin
+  Result := '';
+  if not FileExists(ExpandConstant('{app}\PrintGest\PrintGest.exe')) then
+    Exit;
+  VersaoAtual := GetVersionNumbersString(ExpandConstant('{app}\PrintGest\PrintGest.exe'));
+  { Só encerra quando há instalação anterior — primeira instalação não tem o que fechar. }
+  if VersaoAtual <> '' then
+  begin
+    EncerrarProcesso('PrintGestAPI.exe');
+    EncerrarProcesso('PrintGest.exe');
+    Log('PrintGest: processos encerrados antes da atualização de ' + VersaoAtual +
+        ' para ' + '{#VersaoApp}' + '. Dados do cliente preservados.');
+  end;
+end;
+
 #ifdef ModoEstacao
 var
   PaginaServidor: TInputQueryWizardPage;
