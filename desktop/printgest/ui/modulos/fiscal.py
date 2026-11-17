@@ -15,6 +15,7 @@ contingência é explícita sobre a indisponibilidade (nada é simulado).
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
+    QInputDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -42,9 +43,10 @@ _STATUS_FISCAL = {
     "autorizado": "AUTORIZADO",
     "rejeitado": "REJEITADO",
     "cancelado": "CANCELADO",
+    "contingenciado": "CONTINGENCIADO",
 }
-_MODELO = {"nfe": "NF-e", "nfce": "NFC-e"}
-_PENDENTES = ("rascunho", "processando", "rejeitado")
+_MODELO = {"nfe": "NF-e", "nfce": "NFC-e", "nfse": "NFS-e"}
+_PENDENTES = ("rascunho", "processando", "rejeitado", "contingenciado")
 
 
 def _status_rotulo(valor) -> str:
@@ -186,12 +188,128 @@ class PaginaDocumentosFiscais(PaginaCrud):
         # Consulta: sem cadastro (nenhum F6/F10).
         return
 
+    # ------------------------------------------------------- gateway (P0#3)
+
+    def _acao_extra(self) -> list:
+        """Ações do gateway no rodapé: consultar, cancelar, auditoria."""
+        botoes = []
+        consultar = QPushButton("Consultar gateway")
+        consultar.setObjectName("acaoLinha")
+        consultar.setToolTip("Consulta o status do documento no gateway fiscal")
+        consultar.clicked.connect(self._consultar_gateway)
+        botoes.append(consultar)
+
+        cancelar = QPushButton("Cancelar")
+        cancelar.setObjectName("acaoLinha")
+        cancelar.setToolTip("Cancela o documento autorizado no gateway (pede motivo)")
+        cancelar.clicked.connect(self._cancelar_documento)
+        self._btn_cancelar_documento = cancelar
+        botoes.append(cancelar)
+
+        auditoria = QPushButton("Auditoria")
+        auditoria.setObjectName("acaoLinha")
+        auditoria.setToolTip("Mostra o histórico de emissão/consulta/cancelamento")
+        auditoria.clicked.connect(self._ver_auditoria)
+        botoes.append(auditoria)
+        return botoes
+
+    def _doc_selecionado(self) -> dict | None:
+        if not self._editando_id:
+            QMessageBox.information(self, "Fiscal", "Selecione um documento na lista.")
+            return None
+        for linha in self._linhas:
+            if linha.get("id") == self._editando_id:
+                return linha
+        return {"id": self._editando_id}
+
+    def _consultar_gateway(self) -> None:
+        doc = self._doc_selecionado()
+        if doc is None:
+            return
+        item_id = doc["id"]
+
+        def ok(_resposta) -> None:
+            self.recarregar(self._busca.texto())
+            QMessageBox.information(self, "Fiscal", "Status atualizado pelo gateway.")
+
+        def erro(msg: str) -> None:
+            QMessageBox.warning(self, "Fiscal", msg)
+
+        tarefas.rodar(
+            lambda: self._api.consultar_documento_fiscal(item_id), ok, erro
+        )
+
+    def _cancelar_documento(self) -> None:
+        doc = self._doc_selecionado()
+        if doc is None:
+            return
+        if str(doc.get("status")) != "autorizado":
+            QMessageBox.warning(
+                self, "Fiscal", "Só documentos autorizados podem ser cancelados."
+            )
+            return
+        motivo, confirmado = QInputDialog.getText(
+            self, "Cancelar documento", "Motivo do cancelamento:"
+        )
+        if not confirmado or not (motivo or "").strip():
+            return
+
+        def ok(_resposta) -> None:
+            self.recarregar(self._busca.texto())
+            QMessageBox.information(self, "Fiscal", "Cancelamento enviado ao gateway.")
+
+        def erro(msg: str) -> None:
+            QMessageBox.warning(self, "Fiscal", msg)
+
+        tarefas.rodar(
+            lambda: self._api.cancelar_documento_fiscal(doc["id"], motivo.strip()),
+            ok,
+            erro,
+        )
+
+    def _ver_auditoria(self) -> None:
+        doc = self._doc_selecionado()
+        if doc is None:
+            return
+
+        def ok(saida: dict) -> None:
+            eventos = (
+                saida.get("data", []) if isinstance(saida, dict) else saida
+            ) or []
+            if not eventos:
+                QMessageBox.information(self, "Auditoria", "Nenhum evento registrado.")
+                return
+            linhas = []
+            for ev in eventos:
+                quando = formatar_data_hora(ev.get("created_at")) or "—"
+                linhas.append(
+                    f"• {quando} — {str(ev.get('tipo') or '').upper()}"
+                    f"\n   {ev.get('mensagem') or ''}"
+                )
+            QMessageBox.information(
+                self, "Auditoria fiscal", "\n".join(linhas)[:4000]
+            )
+
+        def erro(msg: str) -> None:
+            QMessageBox.warning(self, "Auditoria", msg)
+
+        tarefas.rodar(
+            lambda: self._api.eventos_documento_fiscal(doc["id"]), ok, erro
+        )
+
     def _aplicar_modo_leitura_acoes(self) -> None:
         super()._aplicar_modo_leitura_acoes()
         for campo in self._campos():
             campo.habilitar(False)
         for botao in (self._btn_novo, self._btn_salvar, self._btn_cancelar):
             botao.hide()
+        # Consulta/auditoria também valem em modo leitura; só o cancelamento
+        # (escrita no gateway) obedece ao bloqueio da licença.
+        for botao in getattr(self, "_acoes_extra", []):
+            botao.setEnabled(
+                botao is not getattr(self, "_btn_cancelar_documento", None)
+                or not self._modo_leitura
+            )
 
 
 # ============================================================= contingência

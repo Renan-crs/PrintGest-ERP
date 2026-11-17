@@ -498,6 +498,47 @@ class Api:
         """Panorama fiscal usado pela tela de contingência: `GET /v1/fiscal/resumo`."""
         return self._get("/v1/fiscal/resumo", self._token)
 
+    def estado_gateway_fiscal(self) -> dict:
+        """`GET /v1/fiscal/gateway` — estado do gateway sem expor credenciais."""
+        return self._get("/v1/fiscal/gateway", self._token)
+
+    def emitir_documento_fiscal(
+        self,
+        *,
+        modelo: str,
+        venda_balcao_id: int | None = None,
+        ordem_servico_id: int | None = None,
+        contingencia: bool = False,
+    ) -> dict:
+        """Emite NFC-e/NF-e/NFS-e via gateway de terceiro (P0#3)."""
+        payload = {
+            "modelo": modelo,
+            "contingencia": contingencia,
+        }
+        if venda_balcao_id is not None:
+            payload["venda_balcao_id"] = venda_balcao_id
+        if ordem_servico_id is not None:
+            payload["ordem_servico_id"] = ordem_servico_id
+        return self._post("/v1/fiscal/documentos/emitir", payload, self._token)
+
+    def consultar_documento_fiscal(self, item_id: int) -> dict:
+        """Consulta o status do documento no gateway: `POST .../consultar`."""
+        return self._post(
+            f"/v1/fiscal/documentos/{item_id}/consultar", {}, self._token
+        )
+
+    def cancelar_documento_fiscal(self, item_id: int, motivo: str) -> dict:
+        """Cancela no gateway com motivo: `POST .../cancelar`."""
+        return self._post(
+            f"/v1/fiscal/documentos/{item_id}/cancelar",
+            {"motivo": motivo},
+            self._token,
+        )
+
+    def eventos_documento_fiscal(self, item_id: int) -> dict:
+        """Trilha de auditoria do documento: `GET .../eventos`."""
+        return self.listar_com_filtros(f"fiscal/documentos/{item_id}/eventos")
+
     # --------------------------------------------------------- configuração
 
     def empresa(self) -> dict:

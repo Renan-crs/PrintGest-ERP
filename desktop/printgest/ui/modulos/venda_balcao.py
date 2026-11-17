@@ -1734,17 +1734,42 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._btn_salvar.setEnabled(True)
         catalogos.invalidar("vendas")
         numero = (dado or {}).get("numero")
+        venda_id = (dado or {}).get("id")
         self._limpar_form()
         self.recarregar(self._busca.texto())
         # feedback de fluxo: prepara próxima venda imediatamente
         self._itens_editor.focar_busca()
-        if emitir_nfce:
+        if emitir_nfce and venda_id is not None:
+            self._emitir_nfce(venda_id, numero)
+
+    def _emitir_nfce(self, venda_id: int, numero) -> None:
+        """Emite NFC-e via gateway de terceiro (P0#3) — não simula sucesso."""
+
+        def ok(doc: dict) -> None:
+            dados = doc.get("data", doc) if isinstance(doc, dict) else {}
+            status = str(dados.get("status") or "").upper()
             QMessageBox.information(
                 self,
                 "NFC-e",
                 f"Venda Nº {numero} registrada.\n"
-                "A emissão de NFC-e estará disponível em uma próxima etapa.",
+                f"NFC-e enviada ao gateway: {status or 'processando'}.",
             )
+
+        def erro(msg: str) -> None:
+            QMessageBox.warning(
+                self,
+                "NFC-e",
+                f"Venda Nº {numero} registrada, mas a emissão falhou:\n{msg}\n"
+                "Consulte Fiscal > Documentos para tentar novamente.",
+            )
+
+        tarefas.rodar(
+            lambda: self._api.emitir_documento_fiscal(
+                modelo="nfce", venda_balcao_id=venda_id
+            ),
+            ok,
+            erro,
+        )
 
     def _erro_salvar(self, msg: str) -> None:
         self._btn_salvar.setEnabled(True)
