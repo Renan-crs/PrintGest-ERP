@@ -28,7 +28,9 @@ from app.services import (
     diagnostico_service,
     estacao_service,
     filial_service,
+    sync_service,
 )
+from app.schemas.plataforma import SyncConfigIn, SyncConfigOut, SyncStatusOut
 
 router = APIRouter(prefix="/plataforma", tags=["plataforma"])
 
@@ -140,9 +142,37 @@ def marcar_enviados(
     return ItemResponse(data={"marcados": n})
 
 
-@router.get("/sync/status", response_model=ItemResponse[dict])
-def status_sync(db: DbDep, filial: FilialDep, _=admin):
-    return ItemResponse(data=filial_service.defasagem(db, filial_id=filial))
+# ------------------------------------------------------------- sync Neon
+
+
+@router.get("/sync/config", response_model=ItemResponse[SyncConfigOut])
+def sync_config(db: DbDep, filial: FilialDep, _=admin):
+    return ItemResponse(
+        data={
+            "filial_id": filial,
+            "configurado": sync_service.configurado(db, filial),
+            "url_mascarada": None,
+        }
+    )
+
+
+@router.put("/sync/config", response_model=ItemResponse[SyncConfigOut])
+def configurar_sync(
+    payload: SyncConfigIn, db: DbDep, filial: FilialDep, _=admin
+):
+    return ItemResponse(
+        data=sync_service.registrar_url(db, filial_id=filial, url=payload.url)
+    )
+
+
+@router.get("/sync/status", response_model=ItemResponse[SyncStatusOut])
+def status_sync_neon(db: DbDep, filial: FilialDep, _=admin):
+    return ItemResponse(data=sync_service.status(db, filial_id=filial))
+
+
+@router.post("/sync/executar", response_model=ItemResponse[dict])
+def executar_sync(db: DbDep, filial: FilialDep, _=admin):
+    return ItemResponse(data=sync_service.sincronizar(db, filial_id=filial))
 
 
 # ------------------------------------------------------------- diagnóstico

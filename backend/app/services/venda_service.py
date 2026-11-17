@@ -33,7 +33,7 @@ from app.schemas.venda import (
     VendaItemOut,
     VendaOut,
 )
-from app.services import adiantamento_service
+from app.services import adiantamento_service, filial_service
 
 _TWO = Decimal("0.01")
 
@@ -263,6 +263,20 @@ def criar(
             )
         _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
         _registrar_no_caixa(db, filial_id=filial_id, usuario_id=usuario_id, venda=venda)
+        # PRD v3.3 RF-SY-01: evento de sync na MESMA transação da venda.
+        filial_service.registrar_evento(
+            db,
+            filial_id=filial_id,
+            entidade="venda_balcao",
+            entidade_id=venda.id,
+            operacao="CRS",
+            payload={
+                "numero": venda.numero,
+                "valor_total": str(venda.valor_total),
+                "forma_pagamento": str(venda.forma_pagamento.value),
+                "data_venda": venda.data_venda.isoformat() if venda.data_venda else None,
+            },
+        )
         db.commit()
     except HTTPException:
         db.rollback()
@@ -364,6 +378,17 @@ def cancelar(
     venda.cancelado_por = usuario_id
     _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
     _estornar_caixa(db, venda=venda, filial_id=filial_id)
+    filial_service.registrar_evento(
+        db,
+        filial_id=filial_id,
+        entidade="venda_balcao",
+        entidade_id=venda.id,
+        operacao="UPD",
+        payload={
+            "status": str(venda.status.value),
+            "motivo_cancelamento": venda.motivo_cancelamento,
+        },
+    )
     db.commit()
 
 

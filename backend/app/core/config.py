@@ -125,6 +125,12 @@ class Settings(BaseSettings):
     # Arquivo cifrado (DPAPI) com as credenciais de integrações de terceiros.
     # Nunca contém segredos em texto; override em testes/diagnóstico.
     cofre_integracoes_arquivo: str = ""
+    # Sync Agent (PRD v3.3 §5.4): envio do outbox ao Neon em lotes, com
+    # backoff (60/300/900/3600 s) e jitter. URL por filial fica no cofre.
+    sync_intervalo_segundos: int = 60
+    sync_lote: int = 100
+    sync_backoff_segundos: str = "60,300,900,3600"
+    sync_jitter_percentual: int = 20
 
     model_config = {"env_prefix": "PRINTGEST_", "env_file": ".env", "extra": "ignore"}
 

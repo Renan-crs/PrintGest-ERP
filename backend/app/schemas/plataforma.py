@@ -153,6 +153,24 @@ class BackupResultado(BaseModel):
     executado_em: datetime
 
 
+class SyncConfigIn(BaseModel):
+    url: str | None = Field(default=None, max_length=1000)
+
+
+class SyncConfigOut(BaseModel):
+    filial_id: int
+    configurado: bool
+    url_mascarada: str | None = None
+
+
+class SyncStatusOut(BaseModel):
+    ultimo_envio: datetime | None = None
+    pendentes: int
+    configurado: bool
+    intervalo_segundos: int
+    ultima_verificacao: datetime | None = None
+
+
 class TermoBackupIn(BaseModel):
     aceito: bool
     versao: str = Field(default="1.0", max_length=20)

@@ -111,6 +111,45 @@ async def _loop_fechamento_automatico_caixa() -> None:
         await asyncio.sleep(30)
 
 
+async def _loop_sync_agent() -> None:
+    """Sync Agent (RF-SY-02): envia pendências em lote, com backoff.
+
+    Roda fora da requisição; falha de rede nunca derruba o serviço nem afeta
+    a operação local. Usa uma sessão de banco por ciclo.
+    """
+    from app.db import SessionLocal
+    from app.services import sync_service
+    from app.services.tenants import filiais_do_tenant
+
+    falhas = 0
+    await asyncio.sleep(10)  # dá tempo ao bootstrap/migrations
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                for filial_id in filiais_do_tenant(db):
+                    if not sync_service.configurado(db, filial_id):
+                        continue
+                    resultado = sync_service.sincronizar(db, filial_id=filial_id)
+                    logger.info("sync_agent filial=%s %s", filial_id, resultado)
+                    if resultado.get("ok"):
+                        falhas = 0
+                    else:
+                        falhas += 1
+            finally:
+                db.close()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            falhas += 1
+            logger.exception("Falha no Sync Agent")
+        await asyncio.sleep(
+            sync_service.backoff(falhas)
+            if falhas
+            else settings.sync_intervalo_segundos
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # P17: falha cedo quando defaults de desenvolvimento estão ativos em produção.
@@ -128,7 +167,10 @@ async def lifespan(_: FastAPI):
     # Fase 4: mantém a licença renovada; sem ativação, apenas recalcula o modo.
     tarefa_renovacao = asyncio.create_task(licensa_service.loop_renovacao())
     tarefa_fechamento = asyncio.create_task(_loop_fechamento_automatico_caixa())
+    # PRD v3.3: Sync Agent — esvazia o outbox para o Neon em background.
+    tarefa_sync = asyncio.create_task(_loop_sync_agent())
     yield
+    tarefa_sync.cancel()
     tarefa_fechamento.cancel()
     tarefa_renovacao.cancel()
 
