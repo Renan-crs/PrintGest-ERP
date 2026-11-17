@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     fiscal_gateway_health_path: str = "/health"
     fiscal_gateway_auth_header: str = "Authorization"
     fiscal_gateway_auth_prefix: str = "Bearer "
+    # Arquivo cifrado (DPAPI) com as credenciais de integrações de terceiros.
+    # Nunca contém segredos em texto; override em testes/diagnóstico.
+    cofre_integracoes_arquivo: str = ""
 
     model_config = {"env_prefix": "PRINTGEST_", "env_file": ".env", "extra": "ignore"}
 

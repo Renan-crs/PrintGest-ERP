@@ -48,6 +48,7 @@ from printgest.ui.formulario import (
     limpo,
     rotulo_secao,
 )
+from printgest.ui.modulos.integracoes import PaginaIntegracoes
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.tabela import TabelaDensa
 from printgest.ui.widgets import ElideLabel, badge, botao_com_atalho
@@ -757,6 +758,7 @@ class PaginaConfiguracoes(QWidget):
             ("personalizacao", "Personalização", PaginaPersonalizacao),
             ("reajuste_bloco", "Reajuste de Preços", PaginaReajuste),
             ("usuarios", "Usuários e Níveis", PaginaUsuarios),
+            ("integracoes", "Integrações", PaginaIntegracoes),
         ]
         # RBAC não hierárquico: o item interno é visível só ao admin.
         self._abas = [

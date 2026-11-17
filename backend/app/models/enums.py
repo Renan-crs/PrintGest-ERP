@@ -202,3 +202,17 @@ class StatusFiscal(StrEnum):
     REJEITADO = "rejeitado"
     CANCELADO = "cancelado"
     CONTINGENCIADO = "contingenciado"
+
+
+class TipoIntegracao(StrEnum):
+    """Apps/services externos cuja credencial é guardada no cofre do SO.
+
+    `fiscal` é o emissor de NF-e/NFC-e/NFS-e (PRD v3.3 §3.6/RF-SG-01); os
+    demais tipos usam o mesmo mecanismo de API key/certificado, sem lógica
+    de negócio própria neste release.
+    """
+
+    FISCAL = "fiscal"
+    EMAIL = "email"
+    PAGAMENTO = "pagamento"
+    GENERICA = "generica"

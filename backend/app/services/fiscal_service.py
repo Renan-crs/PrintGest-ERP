@@ -157,6 +157,28 @@ def invalidar_cache_disponibilidade() -> None:
     _DISPONIBILIDADE = None
 
 
+def _gateway(db, filial_id: int) -> FiscalGateway:
+    """Constrói o gateway com a integração fiscal do banco, se cadastrada."""
+    integracao = None
+    if db is not None:
+        try:
+            from app.models.enums import TipoIntegracao
+            from app.models.integracao import Integracao
+
+            integracao = (
+                db.query(Integracao)
+                .filter(
+                    Integracao.filial_id == filial_id,
+                    Integracao.tipo == TipoIntegracao.FISCAL,
+                    Integracao.ativo.is_(True),
+                )
+                .first()
+            )
+        except Exception:
+            integracao = None
+    return FiscalGateway(integracao=integracao, db=db, filial_id=filial_id)
+
+
 def gateway_configurado() -> bool:
     return FiscalGateway().configurado
 
@@ -434,13 +456,13 @@ def emitir(
     Idempotente para documentos já autorizados/processando: devolve o existente
     em vez de transmitir duas vezes a mesma origem.
     """
-    gateway = FiscalGateway()
+    gateway = _gateway(db, filial_id)
     if not gateway.configurado:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
                 "Gateway fiscal não configurado nesta instalação. "
-                "Defina PRINTGEST_FISCAL_GATEWAY_URL."
+                "Configure em Configurações > Integrações ou defina PRINTGEST_FISCAL_GATEWAY_URL."
             ),
         )
     if bool(venda_balcao_id) == bool(ordem_servico_id):
@@ -583,7 +605,7 @@ def consultar(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Gateway fiscal não configurado nesta instalação.",
         )
-    resultado = gateway.consultar(doc.gateway_id)
+    resultado = gateway.consultar(doc.gateway_id)  # gateway com integração da filial
     doc.tentativas = (doc.tentativas or 0) + 1
     doc.ultima_consulta_em = datetime.now(UTC)
     if resultado.ok:
@@ -625,10 +647,10 @@ def cancelar(
             status.HTTP_409_CONFLICT,
             detail="Documento sem ID de referência no gateway.",
         )
-    gateway = FiscalGateway()
+    gateway = _gateway(db, filial_id)
     if not gateway.configurado:
         raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Gateway fiscal não configurado nesta instalação.",
         )
     resultado = gateway.cancelar(doc.gateway_id, motivo)

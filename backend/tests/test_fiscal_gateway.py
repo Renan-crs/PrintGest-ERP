@@ -81,8 +81,8 @@ def _mockar_gateway(monkeypatch, transport: httpx.MockTransport) -> dict:
         fiscal_gateway_token="tok-teste",
         fiscal_gateway_health_path="/health",
     )
-    fabrica = lambda: fiscal_gateway.FiscalGateway(
-        config=cfg, client=httpx.Client(transport=transport)
+    fabrica = lambda **kwargs: fiscal_gateway.FiscalGateway(
+        config=cfg, client=httpx.Client(transport=transport), **kwargs
     )
     monkeypatch.setattr(fiscal_service, "FiscalGateway", fabrica)
     monkeypatch.setattr(settings, "fiscal_gateway_url", cfg.fiscal_gateway_url)

@@ -78,10 +78,19 @@ class FiscalGateway:
     """Cliente HTTP — uma instância por chamada (stateless, segura em paralelo)."""
 
     def __init__(
-        self, config: Settings | None = None, client: httpx.Client | None = None
+        self,
+        config: Settings | None = None,
+        client: httpx.Client | None = None,
+        *,
+        integracao=None,
+        db=None,
+        filial_id: int | None = None,
     ):
         self._cfg = config or settings
         self._client = client
+        self._integracao = integracao
+        self._db = db
+        self._filial_id = filial_id or 0
 
     @property
     def configurado(self) -> bool:
@@ -95,6 +104,24 @@ class FiscalGateway:
     def _headers(self) -> dict[str, str]:
         cabecalhos = {"Accept": "application/json", "Content-Type": "application/json"}
         token = (self._cfg.fiscal_gateway_token or "").strip()
+        # PRD v3.3 §3.6: integração fiscal cadastrada na tela de Configurações
+        # tem prioridade sobre o token legado de .env (que segue como fallback).
+        if self._integracao is not None:
+            from app.models.enums import TipoIntegracao
+            from app.services import integracao_service
+
+            try:
+                token = integracao_service.usar_credencial(
+                    self._db,
+                    filial_id=self._filial_id,
+                    tipo=TipoIntegracao.FISCAL,
+                ) or token
+                cabecalhos[self._integracao.auth_header or "Authorization"] = (
+                    f"{self._integracao.auth_prefix or ''}{token}"
+                )
+                return cabecalhos
+            except Exception:
+                pass  # cofre indisponível → mantém o token de .env
         if token:
             nome = (self._cfg.fiscal_gateway_auth_header or "Authorization").strip()
             prefixo = self._cfg.fiscal_gateway_auth_prefix or ""

@@ -21,6 +21,7 @@ from printgest.ui.modulos.configuracao import (
     PaginaUsuarios,
 )
 from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
+from printgest.ui.modulos.integracoes import PaginaIntegracoes
 from printgest.ui.modulos.estoque import (
     PaginaEstoque,
     PaginaEstoqueConsulta,
@@ -85,6 +86,7 @@ def criar_pagina(
         "personalizacao": PaginaPersonalizacao,
         "reajuste_bloco": PaginaReajuste,
         "usuarios": PaginaUsuarios,
+        "integracoes": PaginaIntegracoes,
     }
     construtora = paginas.get(item_id, PaginaEmConstrucao)
     if construtora is PaginaEmConstrucao:

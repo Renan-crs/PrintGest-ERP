@@ -539,6 +539,31 @@ class Api:
         """Trilha de auditoria do documento: `GET .../eventos`."""
         return self.listar_com_filtros(f"fiscal/documentos/{item_id}/eventos")
 
+    # ---------------------------------------------------- integrações (v3.3)
+
+    def listar_integracoes(self) -> dict:
+        """`GET /v1/config/integracoes` — segredos só como máscara."""
+        return self.listar_com_filtros("config/integracoes")
+
+    def criar_integracao(self, payload: dict) -> dict:
+        return self._post("/v1/config/integracoes", payload, self._token)
+
+    def atualizar_integracao(self, item_id: int, payload: dict) -> dict:
+        return self._put(f"/v1/config/integracoes/{item_id}", payload, self._token)
+
+    def excluir_integracao(self, item_id: int) -> None:
+        self._delete(f"/v1/config/integracoes/{item_id}", self._token)
+
+    def testar_integracao(self, item_id: int) -> dict:
+        return self._post(
+            f"/v1/config/integracoes/{item_id}/testar", {}, self._token
+        )
+
+    def eventos_integracao(self, item_id: int) -> dict:
+        return self._get(
+            f"/v1/config/integracoes/{item_id}/eventos", self._token
+        )
+
     # --------------------------------------------------------- configuração
 
     def empresa(self) -> dict:

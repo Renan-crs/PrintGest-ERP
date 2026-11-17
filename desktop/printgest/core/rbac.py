@@ -95,6 +95,7 @@ ITENS_INTERNOS = [
     {"id": "personalizacao", "rotulo": "Personalização", "nivel": "admin"},
     {"id": "reajuste_bloco", "rotulo": "Reajuste de Preços", "nivel": "admin"},
     {"id": "usuarios", "rotulo": "Usuários e Níveis", "nivel": "admin"},
+    {"id": "integracoes", "rotulo": "Integrações", "nivel": "admin"},
 ]
 
 

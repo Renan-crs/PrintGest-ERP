@@ -37,6 +37,7 @@ from app.models.financeiro import (
     PlanoContas,
 )
 from app.models.fiscal import DocumentoFiscal
+from app.models.integracao import Integracao, IntegracaoEvento
 from app.models.licenca import Licenca
 from app.models.movimento import (
     Agendamento,
@@ -63,6 +64,8 @@ __all__ = [
     "Filial",
     "FormaPagamento",
     "Fornecedor",
+    "Integracao",
+    "IntegracaoEvento",
     "Funcionario",
     "Licenca",
     "ModeloFiscal",

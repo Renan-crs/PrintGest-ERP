@@ -59,6 +59,8 @@ def _reset() -> None:
     ESTADO.update(
         {
             "empresa": dict(EMPRESA),
+            "integracoes": [],
+            "integracoes_payloads": [],
             "empresa_gets": 0,
             "payloads": [],
             "ultimo_simular": None,
@@ -208,6 +210,61 @@ def _handler(request: httpx.Request) -> httpx.Response:
         alvo.update({k: v for k, v in payload.items() if k != "senha"})
         return _item(alvo)
 
+    # Integrações (PRD v3.3 §3.6)
+    if path == "/v1/config/integracoes":
+        if metodo == "GET":
+            return _paginado(ESTADO.get("integracoes", []))
+        if metodo == "POST":
+            payload = _corpo(request)
+            item = {
+                "id": 70 + len(ESTADO.setdefault("integracoes", [])),
+                "filial_id": 1,
+                **payload,
+                "credencial_mascara": "••••" + payload.get("credencial", "")[-4:],
+                "tem_credencial": bool(payload.get("credencial")),
+                "tem_certificado": bool(payload.get("certificado")),
+                "ativo": payload.get("ativo", True),
+                "ultimo_teste_ok": None,
+                "created_at": "2026-11-17T10:00:00Z",
+                "updated_at": "2026-11-17T10:00:00Z",
+            }
+            item.pop("credencial", None)
+            item.pop("certificado", None)
+            ESTADO["integracoes"].append(item)
+            ESTADO.setdefault("integracoes_payloads", []).append(_corpo(request))
+            return _item(item)
+    if path.startswith("/v1/config/integracoes/"):
+        partes = path.rsplit("/", 1)
+        sufixo = partes[-1]
+        try:
+            item_id = int(sufixo)
+        except ValueError:
+            item_id = int(partes[0].rsplit("/", 1)[-1])
+        alvo = next(
+            (i for i in ESTADO.get("integracoes", []) if i["id"] == item_id), None
+        )
+        if alvo is None:
+            return httpx.Response(404, json={"detail": "não encontrado"})
+        if sufixo == "testar" and metodo == "POST":
+            return _item(
+                {"ok": True, "status_http": 200, "mensagem": "Conexão OK.",
+                 "testado_em": "2026-11-17T10:01:00Z", "segredo_exposto": False}
+            )
+        if sufixo == "eventos" and metodo == "GET":
+            return _paginado([])
+        if sufixo == "testar" and metodo == "GET":
+            return _item({"ok": True, "status_http": 200, "mensagem": "OK"})
+        if metodo == "PUT":
+            payload = _corpo(request)
+            ESTADO.setdefault("integracoes_payloads", []).append(payload)
+            alvo.update({k: v for k, v in payload.items() if not k.startswith("remover")})
+            if payload.get("credencial"):
+                alvo["credencial_mascara"] = "••••" + payload["credencial"][-4:]
+                alvo["tem_credencial"] = True
+            return _item(alvo)
+        if metodo == "GET":
+            return _item(alvo)
+
     return httpx.Response(404, json={"detail": f"rota não esperada: {path}"})
 
 
@@ -244,6 +301,7 @@ def test_host_configuracoes_admin_tem_quatro_abas(app):
         "Personalização",
         "Reajuste de Preços",
         "Usuários e Níveis",
+        "Integrações",
     ]
 
 
@@ -419,3 +477,61 @@ def test_usuarios_cria_com_login_e_senha(app, pumpar):
     assert payload["login"] == "novo.op"
     assert payload["senha"] == "senha12345"
     assert payload["nivel_acesso"] == "operador"
+
+
+
+# ------------------------------------------------- integrações (PRD v3.3 §3.6)
+
+
+def test_integracoes_carrega_mascara_e_nao_reenvia_segredo(app, pumpar):
+    from printgest.ui.modulos.integracoes import PaginaIntegracoes
+
+    ESTADO["integracoes"] = [
+        {
+            "id": 70,
+            "tipo": "fiscal",
+            "nome": "Emissor NF",
+            "provedor": "Focus NFe",
+            "base_url": "https://api.test/v2",
+            "auth_header": "Authorization",
+            "auth_prefix": "Bearer ",
+            "ambiente": "homologacao",
+            "ativo": True,
+            "credencial_mascara": "••••7890",
+            "tem_credencial": True,
+            "tem_certificado": False,
+            "ultimo_teste_ok": None,
+        }
+    ]
+    pagina = PaginaIntegracoes(_api())
+    pumpar(lambda: pagina._tabela.rowCount() == 1)
+    pagina._tabela.selectRow(0)
+    pumpar(lambda: pagina._editando_id == 70)
+
+    assert pagina._nome.valor() == "Emissor NF"
+    assert "••••7890" in pagina._lbl_mascaras.text()
+    assert pagina._credencial.valor() == ""
+
+    pagina._salvar()
+    pumpar(lambda: len(ESTADO["integracoes_payloads"]) == 1)
+    payload = ESTADO["integracoes_payloads"][-1]
+    assert "credencial" not in payload
+    assert "certificado" not in payload
+    assert payload["nome"] == "Emissor NF"
+
+
+def test_integracoes_segredo_e_write_only_no_payload(app, pumpar):
+    from printgest.ui.modulos.integracoes import PaginaIntegracoes
+
+    pagina = PaginaIntegracoes(_api())
+    pumpar(lambda: pagina._tabela.rowCount() == 0)
+    pagina._nome.definir("Novo emissor")
+    pagina._base_url.definir("https://api.test/v2")
+    pagina._credencial.definir("sk_1234567890")
+    pagina._salvar()
+    pumpar(lambda: len(ESTADO["integracoes"]) == 1)
+
+    payload = ESTADO["integracoes_payloads"][-1]
+    assert payload["credencial"] == "sk_1234567890"
+    lista = _api().listar_integracoes()
+    assert "sk_1234567890" not in json.dumps(lista)

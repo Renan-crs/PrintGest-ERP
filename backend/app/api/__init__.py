@@ -2,7 +2,15 @@
 
 from fastapi import APIRouter
 
-from app.api import agendamento, cadastros, config, financeiro, fiscal, projetos
+from app.api import (
+    agendamento,
+    cadastros,
+    config,
+    financeiro,
+    fiscal,
+    integracoes,
+    projetos,
+)
 from app.api.auth import router as auth_router
 from app.api.balcao import router as balcao_router
 from app.api.dashboard import router as dashboard_router
@@ -19,6 +27,7 @@ agendamento.registrar(api)
 financeiro.registrar(api)
 fiscal.registrar(api)
 config.registrar(api)
+integracoes.registrar(api)
 projetos.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)

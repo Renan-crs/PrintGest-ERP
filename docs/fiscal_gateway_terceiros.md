@@ -79,8 +79,35 @@ A emissão é idempotente para documentos já `processando`/`autorizados`.
   viram `***`).
 - Isolamento: documentos e eventos são sempre filtrados por `filial_id`.
 
-## Migration
+## Tela Configurações > Integrações (PRD v3.3 §3.6)
 
-`a3b4c5d6e7f8` — adiciona `nfse` ao enum `modelo_fiscal`, colunas de gateway/
-ambiente/consulta/cancelamento em `documento_fiscal` e cria `fiscal_evento`.
+O admin cadastra apps de terceiros em **Configurações > Integrações**:
+tipo (fiscal/email/pagamento/generica), nome, provedor, URL base, cabeçalho/
+prefixo de autenticação, ambiente (homologação/produção), **API key/token** e
+**certificado de API**, além do botão **Testar conexão**.
+
+Regras (todas cobertas por testes):
+
+- **O segredo nunca volta para a UI**: a resposta contém só `credencial_mascara`
+  (`••••1234`) e `tem_credencial`/`tem_certificado`. Ao editar, o campo de senha
+  nasce vazio; deixá-lo em branco **mantém** o valor atual (writeOnly).
+- **Cofre do SO**: o valor é cifrado com DPAPI em `integracoes.dat` fora do
+  banco, de logs e de backups. Banco/resposta/eventos não contêm o segredo.
+- **Teste de conexão** usa a credencial do cofre no cabeçalho configurado e
+  registra só `status_http` (sem o token) em `integracao_evento`.
+- **Isolamento** por `filial_id`; **RBAC** Admin-only; escrita sujeita a 423
+  (modo leitura) e 403 (gating do módulo `configuracoes`).
+- O emissor fiscal usa a integração do tipo `fiscal` cadastrada na tela — o
+  token de `.env` segue apenas como fallback.
+
+Rotas: `GET/POST /v1/config/integracoes`, `GET/PUT/DELETE
+/v1/config/integracoes/{id}`, `POST .../{id}/testar`, `GET .../{id}/eventos`.
+
+## Migrations
+
+- `a3b4c5d6e7f8` — `nfse`, colunas de gateway/auditoria em `documento_fiscal`,
+  cria `fiscal_evento`.
+- `b4c5d6e7f8a9` — cria `integracao` (metadados + máscaras, **sem segredos**) e
+  `integracao_evento`.
+
 Aplique com `alembic upgrade head` em cada instalação.
