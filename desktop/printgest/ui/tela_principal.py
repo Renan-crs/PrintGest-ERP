@@ -57,7 +57,9 @@ from printgest.ui.busca_global import BuscaGlobal
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
 from printgest.ui.widgets import (
+    ConteudoRolavel,
     ElideLabel,
+    PilhaResponsiva,
     SkeletonCartao,
     aplicar_estilo,
     aplicar_estado,
@@ -210,7 +212,7 @@ class PaginaInicial(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        conteudo = QWidget()
+        conteudo = ConteudoRolavel()
         self._scroll.setWidget(conteudo)
         raiz.addWidget(self._scroll)
 
@@ -371,6 +373,12 @@ class PaginaInicial(QWidget):
             self._lista_entregas = QListWidget()
             self._lista_entregas.setMinimumHeight(120)
             self._lista_entregas.setAccessibleName("Entregas de hoje e atrasadas")
+            # P3/1024px: nomes longos de clientes geravam rolagem horizontal no
+            # card de entregas; textos longos elidem e o tooltip traz o completo.
+            self._lista_entregas.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            self._lista_entregas.setWordWrap(False)
             self._lista_entregas.itemClicked.connect(
                 lambda _item: self.navegar.emit("projetos")
             )
@@ -589,6 +597,7 @@ class PaginaInicial(QWidget):
         for e in itens:
             texto = self._texto_entrega(e)
             linha = QListWidgetItem(texto)
+            linha.setToolTip(texto)
             linha.setData(
                 Qt.ItemDataRole.UserRole, {"os_id": e.get("os_id"), "numero": e.get("numero")}
             )
@@ -900,7 +909,10 @@ class TelaPrincipal(QMainWindow):
         self._detalhe_licenca = "Licença ainda não verificada."
 
         self.setWindowTitle(APP_NAME)
-        self.setMinimumSize(1100, 660)
+        # P3/matriz 1024x768: o mínimo antigo (1100x660) impedia a janela de
+        # caber em 1024x768 e, a 125%, travava em ~1375x825 físicos. Todo o
+        # conteúdo agora elide/rola, então um mínimo menor é seguro.
+        self.setMinimumSize(760, 560)
 
         raiz = QWidget()
         coluna = QVBoxLayout(raiz)
@@ -962,22 +974,26 @@ class TelaPrincipal(QMainWindow):
     def _cabecalho(self) -> QWidget:
         cabecalho = QWidget()
         cabecalho.setObjectName("cabecalho")
+        self._cabecalho_widget = cabecalho
         linha = QHBoxLayout(cabecalho)
         linha.setContentsMargins(20, 10, 20, 10)
         linha.setSpacing(12)
 
-        marca = QLabel(APP_NAME)
+        # P3 (1024px): rótulos do topo elidem (com tooltip) em vez de impor
+        # largura mínima — o cabeçalho travava a janela em ~1248px.
+        marca = ElideLabel(APP_NAME)
         marca.setObjectName("marca")
+        marca.setMinimumWidth(130)
         linha.addWidget(marca)
 
-        self._lbl_filial = QLabel(self._usuario.get("filial_nome", ""))
+        self._lbl_filial = ElideLabel(self._usuario.get("filial_nome", ""))
         estado_muted(self._lbl_filial)
         linha.addWidget(self._lbl_filial)
 
         # Indicador do servidor local — estado legível ("online"/"offline"),
         # IP fica só no tooltip (duplicava com o rodapé; revisão P0#4/P2#14).
         server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
-        self._lbl_servidor = QLabel("● verificando…")
+        self._lbl_servidor = ElideLabel("● verificando…")
         estado_muted(self._lbl_servidor)
         self._lbl_servidor.setToolTip(f"Servidor local: {self._base_url}")
         linha.addWidget(self._lbl_servidor)
@@ -1295,6 +1311,24 @@ class TelaPrincipal(QMainWindow):
 
     def resizeEvent(self, evento) -> None:  # noqa: N802 (API do Qt)
         super().resizeEvent(evento)
+        # P3 (1024px): em janelas estreitas, esconde os indicadores secundários
+        # do topo (filial/servidor) para preservar marca, busca, licença e
+        # usuário. O estado completo continua em tooltips/rodapé.
+        if hasattr(self, "_lbl_filial"):
+            self._lbl_filial.setVisible(self.width() >= 1180)
+        if hasattr(self, "_lbl_servidor"):
+            self._lbl_servidor.setVisible(self.width() >= 1120)
+        # Comprime os espaçamentos do topo/rodapé para caber em 1024px sem
+        # cortar texto (os rótulos já elidem e mantêm tooltip).
+        denso = self.width() < 1200
+        if hasattr(self, "_cabecalho_widget"):
+            lay = self._cabecalho_widget.layout()
+            lay.setSpacing(6 if denso else 12)
+            lay.setContentsMargins(12 if denso else 20, 10, 12 if denso else 20, 10)
+        if hasattr(self, "_rodape_widget"):
+            lay = self._rodape_widget.layout()
+            lay.setSpacing(8 if denso else 14)
+            lay.setContentsMargins(12 if denso else 16, 6, 12 if denso else 16, 6)
         # P0#2 (revisão PDV): abaixo de ~1280 px o layout de duas colunas do
         # PDV não cabe — a sidebar recolhe automaticamente para o trilho de 64
         # px. O toque manual do operador vence (só re-automatiza ao voltar da
@@ -1352,7 +1386,9 @@ class TelaPrincipal(QMainWindow):
         return botao
 
     def _stack(self) -> QStackedWidget:
-        self._stack_paginas = QStackedWidget()
+        # P3: pilha responsiva — páginas largas (PDV/Histórico) não forçam a
+        # janela a crescer além da resolução do operador.
+        self._stack_paginas = PilhaResponsiva()
         self._pagina_inicio = PaginaInicial(
             self._api,
             self._nivel,
@@ -1371,11 +1407,15 @@ class TelaPrincipal(QMainWindow):
     def _rodape(self) -> QWidget:
         rodape = QWidget()
         rodape.setObjectName("rodape")
+        self._rodape_widget = rodape
         linha = QHBoxLayout(rodape)
         linha.setContentsMargins(16, 6, 16, 6)
         linha.setSpacing(14)
 
-        self._lbl_relogio = QLabel(datetime.now().strftime("%H:%M:%S"))
+        # P3 (1024px): todo o rodapé usa rótulos elidíveis — antes os oito
+        # QLabels fixavam ~1248px de largura mínima e impediam 1024×768.
+        self._lbl_relogio = ElideLabel(datetime.now().strftime("%H:%M:%S"))
+        self._lbl_relogio.setMinimumWidth(78)
         estado_muted(self._lbl_relogio)
         linha.addWidget(self._lbl_relogio)
         self._timer_relogio = QTimer(self)
@@ -1383,17 +1423,19 @@ class TelaPrincipal(QMainWindow):
         self._timer_relogio.timeout.connect(self._tick_relogio)
         self._timer_relogio.start()
 
-        host = QLabel(socket.gethostname())
+        host = ElideLabel(socket.gethostname())
+        host.setToolTip(f"Estação: {socket.gethostname()}")
         estado_muted(host)
         linha.addWidget(host)
 
         # Servidor: IP/Porta do servidor (extraído de base_url)
         server_ip = self._base_url.split(":")[0] if ":" in self._base_url else self._base_url
-        server_label = QLabel(f"  · Servidor: {server_ip}")
+        server_label = ElideLabel(f"  · Servidor: {server_ip}")
+        server_label.setToolTip(f"Servidor local: {self._base_url}")
         estado_muted(server_label)
         linha.addWidget(server_label)
 
-        self._lbl_conexao = QLabel("● —")
+        self._lbl_conexao = ElideLabel("● —")
         estado_muted(self._lbl_conexao)
         linha.addWidget(self._lbl_conexao)
         # A Tela Início já consulta /health ao abrir; o rodapé reaproveita o
@@ -1405,11 +1447,13 @@ class TelaPrincipal(QMainWindow):
             ("F3", "Produtos"),
             ("F5", "PDV"),
         ]:
-            hint = QLabel(f"[{kbd}] {texto}")
+            hint = ElideLabel(f"[{kbd}] {texto}")
+            hint.setToolTip(f"{texto} ({kbd})")
             estado_muted(hint)
             linha.addWidget(hint)
         linha.addStretch(1)
-        versao = QLabel(f"v{__version__}")
+        versao = ElideLabel(f"v{__version__}")
+        versao.setToolTip(f"PrintGest ERP v{__version__}")
         estado_muted(versao)
         linha.addWidget(versao)
 

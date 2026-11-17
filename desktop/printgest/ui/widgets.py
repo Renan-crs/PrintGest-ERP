@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QLayout,
     QPushButton,
     QSizePolicy,
+    QStackedWidget,
     QWidget,
 )
 
@@ -244,6 +245,32 @@ class ElideLabel(QLabel):
         completo = self.text()
         cabe = self.fontMetrics().horizontalAdvance(completo) <= max(0, self.width())
         self.setToolTip("" if cabe else completo)
+
+
+class ConteudoRolavel(QWidget):
+    """Conteúdo de `QScrollArea` que nunca força o tamanho da janela.
+
+    Sem isso, o conteúdo do Início (vários cards empilhados) tem `minimumSizeHint`
+    alto e, em 1024x768 @125%, a janela crescia para ~925px físicos em vez de
+    rolar internamente (P3/DPI).
+    """
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (API Qt)
+        return QSize(0, 0)
+
+
+class PilhaResponsiva(QStackedWidget):
+    """Pilha que não deixa páginas ocultas forçarem a largura da janela.
+
+    O `QStackedLayout` calcula o `minimumSizeHint` como o MAIOR entre todas as
+    páginas. Na prática, abrir o Histórico do PDV (grade larga) fazia a janela
+    inteira saltar para ~2096px mesmo na visão "Nova venda". As páginas já têm
+    seus próprios scroll areas; devolver `QSize(0, 0)` mantém a janela no
+    tamanho escolhido pelo operador (P3 / 1024x768).
+    """
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (API Qt)
+        return QSize(0, 0)
 
 
 class FlowLayout(QLayout):

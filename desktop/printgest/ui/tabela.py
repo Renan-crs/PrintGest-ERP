@@ -149,7 +149,13 @@ class TabelaDensa(QTableWidget):
                 break
             larguras[maior] -= 1
             excesso -= 1
+        cabecalho = self.horizontalHeader()
         for c in visiveis:
+            # P3: páginas que pedem ResizeToContents não podem ignorar o limite
+            # da viewport — converte para Interactive antes de fixar a largura
+            # calculada pelos pesos, senão a soma volta a estourar a janela.
+            if cabecalho.sectionResizeMode(c) == QHeaderView.ResizeMode.ResizeToContents:
+                cabecalho.setSectionResizeMode(c, QHeaderView.ResizeMode.Interactive)
             self.setColumnWidth(c, larguras[c])
 
     def resizeEvent(self, evento) -> None:  # noqa: N802 (API Qt)

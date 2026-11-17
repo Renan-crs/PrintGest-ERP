@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from PySide6.QtCore import QStringListModel, Qt, Signal
+from PySide6.QtCore import QSize, QStringListModel, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -66,6 +66,8 @@ from printgest.ui.modulos.condicao_pagamento import CondicaoPagamentoCliente
 from printgest.ui.paginador import LOTE, Paginador
 from printgest.ui.tabela import TabelaDensa
 from printgest.ui.widgets import (
+    FlowLayout,
+    PilhaResponsiva,
     aplicar_estilo,
     estado_primario,
     estado_sucesso,
@@ -128,6 +130,46 @@ def _campo_rotulado(rotulo: str, widget: QWidget) -> QWidget:
 # ----------------------------------------------------------- grade de itens
 
 
+class _TabelaItensVenda(QTableWidget):
+    """Grade de itens que nunca impõe largura mínima à janela (P3/1024px).
+
+    As colunas numéricas usavam `ResizeToContents`; com uma descrição longa a
+    soma passava de 1000px e o `QStackedWidget` do PDV crescia a janela inteira.
+    AQUI as larguras são limitadas à viewport — o texto elide e o tooltip do
+    item mantém o conteúdo completo.
+    """
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (API Qt)
+        return QSize(0, super().minimumSizeHint().height())
+
+    def resizeEvent(self, evento) -> None:  # noqa: N802 (API Qt)
+        super().resizeEvent(evento)
+        self._limitar_colunas()
+
+    def _limitar_colunas(self) -> None:
+        disponivel = self.viewport().width()
+        if disponivel <= 0 or self.columnCount() == 0:
+            return
+        cab = self.horizontalHeader()
+        # Colunas fixas (todas menos a descrição, que faz stretch).
+        fixas = [c for c in range(self.columnCount()) if c != 1]
+        for c in fixas:
+            if cab.sectionResizeMode(c) == QHeaderView.ResizeMode.ResizeToContents:
+                cab.setSectionResizeMode(c, QHeaderView.ResizeMode.Interactive)
+                largura = min(self.sizeHintForColumn(c), 150)
+                self.setColumnWidth(c, max(40, largura))
+        soma_fixas = sum(self.columnWidth(c) for c in fixas)
+        # Reserva mínima para a descrição; se ainda não couber, comprime as fixas.
+        if soma_fixas + 150 > disponivel:
+            excesso = soma_fixas + 150 - disponivel
+            for c in sorted(fixas, key=lambda x: self.columnWidth(x), reverse=True):
+                if excesso <= 0:
+                    break
+                reducao = min(excesso, max(0, self.columnWidth(c) - 40))
+                self.setColumnWidth(c, self.columnWidth(c) - reducao)
+                excesso -= reducao
+
+
 class EditorItensVenda(QWidget):
     """Grade de itens da venda com busca por produto e edição de qtd/valor.
 
@@ -147,7 +189,9 @@ class EditorItensVenda(QWidget):
     _COL_TOTAL = 5
     _COL_REM = 6
 
-    _CABECALHOS = ["#", "Descrição", "Qtd", "Valor unit.", "Desc.", "Total", ""]
+    # Rótulos curtos: o cabeçalho "Valor unit." era elidido para "or ur" quando
+    # a grade comprimia as colunas em 1024px (P3).
+    _CABECALHOS = ["#", "Descrição", "Qtd", "Unit.", "Desc.", "Total", ""]
 
     def __init__(self, api: Api | None = None) -> None:
         super().__init__()
@@ -178,9 +222,9 @@ class EditorItensVenda(QWidget):
     def _barra_editor(self) -> QWidget:
         caixa = QWidget()
         caixa.setObjectName("caixaForma")
-        linha = QHBoxLayout(caixa)
-        linha.setContentsMargins(0, 0, 0, 0)
-        linha.setSpacing(8)
+        # P3/125%: a barra de busca + QTD + dois botões não cabiam numa linha
+        # e os rótulos eram cortados. O FlowLayout quebra em duas linhas.
+        linha = FlowLayout(caixa, margem=0, espaco_h=8, espaco_v=6)
 
         self._entrada = QLineEdit()
         self._entrada.setPlaceholderText("Código, nome ou código de barras")
@@ -193,7 +237,9 @@ class EditorItensVenda(QWidget):
         self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self._completer.activated[str].connect(self._adicionar_do_texto)
         self._entrada.setCompleter(self._completer)
-        linha.addWidget(self._entrada, 1)
+        self._entrada.setMinimumWidth(200)
+        self._entrada.setMaximumWidth(420)
+        linha.addWidget(self._entrada)
 
         rotulo = QLabel("QTD")
         rotulo.setObjectName("labelForm")
@@ -228,6 +274,7 @@ class EditorItensVenda(QWidget):
         col.addStretch(2)
         titulo = QLabel("🔍 Busque um produto/serviço e pressione Enter para adicionar")
         titulo.setObjectName("vazioTabela")
+        titulo.setWordWrap(True)  # P3/125%: evita corte no painel estreito
         titulo.setWordWrap(True)
         titulo.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         col.addWidget(titulo, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -245,7 +292,7 @@ class EditorItensVenda(QWidget):
         return caixa
 
     def _tabela_itens(self) -> QTableWidget:
-        self._tabela = QTableWidget(0, len(self._CABECALHOS))
+        self._tabela = _TabelaItensVenda(0, len(self._CABECALHOS))
         self._tabela.setHorizontalHeaderLabels(self._CABECALHOS)
         self._tabela.verticalHeader().setVisible(False)
         # Linhas de 40 px: alvo de toque confortável e leitura sem aperto (P1#7).
@@ -671,7 +718,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         # bloqueia (409 "Caixa fechado").
         layout.addWidget(self._montar_banner_caixa())
 
-        self._vistas = QStackedWidget()
+        # P3: a grade do Histórico não pode forçar a largura da visão Venda.
+        self._vistas = PilhaResponsiva()
         self._vista_venda = self._montar_vista_venda()
         self._vista_historico = self._montar_vista_historico()
         self._vistas.addWidget(self._vista_venda)
@@ -958,13 +1006,16 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
         barra = QWidget()
         barra.setObjectName("caixaForma")
-        linha = QHBoxLayout(barra)
-        linha.setContentsMargins(0, 0, 0, 0)
-        linha.setSpacing(8)
+        # P3/1024px: os oito controles de filtro não cabiam numa única linha e
+        # eram cortados ("portar Ex...", "mpar filt..."). O FlowLayout quebra
+        # em linhas em telas estreitas sem cortar rótulo algum.
+        linha = FlowLayout(barra, margem=8, espaco_h=8, espaco_v=6)
 
         self._busca = CampoBusca(self.LUGAR_BUSCA, nivel_hint="Ctrl+F")
+        self._busca.setMinimumWidth(180)
+        self._busca.setMaximumWidth(340)
         self._busca.buscado.connect(lambda q: self.recarregar(q))
-        linha.addWidget(self._busca, 1)
+        linha.addWidget(self._busca)
 
         self._btn_filtros: dict[str, QPushButton] = {}
         for valor, rotulo in self.FILTROS:
@@ -1044,6 +1095,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         col_card.setSpacing(0)
 
         self._tabela = TabelaDensa(self.CHAVES, self.COLUNAS)
+        # P3: as ações por linha (Ver / ⋯) têm 30px + margens; sem isso a grade
+        # cortava os botões no meio e o rótulo "Ver" desaparecia.
+        self._tabela.verticalHeader().setDefaultSectionSize(40)
         self._tabela.formata = self._formatar_texto
         self._tabela.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
@@ -1054,10 +1108,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         cab.setSectionResizeMode(
             self.CHAVES.index("cliente_nome"), QHeaderView.ResizeMode.Stretch
         )
-        # Ajustes para legibilidade em 1024px (colunas-chave sem clipping excessivo)
-        for chave in ("numero", "data_venda", "forma_pagamento", "valor_total", "status"):
-            if chave in self.CHAVES:
-                cab.setSectionResizeMode(self.CHAVES.index(chave), QHeaderView.ResizeMode.ResizeToContents)
+        # P3: pesos da TabelaDensa dimensionam as colunas pela viewport; apenas
+        # Fiscal e Ações ficam fixas (o restante é elidido com tooltip).
         if "fiscal" in self.CHAVES:
             col_fiscal = self.CHAVES.index("fiscal")
             cab.setSectionResizeMode(col_fiscal, QHeaderView.ResizeMode.Fixed)
@@ -1068,14 +1120,14 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         # P0#3/P1#14: ações compactas (menu ⋯).
         col_acoes = self.CHAVES.index("acoes")
         cab.setSectionResizeMode(col_acoes, QHeaderView.ResizeMode.Fixed)
-        self._tabela.setColumnWidth(col_acoes, 116)
+        self._tabela.setColumnWidth(col_acoes, 132)
 
         self._vazio = QLabel("Nenhuma venda encontrada. Clique em Nova venda (F6).")
         self._vazio.setAlignment(Qt.AlignmentFlag.AlignCenter)
         estado_muted(self._vazio)
         self._vazio.setWordWrap(True)
 
-        self._pilha_lista = QStackedWidget()
+        self._pilha_lista = PilhaResponsiva()
         self._pilha_lista.addWidget(self._tabela)
         self._pilha_lista.addWidget(self._vazio)
         col_card.addWidget(self._pilha_lista, 1)
@@ -1432,6 +1484,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             btn_ver = QPushButton("Ver")
             btn_ver.setObjectName("acaoLinha")
             btn_ver.setMinimumHeight(30)
+            btn_ver.setMinimumWidth(46)  # P3/125%: evita "Ver" cortado na grade
             btn_ver.clicked.connect(
                 lambda _=False, vid=dado.get("id"): self._ver_detalhes(vid)
             )
@@ -1440,6 +1493,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             btn_mais.setText("⋯")
             btn_mais.setObjectName("acaoLinha")
             btn_mais.setMinimumHeight(30)
+            btn_mais.setMinimumWidth(34)
             btn_mais.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
             menu = QMenu(btn_mais)
             act_ver = menu.addAction("Ver detalhes")

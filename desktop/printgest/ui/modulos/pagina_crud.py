@@ -85,6 +85,10 @@ class PaginaCrud(QWidget):
         self._conectar_campos()
         self._instalar_atalhos()
         self.recarregar()
+        # P3/1024px: no modo "formulário em tela cheia" a lista nasce sozinha;
+        # o painel do formulário só aparece ao criar/abrir um registro.
+        if self.FORM_EM_TELA_CHEIA and hasattr(self, "_painel_direito"):
+            self._painel_direito.hide()
 
     # ----------------------------------------------------------- construção
 
@@ -130,13 +134,16 @@ class PaginaCrud(QWidget):
 
     def _barra_busca(self) -> QWidget:
         caixa = QWidget()
-        layout = QHBoxLayout(caixa)
+        # P3/1024px: busca em cima e filtros abaixo, ocupando a largura toda.
+        # Antes o FlowLayout dividia o espaço com a busca e os botões ficavam
+        # empilhados numa coluna estreita à direita (visto na captura da OS).
+        layout = QVBoxLayout(caixa)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         self._busca = CampoBusca(self.LUGAR_BUSCA)
         self._busca.buscado.connect(lambda q: self.recarregar(q))
-        layout.addWidget(self._busca, 1)
+        layout.addWidget(self._busca, 0)
 
         self._btn_filtros: dict[str, QPushButton] = {}
         self._filtros_widget = None
@@ -373,6 +380,7 @@ class PaginaCrud(QWidget):
         self._btn_voltar_lista.setVisible(True)
         self._barra_busca_widget.setVisible(False)
         self._painel_lista.setVisible(False)
+        self._painel_direito.setVisible(True)
 
     def _sair_form_cheio(self) -> None:
         if not self.FORM_EM_TELA_CHEIA:
@@ -380,6 +388,7 @@ class PaginaCrud(QWidget):
         self._btn_voltar_lista.setVisible(False)
         self._barra_busca_widget.setVisible(True)
         self._painel_lista.setVisible(True)
+        self._painel_direito.setVisible(False)
 
     def _voltar_para_lista(self) -> None:
         self._limpar_form()

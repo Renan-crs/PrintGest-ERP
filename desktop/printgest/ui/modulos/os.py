@@ -41,6 +41,7 @@ from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
     CampoCombo,
+    CampoData,
     CampoDataHora,
     CampoTexto,
     CampoValor,
@@ -670,8 +671,12 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._lbl_contadores_os = QLabel("")
         estado_muted(self._lbl_contadores_os)
         self._lbl_contadores_os.setWordWrap(True)
-        if getattr(self, "_filtros_widget", None) is not None and self._filtros_widget.layout() is not None:
-            self._filtros_widget.layout().addWidget(self._lbl_contadores_os)
+        if getattr(self, "_filtros_widget", None) is not None:
+            # Abaixo da barra de filtros (não dentro do FlowLayout, onde o
+            # rótulo com quebra de linha sobrepunha os botões em 1024px).
+            barra = self._filtros_widget.parentWidget()
+            if barra is not None and barra.layout() is not None:
+                barra.layout().addWidget(self._lbl_contadores_os)
         self._carregar_clientes_flags()
         self._carregar_funcionarios()
         self._atualizar_contadores_os()
