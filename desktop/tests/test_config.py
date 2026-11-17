@@ -302,6 +302,9 @@ def test_host_configuracoes_admin_tem_quatro_abas(app):
         "Reajuste de Preços",
         "Usuários e Níveis",
         "Integrações",
+        "Estações",
+        "Backup",
+        "Diagnóstico",
     ]
 
 

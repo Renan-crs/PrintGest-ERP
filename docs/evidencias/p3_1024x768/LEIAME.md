@@ -20,6 +20,7 @@ com `QApplication` offscreen e API falsa (`httpx.MockTransport`), sem backend:
 | Cabeçalho "Valor unit." elidido para "or ur" | `pdv_*`: "Unit." legível |
 | Barra de itens do PDV cortada em 125% | `pdv_1024x768_125.png`: barra em duas linhas |
 | Aba anterior sobreposta ao trocar Configurações (deleteLater assíncrono) | `integracoes_1024x768_100.png`: aba limpa, formulário rolável |
+| 8 abas de Configurações cortadas numa linha | `estacoes_1024x768_100.png`: duas linhas de 4, rótulos completos |
 
 ## Reprodução
 

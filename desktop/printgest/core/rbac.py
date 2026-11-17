@@ -64,6 +64,7 @@ MENU = [
         "Sistema",
         [
             {"id": "configuracoes", "rotulo": "Configurações", "niveis": ["admin"]},
+            {"id": "filiais", "rotulo": "Filiais", "niveis": ["admin"]},
         ],
     ),
 ]
@@ -96,6 +97,9 @@ ITENS_INTERNOS = [
     {"id": "reajuste_bloco", "rotulo": "Reajuste de Preços", "nivel": "admin"},
     {"id": "usuarios", "rotulo": "Usuários e Níveis", "nivel": "admin"},
     {"id": "integracoes", "rotulo": "Integrações", "nivel": "admin"},
+    {"id": "estacoes", "rotulo": "Estações", "nivel": "admin"},
+    {"id": "backup", "rotulo": "Backup", "nivel": "admin"},
+    {"id": "diagnostico", "rotulo": "Diagnóstico", "nivel": "admin"},
 ]
 
 

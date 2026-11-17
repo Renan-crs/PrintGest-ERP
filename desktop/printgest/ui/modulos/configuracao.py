@@ -49,6 +49,11 @@ from printgest.ui.formulario import (
     rotulo_secao,
 )
 from printgest.ui.modulos.integracoes import PaginaIntegracoes
+from printgest.ui.modulos.plataforma import (
+    PaginaBackup,
+    PaginaDiagnostico,
+    PaginaEstacoes,
+)
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.tabela import TabelaDensa
 from printgest.ui.widgets import ElideLabel, badge, botao_com_atalho
@@ -759,6 +764,9 @@ class PaginaConfiguracoes(QWidget):
             ("reajuste_bloco", "Reajuste de Preços", PaginaReajuste),
             ("usuarios", "Usuários e Níveis", PaginaUsuarios),
             ("integracoes", "Integrações", PaginaIntegracoes),
+            ("estacoes", "Estações", PaginaEstacoes),
+            ("backup", "Backup", PaginaBackup),
+            ("diagnostico", "Diagnóstico", PaginaDiagnostico),
         ]
         # RBAC não hierárquico: o item interno é visível só ao admin.
         self._abas = [
@@ -785,23 +793,30 @@ class PaginaConfiguracoes(QWidget):
             self._corpo_layout.addWidget(restrito)
 
     def _barra(self) -> QWidget:
+        # P3/1024px: 8 abas não cabiam numa linha e os rótulos eram cortados
+        # ("ados da Empres"). Título em cima + duas linhas de 4 botões.
         caixa = QWidget()
-        linha = QHBoxLayout(caixa)
-        linha.setContentsMargins(20, 16, 20, 0)
-        linha.setSpacing(8)
+        col = QVBoxLayout(caixa)
+        col.setContentsMargins(20, 12, 20, 0)
+        col.setSpacing(6)
         titulo = ElideLabel("Configurações")
         titulo.setObjectName("titulo")
-        linha.addWidget(titulo)
-        linha.addStretch(1)
+        col.addWidget(titulo)
         self._botoes = []
-        for indice, (rotulo, _classe) in enumerate(self._abas):
-            botao = QPushButton(rotulo)
-            botao.setObjectName("chaveRapida")
-            botao.setCheckable(True)
-            botao.setChecked(indice == 0)
-            botao.clicked.connect(lambda _=False, i=indice: self._trocar(i))
-            self._botoes.append(botao)
-            linha.addWidget(botao)
+        for inicio in range(0, len(self._abas), 4):
+            linha = QHBoxLayout()
+            linha.setSpacing(8)
+            for indice in range(inicio, min(inicio + 4, len(self._abas))):
+                rotulo = self._abas[indice][0]
+                botao = QPushButton(rotulo)
+                botao.setObjectName("chaveRapida")
+                botao.setCheckable(True)
+                botao.setChecked(indice == 0)
+                botao.clicked.connect(lambda _=False, i=indice: self._trocar(i))
+                self._botoes.append(botao)
+                linha.addWidget(botao)
+            linha.addStretch(1)
+            col.addLayout(linha)
         return caixa
 
     def _trocar(self, indice: int) -> None:

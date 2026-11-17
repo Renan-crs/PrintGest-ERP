@@ -564,6 +564,56 @@ class Api:
             f"/v1/config/integracoes/{item_id}/eventos", self._token
         )
 
+    # ------------------------------------------- plataforma PRD v3.3 (§4/§5)
+
+    def filiais(self) -> dict:
+        return self._get("/v1/plataforma/filiais", self._token)
+
+    def atualizar_filial(self, item_id: int, payload: dict) -> dict:
+        return self._put(f"/v1/plataforma/filiais/{item_id}", payload, self._token)
+
+    def estacoes(self) -> dict:
+        return self._get("/v1/plataforma/estacoes", self._token)
+
+    def registrar_estacao(self, nome: str, fingerprint: str) -> dict:
+        return self._post(
+            "/v1/plataforma/estacoes/registrar",
+            {"nome": nome, "fingerprint": fingerprint},
+            self._token,
+        )
+
+    def remover_estacao(self, item_id: int) -> None:
+        self._delete(f"/v1/plataforma/estacoes/{item_id}", self._token)
+
+    def eventos_sync(self, pendentes: bool | None = None) -> dict:
+        params = {"pendentes": "true"} if pendentes else None
+        return self._get("/v1/plataforma/sync/eventos", self._token, params)
+
+    def status_sync(self) -> dict:
+        return self._get("/v1/plataforma/sync/status", self._token)
+
+    def diagnostico_licenca(self) -> dict:
+        return self._get("/v1/plataforma/diagnostico", self._token)
+
+    def config_backup(self) -> dict:
+        return self._get("/v1/plataforma/backup", self._token)
+
+    def salvar_config_backup(self, payload: dict) -> dict:
+        return self._put("/v1/plataforma/backup", payload, self._token)
+
+    def executar_backup(self) -> dict:
+        return self._post("/v1/plataforma/backup/executar", {}, self._token)
+
+    def termo_backup(self) -> dict:
+        return self._get("/v1/plataforma/backup/termo", self._token)
+
+    def registrar_termo_backup(self, aceito: bool, versao: str = "1.0") -> dict:
+        return self._post(
+            "/v1/plataforma/backup/termo",
+            {"aceito": aceito, "versao": versao},
+            self._token,
+        )
+
     # --------------------------------------------------------- configuração
 
     def empresa(self) -> dict:

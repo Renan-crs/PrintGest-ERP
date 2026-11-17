@@ -151,6 +151,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.core.rbac import MENU
     from printgest.ui.modulos.clientes import PaginaClientes
     from printgest.ui.modulos.configuracao import PaginaConfiguracoes
+    from printgest.ui.modulos.plataforma import PaginaFiliais
     from printgest.ui.modulos.financeiro import PaginaFinanceiro
     from printgest.ui.modulos.fiscal import PaginaFiscal
     from printgest.ui.modulos.fornecedores import PaginaFornecedores
@@ -180,6 +181,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
         "estoque": PaginaEstoque,
         "relatorios": PaginaRelatorios,
         "configuracoes": PaginaConfiguracoes,
+        "filiais": PaginaFiliais,
     }
     visitadas = set()
 
