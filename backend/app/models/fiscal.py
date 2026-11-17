@@ -45,6 +45,13 @@ class DocumentoFiscal(Base):
         BigInteger, ForeignKey("filial.id"), nullable=False
     )
     modelo: Mapped[ModeloFiscal] = mapped_column(pg_enum(ModeloFiscal), nullable=False)
+    # Gateway de terceiro que transmitiu o documento (identificação apenas —
+    # credenciais ficam na configuração da instalação, nunca no banco).
+    gateway: Mapped[str | None] = mapped_column(String(40))
+    gateway_id: Mapped[str | None] = mapped_column(String(120))
+    ambiente: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="homologacao"
+    )
     numero: Mapped[int | None] = mapped_column(Integer)
     serie: Mapped[int | None] = mapped_column(Integer)
     chave_acesso: Mapped[str | None] = mapped_column(String(44))
@@ -68,10 +75,43 @@ class DocumentoFiscal(Base):
     retorno_json: Mapped[dict | None] = mapped_column(JSONB)
     contingencia: Mapped[bool] = mapped_column(Boolean, server_default="false")
     tentativas: Mapped[int] = mapped_column(Integer, server_default="0")
+    ultima_consulta_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    motivo_cancelamento: Mapped[str | None] = mapped_column(Text)
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class FiscalEvento(Base):
+    """Trilha de auditoria das operações fiscais (P0#3).
+
+    Registra TODA tentativa de emissão/consulta/cancelamento — inclusive
+    falhas — com o retorno sanitizado do gateway. Consulta sempre escopada por
+    `filial_id` (isolamento entre inquilinos).
+    """
+
+    __tablename__ = "fiscal_evento"
+    __table_args__ = (
+        Index("idx_fiscal_evento_doc", "documento_fiscal_id", "created_at"),
+        Index("idx_fiscal_evento_filial", "filial_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    filial_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("filial.id"), nullable=False
+    )
+    documento_fiscal_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("documento_fiscal.id")
+    )
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    mensagem: Mapped[str | None] = mapped_column(Text)
+    detalhes: Mapped[dict | None] = mapped_column(JSONB)
+    criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

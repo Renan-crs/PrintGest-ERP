@@ -189,6 +189,10 @@ class FormaPagamento(StrEnum):
 class ModeloFiscal(StrEnum):
     NFE = "nfe"
     NFCE = "nfce"
+    # NFS-e é emitida por API de terceiro (prefeitura/gateway), com regras
+    # municipais próprias — o gateway faz a transmissão, o PrintGest monta o
+    # payload e acompanha o retorno.
+    NFSE = "nfse"
 
 
 class StatusFiscal(StrEnum):

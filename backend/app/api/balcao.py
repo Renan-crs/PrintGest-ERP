@@ -126,7 +126,8 @@ def cancelar(
     body: VendaCancelIn | None = Body(default=None),
 ) -> None:
     motivo = body.motivo if body else None
+    # Uma única chamada: a segunda sobrescrevia o motivo e fazia o endpoint
+    # responder 400 ("já cancelada") logo após cancelar com sucesso.
     venda_service.cancelar(
         db, filial_id=filial, venda_id=venda_id, usuario_id=usuario.id, motivo=motivo
     )
-    venda_service.cancelar(db, filial_id=filial, venda_id=venda_id)

@@ -106,6 +106,23 @@ class Settings(BaseSettings):
     licenca_backoff_jitter_percentual: int = 20
     licenca_desabilitada: bool = False
 
+    # ------------------------------------------------------------------ fiscal
+    # O PrintGest NÃO emite NF-e/NFC-e/NFS-e diretamente: um gateway de terceiro
+    # (Focus NFe, PlugNotas, eNotas, API da prefeitura, etc.) faz a transmissão.
+    # A integração é REST genérica — os caminhos abaixo são templates para que
+    # qualquer provedor seja adaptado sem mudar código (variáveis de ambiente,
+    # nunca credenciais no repositório).
+    fiscal_gateway_url: str = ""
+    fiscal_gateway_token: str = ""
+    fiscal_gateway_timeout_segundos: float = 15.0
+    fiscal_gateway_ambiente: str = "homologacao"  # homologacao | producao
+    fiscal_gateway_emitir_path: str = "/documentos"
+    fiscal_gateway_consultar_path: str = "/documentos/{id}"
+    fiscal_gateway_cancelar_path: str = "/documentos/{id}/cancelamento"
+    fiscal_gateway_health_path: str = "/health"
+    fiscal_gateway_auth_header: str = "Authorization"
+    fiscal_gateway_auth_prefix: str = "Bearer "
+
     model_config = {"env_prefix": "PRINTGEST_", "env_file": ".env", "extra": "ignore"}
 
     @property
@@ -140,6 +157,14 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "Defina PRINTGEST_DATABASE_URL com credenciais próprias — a "
                 "credencial padrão não é permitida em produção."
+            )
+        if (
+            self.fiscal_gateway_url
+            and self.fiscal_gateway_ambiente.lower() == "producao"
+            and not self.fiscal_gateway_url.lower().startswith("https://")
+        ):
+            raise RuntimeError(
+                "PRINTGEST_FISCAL_GATEWAY_URL deve usar HTTPS em produção."
             )
 
 
