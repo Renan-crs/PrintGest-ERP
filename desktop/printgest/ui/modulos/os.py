@@ -1081,6 +1081,27 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             return ("Informe o cliente.", self._cliente)
         if not self._itens.valor():
             return ("Adicione ao menos um item.", self._itens.widget)
+        # P1#11 (refino): validações financeiras defensivas do sinal.
+        if hasattr(self, "_valor_sinal") and hasattr(self, "_forma_sinal"):
+            from decimal import Decimal
+
+            sinal = para_decimal(self._valor_sinal.valor()) or Decimal("0")
+            if sinal > 0 and not self._forma_sinal.valor():
+                return ("Informe a forma de pagamento do sinal.", self._forma_sinal)
+            if sinal > 0:
+                subtotal = Decimal("0")
+                for item in self._itens.valor():
+                    qtd = para_decimal(item.get("quantidade")) or Decimal("0")
+                    unit = para_decimal(item.get("valor_unitario")) or Decimal("0")
+                    desc_item = para_decimal(item.get("desconto")) or Decimal("0")
+                    subtotal += (qtd * unit) - desc_item
+                desconto = para_decimal(self._desconto.valor()) or Decimal("0")
+                total = max(Decimal("0"), subtotal - desconto)
+                if sinal > total:
+                    return (
+                        "O sinal não pode ser maior que o total da O.S.",
+                        self._valor_sinal,
+                    )
         if self._editando_id is None and self.TIPO == "os":
             exigencia = self._exigencia_pendente()
             if exigencia:
