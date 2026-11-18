@@ -118,7 +118,7 @@ async def _loop_sync_agent() -> None:
     a operação local. Usa uma sessão de banco por ciclo.
     """
     from app.db import SessionLocal
-    from app.services import sync_service
+    from app.services import consolidacao_service, sync_service
     from app.services.tenants import filiais_do_tenant
 
     falhas = 0
@@ -136,6 +136,26 @@ async def _loop_sync_agent() -> None:
                         falhas = 0
                     else:
                         falhas += 1
+                    # PRD v3.3 §5.3/§5.4: subida + descida no mesmo ciclo.
+                    # Cada etapa é isolada: falha de uma não impede as outras.
+                    for nome, acao in (
+                        ("mestres", consolidacao_service.descer_mestres),
+                        ("resolucoes", consolidacao_service.descer_resolucoes),
+                    ):
+                        try:
+                            descida = acao(db, filial_id=filial_id)
+                            logger.info(
+                                "sync_agent filial=%s descida=%s %s",
+                                filial_id,
+                                nome,
+                                descida,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "sync_agent falha na descida %s (filial=%s)",
+                                nome,
+                                filial_id,
+                            )
             finally:
                 db.close()
         except asyncio.CancelledError:

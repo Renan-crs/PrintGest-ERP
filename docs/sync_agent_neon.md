@@ -66,8 +66,12 @@ testes — nenhum acesso real ao Neon nos testes automatizados.
   com os dados do escolhido e duplicatas são **inativadas (soft delete)** —
   nenhum dado é apagado. Idempotente por `sinc_estado` (`resolucao:<doc>`).
 
-## Limites restantes
+## Ciclo completo
 
-- A aplicação automática da descida de resoluções no loop do Sync Agent ainda
-  depende da ação manual *Descer resoluções* — a próxima iteração pode
-  automatizar isso no background (já há o cursor de idempotência).
+O `_loop_sync_agent` executa, **por filial e por ciclo**: subida do outbox →
+descida de mestres → descida de resoluções de conflito. Cada etapa é isolada
+por `try/except`: falha de uma não impede as outras nem derruba o serviço.
+Todas são idempotentes (`uuid`/`sinc_estado`), então repetir o ciclo é seguro.
+
+A ação manual *Descer resoluções* na tela continua disponível para aplicar
+imediatamente sem esperar o próximo ciclo.
