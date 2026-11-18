@@ -42,8 +42,11 @@ CREATE TABLE IF NOT EXISTS consolidado.cliente_conflito_resolucao (
     filial_escolhida bigint NOT NULL,
     uuid_escolhido text NOT NULL,
     resolvido_por bigint,
+    payload jsonb,  -- dados do cliente escolhido, para a filial "descer"
     resolvido_em timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE consolidado.cliente_conflito_resolucao
+    ADD COLUMN IF NOT EXISTS payload jsonb;
 
 -- Relatórios consolidados derivam dos eventos imutáveis (RF-SY-04).
 CREATE OR REPLACE VIEW consolidado.vw_vendas AS

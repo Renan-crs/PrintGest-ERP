@@ -636,6 +636,11 @@ class Api:
             "/v1/plataforma/consolidacao/conflitos/resolver", payload, self._token
         )
 
+    def descer_resolucoes_conflitos(self) -> dict:
+        return self._post(
+            "/v1/plataforma/consolidacao/conflitos/descer", {}, self._token
+        )
+
     def relatorio_consolidado(self, de: str | None = None, ate: str | None = None) -> dict:
         params = {}
         if de:

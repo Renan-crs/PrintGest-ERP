@@ -53,10 +53,21 @@ reenvio. Testes Python com conexão psycopg mockada: nenhum acesso real ao Neon.
 Tudo validado em branch isolada (`sync-agent-teste`) e com psycopg mockado nos
 testes — nenhum acesso real ao Neon nos testes automatizados.
 
+## Publicação e desduplicação (concluído)
+
+- **Mestres**: produtos e fornecedores criaram evento `mestre:*`
+  **automaticamente na mesma transação** (RF-SY-01) — mas **somente quando a
+  filial tem papel MATRIZ**. Filial com papel `FILIAL` recebe os mestres e não
+  publica (RF-FL-03). Papel nulo = legado/single-tenant, publica como antes.
+- **Conflitos**: ao resolver, a Gerente escolhe o `uuid` do cliente vencedor;
+  o backend lê o payload dele no outbox e grava na resolução (coluna `payload`).
+  As filiais executam **`POST .../consolidacao/conflitos/descer`** (botão
+  *Descer resoluções* na tela Consolidação): o cliente local é **renomeado**
+  com os dados do escolhido e duplicatas são **inativadas (soft delete)** —
+  nenhum dado é apagado. Idempotente por `sinc_estado` (`resolucao:<doc>`).
+
 ## Limites restantes
 
-- **Sync Agent de mestres** depende da MATRIZ publicar (`POST
-  .../consolidacao/mestres/publicar`) — a publicação é explícita, não automática
-  em todos os cadastros ainda.
-- A resolução de conflito registra a decisão no Neon; a **desduplicação
-  automática** dos cadastros locais das filiais será feita na próxima iteração.
+- A aplicação automática da descida de resoluções no loop do Sync Agent ainda
+  depende da ação manual *Descer resoluções* — a próxima iteração pode
+  automatizar isso no background (já há o cursor de idempotência).

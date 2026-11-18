@@ -224,6 +224,13 @@ def resolver_conflito(
     )
 
 
+@router.post("/consolidacao/conflitos/descer", response_model=ItemResponse[dict])
+def descer_resolucoes(db: DbDep, filial: FilialDep, _=admin):
+    return ItemResponse(
+        data=consolidacao_service.descer_resolucoes(db, filial_id=filial)
+    )
+
+
 @router.get("/consolidacao/relatorio", response_model=ItemResponse[dict])
 def relatorio_consolidado(
     db: DbDep,

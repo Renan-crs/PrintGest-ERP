@@ -7,6 +7,7 @@ from app.core import cofre_sync
 from app.core.config import settings
 from app.db import SessionLocal
 from app.models.cadastros import Cliente, Fornecedor, Produto
+from app.models.core import Empresa, Filial
 from app.models.consolidacao import SyncEstado
 from app.models.plataforma import EventoSync
 from app.services import consolidacao_service, filial_service
@@ -171,9 +172,9 @@ def test_conflitos_e_resolucao(client, admin_token):
     )
     assert res["ok"] is True and conn2.commitado
     # O mock registra execute() no cursor; verificamos o SQL gravado.
-    sql = conn2.consultas[0][0] if conn2.consultas else ""
-    assert "cliente_conflito_resolucao" in sql
-    assert "ON CONFLICT" in sql
+    sqls = [sql for sql, _ in conn2.consultas]
+    assert any("cliente_conflito_resolucao" in s for s in sqls)
+    assert any("ON CONFLICT" in s for s in sqls)
 
 
 def test_relatorio_consolidado(client, admin_token):
@@ -219,3 +220,114 @@ def test_cliente_criado_gera_evento_para_conflitos(client, admin_token):
         assert "cpf_cnpj" in (eventos[-1].payload or {})
     finally:
         db.close()
+
+
+def test_filial_nao_publica_mestre(client, admin_token):
+    db = SessionLocal()
+    try:
+        filial = db.get(Filial, 1)
+        filial.papel = "FILIAL"
+        db.commit()
+    finally:
+        db.close()
+
+    h = auth(client, admin_token)
+    resp = client.post(
+        "/v1/produtos",
+        headers=h,
+        json={
+            "codigo": f"FIL{uuid.uuid4().hex[:8].upper()}",
+            "nome": "Produto da filial",
+            "tipo": "produto",
+            "unidade": "un",
+            "preco_venda": 1.0,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    db = SessionLocal()
+    try:
+        mestres = (
+            db.query(EventoSync)
+            .filter(EventoSync.entidade.like("mestre:%"))
+            .count()
+        )
+        assert mestres == 0, "filial não deve publicar cadastro mestre"
+    finally:
+        db.close()
+
+
+def test_descer_resolucoes_unifica_sem_apagar(client, admin_token):
+    cofre_sync.definir_url(FILIAL, URL)
+    db = SessionLocal()
+    try:
+        empresa = Empresa(razao_social="Matriz", cnpj=uuid.uuid4().hex[:14])
+        db.add(empresa)
+        db.flush()
+        filial2 = Filial(empresa_id=empresa.id, nome="Filial 2")
+        db.add(filial2)
+        db.flush()
+        doc = uuid.uuid4().hex[:14]
+        # Cliente local duplicado (filial 1) e o escolhido (filial 2).
+        duplicado = Cliente(
+            filial_id=FILIAL, nome_razao="Cliente Duplicado",
+            cpf_cnpj=doc, tipo_pessoa="pj", ativo=True,
+        )
+        escolhido = Cliente(
+            filial_id=filial2.id, nome_razao="Cliente Oficial",
+            cpf_cnpj=doc, tipo_pessoa="pj", ativo=True,
+        )
+        db.add(duplicado)
+        db.add(escolhido)
+        db.commit()
+        fid2 = filial2.id
+        dup_id = duplicado.id
+    finally:
+        db.close()
+
+    uuid_escolhido = str(uuid.uuid4())
+    resolucoes = [(
+        doc, fid2, uuid_escolhido,
+        {"nome_razao": "Cliente Oficial", "cpf_cnpj": doc, "tipo_pessoa": "pj"},
+    )]
+
+    class _CurRes(_Cursor):
+        def __init__(self):
+            super().__init__([], {})
+
+        def fetchall(self):
+            return resolucoes
+
+    class _ConnRes(_Conexao):
+        def cursor(self):
+            return _CurRes()
+
+    resultado = consolidacao_service.descer_resolucoes(
+        db, filial_id=FILIAL, conexao=_ConnRes()
+    )
+    assert resultado["ok"] is True, resultado
+    assert resultado["criados"] == 0  # reaproveitou o cliente local
+    assert resultado["inativados"] == 0  # não havia outra duplicata nesta filial
+
+    db = SessionLocal()
+    try:
+        # O registro local é reaproveitado e assume os dados do escolhido
+        # (nada é apagado — os dados do cliente são preservados).
+        duplicado = db.get(Cliente, dup_id)
+        assert duplicado.ativo is True
+        assert duplicado.nome_razao == "Cliente Oficial"
+        oficial = (
+            db.query(Cliente)
+            .filter(Cliente.filial_id == FILIAL, Cliente.cpf_cnpj == doc, Cliente.ativo.is_(True))
+            .first()
+        )
+        assert oficial is not None and oficial.nome_razao == "Cliente Oficial"
+        assert "resolução de conflito" in (oficial.observacoes or "").lower()
+    finally:
+        db.close()
+
+    # Idempotente: segunda execução não cria nem inativa de novo.
+    resultado2 = consolidacao_service.descer_resolucoes(
+        db, filial_id=FILIAL, conexao=_ConnRes()
+    )
+    assert resultado2["criados"] == 0
+    assert resultado2["ja_aplicados"] == [doc]

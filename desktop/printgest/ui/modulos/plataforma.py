@@ -447,10 +447,14 @@ class PaginaConsolidacao(_PaginaSimples):
         self._btn_conflitos = QPushButton("Atualizar conflitos")
         estado_secundario(self._btn_conflitos)
         self._btn_conflitos.clicked.connect(self._carregar_conflitos)
+        self._btn_descer_res = QPushButton("Descer resoluções")
+        estado_secundario(self._btn_descer_res)
+        self._btn_descer_res.clicked.connect(self._descer_resolucoes)
         linha.addStretch(1)
         linha.addWidget(self._btn_descer)
         linha.addWidget(self._btn_relatorio)
         linha.addWidget(self._btn_conflitos)
+        linha.addWidget(self._btn_descer_res)
         self._corpo.addLayout(linha)
 
         self._lbl_mestres = QLabel("Mestres: —")
@@ -486,6 +490,21 @@ class PaginaConsolidacao(_PaginaSimples):
             estado_sucesso(self._lbl_mestres)
 
         tarefas.rodar(self._api.descer_mestres, ok, self._erro)
+
+    def _descer_resolucoes(self) -> None:
+        if self._modo_leitura:
+            return
+
+        def ok(saida: dict) -> None:
+            dados = saida.get("data", saida) if isinstance(saida, dict) else {}
+            self._lbl_conflitos.setText(
+                f"Resoluções aplicadas: {dados.get('criados', 0)} cliente(s) criado(s), "
+                f"{dados.get('inativados', 0)} duplicata(s) inativada(s)."
+            )
+            estado_sucesso(self._lbl_conflitos)
+            self._carregar_conflitos()
+
+        tarefas.rodar(self._api.descer_resolucoes_conflitos, ok, self._erro)
 
     def _carregar_relatorio(self) -> None:
         def ok(saida: dict) -> None:

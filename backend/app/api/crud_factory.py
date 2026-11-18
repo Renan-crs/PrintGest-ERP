@@ -74,6 +74,15 @@ def criar_router_crud(
                 "tipo_pessoa": str(item.tipo_pessoa.value),
             }
         elif isinstance(item, (Produto, Fornecedor)):
+            from app.models.core import Filial
+
+            # RF-FL-03: cadastros mestres têm origem na MATRIZ. A FILIAL recebe
+            # os mestres e não os publica. `papel` nulo = legado/single-tenant
+            # (publica como antes) para não quebrar instalações sem ativação.
+            filial = db.get(Filial, item.filial_id)
+            papel = str(getattr(filial, "papel", None) or "").upper()
+            if papel == filial_service.PAPEL_FILIAL:
+                return
             entidade = "mestre:produto" if isinstance(item, Produto) else "mestre:fornecedor"
             payload = {
                 "chave": item.codigo if isinstance(item, Produto) else item.cpf_cnpj,

@@ -231,18 +231,40 @@ def resolver_conflito(
     conn = conexao or _conectar(filial_id)
     try:
         with conn.cursor() as cur:
+            # Busca o payload do cliente escolhido no outbox consolidado:
+            # a filial que perdeu o conflito vai "descer" esse registro.
+            cur.execute(
+                "SELECT payload FROM consolidado.evento_sync "
+                "WHERE uuid = %s AND entidade = 'cliente' ORDER BY seq DESC LIMIT 1",
+                (uuid_escolhido,),
+            )
+            linha = cur.fetchone()
+            escolhido = linha[0] if linha else {}
+            if isinstance(escolhido, str):
+                escolhido = json.loads(escolhido)
             cur.execute(
                 "INSERT INTO consolidado.cliente_conflito_resolucao "
-                "(documento, filial_escolhida, uuid_escolhido, resolvido_por) "
-                "VALUES (%s,%s,%s,%s) "
+                "(documento, filial_escolhida, uuid_escolhido, resolvido_por, payload) "
+                "VALUES (%s,%s,%s,%s,%s::jsonb) "
                 "ON CONFLICT (documento) DO UPDATE SET "
                 "filial_escolhida=EXCLUDED.filial_escolhida, "
                 "uuid_escolhido=EXCLUDED.uuid_escolhido, "
-                "resolvido_por=EXCLUDED.resolvido_por, resolvido_em=now()",
-                (documento, filial_escolhida, uuid_escolhido, usuario_id),
+                "resolvido_por=EXCLUDED.resolvido_por, "
+                "payload=EXCLUDED.payload, resolvido_em=now()",
+                (
+                    documento,
+                    filial_escolhida,
+                    uuid_escolhido,
+                    usuario_id,
+                    json.dumps(escolhido, ensure_ascii=False),
+                ),
             )
         conn.commit()
-        return {"ok": True, "documento": documento}
+        return {
+            "ok": True,
+            "documento": documento,
+            "payload_disponivel": bool(escolhido),
+        }
     except Exception as exc:
         if dono:
             conn.rollback()
@@ -253,6 +275,107 @@ def resolver_conflito(
     finally:
         if dono:
             conn.close()
+
+
+def descer_resolucoes(
+    db: Session, *, filial_id: int, conexao=None
+) -> dict:
+    """Aplica resoluções de conflito vindas do Neon (RF-FL-04).
+
+    A filial que **não** foi escolhida inativa (soft delete — nunca apaga) seu
+    cliente duplicado e passa a usar o registro escolhido, criado a partir do
+    payload auditado. Idempotente via `sinc_estado` (`resolucao:<documento>`).
+    """
+    dono = conexao is None
+    conn = conexao or _conectar(filial_id)
+    criados = 0
+    inativados = 0
+    ja_aplicados: list[str] = []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT documento, filial_escolhida, uuid_escolhido, payload "
+                "FROM consolidado.cliente_conflito_resolucao "
+                "WHERE filial_escolhida <> %s ORDER BY resolvido_em",
+                (filial_id,),
+            )
+            resolucoes = cur.fetchall()
+        for documento, escolhida, uuid_escolhido, payload in resolucoes:
+            chave = f"resolucao:{documento}"
+            cursor = _cursor(db, filial_id, chave)
+            if cursor >= 1:
+                ja_aplicados.append(str(documento))
+                continue
+            dados = payload if isinstance(payload, dict) else json.loads(payload or "{}")
+            nome = str(
+                dados.get("nome_razao") or dados.get("nome") or "Cliente consolidado"
+            )[:200]
+            tipo = str(dados.get("tipo_pessoa") or "pf").lower()
+            # Cria o registro escolhido nesta filial (se ainda não houver ativo
+            # com o mesmo documento e nome). Nunca apaga nada.
+            existente = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.filial_id == filial_id,
+                    Cliente.cpf_cnpj == documento,
+                    Cliente.ativo.is_(True),
+                )
+                .first()
+            )
+            nota = (
+                f"Cliente unificado por resolução de conflito "
+                f"(filial {escolhida}, uuid {uuid_escolhido})."
+            )[:2000]
+            if existente is None:
+                escolhido_local = Cliente(
+                    filial_id=filial_id,
+                    nome_razao=nome,
+                    cpf_cnpj=str(documento)[:18],
+                    tipo_pessoa=tipo,
+                    ativo=True,
+                    observacoes=nota,
+                )
+                db.add(escolhido_local)
+                criados += 1
+            else:
+                # Já há cliente local com o documento: ele assume os dados do
+                # escolhido (o registro sobrevive, não é apagado).
+                if existente.nome_razao != nome:
+                    existente.nome_razao = nome
+                existente.observacoes = nota
+                escolhido_local = existente
+            # Inativa as OUTRAS duplicatas locais do mesmo documento.
+            duplicatas = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.filial_id == filial_id,
+                    Cliente.cpf_cnpj == documento,
+                    Cliente.ativo.is_(True),
+                )
+                .all()
+            )
+            for item in duplicatas:
+                if item is not escolhido_local and item.id != escolhido_local.id:
+                    item.ativo = False
+                    inativados += 1
+            db.commit()
+            _salvar_cursor(db, filial_id, chave, 1)
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Falha ao descer resoluções (filial=%s)", filial_id)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Falha ao descer resoluções: {type(exc).__name__}.",
+        ) from exc
+    finally:
+        if dono:
+            conn.close()
+    return {
+        "ok": True,
+        "criados": criados,
+        "inativados": inativados,
+        "ja_aplicados": ja_aplicados,
+    }
 
 
 # ---------------------------------------------------------------- relatórios
