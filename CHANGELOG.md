@@ -9,6 +9,18 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.5] - 2026-11-18 — Correção crítica do Sync Agent
+
+### Corrigido
+- **Sync Agent não enviava eventos ao Neon**: `SET LOCAL app.filial_id = %s`
+  gerava `syntax error at or near $1` no psycopg3, e múltiplos comandos numa
+  `execute()` parametrizada eram rejeitados. Trocado por
+  `set_config('app.filial_id', %s, true)` em `execute()` separada. O bug passou
+  despercebido nos testes com psycopg mockado; novos testes executam o SQL em
+  um Postgres real (envio → trigger de mestre → descida → relatório).
+
+---
+
 ## [0.5.4] - 2026-11-17 — Plataforma PRD v3.3 e consolidação entre filiais
 
 ### Novidades
