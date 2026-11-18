@@ -909,10 +909,12 @@ class TelaPrincipal(QMainWindow):
         self._detalhe_licenca = "Licença ainda não verificada."
 
         self.setWindowTitle(APP_NAME)
-        # P3/matriz 1024x768: o mínimo antigo (1100x660) impedia a janela de
-        # caber em 1024x768 e, a 125%, travava em ~1375x825 físicos. Todo o
-        # conteúdo agora elide/rola, então um mínimo menor é seguro.
-        self.setMinimumSize(760, 560)
+        # Matriz de resoluções suportadas: 1024x768 (mínimo) e 1366x768.
+        # O mínimo é 1024x768 — abaixo disso o layout não é garantido.
+        # Em 1366 a janela abre maximizada (main.py) com sidebar expandida,
+        # rótulos completos e espaçamentos normais; em 1024 o resizeEvent
+        # colapsa a sidebar, elide rótulos e comprime espaçamentos.
+        self.setMinimumSize(1024, 768)
 
         raiz = QWidget()
         coluna = QVBoxLayout(raiz)

@@ -21,6 +21,7 @@ com `QApplication` offscreen e API falsa (`httpx.MockTransport`), sem backend:
 | Barra de itens do PDV cortada em 125% | `pdv_1024x768_125.png`: barra em duas linhas |
 | Aba anterior sobreposta ao trocar Configurações (deleteLater assíncrono) | `integracoes_1024x768_100.png`: aba limpa, formulário rolável |
 | 8 abas de Configurações cortadas numa linha | `estacoes_1024x768_100.png`: duas linhas de 4, rótulos completos |
+| Matriz 1024×768 (mínimo) e 1366×768 | `pdv_1024x768_minimo.png` (sidebar colapsada) e `pdv_1366x768_revisado.png` (sidebar expandida) |
 
 ## Reprodução
 

@@ -9,6 +9,17 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.9] - 2026-11-18 — Matriz de resolução 1024x768 / 1366x768
+
+### Corrigido
+- **Dimensão mínima da janela principal agora é 1024x768** (antes 760x560).
+- Redimensionamento validado na matriz: em **1366x768** a sidebar fica
+  expandida com rótulos completos; em **1024x768** (mínimo) a sidebar colapsa
+  e os indicadores secundários são elididos automaticamente.
+- Testes parametrizados para as duas resoluções em todas as telas principais.
+
+---
+
 ## [0.5.8] - 2026-11-18 — Verificação dos endpoints e tela de transferências
 
 ### Novidades

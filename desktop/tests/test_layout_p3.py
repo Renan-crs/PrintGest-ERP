@@ -1,4 +1,4 @@
-"""Auditoria visual P3: a janela deve caber em 1024x768 em todas as telas.
+"""Auditoria visual P3: matriz 1024x768 (mínimo) e 1366x768.
 
 Regressões já vistas e cobertas aqui:
   - cabeçalho/rodapé com QLabel's de largura fixa travavam a janela em ~1248px;
@@ -58,18 +58,35 @@ def _principal() -> TelaPrincipal:
     return principal
 
 
+@pytest.mark.parametrize("largura,altura", [(1024, 768), (1366, 768)])
 @pytest.mark.parametrize("pagina", ["inicio", "pdv", "os", "cliente", "produto"])
-def test_tela_cabe_em_1024x768(app, pagina):
+def test_tela_cabe_na_matriz(app, pagina, largura, altura):
     principal = _principal()
-    assert principal.width() == 1024
-    assert principal.height() == 768
-
-    principal._navegar(pagina)
+    principal.resize(largura, altura)
     app = QApplication.instance()
     for _ in range(10):
         app.processEvents()
-    assert principal.width() == 1024, f"{pagina} forçou largura {principal.width()}"
-    assert principal.height() == 768
+    assert principal.width() == largura
+    assert principal.height() == altura
+
+    principal._navegar(pagina)
+    for _ in range(10):
+        app.processEvents()
+    assert principal.width() == largura, f"{pagina} forçou largura {principal.width()}"
+    assert principal.height() == altura
+
+
+def test_minimo_e_1024x768(app):
+    principal = _principal()
+    minimo = principal.minimumSize()
+    assert minimo.width() == 1024
+    assert minimo.height() == 768
+    # Redimensionar abaixo do mínimo é clampado pelo Qt.
+    principal.resize(800, 600)
+    app = QApplication.instance()
+    app.processEvents()
+    assert principal.width() >= 1024
+    assert principal.height() >= 768
 
 
 def test_sem_rolagem_horizontal_em_1024(app):
