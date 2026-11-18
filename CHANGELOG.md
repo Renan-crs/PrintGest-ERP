@@ -9,6 +9,20 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.8] - 2026-11-18 — Verificação dos endpoints e tela de transferências
+
+### Novidades
+- Aba **Transferências** em Estoque: enviar, confirmar recebimento e cancelar,
+  com recarga automática após cada operação.
+
+### Verificação
+- 173 rotas do backend × 90 chamadas do desktop: todas correspondem.
+- Teste ponta a ponta cobre cadastro → variação → SKU → venda → caixa →
+  transferência → listagens.
+- 395 testes backend, 416 desktop.
+
+---
+
 ## [0.5.7] - 2026-11-18 — Variações de produto e baixa otimista de estoque
 
 ### Novidades

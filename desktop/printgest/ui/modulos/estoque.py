@@ -557,6 +557,115 @@ __all__ = [
 # ================================================================ host Estoque
 
 
+class PaginaEstoqueTransferencias(QWidget):
+    """Transferência entre filiais em dois passos (PRD §5.6)."""
+
+    CHAVES = ["numero", "produto_nome", "quantidade", "estado", "destino"]
+    COLUNAS = ["Nº", "Produto", "Qtd", "Estado", "Filial"]
+    PESOS = [3, 6, 2, 3, 4]
+
+    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
+        super().__init__()
+        self._api = api
+        self._modo_leitura = modo_leitura
+        col = QVBoxLayout(self)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(10)
+        titulo = ElideLabel("Transferências entre filiais")
+        titulo.setObjectName("titulo")
+        col.addWidget(titulo)
+        aviso = QLabel(
+            "Saída na origem; o destino só recebe o estoque após confirmar."
+        )
+        aviso.setObjectName("subtitulo")
+        col.addWidget(aviso)
+
+        self._tabela = TabelaDensa(self.CHAVES, self.COLUNAS, self.PESOS)
+        self._tabela.formata = self._formatar
+        col.addWidget(self._tabela, 1)
+
+        formulario = QWidget()
+        formulario.setObjectName("card")
+        linha = QHBoxLayout(formulario)
+        self._destino = CampoTexto("Filial destino (ID)", maximo=10)
+        self._produto = CampoTexto("Produto (ID)", maximo=10)
+        self._quantidade = CampoTexto("Quantidade", maximo=12)
+        linha.addWidget(em_volta(self._destino))
+        linha.addWidget(em_volta(self._produto))
+        linha.addWidget(em_volta(self._quantidade))
+        self._btn_enviar = QPushButton("Enviar")
+        estado_primario(self._btn_enviar)
+        self._btn_enviar.clicked.connect(self._enviar)
+        linha.addWidget(self._btn_enviar)
+        col.addWidget(formulario)
+
+        acoes = QHBoxLayout()
+        self._btn_receber = QPushButton("Confirmar recebimento")
+        estado_secundario(self._btn_receber)
+        self._btn_receber.clicked.connect(self._receber)
+        self._btn_cancelar = QPushButton("Cancelar envio")
+        estado_secundario(self._btn_cancelar)
+        self._btn_cancelar.clicked.connect(self._cancelar)
+        acoes.addStretch(1)
+        acoes.addWidget(self._btn_receber)
+        acoes.addWidget(self._btn_cancelar)
+        col.addLayout(acoes)
+        self._carregar()
+
+    def _formatar(self, dado: dict, chave: str) -> str:
+        return str(dado.get(chave) if dado.get(chave) is not None else "—")
+
+    def _carregar(self) -> None:
+        def ok(saida: dict) -> None:
+            itens = saida.get("data", []) if isinstance(saida, dict) else []
+            self._tabela.preencher(itens)
+
+        tarefas.rodar(self._api.listar_transferencias, ok, self._erro)
+
+    def _erro(self, msg: str) -> None:
+        QMessageBox.warning(self, "Transferências", msg)
+
+    def _selecionada(self) -> dict | None:
+        dado = self._tabela.objeto_selecionado()
+        if not dado:
+            QMessageBox.information(self, "Transferências", "Selecione uma transferência.")
+        return dado
+
+    def _enviar(self) -> None:
+        if self._modo_leitura:
+            return
+        payload = {
+            "filial_destino_id": self._destino.valor(),
+            "produto_id": self._produto.valor(),
+            "quantidade": self._quantidade.valor(),
+        }
+        tarefas.rodar(
+            lambda: self._api.transferir(payload),
+            lambda _: self._carregar(),
+            self._erro,
+        )
+
+    def _receber(self) -> None:
+        dado = self._selecionada()
+        if dado is None or self._modo_leitura:
+            return
+        tarefas.rodar(
+            lambda: self._api.receber_transferencia(dado["id"]),
+            lambda _: self._carregar(),
+            self._erro,
+        )
+
+    def _cancelar(self) -> None:
+        dado = self._selecionada()
+        if dado is None or self._modo_leitura:
+            return
+        tarefas.rodar(
+            lambda: self._api.cancelar_transferencia(dado["id"]),
+            lambda _: self._carregar(),
+            self._erro,
+        )
+
+
 class PaginaEstoque(QWidget):
     """Menu "Estoque": hospeda as sub-abas (Consulta, Movimentação, Reposição)."""
 
@@ -568,6 +677,7 @@ class PaginaEstoque(QWidget):
             ("Consulta", PaginaEstoqueConsulta),
             ("Movimentação", PaginaEstoqueMovimento),
             ("Reposição", PaginaEstoqueReposicao),
+            ("Transferências", PaginaEstoqueTransferencias),
         ]
         self._atual: QWidget | None = None
 
@@ -605,6 +715,7 @@ class PaginaEstoque(QWidget):
         _rotulo, classe = self._abas[indice]
         pagina = classe(self._api, modo_leitura=self._modo_leitura)
         if self._atual is not None:
+            self._atual.setVisible(False)
             self._corpo_layout.removeWidget(self._atual)
             self._atual.deleteLater()
         self._corpo_layout.addWidget(pagina)
