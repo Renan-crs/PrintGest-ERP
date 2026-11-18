@@ -9,6 +9,38 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.4] - 2026-11-17 — Plataforma PRD v3.3 e consolidação entre filiais
+
+### Novidades
+- **Configurações > Integrações** (Admin): API key/token e certificado de APIs
+  de terceiros (emissor de nota fiscal, email, pagamento, genérica), com teste
+  de conexão e auditoria. Segredos cifrados no cofre DPAPI — nunca em banco,
+  log ou resposta (só máscara).
+- **Fiscal via API de terceiro**: emissão/consulta/cancelamento de NFC-e/NF-e/
+  NFS-e em gateway configurável; o PDV emite NFC-e após a venda quando pedido.
+- **Filiais / multi-filial**: `instalacao_id` e papel MATRIZ/FILIAL vindos da
+  licença; outbox `evento_sync` idempotente por `uuid`; Sync Agent envia ao
+  Neon com RLS por filial e `ON CONFLICT`.
+- **Estações** por servidor (limite `max_estacoes`, 409 na extra, remoção de
+  inativa) e **Diagnóstico** da licença com *Copiar diagnóstico* sem segredos.
+- **Backup**: local (`pg_dump -Fc`, rotação, manual) e espelho no Neon após
+  aceite auditado do termo LGPD.
+- **Consolidação**: mestres descem da matriz por versão, relatórios
+  consolidados e fila de conflitos de clientes com desduplicação automática
+  (renomeia/soft-delete — nunca apaga dados).
+- **Instalador**: ao atualizar, encerra `PrintGestAPI.exe`/`PrintGest.exe`
+  antes de copiar e **nunca apaga dados do cliente** (`.env`, cofres, dumps).
+
+### Banco de dados
+- Migrations aplicadas no startup: `a3b4c5d6e7f8`, `b4c5d6e7f8a9`,
+  `c5d6e7f8a9b0`, `d7e8f9a0b1c2`. Consolidação no Neon:
+  `backend/sql/consolidacao_neon.sql` e `consolidacao_leitura.sql`.
+
+### Validação
+- 385 testes backend, 414 desktop, regra do instalador validada por script.
+
+---
+
 ## [0.4.7] - 2026-11-08 — Credencial Neon rotacionada
 
 ### Corrigido
