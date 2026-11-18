@@ -102,27 +102,24 @@ Type: files; Name: "{app}\PrintGest\.env"
   sobrescritos no Windows. Os dados do cliente NUNCA são apagados: esta função
   apenas fecha processos; não toca em .env, cofres, banco ou backups.
   --------------------------------------------------------------------------- }
-function EncerrarProcesso(const Nome: string);
+procedure EncerrarProcesso(const Nome: string);
+var
+  Codigo: Integer;
 begin
   Exec(ExpandConstant('{sys}\taskkill.exe'),
-    '/IM ' + Nome + ' /F', '', SW_HIDE, ewWaitUntilTerminated, 10000);
+    '/IM ' + Nome + ' /F', '', SW_HIDE, ewWaitUntilTerminated, Codigo);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  VersaoAtual: string;
 begin
   Result := '';
-  if not FileExists(ExpandConstant('{app}\PrintGest\PrintGest.exe')) then
-    Exit;
-  VersaoAtual := GetVersionNumbersString(ExpandConstant('{app}\PrintGest\PrintGest.exe'));
-  { Só encerra quando há instalação anterior — primeira instalação não tem o que fechar. }
-  if VersaoAtual <> '' then
+  { A existência do exe indica atualização sobre instalação anterior —
+    primeira instalação não tem processo para encerrar. }
+  if FileExists(ExpandConstant('{app}\PrintGest\PrintGest.exe')) then
   begin
     EncerrarProcesso('PrintGestAPI.exe');
     EncerrarProcesso('PrintGest.exe');
-    Log('PrintGest: processos encerrados antes da atualização de ' + VersaoAtual +
-        ' para ' + '{#VersaoApp}' + '. Dados do cliente preservados.');
+    Log('PrintGest: processos encerrados antes da atualização para ' + '{#VersaoApp}' + '. Dados preservados.');
   end;
 end;
 
