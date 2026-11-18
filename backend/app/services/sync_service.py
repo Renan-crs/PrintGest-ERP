@@ -29,8 +29,12 @@ from app.models.plataforma import EventoSync
 from app.services import filial_service
 
 # SQL de consolidação — executado no Neon com role da filial e RLS ativo.
+# `set_config` aceita parâmetro (ao contrário de `SET LOCAL`, que exige
+# literal e falharia com "syntax error at or near $1" no psycopg3).
+# As duas instruções DEVEM ser executadas separadamente: psycopg3 usa
+# prepared statements e rejeita múltiplos comandos numa só `execute()`.
+_SET_FILIAL = "SELECT set_config('app.filial_id', %s::text, true)"
 _INSERT = """
-SET LOCAL app.filial_id = %s;
 INSERT INTO consolidado.evento_sync
     (uuid, filial_id, entidade, entidade_id, operacao, payload, seq, criado_em)
 VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s)
@@ -81,11 +85,12 @@ def enviar_lote(
     erro: str | None = None
     try:
         with conn.cursor() as cur:
+            # is_local=True → vigente só nesta transação (equivale ao SET LOCAL).
+            cur.execute(_SET_FILIAL, (str(filial_id),))
             for ev in eventos:
                 cur.execute(
                     _INSERT,
                     (
-                        filial_id,
                         ev.uuid,
                         filial_id,
                         ev.entidade,

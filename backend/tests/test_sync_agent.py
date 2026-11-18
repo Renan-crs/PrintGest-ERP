@@ -94,14 +94,19 @@ def test_envia_lote_com_rls_e_marca_enviados(client, admin_token):
     assert resultado == {"ok": True, "motivo": "ok", "enviados": 3}
     assert conn.commitado
     assert not conn.fechado  # conexão injetada pertence ao chamador
-    assert len(conn.comandos) == 3
+    # 1 set_config (RLS) + 3 INSERTs — eram 3 comandos antes da correção do
+    # SET LOCAL, que falhava com "syntax error at or near $1" no psycopg3.
+    assert len(conn.comandos) == 4
 
-    sql, params = conn.comandos[0]
-    assert "SET LOCAL app.filial_id" in sql
+    sql_rls, params_rls = conn.comandos[0]
+    assert "set_config('app.filial_id'" in sql_rls
+    assert params_rls == (str(FILIAL),)
+
+    sql, params = conn.comandos[1]
     assert "consolidado.evento_sync" in sql
     assert "ON CONFLICT (uuid) DO NOTHING" in sql
-    assert params[0] == FILIAL  # RLS
-    assert json.loads(params[6]) == {"n": 0}
+    assert params[1] == FILIAL  # filial_id (após o uuid)
+    assert json.loads(params[5]) == {"n": 0}
 
     pendentes, total = filial_service.eventos(
         db, filial_id=FILIAL, pendentes=True
