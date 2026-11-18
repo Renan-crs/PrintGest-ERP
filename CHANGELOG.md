@@ -9,6 +9,21 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.6] - 2026-11-18 — Atualização automática entre endpoints
+
+### Corrigido
+- **Cache de catálogos com assinantes**: invalidar um cadastro (categoria,
+  produto, serviço, cliente, funcionário) agora recarrega automaticamente
+  todas as telas abertas — antes só aparecia após novo login.
+- **Recarga ao trocar de tela**: listagens e KPIs do Início voltam a ser
+  atualizados ao navegar, em background.
+- **Caixa sincronizado**: finalizar ou cancelar venda atualiza o estado do
+  caixa na tela; a tela Caixa recarrega ao voltar de outro módulo.
+- **Soft delete gera evento de sync**: desativar cadastro propaga a mudança
+  para matriz/filiais (antes apenas criar/editar emitiam evento).
+
+---
+
 ## [0.5.5] - 2026-11-18 — Correção crítica do Sync Agent
 
 ### Corrigido
