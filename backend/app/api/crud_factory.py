@@ -185,6 +185,14 @@ def criar_router_crud(
 
     @router.delete("/{item_id}", status_code=204)
     def remover(item_id: int, db: DbDep, filial: FilialDep) -> None:
-        desativar(db, model, item_id, filial_id=filial)
+        # Soft delete também gera evento de sync (RF-SY-01): a matriz/filiais
+        # precisam saber que o cadastro foi desativado.
+        desativar(
+            db,
+            model,
+            item_id,
+            filial_id=filial,
+            ao_salvar=lambda sess, obj: _registrar_sync(sess, obj, "DEL"),
+        )
 
     return router

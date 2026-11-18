@@ -1499,6 +1499,10 @@ class TelaPrincipal(QMainWindow):
         if item_id != ITEM_INICIO and not pode_abrir(self._nivel, item_id):
             return
         if item_id == ITEM_INICIO:
+            # Dashboard: recarrega KPIs ao voltar (antes ficava parado a sessão
+            # inteira — só atualizava no construtor, troca de dias ou retry).
+            if hasattr(self._pagina_inicio, "recarregar"):
+                self._pagina_inicio.recarregar()
             self._marcar(ITEM_INICIO)
             self._stack_paginas.setCurrentWidget(self._pagina_inicio)
             self.navegado.emit(ITEM_INICIO)
@@ -1515,6 +1519,11 @@ class TelaPrincipal(QMainWindow):
             # Páginas que pedem para abrir outro módulo (ex.: PDV → Nova OS).
             if hasattr(pagina, "navegar"):
                 pagina.navegar.connect(self._navegar)
+        # Páginas reaproveitadas: recarrega ao reentrar para refletir escritas
+        # feitas em outros módulos (ex.: venda lançada no caixa, cadastro
+        # alterado em outra tela). Executa em background — nunca bloqueia.
+        if hasattr(pagina, "recarregar"):
+            pagina.recarregar()
         self._marcar(item_id)
         self._stack_paginas.setCurrentWidget(pagina)
         # A página "materializa" com um fade curto (§12): responder na hora,

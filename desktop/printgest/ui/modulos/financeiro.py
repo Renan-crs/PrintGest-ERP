@@ -97,6 +97,11 @@ class PaginaCaixa(QWidget):
         self._aplicar_estado()
         self.recarregar()
 
+    def showEvent(self, evento) -> None:  # noqa: N802
+        """Atualiza extrato/estado ao voltar para Caixa de outro módulo."""
+        super().showEvent(evento)
+        self.recarregar()
+
     # ----------------------------------------------------------- construção
 
     def _barra_titulo(self) -> QWidget:

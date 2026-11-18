@@ -1645,9 +1645,14 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         if resposta != QMessageBox.StandardButton.Yes:
             return
         payload = {"motivo": motivo} if motivo else None
+        def _cancelado(_out) -> None:
+            # Estorno no caixa é feito no backend — recarrega venda e caixa.
+            self.recarregar(self._busca.texto())
+            self._verificar_caixa()
+
         tarefas.rodar(
             lambda: self._api.excluir("vendas", dado["id"], payload=payload),
-            on_ok=lambda _out: self.recarregar(self._busca.texto()),
+            on_ok=_cancelado,
             on_erro=lambda msg: QMessageBox.warning(self, "Cancelar venda", msg),
         )
 
@@ -1737,6 +1742,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         venda_id = (dado or {}).get("id")
         self._limpar_form()
         self.recarregar(self._busca.texto())
+        # O backend lançou a entrada no caixa: atualiza o estado local para
+        # que o banner e o bloqueio reflitam o movimento imediatamente.
+        self._verificar_caixa()
         # feedback de fluxo: prepara próxima venda imediatamente
         self._itens_editor.focar_busca()
         if emitir_nfce and venda_id is not None:

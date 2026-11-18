@@ -126,9 +126,12 @@ def desativar(
     item_id: int,
     *,
     filial_id: int | None = None,
+    ao_salvar: Callable[[Session, ModelT], None] | None = None,
 ) -> None:
     """Soft delete: seta `ativo=false` (auditoria preservada — padrão do schema)."""
     item = buscar_por_id(db, model, item_id, filial_id=filial_id)
     if hasattr(item, "ativo"):
         item.ativo = False
-        db.commit()
+    if ao_salvar is not None:
+        ao_salvar(db, item)
+    db.commit()
