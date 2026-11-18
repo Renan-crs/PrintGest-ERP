@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import TipoPessoa, TipoProduto
 from app.schemas.common import ORMModel
@@ -146,6 +146,12 @@ class CategoriaOut(CategoriaBase):
 class ProdutoBase(ORMModel):
     categoria_id: int | None = None
     codigo: str = Field(min_length=1, max_length=30)
+    sku: str | None = Field(default=None, max_length=64)
+    uuid: str | None = Field(default=None, max_length=36)
+    produto_pai_id: int | None = None
+    atrib_tamanho: str | None = Field(default=None, max_length=40)
+    atrib_marca: str | None = Field(default=None, max_length=60)
+    atrib_cor: str | None = Field(default=None, max_length=60)
     codigo_barras: str | None = Field(default=None, max_length=30)
     nome: str = Field(min_length=1, max_length=160)
     descricao: str | None = None
@@ -176,6 +182,22 @@ class ProdutoOut(ProdutoBase):
     ativo: bool
     created_at: datetime
     updated_at: datetime
+
+
+class VariacaoIn(BaseModel):
+    """Uma combinação de atributos para gerar uma variante filha."""
+
+    tamanho: str | None = Field(default=None, max_length=40)
+    marca: str | None = Field(default=None, max_length=60)
+    cor: str | None = Field(default=None, max_length=60)
+    preco_venda: Decimal | None = Field(default=None, ge=0)
+    codigo_barras: str | None = Field(default=None, max_length=30)
+
+
+class GerarVariacoesIn(BaseModel):
+    produto_pai_id: int
+    variacoes: list[VariacaoIn] = Field(min_length=1, max_length=200)
+    prefixo_sku: str | None = Field(default=None, max_length=20)
 
 
 class ProdutoEstoqueOut(ORMModel):

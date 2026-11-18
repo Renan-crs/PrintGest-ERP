@@ -415,14 +415,51 @@ class EditorItensVenda(QWidget):
             if len(candidatos) == 1:
                 pid = candidatos.pop()
             else:
-                QMessageBox.warning(
-                    self,
-                    "Item",
-                    f"Produto ou serviço não encontrado: “{texto}”.\n"
-                    "Use “Item avulso” para lançar uma descrição livre.",
-                )
+                # Busca direta por SKU/uuid no servidor (banco local/Neon):
+                # o operador bipa o código da variante sem navegar menus.
+                self._buscar_sku_no_servidor(texto)
                 return
         self._adicionar_produto(pid)
+
+    def _buscar_sku_no_servidor(self, texto: str) -> None:
+        """Resolve SKU/uuid não carregado no cache via `GET /buscar-sku`."""
+
+        def ok(resp: dict) -> None:
+            dado = resp.get("data", resp) if isinstance(resp, dict) else resp
+            produto_id = dado.get("id")
+            if produto_id is None:
+                self._produto_nao_encontrado(texto)
+                return
+            # Registra no cache local para os próximos bipes.
+            preco = dado.get("preco_venda")
+            self._produtos[produto_id] = {
+                "nome": dado.get("nome", ""),
+                "codigo": dado.get("sku") or dado.get("codigo", ""),
+                "codigo_barras": dado.get("codigo_barras"),
+                "preco_venda": preco,
+            }
+            self._por_codigo[(dado.get("sku") or texto).lower()] = produto_id
+            self._por_codigo[str(dado.get("codigo_barras") or "").lower()] = produto_id
+            self._por_nome[dado.get("nome", "").lower()] = produto_id
+            self._adicionar_produto(produto_id)
+
+        def erro(_msg: str, status: int | None = None) -> None:
+            if status == 404:
+                self._produto_nao_encontrado(texto)
+            else:
+                QMessageBox.warning(
+                    self, "Item", "Não foi possível consultar o SKU agora."
+                )
+
+        tarefas.rodar(lambda: self._api.buscar_sku(texto), ok, erro)
+
+    def _produto_nao_encontrado(self, texto: str) -> None:
+        QMessageBox.warning(
+            self,
+            "Item",
+            f"Produto ou serviço não encontrado: “{texto}”.\n"
+            "Use “Item avulso” para lançar uma descrição livre.",
+        )
 
     def _adicionar_do_texto(self, texto: str) -> None:
         self._entrada.setText(texto)
@@ -1779,9 +1816,21 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             erro,
         )
 
-    def _erro_salvar(self, msg: str) -> None:
+    def _erro_salvar(self, msg: str, status: int | None = None) -> None:
         self._btn_salvar.setEnabled(True)
-        QMessageBox.critical(self, "Não foi possível finalizar a venda", msg)
+        if status == 409:
+            # Estoque insuficiente / caixa fechado — Orienta o operador sem
+            # jargão técnico e oferece caminho de ação (PRD §6 concorrência).
+            QMessageBox.warning(
+                self,
+                "Estoque insuficiente",
+                f"{msg}\n\nVerifique o saldo no módulo Estoque e tente novamente.\n"
+                "Se outra estação vendeu o mesmo item agora, atualize a busca "
+                "antes de repetir.",
+            )
+            self._verificar_caixa()
+        else:
+            QMessageBox.critical(self, "Não foi possível finalizar a venda", msg)
 
     # ------------------------------------------------------------ tabela
 

@@ -19,8 +19,10 @@ from app.schemas.estoque import (
     MovimentacaoOut,
     MovimentarIn,
     ReposicaoOut,
+    TransferenciaIn,
+    TransferenciaOut,
 )
-from app.services import estoque_service
+from app.services import estoque_service, transferencia_service
 
 router = APIRouter(
     prefix="/estoque",
@@ -131,3 +133,50 @@ def kardex(
     return ListaResponse(
         data=itens, meta=MetaPaginacao(total=total, limit=limit, offset=offset)
     )
+
+
+# ------------------------------------------------- transferência entre filiais
+
+
+@router.get("/transferencias", response_model=ListaResponse[TransferenciaOut])
+def transferencias(
+    db: DbDep,
+    filial: FilialDep,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    itens = transferencia_service.listar(
+        db, filial_id=filial, limit=limit, offset=offset
+    )
+    return ListaResponse(
+        data=itens, meta=MetaPaginacao(total=len(itens), limit=limit, offset=offset)
+    )
+
+
+@router.post("/transferencias", response_model=ItemResponse[TransferenciaOut], status_code=201)
+def transferir(
+    payload: TransferenciaIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+):
+    doc = transferencia_service.registrar_saida(
+        db, filial_id=filial, dados=payload, usuario_id=usuario.id
+    )
+    return ItemResponse(data=doc)
+
+
+@router.post("/transferencias/{item_id}/receber", response_model=ItemResponse[TransferenciaOut])
+def receber(item_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
+    doc = transferencia_service.confirmar_recebimento(
+        db, item_id=item_id, filial_id=filial, usuario_id=usuario.id
+    )
+    return ItemResponse(data=doc)
+
+
+@router.post("/transferencias/{item_id}/cancelar", response_model=ItemResponse[TransferenciaOut])
+def cancelar(item_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep):
+    doc = transferencia_service.cancelar(
+        db, item_id=item_id, filial_id=filial, usuario_id=usuario.id
+    )
+    return ItemResponse(data=doc)

@@ -43,10 +43,29 @@ class TipoMovEstoque(StrEnum):
     AJUSTE = "ajuste"
 
 
+class MotivoAjuste(StrEnum):
+    """Domínio fechado de motivos de inventário/contagem (rastreabilidade)."""
+
+    PERDA = "perda"
+    QUEBRA = "quebra"
+    ACERTO = "acerto"
+    CONTAGEM = "contagem"
+
+
+class EstadoTransferencia(StrEnum):
+    """Fluxo de dois passos entre filiais (PRD §5.6)."""
+
+    ENVIADA = "enviada"
+    RECEBIDA = "recebida"
+    CANCELADA = "cancelada"
+
+
 class OrigemMov(StrEnum):
     VENDA_BALCAO = "venda_balcao"
     ORDEM_SERVICO = "ordem_servico"
     PEDIDO_COMPRA = "pedido_compra"
+    TRANSFERENCIA_SAIDA = "transferencia_saida"
+    TRANSFERENCIA_ENTRADA = "transferencia_entrada"
     AJUSTE_MANUAL = "ajuste_manual"
 
 

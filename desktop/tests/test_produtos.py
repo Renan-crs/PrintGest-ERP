@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import json as _json
+
 import httpx
 
 from printgest.core.api import Api
@@ -148,3 +150,58 @@ def test_modo_leitura_nao_salva(app, pumpar):
     assert pagina._btn_salvar.isEnabled() is False
     pagina._btn_salvar.click()
     assert _ESCRITAS == []
+
+def test_variacoes_gera_e_atualiza_cache():
+    import httpx as _httpx
+
+    from printgest.core.api import Api
+
+    chamadas = []
+
+    def handler(request):
+        if request.url.path == "/v1/produtos/variacoes/gerar":
+            chamadas.append(_json.loads(request.content or b"{}"))
+            return _httpx.Response(
+                201,
+                json={
+                    "data": [
+                        {
+                            "id": 90,
+                            "sku": "CAR-M-X-AZUL",
+                            "uuid": "abc",
+                            "codigo": "CAR-M-X-AZUL-1",
+                            "nome": "Carimbo M X Azul",
+                        }
+                    ]
+                },
+            )
+        if request.url.path == "/v1/produtos":
+            return _httpx.Response(200, json={"data": [], "meta": {"total": 0}})
+        return _httpx.Response(404, json={"detail": "x"})
+
+    api = Api(base_url="http://daemon.test", transport=_httpx.MockTransport(handler))
+    api.autenticar({"token": "tok", "usuario": {"id": 1}})
+    r = api.gerar_variacoes(
+        {
+            "produto_pai_id": 1,
+            "prefixo_sku": "CAR",
+            "variacoes": [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+        }
+    )
+    assert r[0]["sku"] == "CAR-M-X-AZUL"
+    assert chamadas[0]["produto_pai_id"] == 1
+
+
+def test_buscar_sku_no_cliente():
+    import httpx as _httpx
+
+    def handler(request):
+        if request.url.path.startswith("/v1/produtos/buscar-sku/"):
+            return _httpx.Response(200, json={"data": {"id": 7, "sku": "CAR-M-X-AZUL"}})
+        return _httpx.Response(404, json={"detail": "x"})
+
+    from printgest.core.api import Api
+
+    a = Api(base_url="http://daemon.test", transport=_httpx.MockTransport(handler))
+    a.autenticar({"token": "tok", "usuario": {"id": 1}})
+    assert a.buscar_sku("CAR-M-X-AZUL")["sku"] == "CAR-M-X-AZUL"

@@ -8,7 +8,7 @@ Níveis de acesso (PRD v2.0 §5):
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.crud_factory import criar_router_crud
-from app.deps import DbDep, FilialDep, require_nivel
+from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
 from app.models.cadastros import (
     Cliente,
     Fornecedor,
@@ -34,6 +34,7 @@ from app.schemas.cadastros import (
     ProdutoCreate,
     ProdutoOut,
     ProdutoUpdate,
+    GerarVariacoesIn,
 )
 from app.services.crud import listar
 from app.services.funcionario_service import criar_com_usuario
@@ -175,11 +176,42 @@ produtos_router = criar_router_crud(
     schema_in=ProdutoCreate,
     schema_update=ProdutoUpdate,
     schema_out=ProdutoOut,
-    campos_busca=["codigo", "codigo_barras", "nome"],
+    campos_busca=["codigo", "sku", "uuid", "codigo_barras", "nome"],
     tags=["cadastros"],
     nivel_acesso=NivelAcesso.OPERADOR,
 )
 router.include_router(produtos_router)
+
+
+@router.post(
+    "/produtos/variacoes/gerar",
+    response_model=ItemResponse[list[ProdutoOut]],
+    status_code=201,
+)
+def gerar_variacoes(
+    payload: GerarVariacoesIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
+):
+    from app.services import variacao_service
+
+    criados = variacao_service.gerar(
+        db, filial_id=filial, dados=payload, usuario_id=usuario.id
+    )
+    return ItemResponse(data=[ProdutoOut.model_validate(p) for p in criados])
+
+
+@router.get("/produtos/buscar-sku/{termo}", response_model=ItemResponse[ProdutoOut])
+def buscar_sku(termo: str, db: DbDep, filial: FilialDep):
+    from app.services import variacao_service
+
+    produto = variacao_service.buscar_por_sku(
+        db, filial_id=filial, termo=termo
+    )
+    if produto is None:
+        raise HTTPException(404, "Produto/variante não encontrado por SKU.")
+    return ItemResponse(data=ProdutoOut.model_validate(produto))
 
 
 def registrar(api: APIRouter) -> None:

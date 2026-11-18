@@ -387,6 +387,11 @@ class PaginaEstoqueMovimento(PaginaEstoqueBase):
         qtd = self._quantidade.valor()
         if not qtd or qtd <= 0:
             return ("Informe uma quantidade maior que zero.", self._quantidade)
+        if self._tipo.valor() == "ajuste" and not limpo(self._motivo.valor()):
+            return (
+                "Informe o motivo da contagem (perda, quebra, acerto, contagem).",
+                self._motivo,
+            )
         return None
 
     def _payload(self) -> dict:

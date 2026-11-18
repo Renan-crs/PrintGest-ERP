@@ -3,9 +3,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from app.models.enums import OrigemMov, TipoMovEstoque
+from app.models.enums import MotivoAjuste, OrigemMov, TipoMovEstoque
 from app.schemas.common import ORMModel
 
 
@@ -43,8 +43,19 @@ class MovimentarIn(BaseModel):
     quantidade: Decimal = Field(
         gt=0, description="Qtde > 0; em Ajuste, é o novo saldo físico."
     )
+    # Inventário rotativo: ajuste SEMPRE exige motivo (rastreabilidade).
+    # A UI oferece um domínio fechado (MotivoAjuste); a API aceita texto livre
+    # para compatibilidade com integrações, mas nunca vazio no ajuste.
     motivo: str | None = Field(default=None, max_length=255)
     documento_id: int | None = None
+
+    @model_validator(mode="after")
+    def _exigir_motivo_no_ajuste(self):
+        if self.tipo == TipoMovEstoque.AJUSTE and not (self.motivo or "").strip():
+            raise ValueError(
+                "Ajuste de inventário exige motivo (perda, quebra, acerto ou contagem)."
+            )
+        return self
 
 
 class KardexOut(ORMModel):
@@ -80,3 +91,27 @@ class ReposicaoOut(ORMModel):
     sugestao: Decimal
     custo_est: Decimal
     status: str
+
+
+# ------------------------------------------------------- transferência (§5.6)
+
+
+class TransferenciaIn(BaseModel):
+    filial_destino_id: int
+    produto_id: int
+    quantidade: Decimal = Field(gt=0)
+    observacoes: str | None = Field(default=None, max_length=500)
+
+
+class TransferenciaOut(ORMModel):
+    id: int
+    numero: str
+    filial_origem_id: int
+    filial_destino_id: int
+    produto_id: int
+    quantidade: Decimal
+    estado: str
+    observacoes: str | None = None
+    enviado_em: datetime
+    recebido_em: datetime | None = None
+    cancelado_em: datetime | None = None

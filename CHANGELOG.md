@@ -9,6 +9,28 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.7] - 2026-11-18 — Variações de produto e baixa otimista de estoque
+
+### Novidades
+- **Matriz de produtos**: produto pai + variantes filhas com **SKU único**,
+  uuid global, atributos (tamanho/marca/cor) e estoque próprio. Botão
+  *Gerar variações* na tela de Produtos; leitura direta por SKU no PDV.
+- **Transferência entre filiais** em dois passos (`enviada` → `recebida`):
+  saída na origem, entrada no destino apenas após confirmação; cancelamento
+  estorna a origem.
+- **Inventário rotativo**: ajuste exige motivo (perda/quebra/acerto/contagem).
+
+### Corrigido
+- **Baixa de estoque à prova de falhas**: `UPDATE ... WHERE saldo >= qtd`
+  substituiu a verificação em Python — concorrência entre estações nunca
+  gera saldo negativo; 409 com mensagem clara no PDV (status preservado).
+
+### Banco de dados
+- Migration `f9a0b1c2d3e4`: colunas de SKU/uuid/atributos em `produto`,
+  tabela `transferencia_estoque` e novos valores de `origem_mov`.
+
+---
+
 ## [0.5.6] - 2026-11-18 — Atualização automática entre endpoints
 
 ### Corrigido

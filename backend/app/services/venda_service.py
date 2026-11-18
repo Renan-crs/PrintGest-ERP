@@ -12,7 +12,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import String, cast, or_
+from sqlalchemy import String, cast, or_, text as sa_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -132,18 +132,69 @@ def _baixar_estoque(
                     "Cadastre o estoque antes de vender."
                 ),
             )
-        anterior = est.saldo
-        if venda.status == StatusVenda.OK and est.saldo < item.quantidade:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=("Estoque insuficiente do produto para concluir a venda."),
-            )
-
+        anterior = Decimal(est.saldo)
         if venda.status == StatusVenda.OK:
-            est.saldo = _q(Decimal(est.saldo) - item.quantidade)
+            # Baixa otimista e atômica: UPDATE ... WHERE saldo >= qtd.
+            # Se outra estação já consumiu o saldo, rowcount=0 → 409.
+            # Nunca produce saldo negativo sob concorrência (PRD §6).
+            resultado = db.execute(
+                sa_text(
+                    "UPDATE produto_estoque SET saldo = saldo - :qtd, "
+                    "atualizado_em = now() "
+                    "WHERE filial_id = :filial AND produto_id = :produto "
+                    "AND saldo >= :qtd"
+                ),
+                {
+                    "qtd": item.quantidade,
+                    "filial": filial_id,
+                    "produto": item.produto_id,
+                },
+            )
+            if resultado.rowcount != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Estoque insuficiente para '{produto.nome}'. "
+                        "Outra venda pode ter baixado o saldo agora. "
+                        "Consulte o estoque e tente novamente."
+                    ),
+                )
+            db.expire(est)
+            saldo_final = Decimal(
+                db.execute(
+                    sa_text(
+                        "SELECT saldo FROM produto_estoque "
+                        "WHERE filial_id = :filial AND produto_id = :produto"
+                    ),
+                    {"filial": filial_id, "produto": item.produto_id},
+                ).scalar_one()
+            )
+            est.saldo = saldo_final
             tipo = TipoMovEstoque.SAIDA
         else:  # estorno por cancelamento
-            est.saldo = _q(Decimal(est.saldo) + item.quantidade)
+            db.execute(
+                sa_text(
+                    "UPDATE produto_estoque SET saldo = saldo + :qtd, "
+                    "atualizado_em = now() "
+                    "WHERE filial_id = :filial AND produto_id = :produto"
+                ),
+                {
+                    "qtd": item.quantidade,
+                    "filial": filial_id,
+                    "produto": item.produto_id,
+                },
+            )
+            db.expire(est)
+            saldo_final = Decimal(
+                db.execute(
+                    sa_text(
+                        "SELECT saldo FROM produto_estoque "
+                        "WHERE filial_id = :filial AND produto_id = :produto"
+                    ),
+                    {"filial": filial_id, "produto": item.produto_id},
+                ).scalar_one()
+            )
+            est.saldo = saldo_final
             tipo = TipoMovEstoque.ENTRADA
 
         db.add(

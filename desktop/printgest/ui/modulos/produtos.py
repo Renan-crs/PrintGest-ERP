@@ -7,6 +7,9 @@ identificação, precificação e controle de estoque. Fotos ficam como backlog.
 
 from __future__ import annotations
 
+from PySide6.QtWidgets import QInputDialog, QMessageBox, QPushButton
+
+import printgest.core.tarefas as tarefas
 from printgest.core import catalogos
 from printgest.core.api import Api
 from printgest.ui.formulario import (
@@ -59,6 +62,71 @@ class PaginaProdutos(PaginaCrud):
             self._preco_custo.habilitar(False)
             self._preco_venda.habilitar(False)
         self._carregar_categorias()
+
+    def _acao_extra(self) -> list:
+        """Gera variantes (matriz de produtos) a partir de um produto pai."""
+        botao = QPushButton("Gerar variações")
+        botao.setObjectName("acaoLinha")
+        botao.setToolTip(
+            "Cria variantes com SKU único e estoque próprio a partir de "
+            "combinações de tamanho, marca e cor"
+        )
+        botao.clicked.connect(self._gerar_variacoes)
+        self._btn_variacoes = botao
+        return [botao]
+
+    def _gerar_variacoes(self) -> None:
+        dado = self._tabela.objeto_selecionado()
+        if not dado:
+            QMessageBox.information(
+                self, "Variações", "Selecione o produto pai na lista."
+            )
+            return
+        if getattr(self, "_modo_leitura", False):
+            return
+        # Use domínios pré-definidos (P/M/G/GG, marcas e cores do catálogo)
+        # para evitar duplicidades como "Azul" vs "azul escuro".
+        especs, ok = QInputDialog.getText(
+            self,
+            "Gerar variações",
+            "Combinações (uma por linha): TAMANHO|MARCA|COR\n"
+            "Ex.: M|Marca X|Azul  (use sempre os mesmos valores de domínio)",
+        )
+        if not ok or not especs.strip():
+            return
+        variacoes = []
+        for linha in especs.splitlines():
+            partes = [p.strip() for p in linha.split("|")]
+            if len(partes) != 3:
+                QMessageBox.warning(
+                    self, "Variações", f"Linha inválida: {linha}\nUse TAMANHO|MARCA|COR."
+                )
+                return
+            variacoes.append(
+                {"tamanho": partes[0], "marca": partes[1], "cor": partes[2]}
+            )
+        if not any(v["tamanho"] or v["marca"] or v["cor"] for v in variacoes):
+            QMessageBox.warning(self, "Variações", "Informe ao menos um atributo.")
+            return
+
+        def feito(_resp) -> None:
+            catalogos.invalidar("produtos")
+            self.recarregar(self._busca.texto())
+            QMessageBox.information(
+                self, "Variações", f"{len(variacoes)} variante(s) processada(s)."
+            )
+
+        tarefas.rodar(
+            lambda: self._api.gerar_variacoes(
+                {
+                    "produto_pai_id": dado["id"],
+                    "prefixo_sku": dado.get("codigo", ""),
+                    "variacoes": variacoes,
+                }
+            ),
+            feito,
+            lambda msg: QMessageBox.warning(self, "Variações", msg),
+        )
 
     # ----------------------------------------------------------- formulário
 

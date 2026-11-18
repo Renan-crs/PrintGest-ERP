@@ -8,7 +8,16 @@ sem depender do mecanismo de conexão direta de callables Python entre threads.
 from __future__ import annotations
 
 import atexit
+import inspect
 from typing import Callable
+
+
+def _aceita_status(callback: Callable) -> bool:
+    """Detecta callbacks `on_erro(msg, status)` (novos) vs `on_erro(msg)`."""
+    try:
+        return len(inspect.signature(callback).parameters) >= 2
+    except (TypeError, ValueError):
+        return False
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
@@ -21,7 +30,10 @@ class _Worker(QObject):
         try:
             self._resultado.emit(pedido_id, (True, chamada()))
         except Exception as exc:  # noqa: BLE001 — falha externa não derruba a app
-            self._resultado.emit(pedido_id, (False, str(exc)))
+            # Preserva o status HTTP (ex.: 409 de estoque insuficiente) para
+            # que a tela possa dar uma mensagem clara ao operador do PDV.
+            status = getattr(exc, "status_code", None)
+            self._resultado.emit(pedido_id, (False, str(exc), status))
 
 
 class _Controle(QObject):
@@ -55,8 +67,13 @@ class _Controle(QObject):
     @Slot(int, object)
     def _entregar(self, pedido_id: int, resultado: tuple) -> None:
         on_ok, on_erro = self._cotas.pop(pedido_id)
-        ok, valor = resultado
-        (on_ok if ok else on_erro)(valor)
+        ok, valor, *resto = resultado
+        if ok:
+            on_ok(valor)
+        elif len(resto) and resto[0] is not None and _aceita_status(on_erro):
+            on_erro(valor, resto[0])
+        else:
+            on_erro(valor)
 
     def finalizar(self) -> None:
         if self._thread.isRunning():

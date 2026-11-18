@@ -221,7 +221,9 @@ class Produto(Base):
         ),
         CheckConstraint("estoque_minimo >= 0", name="ck_produto_estoque_minimo"),
         UniqueConstraint("filial_id", "codigo", name="uq_produto_filial_codigo"),
+        UniqueConstraint("filial_id", "sku", name="uq_produto_filial_sku"),
         Index("idx_produto_nome", "nome"),
+        Index("idx_produto_pai", "produto_pai_id"),
         Index("idx_produto_categoria", "categoria_id"),
         Index("idx_produto_codigo_busca", "codigo"),
     )
@@ -234,6 +236,16 @@ class Produto(Base):
         BigInteger, ForeignKey("produto_categoria.id")
     )
     codigo: Mapped[str] = mapped_column(String(30), nullable=False)
+    # SKU único por filial (ex.: CAR-MARCAX-TAMM-CORAZ). Variações filhas
+    # apontam para o produto "pai" e herdam atributos de domínio fechado.
+    sku: Mapped[str | None] = mapped_column(String(64))
+    uuid: Mapped[str | None] = mapped_column(String(36))
+    produto_pai_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("produto.id")
+    )
+    atrib_tamanho: Mapped[str | None] = mapped_column(String(40))
+    atrib_marca: Mapped[str | None] = mapped_column(String(60))
+    atrib_cor: Mapped[str | None] = mapped_column(String(60))
     codigo_barras: Mapped[str | None] = mapped_column(String(30))
     nome: Mapped[str] = mapped_column(String(160), nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text)

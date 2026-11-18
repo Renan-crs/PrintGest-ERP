@@ -541,6 +541,33 @@ class Api:
 
     # ---------------------------------------------------- integrações (v3.3)
 
+    def buscar_sku(self, termo: str) -> dict:
+        """Leitura direta por SKU/uuid/código de barras da variante (PRD v3.2)."""
+        from urllib.parse import quote
+
+        return self._get(
+            f"/v1/produtos/buscar-sku/{quote(termo, safe='')}", self._token
+        )
+
+    def gerar_variacoes(self, payload: dict) -> dict:
+        return self._post("/v1/produtos/variacoes/gerar", payload, self._token)
+
+    def listar_transferencias(self) -> dict:
+        return self._get("/v1/estoque/transferencias", self._token)
+
+    def transferir(self, payload: dict) -> dict:
+        return self._post("/v1/estoque/transferencias", payload, self._token)
+
+    def receber_transferencia(self, item_id: int) -> dict:
+        return self._post(
+            f"/v1/estoque/transferencias/{item_id}/receber", {}, self._token
+        )
+
+    def cancelar_transferencia(self, item_id: int) -> dict:
+        return self._post(
+            f"/v1/estoque/transferencias/{item_id}/cancelar", {}, self._token
+        )
+
     def listar_integracoes(self) -> dict:
         """`GET /v1/config/integracoes` — segredos só como máscara."""
         return self.listar_com_filtros("config/integracoes")

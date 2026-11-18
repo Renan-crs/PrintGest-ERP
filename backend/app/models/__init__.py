@@ -57,6 +57,7 @@ from app.models.plataforma import (
     TermoBackup,
 )
 from app.models.projetos import Cartao, CartaoMembro, Quadro, QuadroLista
+from app.models.transferencia import TransferenciaEstoque
 
 __all__ = [
     "Agendamento",
@@ -106,6 +107,7 @@ __all__ = [
     "StatusVenda",
     "SyncEstado",
     "TermoBackup",
+    "TransferenciaEstoque",
     "TipoLista",
     "TipoMovEstoque",
     "TipoOs",
