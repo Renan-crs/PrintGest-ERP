@@ -13,6 +13,7 @@ from printgest.ui.modulos.estoque import (
     PaginaEstoqueConsulta,
     PaginaEstoqueMovimento,
     PaginaEstoqueReposicao,
+    PaginaEstoqueTransferencias,
 )
 
 _LINHAS = [
@@ -98,6 +99,17 @@ _REPOSICAO = [
     }
 ]
 
+_TRANSFERENCIAS = [
+    {
+        "id": 1,
+        "numero": 55,
+        "produto_id": 7,
+        "quantidade": "3",
+        "estado": "enviada",
+        "filial_destino_id": 2,
+    }
+]
+
 _GETS_ESTOQUE: list[httpx.Request] = []
 _ESCRITAS: list[tuple[str, str]] = []
 
@@ -125,6 +137,22 @@ def _handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200, json={"data": _KARDEX, "meta": {"total": 1, "limit": 200, "offset": 0}}
         )
+    if request.method == "GET" and request.url.path == "/v1/estoque/transferencias":
+        return httpx.Response(
+            200,
+            json={
+                "data": _TRANSFERENCIAS,
+                "meta": {"total": len(_TRANSFERENCIAS), "limit": 50, "offset": 0},
+            },
+        )
+    if request.method == "POST" and request.url.path == "/v1/estoque/transferencias":
+        _ESCRITAS.append(("POST", request.read().decode()))
+        return httpx.Response(201, json={"data": _TRANSFERENCIAS[0]})
+    if request.method == "POST" and request.url.path.startswith(
+        "/v1/estoque/transferencias/"
+    ):
+        _ESCRITAS.append(("POST", request.url.path))
+        return httpx.Response(200, json={"data": _TRANSFERENCIAS[0]})
     if request.method == "POST" and request.url.path == "/v1/estoque/movimentar":
         _ESCRITAS.append(("POST", request.read().decode()))
         return httpx.Response(
@@ -275,3 +303,59 @@ def test_reposicao_define_produto_para_emitir_pedido(app, pumpar, monkeypatch):
     pagina._tabela.selectRow(0)
     pumpar(lambda: pagina._produto_atual is not None)
     assert pagina._produto_atual["produto_id"] == 7
+
+def test_tela_transferencias_instancia_e_botoes(app, pumpar):
+    """Regressão: faltavam imports (em_volta/estado_*) — a aba quebrava ao abrir."""
+    pagina = PaginaEstoqueTransferencias(_api())
+    pumpar(lambda: pagina._tabela.rowCount() == 1)
+    assert pagina._btn_enviar.text() == "Enviar"
+    assert pagina._btn_receber.text() == "Confirmar recebimento"
+    assert pagina._btn_cancelar.text() == "Cancelar envio"
+    # Colunas conferem com o contrato TransferenciaOut.
+    assert pagina.CHAVES == [
+        "numero", "produto_id", "quantidade", "estado", "filial_destino_id"
+    ]
+    assert pagina._formatar({"estado": "enviada"}, "estado") == "Enviada"
+    assert pagina._formatar({"estado": "recebida"}, "estado") == "Recebida"
+
+
+def test_transferencia_valida_e_envia_quantidade_decimal(app, pumpar, monkeypatch):
+    pagina = PaginaEstoqueTransferencias(_api())
+    pumpar(lambda: pagina._tabela.rowCount() == 1)
+
+    avisos = []
+    monkeypatch.setattr(
+        "printgest.ui.modulos.estoque.QMessageBox.warning",
+        lambda *_a, **_k: avisos.append(_a),
+    )
+    # Vazio: não pode POSTar.
+    pagina._enviar()
+    assert avisos and not _ESCRITAS
+
+    avisos.clear()
+    pagina._destino.definir("2")
+    pagina._produto.definir("7")
+    pagina._quantidade.definir("2,5")
+    pagina._enviar()
+    pumpar(lambda: len(_ESCRITAS) == 1)
+    corpo = json.loads(_ESCRITAS[-1][1])
+    assert corpo == {
+        "filial_destino_id": 2,
+        "produto_id": 7,
+        "quantidade": "2.5",
+    }
+    assert pagina._btn_enviar.isEnabled() is True
+
+
+def test_transferencia_status_409_nao_rotula_como_sessao(app, pumpar, monkeypatch):
+    pagina = PaginaEstoqueTransferencias(_api())
+    pumpar(lambda: pagina._tabela.rowCount() == 1)
+    vistos = []
+    monkeypatch.setattr(
+        "printgest.ui.modulos.estoque.QMessageBox.warning",
+        lambda _pai, titulo, msg: vistos.append(str(titulo)),
+    )
+    pagina._erro("Estoque insuficiente na origem para transferir.", 409)
+    assert vistos[-1] == "Transferências"
+    pagina._erro("Sessão inválida.", 401)
+    assert vistos[-1] == "Sessão encerrada"

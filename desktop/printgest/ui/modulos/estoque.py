@@ -31,13 +31,20 @@ from printgest.ui.formulario import (
     CampoCombo,
     CampoTexto,
     CampoValor,
+    em_volta,
     formatar_moeda,
     limpo,
 )
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import badge, botao_com_atalho, ElideLabel
+from printgest.ui.widgets import (
+    badge,
+    botao_com_atalho,
+    ElideLabel,
+    estado_primario,
+    estado_secundario,
+)
 
 _STATUS = {
     "critico": "CRÍTICO (repor)",
@@ -254,10 +261,17 @@ class PaginaEstoqueConsulta(PaginaEstoqueBase):
                 f"Abaixo mín.: {dados.get('abaixo_minimo', 0)}"
             )
 
+        def _erro(msg: str, status: int | None = None) -> None:
+            # Antes o erro era engolido e os KPIs ficavam em "—" sem explicação.
+            for badge_kpi in self._badges_kpi.values():
+                badge_kpi.setText("—")
+            if status not in (401, 423):
+                QMessageBox.warning(self, "Resumo de estoque", msg)
+
         tarefas.rodar(
             lambda: self._api.resumo_estoque(q=q, abaixo_minimo=baixo),
             on_ok=_aplicar,
-            on_erro=lambda msg: None,
+            on_erro=_erro,
         )
 
     def recarregar(self, q: str = "", offset: int | None = None) -> None:
@@ -413,8 +427,19 @@ class PaginaEstoqueMovimento(PaginaEstoqueBase):
         tarefas.rodar(
             lambda: self._api.movimentar_estoque(self._payload()),
             on_ok=self._movimentado,
-            on_erro=lambda msg: self._erro_salvar(msg),
+            on_erro=self._erro_movimentar,
         )
+
+    def _erro_movimentar(self, msg: str, status: int | None = None) -> None:
+        self._btn_salvar.setEnabled(True)
+        if status in (401, 423):
+            titulo = "Sessão encerrada" if status == 401 else "Modo leitura"
+            QMessageBox.warning(self, titulo, msg)
+        elif status == 409:
+            # Saída sem saldo: o detail do servidor já traz o produto/saldo.
+            QMessageBox.warning(self, "Estoque insuficiente", msg)
+        else:
+            QMessageBox.critical(self, "Não foi possível movimentar", msg)
 
     def _movimentado(self, saida: dict) -> None:
         self._ultima_movimentacao = saida
@@ -560,9 +585,16 @@ __all__ = [
 class PaginaEstoqueTransferencias(QWidget):
     """Transferência entre filiais em dois passos (PRD §5.6)."""
 
-    CHAVES = ["numero", "produto_nome", "quantidade", "estado", "destino"]
-    COLUNAS = ["Nº", "Produto", "Qtd", "Estado", "Filial"]
-    PESOS = [3, 6, 2, 3, 4]
+    # Colunas reais do `TransferenciaOut` — `produto_nome`/`destino` não
+    # existem no contrato e deixavam a grade sempre com "—".
+    CHAVES = ["numero", "produto_id", "quantidade", "estado", "filial_destino_id"]
+    COLUNAS = ["Nº", "Produto ID", "Qtd", "Estado", "Destino ID"]
+    PESOS = [3, 4, 2, 3, 4]
+    _ESTADOS = {
+        "enviada": "Enviada",
+        "recebida": "Recebida",
+        "cancelada": "Cancelada",
+    }
 
     def __init__(self, api: Api, modo_leitura: bool = False) -> None:
         super().__init__()
@@ -589,7 +621,9 @@ class PaginaEstoqueTransferencias(QWidget):
         linha = QHBoxLayout(formulario)
         self._destino = CampoTexto("Filial destino (ID)", maximo=10)
         self._produto = CampoTexto("Produto (ID)", maximo=10)
-        self._quantidade = CampoTexto("Quantidade", maximo=12)
+        # CampoValor aceita o formato brasileiro ("2,5") que o Pydantic
+        # rejeitaria se enviado como string.
+        self._quantidade = CampoValor("Quantidade", prefixo="")
         linha.addWidget(em_volta(self._destino))
         linha.addWidget(em_volta(self._produto))
         linha.addWidget(em_volta(self._quantidade))
@@ -613,7 +647,11 @@ class PaginaEstoqueTransferencias(QWidget):
         self._carregar()
 
     def _formatar(self, dado: dict, chave: str) -> str:
-        return str(dado.get(chave) if dado.get(chave) is not None else "—")
+        if chave == "estado":
+            estado = str(dado.get("estado") or "")
+            return self._ESTADOS.get(estado, estado or "—")
+        valor = dado.get(chave)
+        return str(valor) if valor is not None else "—"
 
     def _carregar(self) -> None:
         def ok(saida: dict) -> None:
@@ -622,7 +660,12 @@ class PaginaEstoqueTransferencias(QWidget):
 
         tarefas.rodar(self._api.listar_transferencias, ok, self._erro)
 
-    def _erro(self, msg: str) -> None:
+    def _erro(self, msg: str, status: int | None = None) -> None:
+        # `tarefas.rodar` só entrega o status a callbacks com 2 parâmetros.
+        if status in (401, 423):
+            titulo = "Sessão encerrada" if status == 401 else "Modo leitura"
+            QMessageBox.warning(self, titulo, msg)
+            return
         QMessageBox.warning(self, "Transferências", msg)
 
     def _selecionada(self) -> dict | None:
@@ -631,19 +674,43 @@ class PaginaEstoqueTransferencias(QWidget):
             QMessageBox.information(self, "Transferências", "Selecione uma transferência.")
         return dado
 
+    def _validar(self):
+        if not str(self._destino.valor() or "").strip().isdigit():
+            return ("Informe o ID da filial destino.", self._destino)
+        if not str(self._produto.valor() or "").strip().isdigit():
+            return ("Informe o ID do produto.", self._produto)
+        qtd = self._quantidade.valor()
+        if qtd is None or qtd <= 0:
+            return ("Informe uma quantidade maior que zero.", self._quantidade)
+        return None
+
     def _enviar(self) -> None:
         if self._modo_leitura:
             return
+        problema = self._validar()
+        if problema:
+            msg, campo = problema
+            QMessageBox.warning(self, "Transferência", msg)
+            if getattr(campo, "widget", None) is not None:
+                campo.widget.setFocus()
+            return
+        # Trava contra duplo clique (a API não é idempotente em POST).
+        self._btn_enviar.setEnabled(False)
         payload = {
-            "filial_destino_id": self._destino.valor(),
-            "produto_id": self._produto.valor(),
-            "quantidade": self._quantidade.valor(),
+            "filial_destino_id": int(str(self._destino.valor()).strip()),
+            "produto_id": int(str(self._produto.valor()).strip()),
+            "quantidade": str(self._quantidade.valor()),
         }
-        tarefas.rodar(
-            lambda: self._api.transferir(payload),
-            lambda _: self._carregar(),
-            self._erro,
-        )
+
+        def _ok(_saida) -> None:
+            self._btn_enviar.setEnabled(True)
+            self._carregar()
+
+        def _erro(msg: str, status: int | None = None) -> None:
+            self._btn_enviar.setEnabled(True)
+            self._erro(msg, status)
+
+        tarefas.rodar(lambda: self._api.transferir(payload), _ok, _erro)
 
     def _receber(self) -> None:
         dado = self._selecionada()

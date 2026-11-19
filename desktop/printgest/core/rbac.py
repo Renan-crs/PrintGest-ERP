@@ -83,7 +83,9 @@ ITENS_INTERNOS = [
     {"id": "estoque_movimento", "rotulo": "Movimentação Manual", "nivel": "operador"},
     {"id": "estoque_reposicao", "rotulo": "Relatório de Reposição", "nivel": "operador"},
     {"id": "estoque_mais_vendidos", "rotulo": "Mais Vendidos", "nivel": "operador"},
-    {"id": "caixa", "rotulo": "Caixa", "nivel": "caixa"},
+    # RBAC não hierárquico: o backend usa require_perfis(CAIXA, GERENTE, ADMIN)
+    # e recusa OPERADOR com 403, embora seu rank seja maior que o de caixa.
+    {"id": "caixa", "rotulo": "Caixa", "niveis": ["caixa", "gerente", "admin"]},
     {"id": "contas_receber", "rotulo": "Contas a Receber", "nivel": "gerente"},
     {"id": "contas_pagar", "rotulo": "Contas a Pagar", "nivel": "gerente"},
     {"id": "plano_contas", "rotulo": "Plano de Contas", "nivel": "gerente"},
@@ -112,6 +114,10 @@ def pode_abrir(nivel: str, item_id: str) -> bool:
                 return nivel in item["niveis"]
     for item in ITENS_INTERNOS:
         if item["id"] == item_id:
+            # `niveis` explícito = RBAC não hierárquico (ex.: Caixa), igual ao
+            # `require_perfis` do backend. `nivel` = atalho hierárquico.
+            if "niveis" in item:
+                return nivel in item["niveis"]
             return tem_acesso(nivel, item["nivel"])
     return False
 

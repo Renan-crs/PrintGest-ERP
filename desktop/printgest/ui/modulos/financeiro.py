@@ -242,7 +242,7 @@ class PaginaCaixa(QWidget):
         tarefas.rodar(
             lambda: self._api.caixa_atual(),
             on_ok=_receber,
-            on_erro=lambda msg: QMessageBox.warning(self, "Caixa", msg),
+            on_erro=lambda msg, status=None: self._erro_leitura("Caixa", msg, status),
         )
 
     def _aplicar_estado(self) -> None:
@@ -299,7 +299,9 @@ class PaginaCaixa(QWidget):
         tarefas.rodar(
             lambda: self._api.extrato_caixa(caixa_id, limit=LOTE, offset=offset),
             on_ok=lambda saida: self._extrato_recebido(saida, offset),
-            on_erro=lambda msg: QMessageBox.warning(self, "Extrato do Caixa", msg),
+            on_erro=lambda msg, status=None: self._erro_leitura(
+                "Extrato do Caixa", msg, status
+            ),
         )
 
     def _extrato_recebido(self, saida: dict, offset: int = 0) -> None:
@@ -403,10 +405,21 @@ class PaginaCaixa(QWidget):
         )
         self.recarregar()
 
-    def _erro(self, msg: str) -> None:
+    def _erro_leitura(self, titulo: str, msg: str, status: int | None = None) -> None:
+        # Status só chega quando o callback aceita 2 parâmetros (tarefas.py).
+        if status == 401:
+            titulo = "Sessão encerrada"
+        elif status == 423:
+            titulo = "Modo leitura"
+        QMessageBox.warning(self, titulo, msg)
+
+    def _erro(self, msg: str, status: int | None = None) -> None:
         for botao in (self._btn_abrir, self._btn_lancar, self._btn_fechar):
             botao.setEnabled(not self._modo_leitura)
-        QMessageBox.critical(self, "Caixa", msg)
+        if status in (401, 423, 409):
+            self._erro_leitura("Caixa", msg, status)
+        else:
+            QMessageBox.critical(self, "Caixa", msg)
 
 
 # ================================================================ contas
@@ -570,9 +583,17 @@ class PaginaContas(PaginaCrud):
         self._btn_baixa.setEnabled(True)
         self.recarregar(self._busca.texto())
 
-    def _baixa_erro(self, msg: str) -> None:
+    def _baixa_erro(self, msg: str, status: int | None = None) -> None:
         self._btn_baixa.setEnabled(True)
-        QMessageBox.critical(self, self.ROTULO_PAGINA, msg)
+        if status == 401:
+            QMessageBox.warning(self, "Sessão encerrada", msg)
+        elif status == 423:
+            QMessageBox.warning(self, "Modo leitura", msg)
+        elif status == 409:
+            # Título já baixado/cancelado — conflito de concorrência.
+            QMessageBox.warning(self, self.ROTULO_PAGINA, msg)
+        else:
+            QMessageBox.critical(self, self.ROTULO_PAGINA, msg)
 
 
 class PaginaContasReceber(PaginaContas):

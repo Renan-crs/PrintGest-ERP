@@ -129,4 +129,13 @@ def test_ids_internos_e_menu_nao_colidem():
     internos = {i["id"] for i in ITENS_INTERNOS}
     assert ID_MENU.isdisjoint(internos)
     for item in ITENS_INTERNOS:
-        assert item["id"] and item["rotulo"] and item["nivel"]
+        assert item["id"] and item["rotulo"]
+        # Itens de RBAC não hierárquico declaram `niveis`; os demais, `nivel`.
+        assert item.get("niveis") or item.get("nivel")
+
+def test_caixa_e_rbac_nao_hierarquico_no_desktop():
+    """Operador NÃO pode abrir Caixa — o backend responde 403 para ele."""
+    assert pode_abrir("caixa", "caixa")
+    assert pode_abrir("gerente", "caixa")
+    assert pode_abrir("admin", "caixa")
+    assert not pode_abrir("operador", "caixa")

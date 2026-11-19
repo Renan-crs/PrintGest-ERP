@@ -49,6 +49,10 @@ def _movimentar(
     origem: OrigemMov,
     documento_id: int,
 ) -> None:
+    # Lê o saldo ANTES da atualização: o kardex precisa do par de valores
+    # real (anterior → posterior). Lendo depois, o UPDATE já havia mudado o
+    # saldo e o kardex registrava um par distorcido.
+    anterior = _saldo(db, filial_id, produto_id)
     if tipo == "saida":
         r = db.execute(
             sa_text(
@@ -78,7 +82,6 @@ def _movimentar(
                 ),
                 {"f": filial_id, "p": produto_id, "q": quantidade},
             )
-    anterior = _saldo(db, filial_id, produto_id)
     posterior = (
         anterior - quantidade if tipo == "saida" else anterior + quantidade
     )
@@ -97,20 +100,28 @@ def _movimentar(
     )
 
 
+def _escopo(db: Session, filial_id: int):
+    return db.query(TransferenciaEstoque).filter(
+        (TransferenciaEstoque.filial_origem_id == filial_id)
+        | (TransferenciaEstoque.filial_destino_id == filial_id)
+    )
+
+
 def listar(
     db: Session, *, filial_id: int, limit: int = 50, offset: int = 0
 ) -> list[TransferenciaEstoque]:
     return (
-        db.query(TransferenciaEstoque)
-        .filter(
-            (TransferenciaEstoque.filial_origem_id == filial_id)
-            | (TransferenciaEstoque.filial_destino_id == filial_id)
-        )
+        _escopo(db, filial_id)
         .order_by(TransferenciaEstoque.id.desc())
         .limit(limit)
         .offset(offset)
         .all()
     )
+
+
+def contar(db: Session, *, filial_id: int) -> int:
+    """Total real (antes da paginação) para o `meta.total` da listagem."""
+    return _escopo(db, filial_id).count()
 
 
 def registrar_saida(

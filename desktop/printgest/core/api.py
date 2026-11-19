@@ -576,8 +576,19 @@ class Api:
     def gerar_variacoes(self, payload: dict) -> dict:
         return self._post("/v1/produtos/variacoes/gerar", payload, self._token)
 
-    def listar_transferencias(self) -> dict:
-        return self._get("/v1/estoque/transferencias", self._token)
+    def listar_transferencias(self, limit: int = 50, offset: int = 0) -> dict:
+        """Lista paginada no mesmo envelope das demais (`data`/`total`).
+
+        Antes usava `_get`, que devolve só a lista — a tela esperava `data` e
+        mostrava a grade de transferências sempre vazia.
+        """
+        resp = self._enviar(
+            "get",
+            "/v1/estoque/transferencias",
+            params={"limit": limit, "offset": offset},
+            headers=self._headers(self._token),
+        )
+        return self._paginar(self._resposta_completa(resp))
 
     def transferir(self, payload: dict) -> dict:
         return self._post("/v1/estoque/transferencias", payload, self._token)

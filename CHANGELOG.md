@@ -9,6 +9,26 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.15] - 2026-11-19 — Verificação das telas de Estoque e Caixa
+
+### Corrigido
+- Tela de Transferências quebrava ao abrir (imports missing) e a grade ficava
+  vazia (`Api.listar_transferencias` não normalizava o envelope `data/total`).
+- Operador podia abrir a tela de Caixa no desktop, mas levava 403 no backend
+  — RBAC de Caixa agora é não hierárquico, como `require_perfis`.
+- Kardex de transferência gravava `saldo_anterior` lido após o UPDATE
+  (saída 3 de 10 virava 7→4); agora registra 10→7.
+- Status 409/401/423 passaram a ser tratados em Estoque/Caixa; erro do resumo
+  de estoque não é mais silencioso.
+- Transferência valida IDs/quantidade (`2,5` aceito), trava duplo POST e
+  mostra colunas/estados que realmente existem no contrato.
+- `meta.total` da listagem de transferências agora é o total real.
+
+### Validação
+Backend: 409 passed. Desktop: 440 passed, 4 xfailed.
+
+---
+
 ## [0.5.14] - 2026-11-19 — Verificação do fluxo de Orçamento
 
 ### Corrigido

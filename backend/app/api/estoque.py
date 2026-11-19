@@ -149,7 +149,12 @@ def transferencias(
         db, filial_id=filial, limit=limit, offset=offset
     )
     return ListaResponse(
-        data=itens, meta=MetaPaginacao(total=len(itens), limit=limit, offset=offset)
+        data=itens,
+        meta=MetaPaginacao(
+            total=transferencia_service.contar(db, filial_id=filial),
+            limit=limit,
+            offset=offset,
+        ),
     )
 
 
