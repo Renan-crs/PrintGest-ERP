@@ -73,15 +73,17 @@ def _handler(request: httpx.Request) -> httpx.Response:
             200,
             json={"data": linhas, "meta": {"total": len(linhas), "limit": 50, "offset": 0}},
         )
-    if request.method == "GET" and request.url.path == "/v1/clientes":
+    if request.method == "GET" and request.url.path in ("/v1/clientes", "/v1/pdv/clientes"):
         return httpx.Response(
             200, json={"data": _CLIENTES, "meta": {"total": 2, "limit": 50, "offset": 0}}
         )
-    if request.method == "GET" and request.url.path == "/v1/funcionarios":
+    if request.method == "GET" and request.url.path in (
+        "/v1/funcionarios", "/v1/pdv/funcionarios"
+    ):
         return httpx.Response(
             200, json={"data": _FUNCIONARIOS, "meta": {"total": 2, "limit": 50, "offset": 0}}
         )
-    if request.method == "GET" and request.url.path == "/v1/produtos":
+    if request.method == "GET" and request.url.path in ("/v1/produtos", "/v1/pdv/produtos"):
         return httpx.Response(
             200, json={"data": _PRODUTOS, "meta": {"total": 2, "limit": 50, "offset": 0}}
         )

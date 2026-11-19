@@ -48,7 +48,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200, json={"data": [_VENDA], "meta": {"total": 1, "limit": 50, "offset": 0}}
         )
-    if caminho == "/v1/clientes":
+    if caminho in ("/v1/clientes", "/v1/pdv/clientes"):
         return httpx.Response(
             200,
             json={
@@ -56,7 +56,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
                 "meta": {"total": 1, "limit": 50, "offset": 0},
             },
         )
-    if caminho == "/v1/funcionarios":
+    if caminho in ("/v1/funcionarios", "/v1/pdv/funcionarios"):
         return httpx.Response(
             200,
             json={
@@ -64,7 +64,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
                 "meta": {"total": 1, "limit": 50, "offset": 0},
             },
         )
-    if caminho == "/v1/produtos":
+    if caminho in ("/v1/produtos", "/v1/pdv/produtos"):
         return httpx.Response(
             200,
             json={
@@ -79,6 +79,16 @@ def _handler(request: httpx.Request) -> httpx.Response:
                 "meta": {"total": 1, "limit": 50, "offset": 0},
             },
         )
+    if caminho == "/v1/pdv/operadores":
+        return httpx.Response(
+            200,
+            json={
+                "data": [{"id": 1, "nome": "Operador", "login": "op"}],
+                "meta": {"total": 1, "limit": 200, "offset": 0},
+            },
+        )
+    if caminho.startswith("/v1/pdv/produtos/buscar-sku/"):
+        return httpx.Response(404, json={"detail": "não encontrado"})
     if caminho == "/v1/dashboard/resumo":
         return httpx.Response(
             200,

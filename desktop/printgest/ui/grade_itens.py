@@ -162,7 +162,8 @@ class GradeItens(QWidget):
         self._api = api
         catalogos.carregar(
             "produtos",
-            lambda: api.listar("produtos", limit=1000),
+            # Mesmo catálogo completo do PDV (sem o teto de 200 da fábrica).
+            lambda: api.listar("pdv/produtos", limit=1000),
             on_ok=self._produtos_recebidos,
         )
 

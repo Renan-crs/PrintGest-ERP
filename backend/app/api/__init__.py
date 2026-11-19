@@ -18,6 +18,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.estoque import router as estoque_router
 from app.api.licenca import router as licenca_router
 from app.api.movimento import router as movimento_router
+from app.api.pdv import router as pdv_router
 from app.api.usuarios import router as usuarios_router
 
 api = APIRouter(prefix="/v1")
@@ -34,6 +35,7 @@ projetos.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)
 api.include_router(estoque_router)
+api.include_router(pdv_router)
 api.include_router(usuarios_router)
 api.include_router(licenca_router)
 api.include_router(dashboard_router)

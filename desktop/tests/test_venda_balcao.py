@@ -86,18 +86,35 @@ def _handler(request: httpx.Request) -> httpx.Response:
             200,
             json={"data": linhas, "meta": {"total": len(linhas), "limit": 50, "offset": 0}},
         )
-    if request.method == "GET" and request.url.path == "/v1/clientes":
+    if request.method == "GET" and request.url.path in ("/v1/clientes", "/v1/pdv/clientes"):
         return httpx.Response(
             200, json={"data": _CLIENTES, "meta": {"total": 2, "limit": 50, "offset": 0}}
         )
-    if request.method == "GET" and request.url.path == "/v1/funcionarios":
+    if request.method == "GET" and request.url.path in (
+        "/v1/funcionarios", "/v1/pdv/funcionarios"
+    ):
         return httpx.Response(
             200, json={"data": _FUNCIONARIOS, "meta": {"total": 1, "limit": 50, "offset": 0}}
         )
-    if request.method == "GET" and request.url.path == "/v1/produtos":
+    if request.method == "GET" and request.url.path in ("/v1/produtos", "/v1/pdv/produtos"):
         return httpx.Response(
             200, json={"data": _PRODUTOS, "meta": {"total": 1, "limit": 50, "offset": 0}}
         )
+    if request.method == "GET" and request.url.path == "/v1/pdv/operadores":
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"id": 1, "nome": "Operador", "login": "op"},
+                    {"id": 2, "nome": "Caixa", "login": "cx"},
+                ],
+                "meta": {"total": 2, "limit": 200, "offset": 0},
+            },
+        )
+    if request.method == "GET" and request.url.path.startswith(
+        "/v1/pdv/produtos/buscar-sku/"
+    ):
+        return httpx.Response(404, json={"detail": "não encontrado"})
     if request.method == "POST" and request.url.path == "/v1/vendas":
         _ESCRITAS.append(("POST", "", request.read().decode()))
         return httpx.Response(200, json={"data": {"id": 11, "numero": 2895}})
@@ -672,3 +689,113 @@ def QApplication_active():
     from PySide6.QtWidgets import QApplication
 
     return QApplication.instance()
+
+
+# --- Verificação API ↔ endpoints (PDV) ---------------------------------------
+
+
+def test_pdv_usa_apenas_catalogos_caixa_safe(app, pumpar):
+    """PDV (CAIXA) não deve chamar /v1/usuarios (ADMIN) nem cadastros OPERADOR."""
+    caminhos: list[tuple[str, str]] = []
+
+    def handler(request):
+        caminhos.append((request.method, request.url.path))
+        return _handler(request)
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(handler))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
+    PaginaVendaBalcao(api)
+    pumpar(lambda: "/v1/pdv/produtos" in [p for _, p in caminhos])
+
+    vistos = {p for _, p in caminhos}
+    assert "/v1/pdv/clientes" in vistos
+    assert "/v1/pdv/produtos" in vistos
+    assert "/v1/pdv/funcionarios" in vistos
+    assert "/v1/pdv/operadores" in vistos
+    assert "/v1/usuarios" not in vistos
+    assert "/v1/clientes" not in vistos
+    assert "/v1/produtos" not in vistos
+
+
+def test_limpar_filtros_volta_para_todas_com_uma_requisicao(app, pumpar, pagina):
+    pumpar(lambda: pagina._tabela.rowCount() == 1)
+    pagina._btn_filtros["ok"].click()
+    pumpar(lambda: len(_GETS) >= 2)
+    antes = len(_GETS)
+
+    pagina._limpar_filtros_historico()
+    pumpar(lambda: len(_GETS) > antes)
+
+    assert pagina._filtro == ""
+    assert pagina._btn_filtros[""].isChecked() is True
+    assert pagina._busca.texto() == ""
+    assert _GETS[-1].url.params.get("status_venda") is None
+    assert len(_GETS) == antes + 1  # uma única recarga, não duas
+
+
+def test_resumo_consolidado_tem_rotulo_proprio(app, pagina):
+    assert hasattr(pagina, "_lbl_resumo_consolidado")
+    assert pagina._lbl_resumo_consolidado is not pagina._lbl_resumo_hist
+
+
+def test_coluna_fiscal_mostra_documento_emitido(app, pagina):
+    assert pagina._formatar_texto({"documento_fiscal_id": None}, "fiscal") == "—"
+    assert (
+        pagina._formatar_texto({"documento_fiscal_id": 321}, "fiscal")
+        == "NFC-e #321"
+    )
+
+
+def test_erro_409_caixa_fechado_usa_mensagem_do_servidor(app, pagina, monkeypatch):
+    vistos: list[tuple[str, str]] = []
+
+    class CaixaMensagens:
+        StandardButton = QMessageBox.StandardButton
+
+        @staticmethod
+        def warning(pai, titulo, texto, *_a, **_k):
+            vistos.append((str(titulo), str(texto)))
+
+        @staticmethod
+        def critical(pai, titulo, texto, *_a, **_k):
+            vistos.append((str(titulo), str(texto)))
+
+    monkeypatch.setattr(
+        "printgest.ui.modulos.venda_balcao.QMessageBox", CaixaMensagens
+    )
+    pagina._erro_salvar(
+        "Caixa fechado — abra o caixa antes de registrar vendas.", 409
+    )
+    assert vistos
+    titulo, texto = vistos[-1]
+    assert titulo == "Caixa fechado"
+    assert "abra o caixa" in texto.casefold()
+
+    vistos.clear()
+    pagina._erro_salvar("Estoque insuficiente para 'Adesivo'.", 409)
+    titulo, texto = vistos[-1]
+    assert titulo == "Conflito ao finalizar"
+    assert "Estoque insuficiente" in texto
+
+
+def test_erro_401_nao_derruba_sessao(app, pagina, monkeypatch):
+    vistos: list[str] = []
+
+    class CaixaMensagens:
+        StandardButton = QMessageBox.StandardButton
+
+        @staticmethod
+        def warning(pai, titulo, texto, *_a, **_k):
+            vistos.append(str(titulo))
+
+        @staticmethod
+        def critical(pai, titulo, texto, *_a, **_k):
+            vistos.append(str(titulo))
+
+    monkeypatch.setattr(
+        "printgest.ui.modulos.venda_balcao.QMessageBox", CaixaMensagens
+    )
+    pagina._erro_salvar("Sessão inválida.", 401)
+    assert vistos[-1] == "Sessão encerrada"
+    # A sessão permanece carregada (não houve limpeza automática).
+    assert pagina._api.autenticado is True

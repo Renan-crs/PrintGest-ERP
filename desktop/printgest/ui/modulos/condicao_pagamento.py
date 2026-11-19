@@ -28,7 +28,9 @@ class CondicaoPagamentoCliente:
     def _carregar_clientes_flags(self) -> None:
         catalogos.carregar(
             "clientes",
-            lambda: self._api.listar("clientes", limit=1000),
+            # Router de cadastros exige OPERADOR e limita a 200; o espelho de
+            # leitura /v1/pdv/clientes atende CAIXA (PDV) e OPERADOR (O.S.).
+            lambda: self._api.listar("pdv/clientes", limit=1000),
             on_ok=self._clientes_flags_recebidos,
         )
 

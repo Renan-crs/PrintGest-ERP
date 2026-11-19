@@ -9,6 +9,30 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.13] - 2026-11-19 — Verificação das chamadas do PDV
+
+### Novidades
+- Router de leitura **`/v1/pdv/*`** (somente GET, CAIXA-safe): catálogos de
+  clientes, produtos, funcionários e operadores sem o teto de 200 e sem exigir
+  OPERADOR/ADMIN. Projeção de operadores expõe só `id`, `nome` e `login`.
+
+### Corrigido
+- PDV com perfil CAIXA exclusivo via combos/grade vazios (403 silencioso nos
+  catálogos) — agora usa os espelhos de leitura.
+- `limit=1000` era cortado para 200; catálogo completo agora carrega por inteiro.
+- 409 de "Caixa fechado" era rotulado como "Estoque insuficiente" — mensagem do
+  servidor agora é respeitada.
+- "Limpar filtros" deixava o histórico em "Finalizadas" e chamava
+  `CampoBusca.definir()` inexistente — volta a "Todas" com uma recarga.
+- Coluna Fiscal e detalhe da venda mostravam "—" mesmo após emissão da NFC-e.
+- 401/423 durante o PDV avisam sem derrubar a sessão.
+- Resumo consolidado sobrescrevia o resumo da página (rótulos separados).
+
+### Validação
+Backend: 404 passed. Desktop: 431 passed, 4 xfailed.
+
+---
+
 ## [0.5.12] - 2026-11-19 — Verificação das chamadas da Tela Início
 
 ### Corrigido

@@ -327,7 +327,9 @@ class EditorItensVenda(QWidget):
         self._api = api
         catalogos.carregar(
             "produtos",
-            lambda: api.listar("produtos", limit=1000),
+            # Espelho de leitura CAIXA-safe: o /v1/produtos exige OPERADOR e
+            # limita a 200; /v1/pdv/produtos devolve o catálogo inteiro.
+            lambda: api.listar("pdv/produtos", limit=1000),
             on_ok=self._produtos_recebidos,
         )
 
@@ -443,15 +445,21 @@ class EditorItensVenda(QWidget):
             self._por_nome[dado.get("nome", "").lower()] = produto_id
             self._adicionar_produto(produto_id)
 
-        def erro(_msg: str, status: int | None = None) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
+            status = status if status is not None else getattr(self._api, "ultimo_status", None)
             if status == 404:
                 self._produto_nao_encontrado(texto)
+            elif status in (401, 423):
+                titulo = "Sessão encerrada" if status == 401 else "Modo leitura"
+                QMessageBox.warning(self, titulo, msg)
             else:
                 QMessageBox.warning(
-                    self, "Item", "Não foi possível consultar o SKU agora."
+                    self, "Item", f"Não foi possível consultar o SKU agora. {msg}"
                 )
 
-        tarefas.rodar(lambda: self._api.buscar_sku(texto), ok, erro)
+        tarefas.rodar(
+            lambda: self._api.buscar_sku(texto, base="/v1/pdv/produtos"), ok, erro
+        )
 
     def _produto_nao_encontrado(self, texto: str) -> None:
         QMessageBox.warning(
@@ -1103,7 +1111,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.addWidget(self._combo_operador_hist)
         # carrega operadores (usuarios) se permitido; falha silenciosa
         tarefas.rodar(
-            lambda: self._api.listar("usuarios", limit=200),
+            # /v1/usuarios é ADMIN-only; /v1/pdv/operadores expõe só
+            # id/nome/login e é legível por CAIXA.
+            lambda: self._api.listar("pdv/operadores", limit=200),
             on_ok=self._operadores_recebidos,
             on_erro=lambda _m: None,
         )
@@ -1124,6 +1134,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._lbl_resumo_hist.setObjectName("textoMuted")
         self._lbl_resumo_hist.setWordWrap(True)
         col.addWidget(self._lbl_resumo_hist)
+        # Resumo consolidado (assíncrono) tem rótulo próprio: antes ele
+        # sobrescrevia o resumo da página assim que a resposta chegava.
+        self._lbl_resumo_consolidado = QLabel("")
+        self._lbl_resumo_consolidado.setObjectName("textoMuted")
+        self._lbl_resumo_consolidado.setWordWrap(True)
+        col.addWidget(self._lbl_resumo_consolidado)
 
         card = QWidget()
         card.setObjectName("card")
@@ -1344,7 +1360,12 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
         if hasattr(self, "_busca"):
             self._busca.definir("")
-        self._aplicar_filtro("ok")
+        # "Limpar" deve voltar a TODAS, não a "Finalizadas". Chamar
+        # `_aplicar_filtro("ok")` recarregava com status_venda=ok e deixava o
+        # filtro preso (além de duplicar a requisição com o `recarregar` final).
+        self._filtro = ""
+        for valor, botao in self._btn_filtros.items():
+            botao.setChecked(valor == "")
         if hasattr(self, "_combo_forma_hist"):
             self._combo_forma_hist.blockSignals(True)
             self._combo_forma_hist.setCurrentIndex(0)
@@ -1445,7 +1466,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         )
 
     def _atualizar_resumo_consolidado(self, q: str = "") -> None:
-        if not hasattr(self, "_lbl_resumo_hist"):
+        if not hasattr(self, "_lbl_resumo_consolidado"):
             return
         # Consolidado respeita os mesmos filtros selecionados.
         data_inicio = None
@@ -1461,7 +1482,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         status_venda = self._filtro or None
 
         def _ok(resp: dict) -> None:
-            if not hasattr(self, "_lbl_resumo_hist"):
+            if not hasattr(self, "_lbl_resumo_consolidado"):
                 return
             data = resp.get("data", resp) if isinstance(resp, dict) else {}
             por_forma = data.get("por_forma") or []
@@ -1484,7 +1505,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 escopo = "filtro, todas"
             texto = f"Resumo ({escopo}): " + (" · ".join(partes) if partes else formatar_moeda(str(total)))
             texto += f" · Vendas: {qtd} · Total: {formatar_moeda(str(total))}"
-            self._lbl_resumo_hist.setText(texto)
+            self._lbl_resumo_consolidado.setText(texto)
 
         tarefas.rodar(
             lambda: self._api.resumo_vendas(
@@ -1571,7 +1592,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             venda = dado.get("data", dado) if isinstance(dado, dict) else dado
             self._mostrar_dialogo_detalhes(venda)
 
-        def erro(msg: str) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
+            if self._erro_sessao(self._status_erro(status)):
+                return
             QMessageBox.warning(self, "Venda", msg)
 
         tarefas.rodar(lambda: self._api.obter("vendas", venda_id), on_ok=ok, on_erro=erro)
@@ -1596,6 +1619,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             ("Total", formatar_moeda(venda.get("valor_total"))),
             ("Valor recebido", formatar_moeda(venda.get("valor_recebido")) if venda.get("valor_recebido") is not None else "—"),
             ("Troco", formatar_moeda(venda.get("troco")) if venda.get("troco") is not None else "—"),
+            ("Documento fiscal", (
+                f"NFC-e Nº {venda.get('documento_fiscal_id')}"
+                if venda.get("documento_fiscal_id") else "—"
+            )),
         ]
         if str(venda.get("status") or "") == "cancelado":
             cancelado_em = venda.get("cancelado_em")
@@ -1687,10 +1714,15 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             self.recarregar(self._busca.texto())
             self._verificar_caixa()
 
+        def _erro_cancelar(msg: str, status: int | None = None) -> None:
+            if self._erro_sessao(self._status_erro(status)):
+                return
+            QMessageBox.warning(self, "Cancelar venda", msg)
+
         tarefas.rodar(
             lambda: self._api.excluir("vendas", dado["id"], payload=payload),
             on_ok=_cancelado,
-            on_erro=lambda msg: QMessageBox.warning(self, "Cancelar venda", msg),
+            on_erro=_erro_cancelar,
         )
 
     # ------------------------------------------------------------ salvar
@@ -1774,7 +1806,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
 
     def _salvo(self, dado: dict, emitir_nfce: bool) -> None:
         self._btn_salvar.setEnabled(True)
-        catalogos.invalidar("vendas")
+        # A lista do PDV usa `tarefas.rodar` direto (não o cache `catalogos`),
+        # então `catalogos.invalidar("vendas")` não tinha efeito: o refresh
+        # real é o `self.recarregar(...)` logo abaixo.
         numero = (dado or {}).get("numero")
         venda_id = (dado or {}).get("id")
         self._limpar_form()
@@ -1799,8 +1833,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 f"Venda Nº {numero} registrada.\n"
                 f"NFC-e enviada ao gateway: {status or 'processando'}.",
             )
+            # O documento agora existe: recarrega a lista para a coluna Fiscal
+            # deixar de mostrar "—".
+            self.recarregar(self._busca.texto() if hasattr(self, "_busca") else "")
 
-        def erro(msg: str) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
+            if self._erro_sessao(self._status_erro(status)):
+                return
             QMessageBox.warning(
                 self,
                 "NFC-e",
@@ -1816,18 +1855,52 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             erro,
         )
 
-    def _erro_salvar(self, msg: str, status: int | None = None) -> None:
-        self._btn_salvar.setEnabled(True)
-        if status == 409:
-            # Estoque insuficiente / caixa fechado — Orienta o operador sem
-            # jargão técnico e oferece caminho de ação (PRD §6 concorrência).
+    def _status_erro(self, status: int | None) -> int | None:
+        """Status HTTP do último erro (o callback pode não tê-lo recebido)."""
+        return status if status is not None else getattr(self._api, "ultimo_status", None)
+
+    def _erro_sessao(self, status: int | None) -> bool:
+        """401 (sessão revogada) e 423 (modo leitura) bloqueiam a operação.
+
+        Não limpamos a sessão aqui: quedas de transporte e erros de licença não
+        devem devolver o operador ao login no meio da venda.
+        """
+        if status == 401:
             QMessageBox.warning(
                 self,
-                "Estoque insuficiente",
-                f"{msg}\n\nVerifique o saldo no módulo Estoque e tente novamente.\n"
-                "Se outra estação vendeu o mesmo item agora, atualize a busca "
-                "antes de repetir.",
+                "Sessão encerrada",
+                "Sua sessão foi encerrada no servidor. Faça login novamente.",
             )
+            return True
+        if status == 423:
+            QMessageBox.warning(
+                self,
+                "Modo leitura",
+                "Esta estação está em modo leitura (licença). "
+                "A operação não foi registrada.",
+            )
+            return True
+        return False
+
+    def _erro_salvar(self, msg: str, status: int | None = None) -> None:
+        self._btn_salvar.setEnabled(True)
+        status = self._status_erro(status)
+        if self._erro_sessao(status):
+            return
+        if status == 409:
+            # O backend devolve um `detail` claro para cada conflito — usamos
+            # a mensagem do servidor em vez de assumir sempre estoque (o 409
+            # também ocorre com caixa fechado e referência inexistente).
+            caixa_fechado = "caixa fechado" in str(msg).casefold()
+            titulo = "Caixa fechado" if caixa_fechado else "Conflito ao finalizar"
+            orientacao = (
+                "Abra o caixa no topo do PDV e tente novamente."
+                if caixa_fechado
+                else "Verifique o saldo no módulo Estoque e tente novamente.\n"
+                "Se outra estação vendeu o mesmo item agora, atualize a busca "
+                "antes de repetir."
+            )
+            QMessageBox.warning(self, titulo, f"{msg}\n\n{orientacao}")
             self._verificar_caixa()
         else:
             QMessageBox.critical(self, "Não foi possível finalizar a venda", msg)
@@ -1865,8 +1938,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 return f"○ {rotulo}"
             return rotulo
         if chave == "fiscal":
-            # NFC-e/fiscal: não implementado neste módulo; exibe estado neutro.
-            return "—"
+            # O backend grava `documento_fiscal_id` quando a NFC-e é emitida
+            # (`fiscal_service`) e devolve em `VendaOut`. Antes a coluna era
+            # sempre "—", mesmo após emissão bem-sucedida.
+            doc_id = dado.get("documento_fiscal_id")
+            return f"NFC-e #{doc_id}" if doc_id else "—"
         valor = dado.get(chave, "")
         return "" if valor is None else str(valor)
 
@@ -1925,7 +2001,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _carregar_vendedores(self) -> None:
         catalogos.carregar(
             "funcionarios",
-            lambda: self._api.listar("funcionarios", limit=1000),
+            lambda: self._api.listar("pdv/funcionarios", limit=1000),
             on_ok=self._vendedores_recebidos,
         )
 
@@ -1995,7 +2071,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             )
             self._verificar_caixa()
 
-        def erro(msg: str) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
+            if self._erro_sessao(self._status_erro(status)):
+                return
             QMessageBox.warning(self, "Abrir caixa", msg)
 
         tarefas.rodar(

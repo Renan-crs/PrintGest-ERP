@@ -55,5 +55,16 @@ class CampoBusca(QWidget):
     def _publicar(self) -> None:
         self.buscado.emit(self._entrada.text().strip())
 
+    def definir(self, texto: str) -> None:
+        """Define o texto sem disparar a busca por debounce.
+
+        Usado por "Limpar filtros": o chamador já recarrega explicitamente,
+        então um `buscado` extra aqui geraria uma requisição duplicada.
+        """
+        self._temporizador.stop()
+        self._entrada.blockSignals(True)
+        self._entrada.setText(texto or "")
+        self._entrada.blockSignals(False)
+
     def texto(self) -> str:
         return self._entrada.text().strip()

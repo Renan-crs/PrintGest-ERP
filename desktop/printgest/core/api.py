@@ -541,12 +541,16 @@ class Api:
 
     # ---------------------------------------------------- integrações (v3.3)
 
-    def buscar_sku(self, termo: str) -> dict:
-        """Leitura direta por SKU/uuid/código de barras da variante (PRD v3.2)."""
+    def buscar_sku(self, termo: str, *, base: str = "/v1/produtos") -> dict:
+        """Leitura direta por SKU/uuid/código de barras da variante (PRD v3.2).
+
+        `base="/v1/pdv/produtos"` é usado pelo PDV: o router de produtos exige
+        OPERADOR, enquanto o espelho de leitura `/v1/pdv/*` aceita CAIXA.
+        """
         from urllib.parse import quote
 
         return self._get(
-            f"/v1/produtos/buscar-sku/{quote(termo, safe='')}", self._token
+            f"{base}/buscar-sku/{quote(termo, safe='')}", self._token
         )
 
     def gerar_variacoes(self, payload: dict) -> dict:
