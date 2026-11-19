@@ -9,6 +9,23 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.10] - 2026-11-19 — Autocomplete de Cliente em O.S./Orçamento (Fase 1)
+
+### Novidades
+- Campo Cliente com busca remota (`GET /v1/clientes?q=`) e debounce 250 ms,
+  descartando respostas obsoletas. Navegação por setas/Enter/Tab via dropdown
+  nativo do `QComboBox`.
+- Ao selecionar: preenche automaticamente **Telefone** (máscara adaptativa)
+  e **E-mail**; desmarca "Salvar como novo cliente".
+- Sem correspondência: estado visual explícito e checkbox sugerido; no `F10`
+  o cliente é criado via `POST /v1/clientes` e o `id` entra no payload da O.S.
+
+### Nota
+Sem mudança de contrato de API / migration. Cliente avulso persistido (Fase 2)
+fica para uma próxima versão.
+
+---
+
 ## [0.5.9] - 2026-11-18 — Matriz de resolução 1024x768 / 1366x768
 
 ### Corrigido

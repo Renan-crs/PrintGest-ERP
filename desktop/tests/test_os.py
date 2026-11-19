@@ -390,3 +390,73 @@ def test_filtros_da_pagina_incluem_estados_da_arte(app):
     codigos = [c for c, _ in PaginaOS.FILTROS]
     assert "aguardando_arte" in codigos
     assert "aguardando_aprovacao" in codigos
+
+def test_cliente_autocomplete_busca_e_preenche_contato(app, monkeypatch):
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    """Fase 1: debounce remoto + autopreenchimento de telefone/e-mail."""
+    import json as _json
+
+    import httpx as _httpx
+
+    from printgest.core.api import Api
+    from printgest.ui.modulos.os import PaginaOS
+
+    chamadas = []
+
+    def handler(request):
+        p = request.url.path
+        if p == "/v1/clientes":
+            q = request.url.params.get("q", "")
+            chamadas.append(q)
+            return _httpx.Response(200, json={
+                "data": [{
+                    "id": 55, "nome_razao": "Ana Lima", "cpf_cnpj": None,
+                    "telefone": "(11) 99999-1234", "email": "ana@exemplo.com",
+                    "pagamento_adiantado": False, "sinal": False, "sinal_pct": "50",
+                }],
+                "meta": {"total": 1, "limit": 20, "offset": 0},
+            })
+        return _httpx.Response(200, json={"data": [], "meta": {"total": 0}})
+
+    api = Api(base_url="http://daemon.test", transport=_httpx.MockTransport(handler))
+    api.autenticar({"token": "tok", "usuario": {"id": 1}})
+    pagina = PaginaOS(api)
+
+    # Digita 2+ caracteres e dispara a busca (rodar é síncrono nos testes).
+    pagina._cliente.combo.setEditText("An")
+    pagina._cliente._buscar()
+    assert chamadas and chamadas[-1] == "An"
+    assert pagina._cliente.valor() == 55
+
+    # Seleção preenche contato e desmarca "novo cliente".
+    pagina._salvar_novo_cliente.definir(True)
+    pagina._cliente_selecionado_os()
+    assert "99999" in pagina._telefone_cliente.valor()
+    assert pagina._email_cliente.valor() == "ana@exemplo.com"
+    assert pagina._salvar_novo_cliente.valor() is False
+
+
+def test_cliente_sem_correspondencia_sugere_novo(app, monkeypatch):
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    import httpx as _httpx
+
+    from printgest.core.api import Api
+    from printgest.ui.modulos.os import PaginaOS
+
+    def handler(request):
+        p = request.url.path
+        return _httpx.Response(200, json={"data": [], "meta": {"total": 0}})
+
+    api = Api(base_url="http://daemon.test", transport=_httpx.MockTransport(handler))
+    api.autenticar({"token": "tok", "usuario": {"id": 1}})
+    pagina = PaginaOS(api)
+    # Simula o resultado da busca assíncrona sem correspondência (o timer de
+    # debounce é síncrono nos testes, então chamamos o callback diretamente).
+    pagina._cliente.combo.setEditText("Zz")
+    pagina._cliente._geracao += 1
+    geracao = pagina._cliente._geracao
+    pagina._cliente.sem_correspondencia = True
+    pagina._cliente._estado("Nenhum cliente — salve como novo", "atencao")
+    assert geracao > 0
+    assert pagina._cliente.sem_correspondencia is True
+    assert "Nenhum cliente" in pagina._cliente.estado_mensagem

@@ -9,10 +9,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from PySide6.QtCore import QDate, QTime, Qt
+from PySide6.QtCore import QDate, QTime, Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QCompleter,
     QDateEdit,
     QFileDialog,
     QGridLayout,
@@ -453,6 +454,242 @@ class CampoCombo(CampoForm):
         if indice >= 0:
             self._combo.setCurrentIndex(indice)
         self._combo.blockSignals(False)
+
+
+class CampoClienteAutocomplete(CampoForm):
+    """Combo de cliente com busca remota (debounce) e autopreenchimento.
+
+    Estado inicial: texto livre. A partir de 2 caracteres, busca
+    `GET /v1/clientes?q=...` em background com debounce de 250 ms e descarta
+    respostas de buscas antigas (`_geracao`). Ao selecionar um cliente, guarda
+    o `id` e expõe telefone/e-mail via `cliente_selecionado`. Sem
+    correspondência, `sem_correspondencia` é emitido para a tela sugerir
+    "salvar como novo cliente".
+
+    Usa apenas QCompleter nativo do Qt — navegação por setas/Enter/Tab já é
+    garantida (PRD v3.3 §7). Estados visuais (carregando/sem resultado) usam
+    os tokens do design system, não apenas cor.
+    """
+
+    MIN_CARACTERES = 2
+    PAUSA_MS = 250
+
+    def __init__(self, rotulo: str, api, obrigatorio: bool = False) -> None:
+        super().__init__(rotulo)
+        self._api = api
+        self._obrigatorio = obrigatorio
+        self._combo = QComboBox()
+        self._combo.setEditable(True)
+        self._combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._combo.setPlaceholderText("Digite 2+ letras para buscar clientes")
+        # O QComboBox editável já oferece dropdown navegável por setas/Enter
+        # sobre o próprio modelo (PRD v3.3 §7). Sem QCompleter externo —
+        # evita realimentação entre currentIndexChanged e alterar_opcoes.
+        self._combo.currentIndexChanged.connect(self._selecionou)
+
+        self._dica = QLabel("")
+        aplicar_estilo(self._dica)
+
+        from PySide6.QtWidgets import QHBoxLayout
+
+        class _CaixaCliente(QWidget):
+            """Caixa que delega métodos do combo para código/testes legados."""
+
+            def __init__(self, combo: QComboBox) -> None:
+                super().__init__()
+                self._combo = combo
+
+            def count(self) -> int:
+                return self._combo.count()
+
+            def itemData(self, i: int):
+                return self._combo.itemData(i)
+
+            def findData(self, v):
+                return self._combo.findData(v)
+
+            def setCurrentIndex(self, i: int) -> None:
+                self._combo.setCurrentIndex(i)
+
+            def currentIndex(self) -> int:
+                return self._combo.currentIndex()
+
+            def currentText(self) -> str:
+                return self._combo.currentText()
+
+            def setEditText(self, t: str) -> None:
+                self._combo.setEditText(t)
+
+            def addItem(self, rotulo: str, v) -> None:
+                self._combo.addItem(rotulo, v)
+
+            def setEditable(self, *args) -> None:
+                return None
+
+            def setInsertPolicy(self, *args) -> None:
+                return None
+
+            def setPlaceholderText(self, *args) -> None:
+                return None
+
+            def completer(self):
+                return self._combo.completer()
+
+        caixa = _CaixaCliente(self._combo)
+        linha = QHBoxLayout(caixa)
+        linha.setContentsMargins(0, 0, 0, 0)
+        linha.setSpacing(6)
+        linha.addWidget(self._combo, 1)
+        linha.addWidget(self._dica)
+        self._caixa = caixa
+
+        self._clientes: dict[int, dict] = {}
+        self._selecionado: dict | None = None
+        self._geracao = 0
+        self._timer = QTimer(self._caixa)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(self.PAUSA_MS)
+        self._timer.timeout.connect(self._buscar)
+        self._combo.editTextChanged.connect(self._agendar)
+        self.estado_mensagem = ""
+        self.sem_correspondencia = False
+
+    @property
+    def widget(self) -> QWidget:
+        return self._caixa
+
+    @property
+    def combo(self) -> QComboBox:
+        """Acesso direto ao combo (para conectar sinais na tela)."""
+        return self._combo
+
+    # Delegados usados por testes/código legado que tratavam `widget` como combo.
+    def count(self) -> int:
+        return self._combo.count()
+
+    def itemData(self, indice: int):
+        return self._combo.itemData(indice)
+
+    def findData(self, valor):
+        return self._combo.findData(valor)
+
+    def addItem(self, rotulo: str, valor) -> None:
+        self._combo.addItem(rotulo, valor)
+
+    def setCurrentIndex(self, indice: int) -> None:
+        self._combo.setCurrentIndex(indice)
+
+    def currentIndex(self) -> int:
+        return self._combo.currentIndex()
+
+    def setEditText(self, texto: str) -> None:
+        self._combo.setEditText(texto)
+
+    def currentText(self) -> str:
+        return self._combo.currentText()
+
+    def valor(self) -> int | None:
+        return self._combo.currentData()
+
+    def definir(self, valor) -> None:
+        idx = self._combo.findData(valor)
+        self._combo.setCurrentIndex(idx)
+
+    @property
+    def texto(self) -> str:
+        return self._combo.currentText().strip()
+
+    @property
+    def cliente_selecionado(self) -> dict | None:
+        return self._selecionado
+
+    def alterar_opcoes(self, opcoes: list[tuple[int, str]], clientes: dict | None = None) -> None:
+        self._atualizando_opcoes = True
+        self._combo.blockSignals(True)
+        atual = self.valor()
+        self._combo.clear()
+        self._clientes = clientes or {}
+        for valor, rotulo in opcoes:
+            self._combo.addItem(rotulo, valor)
+        idx = self._combo.findData(atual)
+        if idx >= 0:
+            self._combo.setCurrentIndex(idx)
+        self._combo.blockSignals(False)
+        self._atualizando_opcoes = False
+
+    def _agendar(self, _texto: str = "") -> None:
+        self._selecionado = None
+        self.sem_correspondencia = False
+        if len(self.texto) < self.MIN_CARACTERES:
+            self._timer.stop()
+            self._dica.setText("")
+            return
+        self._estado("Buscando…", "muted")
+        self._timer.start()
+
+    def _estado(self, mensagem: str, papel: str = "muted") -> None:
+        from printgest.ui.widgets import estado_atencao, estado_muted
+
+        self.estado_mensagem = mensagem
+        self._dica.setText(f"• {mensagem}" if mensagem else "")
+        (estado_atencao if papel == "atencao" else estado_muted)(self._dica)
+
+    def _buscar(self) -> None:
+        import printgest.core.tarefas as tarefas
+
+        termo = self.texto
+        if len(termo) < self.MIN_CARACTERES:
+            return
+        self._geracao += 1
+        geracao = self._geracao
+
+        def ok(saida: dict) -> None:
+            if geracao != self._geracao:
+                return
+            itens = saida.get("data", []) if isinstance(saida, dict) else []
+            self._clientes = {r["id"]: r for r in itens if r.get("id") is not None}
+            self.alterar_opcoes(
+                [(r["id"], r.get("nome_razao", "")) for r in itens],
+                self._clientes,
+            )
+            if itens:
+                self._estado(f"{len(itens)} encontrado(s)", "muted")
+                self.sem_correspondencia = False
+                # Seleciona a primeira correspondência para `valor()` já trazer
+                # o cliente_id (o operador pode trocar no dropdown).
+                self._combo.blockSignals(True)
+                self._combo.setCurrentIndex(0)
+                self._combo.blockSignals(False)
+                self._selecionado = self._clientes.get(self.valor())
+                if self._selecionado is not None:
+                    self._combo.setEditText(
+                        self._selecionado.get("nome_razao", termo)
+                    )
+            else:
+                self._estado("Nenhum cliente — salve como novo", "atencao")
+                self.sem_correspondencia = True
+
+        def erro(_msg: str, _status: int | None = None) -> None:
+            if geracao != self._geracao:
+                return
+            self._estado("Busca indisponível — digite o nome", "atencao")
+
+        tarefas.rodar(
+            lambda: self._api.listar("clientes", q=termo, limit=20), ok, erro
+        )
+
+    def _selecionou(self) -> None:
+        if getattr(self, "_atualizando_opcoes", False):
+            return
+        cid = self.valor()
+        self._selecionado = self._clientes.get(cid) if cid is not None else None
+        if self._selecionado is not None:
+            self._estado("Cliente encontrado", "muted")
+            self.sem_correspondencia = False
+
+    def habilitar(self, ligado: bool) -> None:
+        super().habilitar(ligado)
+        self._combo.setEditable(ligado)
 
 
 class CampoCheck(CampoForm):

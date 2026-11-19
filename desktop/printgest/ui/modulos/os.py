@@ -40,6 +40,7 @@ import printgest.core.tarefas as tarefas
 from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
+    CampoClienteAutocomplete,
     CampoCombo,
     CampoData,
     CampoDataHora,
@@ -688,9 +689,16 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
 
     def _secoes(self):
         self._iniciar_condicao_pagamento()  # flags de pagamento por cliente
-        self._cliente = CampoCombo("Cliente", []).obrigatorio()
+        # Fase 1: combobox com autocomplete remoto (debounce) e autopreenchimento.
+        self._cliente = CampoClienteAutocomplete("Cliente", self._api).obrigatorio()
         self._vendedor = CampoCombo("Vendedor", [])
         self._atendente = CampoCombo("Atendente", [])
+        # Contato preenchido automaticamente ao selecionar cliente cadastrado.
+        from printgest.ui.formulario import CampoTelefone
+
+        self._telefone_cliente = CampoTelefone("Telefone do cliente")
+        self._email_cliente = CampoTexto("E-mail do cliente", maximo=120)
+        self._salvar_novo_cliente = CampoCheck("Salvar como novo cliente")
         # P1#9: data + hora (backend persiste data; hora melhora UX de planejamento)
         self._previsao = CampoDataHora("Previsão de Entrega", obrigatorio=False)
         self._forma = CampoCombo("Forma de Pagamento", FORMAS_PAGAMENTO)
@@ -706,8 +714,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._itens._tabela.setMinimumHeight(170)
 
         # P1#11: combos pesquisáveis (digitação filtra opções).
+        # Cliente agora tem autocomplete remoto próprio — só vendedor/atendente
+        # usam o completer local.
         for campo, placeholder in (
-            (self._cliente, "Buscar/selecionar cliente"),
             (self._vendedor, "Buscar/selecionar vendedor"),
             (self._atendente, "Buscar/selecionar atendente"),
         ):
@@ -751,7 +760,17 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._cliente_campo = _CampoClienteWrap(self._cliente, cliente_widget)
 
         return [
-            ("Cliente & Equipe", [self._cliente_campo, self._vendedor, self._atendente]),
+            (
+                "Cliente & Equipe",
+                [
+                    self._cliente_campo,
+                    self._telefone_cliente,
+                    self._email_cliente,
+                    self._salvar_novo_cliente,
+                    self._vendedor,
+                    self._atendente,
+                ],
+            ),
             (
                 "Prazos & Financeiro",
                 [
@@ -768,7 +787,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         ]
 
     def _conectar_campos(self) -> None:
-        self._cliente.widget.currentIndexChanged.connect(self._ao_mudar_cliente_os)
+        self._cliente.combo.currentIndexChanged.connect(self._ao_mudar_cliente_os)
+        # Ao selecionar um cliente, preenche telefone/e-mail (e desmarca "novo").
+        self._cliente.combo.currentIndexChanged.connect(self._cliente_selecionado_os)
         self._desconto.edicao.textChanged.connect(self._atualizar_totais_os)
         if hasattr(self._valor_sinal, "edicao"):
             self._valor_sinal.edicao.textChanged.connect(self._atualizar_totais_os)
@@ -777,6 +798,24 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     def _ao_mudar_cliente_os(self) -> None:
         self._cliente_mudou()
         self._atualizar_totais_os()
+
+    def _clientes_flags_recebidos(self, saida: dict) -> None:
+        """Carrega flags E dados de contato para autopreenchimento local."""
+        super()._clientes_flags_recebidos(saida)
+        dados = saida.get("data", [])
+        self._cliente.alterar_opcoes(
+            [(r["id"], r.get("nome_razao", "")) for r in dados],
+            {r["id"]: r for r in dados if r.get("id") is not None},
+        )
+
+    def _cliente_selecionado_os(self) -> None:
+        """Autopreenche contato quando o cliente é selecionado."""
+        cliente = self._cliente.cliente_selecionado
+        if cliente is None:
+            return
+        self._telefone_cliente.definir(cliente.get("telefone"))
+        self._email_cliente.definir(cliente.get("email"))
+        self._salvar_novo_cliente.definir(False)
 
     def _novo_cliente_inline(self) -> None:
         dlg = QDialog(self)
@@ -1082,7 +1121,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     # ---------------------------------------------------------------- salvar
 
     def _validar(self):
-        if not self._cliente.valor():
+        if not self._cliente.valor() and not (
+            self._salvar_novo_cliente.valor() and self._cliente.texto
+        ):
             return ("Informe o cliente.", self._cliente)
         if not self._itens.valor():
             return ("Adicione ao menos um item.", self._itens.widget)
@@ -1116,6 +1157,59 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
                     self._pagamento_confirmado,
                 )
         return None
+
+    def _salvar(self) -> None:
+        """Cria o cliente marcado como novo antes de salvar a O.S./Orçamento."""
+        if not self._salvar_novo_cliente.valor() or self._cliente.valor() is not None:
+            super()._salvar()
+            return
+        nome = self._cliente.texto
+        if not nome:
+            QMessageBox.warning(
+                self, "Cliente", "Informe o nome do cliente ou desmarque 'Salvar como novo'."
+            )
+            return
+        payload_cliente = {
+            "nome_razao": nome,
+            "tipo_pessoa": "PF",
+        }
+        telefone = limpo(self._telefone_cliente.valor())
+        email = limpo(self._email_cliente.valor())
+        if telefone:
+            payload_cliente["telefone"] = telefone
+        if email:
+            payload_cliente["email"] = email
+
+        self._btn_salvar.setEnabled(False)
+
+        def criado(saida: dict) -> None:
+            dado = saida.get("data", saida) if isinstance(saida, dict) else {}
+            cid = dado.get("id")
+            if cid is None:
+                self._btn_salvar.setEnabled(True)
+                QMessageBox.warning(self, "Cliente", "Não foi possível salvar o cliente.")
+                return
+            catalogos.invalidar("clientes")
+            self._cliente._clientes[cid] = dado
+            self._cliente.alterar_opcoes(
+                [(cid, dado.get("nome_razao", nome))], self._cliente._clientes
+            )
+            self._cliente.definir(cid)
+            self._salvar_novo_cliente.definir(False)
+            self._cliente_flags[cid] = (
+                bool(dado.get("pagamento_adiantado")),
+                bool(dado.get("sinal")),
+                dado.get("sinal_pct"),
+            )
+            super()._salvar()
+
+        def erro(msg: str, _status: int | None = None) -> None:
+            self._btn_salvar.setEnabled(True)
+            QMessageBox.warning(self, "Cliente", msg)
+
+        tarefas.rodar(
+            lambda: self._api.criar("clientes", payload_cliente), criado, erro
+        )
 
     def _payload(self) -> dict:
         return {
