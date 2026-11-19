@@ -41,6 +41,33 @@ _OSS = [
     },
     {"id": 2, "numero": 1045, "tipo": "os", "status": "producao", "cliente_id": None, "cliente_nome": "Biz"},
     {"id": 6, "numero": 3100, "tipo": "orcamento", "status": "aberto", "cliente_id": 2, "cliente_nome": "Biz"},
+    {
+        "id": 8,
+        "numero": 3101,
+        "tipo": "orcamento",
+        "status": "aberto",
+        "cliente_id": None,
+        "cliente_nome": None,
+        "cliente_nome_avulso": "Cliente Sem Cadastro",
+        "desconto": "0",
+        "valor_total": "100.00",
+        "forma_pagamento": "pix",
+        "itens": [
+            {
+                "id": 20,
+                "seq": 1,
+                "produto_id": None,
+                "descricao_avulsa": "Serviço avulso",
+                "quantidade": "1",
+                "dimensoes": None,
+                "valor_unitario": "100.00",
+                "desconto": "0",
+                "valor_total": "100.00",
+                "executado": False,
+                "tipo": "proprio",
+            }
+        ],
+    },
 ]
 
 _CLIENTES = [
@@ -87,9 +114,14 @@ def _handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200, json={"data": _PRODUTOS, "meta": {"total": 2, "limit": 50, "offset": 0}}
         )
+    if request.method == "GET" and request.url.path == "/v1/os/8":
+        return httpx.Response(200, json={"data": next(o for o in _OSS if o["id"] == 8)})
     if request.method == "POST" and request.url.path == "/v1/os":
         _ESCRITAS.append(("POST", "", request.read().decode()))
         return httpx.Response(200, json={"data": {"id": 3, "numero": 1046}})
+    if request.method == "PUT" and request.url.path == "/v1/os/8":
+        _ESCRITAS.append(("PUT", "8", request.read().decode()))
+        return httpx.Response(200, json={"data": {"id": 8, "numero": 3101}})
     if request.method == "PATCH" and request.url.path == "/v1/os/1/status":
         _ESCRITAS.append(("PATCH", "1/status", request.read().decode()))
         return httpx.Response(200, json={"data": {"id": 1, "status": "aprovado"}})
@@ -256,7 +288,7 @@ def test_modo_leitura_bloqueia_tudo(app, pumpar):
 
 def test_orcamento_converte_em_os(app, pumpar, pagina_orcamento, monkeypatch):
     _sem_dialogos(monkeypatch)
-    pumpar(lambda: pagina_orcamento._tabela.rowCount() == 1)
+    pumpar(lambda: pagina_orcamento._tabela.rowCount() == 2)
     pagina_orcamento._tabela.selectRow(0)
     pumpar(lambda: pagina_orcamento._editando_id == 6)
     antes_get = len(_GETS)
@@ -275,7 +307,7 @@ def test_orcamento_envia_tipo_orcamento_no_post(app, pumpar):
     api.autenticar({"token": "tok", "usuario": {"id": 1, "nome": "x", "login": "x"}})
     pagina = PaginaOrcamento(api)
     pumpar(
-        lambda: pagina._tabela.rowCount() == 1
+        lambda: pagina._tabela.rowCount() == 2
         and pagina._cliente.widget.count() == 2
         and pagina._itens._combo_produto.count() > 1
     )
@@ -462,3 +494,87 @@ def test_cliente_sem_correspondencia_sugere_novo(app, monkeypatch):
     assert geracao > 0
     assert pagina._cliente.sem_correspondencia is True
     assert "Nenhum cliente" in pagina._cliente.estado_mensagem
+
+
+# --- Verificação de Orçamento: botões, salvamento e persistência ---------------
+
+
+def test_botoes_do_orcamento(app, pagina_orcamento):
+    """Ações esperadas na tela de Orçamento (sem Arte/Avançar de O.S.)."""
+    rotulos = {b.text() for b in pagina_orcamento.findChildren(QPushButton)}
+    assert "Converter em O.S." in rotulos
+    assert any("Cancelar Orçamento" in r for r in rotulos)
+    assert hasattr(pagina_orcamento, "_btn_cotacoes")
+    assert hasattr(pagina_orcamento, "_btn_salvar")
+    assert "orçamento" in pagina_orcamento._btn_salvar.toolTip().lower()
+
+
+def test_payload_put_tem_tipo_item_id_e_avulso(app, pumpar, pagina_orcamento):
+    """PUT de orçamento existente preserva o ID do item (merge no backend)."""
+    _GETS.clear()
+    _ESCRITAS.clear()
+    pumpar(lambda: pagina_orcamento._tabela.rowCount() == 2)
+
+    pagina_orcamento._tabela.selectRow(1)  # orçamento id=8, cliente avulso
+    pumpar(lambda: pagina_orcamento._editando_id == 8)
+    assert pagina_orcamento._cliente.texto == "Cliente Sem Cadastro"
+
+    # Simula uma busca remota desatualizada: não pode trocar o nome avulso.
+    pagina_orcamento._cliente._buscar()
+    app.processEvents()
+    assert pagina_orcamento._cliente.texto == "Cliente Sem Cadastro"
+
+    pagina_orcamento._btn_salvar.click()
+    pumpar(lambda: any(escr[0] == "PUT" for escr in _ESCRITAS))
+
+    metodo, alvo, corpo = _ESCRITAS[-1]
+    assert (metodo, alvo) == ("PUT", "8")
+    dados = json.loads(corpo)
+    assert dados["tipo"] == "orcamento"
+    assert dados["cliente_id"] is None
+    assert dados["cliente_nome_avulso"] == "Cliente Sem Cadastro"
+    assert dados["itens"][0]["id"] == 20
+
+
+def test_formas_pagamento_espelham_enum_do_backend():
+    """Nenhuma forma inválida (transferencia/cheque/outro) ou faltando (fiado)."""
+    valores = [codigo for codigo, _rotulo in dominio_os.FORMAS_PAGAMENTO]
+    assert set(valores) == {
+        "dinheiro", "cartao_credito", "cartao_debito", "pix", "boleto", "fiado"
+    }
+    from printgest.core.dominio import FORMAS_PAGAMENTO_LABEL
+
+    assert "fiado" in FORMAS_PAGAMENTO_LABEL
+
+
+def test_padrao_usuario_vem_da_property_api(app):
+    """`Api.usuario` é dict (@property), não método — padrões devem ser aplicados."""
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    api.autenticar({
+        "token": "tok",
+        "usuario": {"id": 1, "nome": "x", "login": "x", "funcionario_id": 10},
+    })
+    pagina = PaginaOrcamento(api)
+    pagina._btn_novo.click()
+    assert any(
+        campo.valor() == 10
+        for campo in (pagina._vendedor, pagina._atendente)
+    )
+
+
+def test_detalhe_422_listado_de_forma_legivel():
+    import httpx
+
+    from printgest.core.api import _detalhe
+
+    resposta = httpx.Response(
+        422,
+        json={"detail": [
+            {"loc": ["body", "cliente_nome_avulso"], "msg": "Field required", "type": "missing"},
+            {"loc": ["body", "itens"], "msg": "List should have at least 1 item", "type": "too_short"},
+        ]},
+    )
+    texto = _detalhe(resposta)
+    assert "cliente_nome_avulso" in texto
+    assert "itens" in texto
+    assert "{" not in texto  # não é repr cru de dict

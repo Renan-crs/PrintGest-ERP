@@ -77,7 +77,27 @@ def _detalhe(resp: httpx.Response) -> str:
         corpo = resp.json()
     except ValueError:
         return "Resposta inválida do Local API Service."
-    return corpo.get("detail") or "Falha no Local API Service."
+    detail = corpo.get("detail") or "Falha no Local API Service."
+    if isinstance(detail, str):
+        return detail
+    # Validação Pydantic (422) devolve uma LISTA de erros. Mostrar o repr
+    # Python cru na UI é inútil ao operador — extrai as mensagens.
+    if isinstance(detail, list):
+        mensagens = []
+        for erro in detail:
+            if isinstance(erro, dict):
+                mensagem = str(erro.get("msg") or "")
+                campo = erro.get("loc")
+                if isinstance(campo, (list, tuple)) and len(campo) > 1:
+                    mensagem = f"{campo[-1]}: {mensagem}" if mensagem else str(campo[-1])
+                if mensagem:
+                    mensagens.append(mensagem)
+            elif str(erro).strip():
+                mensagens.append(str(erro))
+        if mensagens:
+            return " · ".join(dict.fromkeys(mensagens))
+        return "Dados inválidos. Verifique os campos informados."
+    return str(detail)
 
 
 class Api:

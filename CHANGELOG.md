@@ -9,6 +9,27 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.14] - 2026-11-19 — Verificação do fluxo de Orçamento
+
+### Corrigido
+- **PUT de orçamento apagava cotações, `snapshot_preco` e rastreio de
+  terceirizado** (`delete-orphan` ao substituir a lista de itens). Agora os
+  itens são mesclados por `id`; a conversão em O.S. continua funcionando.
+- Edição de cliente avulso podia trocar o nome por um cliente cadastrado
+  (autocomplete repovoava o combo). Texto avulso preservado em 3 camadas.
+- Formas de pagamento do desktop divergiam do enum do banco
+  (`transferencia/cheque/outro` geravam 422; faltava `fiado`). Fonte única
+  alinhada ao enum `forma_pagamento` do Postgres.
+- `_api.usuario()` era chamado como método (é `@property`) — padrões de
+  vendedor/atendente nunca eram aplicados.
+- Erros 422 exibiam o repr bruto do Pydantic; agora mostram mensagens legíveis.
+- `OsUpdate` valida cliente/avulso; rótulos/tooltips de orçamento corrigidos.
+
+### Validação
+Backend: 407 passed (3 novos de persistência). Desktop: 436 passed, 4 xfailed.
+
+---
+
 ## [0.5.13] - 2026-11-19 — Verificação das chamadas do PDV
 
 ### Novidades

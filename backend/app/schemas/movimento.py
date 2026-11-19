@@ -22,6 +22,10 @@ from app.schemas.common import ORMModel
 
 
 class OsItemIn(BaseModel):
+    # ID do item já gravado. A UI reenvia a lista inteira no PUT; sem ele o
+    # service não consegue mesclar e apaga cotações/snapshot (delete-orphan).
+    # Ignorado na criação — o ID é sempre gerado pelo banco.
+    id: int | None = Field(default=None)
     produto_id: int | None = Field(default=None)
     descricao_avulsa: str | None = Field(default=None, max_length=255)
     quantidade: Decimal = Field(default=Decimal(1), gt=0)
@@ -81,6 +85,19 @@ class OsUpdate(BaseModel):
     forma_sinal: FormaPagamento | None = None
     observacoes: str | None = None
     itens: list[OsItemIn] | None = None
+
+    @model_validator(mode="after")
+    def _cliente_ou_avulso(self):
+        # Atualização parcial: só valida quando o chamador enviou um dos dois.
+        enviados = self.model_fields_set
+        if "cliente_id" not in enviados and "cliente_nome_avulso" not in enviados:
+            return self
+        avulso = (self.cliente_nome_avulso or "").strip()
+        if self.cliente_id is None and not avulso:
+            raise ValueError("Informe cliente_id ou cliente_nome_avulso.")
+        if self.cliente_id is not None and avulso:
+            raise ValueError("Use cliente_id OU cliente_nome_avulso, não ambos.")
+        return self
 
 
 class OsStatusIn(BaseModel):

@@ -9,16 +9,16 @@ from datetime import date
 from enum import StrEnum
 from typing import Literal
 
-# FORMAS_PAGAMENTO definida localmente para evitar import circular
+# ESPELHO do enum `FormaPagamento` do backend (app/models/enums.py).
+# `transferencia`/`cheque`/`outro` NÃO existem no enum do banco e geravam 422
+# ao salvar O.S./orçamento e venda; `fiado` é o valor correto que faltava.
 FORMAS_PAGAMENTO = [
     ("dinheiro", "Dinheiro"),
     ("cartao_credito", "Cartão de Crédito"),
     ("cartao_debito", "Cartão de Débito"),
     ("pix", "PIX"),
     ("boleto", "Boleto"),
-    ("transferencia", "Transferência"),
-    ("cheque", "Cheque"),
-    ("outro", "Outro"),
+    ("fiado", "Fiado"),
 ]
 
 

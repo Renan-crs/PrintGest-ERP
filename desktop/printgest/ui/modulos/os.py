@@ -683,7 +683,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._atualizar_contadores_os()
         # Consistência de ação principal no fluxo de OS
         if hasattr(self, "_btn_salvar"):
-            self._btn_salvar.setToolTip("Salvar ordem de serviço (F10)")
+            acao = "orçamento" if self.TIPO == "orcamento" else "ordem de serviço"
+            self._btn_salvar.setToolTip(f"Salvar {acao} (F10)")
 
     # ----------------------------------------------------------- formulário
 
@@ -942,10 +943,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._atualizar_totais_os()
 
     def _aplicar_padrao_usuario(self) -> None:
-        try:
-            usuario = (self._api.usuario() or {}) if hasattr(self._api, "usuario") else {}
-        except Exception:
-            usuario = {}
+        # `Api.usuario` é @property (dict), não método. Chamá-lo como função
+        # lançava TypeError engolido pelo except — os padrões nunca eram aplicados.
+        usuario = getattr(self._api, "usuario", None) or {}
         funcionario_id = usuario.get("funcionario_id")
         nome = str(usuario.get("nome") or "").strip().lower()
         login = str(usuario.get("login") or "").strip().lower()
@@ -1108,7 +1108,13 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         if cid is not None:
             self._cliente.definir(cid)
         else:
-            self._cliente.combo.setEditText(dado.get("cliente_nome_avulso") or "")
+            # Bloqueia sinais: `editTextChanged` agendaria a busca remota, que
+            # repovoa o combo e auto-seleciona o primeiro cliente, apagando ou
+            # trocando o nome avulso gravado no orçamento.
+            combo = self._cliente.combo
+            combo.blockSignals(True)
+            combo.setEditText(dado.get("cliente_nome_avulso") or "")
+            combo.blockSignals(False)
         self._vendedor.definir(dado.get("vendedor_id"))
         self._atendente.definir(dado.get("atendente_id"))
         previsao = dado.get("data_previsao_entrega")
@@ -1220,16 +1226,26 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     def _cliente_da_os(self) -> tuple[int | None, str | None]:
         """Resolve cliente cadastrado ou nome avulso (Fase 2).
 
-        - texto que casa com uma opção → `cliente_id`;
-        - texto livre (não cadastrado) → `cliente_nome_avulso`;
+        - texto que casa com o rótulo da opção selecionada → `cliente_id`;
+        - texto livre → `cliente_nome_avulso`;
         - campo vazio → (None, None) e a validação barra.
+
+        A checagem do rótulo é essencial na edição: o combo pode manter um
+        `currentData` antigo enquanto exibe um nome avulso. Sem ela, um PUT
+        transformava silenciosamente o cliente avulso em outro cadastrado.
         """
-        cid = self._cliente.valor()
-        if cid is not None:
-            return cid, None
         texto = self._cliente.texto
         if not texto:
             return None, None
+        cid = self._cliente.valor()
+        if cid is not None:
+            indice = self._cliente.combo.currentIndex()
+            rotulo = (
+                str(self._cliente.combo.itemText(indice) or "").strip()
+                if indice >= 0 else ""
+            )
+            if rotulo and rotulo.casefold() == texto.casefold():
+                return cid, None
         return None, texto
 
     def _payload(self) -> dict:
@@ -1393,7 +1409,9 @@ class PaginaOrcamento(PaginaOS):
         self._btn_converter.clicked.connect(self._converter_em_os)
         layout.addWidget(converter)
 
-        cotacoes, self._btn_cotacoes = botao_com_atalho("Cotações", "F10")
+        # Sem dica de atalho: F10 já é de "Salvar" no rodapé (botão_com_atalho
+        # só desenha a dica, não instala QShortcut — a duplicata confundia).
+        cotacoes, self._btn_cotacoes = botao_com_atalho("Cotações", "")
         self._btn_cotacoes.clicked.connect(self._abrir_cotacoes)
         cancelar, self._btn_cancelar_os = botao_com_atalho(
             "Cancelar Orçamento", "F8"

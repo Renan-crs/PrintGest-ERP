@@ -654,17 +654,22 @@ class CampoClienteAutocomplete(CampoForm):
             )
             if itens:
                 self._estado(f"{len(itens)} encontrado(s)", "muted")
-                self.sem_correspondencia = False
-                # Seleciona a primeira correspondência para `valor()` já trazer
-                # o cliente_id (o operador pode trocar no dropdown).
-                self._combo.blockSignals(True)
-                self._combo.setCurrentIndex(0)
-                self._combo.blockSignals(False)
-                self._selecionado = self._clientes.get(self.valor())
-                if self._selecionado is not None:
-                    self._combo.setEditText(
-                        self._selecionado.get("nome_razao", termo)
-                    )
+                nome = str(itens[0].get("nome_razao", "") or "")
+                # `alterar_opcoes` limpa o combo (e com ele o texto digitado).
+                # Só faz autoseleção quando o termo é prefixo do primeiro
+                # resultado — caso contrário o texto é um cliente AVULSO que
+                # casou parcialmente e deve ser preservado (edição de O.S./OS).
+                if nome.casefold().startswith(termo.casefold()):
+                    self.sem_correspondencia = False
+                    self._combo.blockSignals(True)
+                    self._combo.setCurrentIndex(0)
+                    self._combo.blockSignals(False)
+                    self._selecionado = self._clientes.get(self.valor())
+                    self._combo.setEditText(nome)
+                else:
+                    self._selecionado = None
+                    self._combo.setEditText(termo)
+                    self.sem_correspondencia = True
             else:
                 self._estado("Nenhum cliente — salve como novo", "atencao")
                 self.sem_correspondencia = True

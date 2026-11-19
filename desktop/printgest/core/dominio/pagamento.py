@@ -16,17 +16,10 @@ from printgest.core.dominio import FORMAS_PAGAMENTO
 TIPO_CONDICAO = Literal["adiantado", "sinal", "parcelado", "recebimento"]
 
 
-# Formas de pagamento válidas (reutiliza do domínio central)
-FORMAS_PAGAMENTO_LABEL = {
-    "dinheiro": "Dinheiro",
-    "cartao_credito": "Cartão de Crédito",
-    "cartao_debito": "Cartão de Débito",
-    "pix": "PIX",
-    "boleto": "Boleto",
-    "transferencia": "Transferência",
-    "cheque": "Cheque",
-    "outro": "Outro",
-}
+# Formas de pagamento válidas — derivado da fonte única (espelho do enum do
+# backend). Antes havia uma segunda lista com transferencia/cheque/outro,
+# valores recusados pelo banco com 422.
+FORMAS_PAGAMENTO_LABEL = dict(FORMAS_PAGAMENTO)
 
 
 # Validações de regra de negócio
@@ -102,16 +95,7 @@ TIPOS_CONDICAO_LABEL = {
     "recebimento": "Recebimento à Vista",
 }
 
-FORMAS_PAGAMENTO_LABEL = {
-    "dinheiro": "Dinheiro",
-    "cartao_credito": "Cartão de Crédito",
-    "cartao_debito": "Cartão de Débito",
-    "pix": "PIX",
-    "boleto": "Boleto",
-    "transferencia": "Transferência",
-    "cheque": "Cheque",
-    "outro": "Outro",
-}
+FORMAS_PAGAMENTO_LABEL = dict(FORMAS_PAGAMENTO)
 
 # Mapeamento para compatibilidade com schema existente
 CONDICAO_PAGAMENTO_DEFAULTS = {

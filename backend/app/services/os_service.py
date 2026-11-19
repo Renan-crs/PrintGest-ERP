@@ -48,27 +48,70 @@ def _erro_integridade() -> HTTPException:
     )
 
 
-def _montar_item(payload: OsItemIn, seq: int) -> OrdemServicoItem:
+def _aplicar_dados_item(
+    item: OrdemServicoItem, payload: OsItemIn, seq: int
+) -> None:
+    """Aplica os campos editáveis do item, preservando o histórico da cotação.
+
+    `snapshot_preco`, `cotacoes`, `executado` e o rastreio `OsTerceirizado` não
+    vêm no payload da UI e pertencem ao registro gravado — nunca devem ser
+    sobrescritos num PUT.
+    """
     total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
     if total < 0:
         total = Decimal("0.00")
-    return OrdemServicoItem(
-        seq=seq,
-        produto_id=payload.produto_id,
-        descricao_avulsa=payload.descricao_avulsa,
-        quantidade=payload.quantidade.quantize(
-            Decimal("0.001"), rounding=ROUND_HALF_UP
-        ),
-        dimensoes=payload.dimensoes,
-        valor_unitario=payload.valor_unitario,
-        desconto=payload.desconto,
-        valor_total=total,
-        tipo=payload.tipo,
+    item.seq = seq
+    item.produto_id = payload.produto_id
+    item.descricao_avulsa = payload.descricao_avulsa
+    item.quantidade = payload.quantidade.quantize(
+        Decimal("0.001"), rounding=ROUND_HALF_UP
     )
+    item.dimensoes = payload.dimensoes
+    item.valor_unitario = payload.valor_unitario
+    item.desconto = payload.desconto
+    item.valor_total = total
+    item.tipo = payload.tipo
+
+
+def _montar_item(payload: OsItemIn, seq: int) -> OrdemServicoItem:
+    item = OrdemServicoItem()
+    _aplicar_dados_item(item, payload, seq)
+    return item
 
 
 def _montar_itens(itens: list[OsItemIn]) -> list[OrdemServicoItem]:
     return [_montar_item(item, seq) for seq, item in enumerate(itens, start=1)]
+
+
+def _mesclar_itens(
+    atuais: list[OrdemServicoItem], payloads: list[OsItemIn]
+) -> list[OrdemServicoItem]:
+    """Mescla a lista enviada pela UI com os itens já gravados.
+
+    A UI reenvia todos os itens no PUT. Substituir a coleção inteira (como era
+    feito) disparava `delete-orphan` e apagava cotações, `snapshot_preco` e o
+    rastreio de terceirizado — a conversão posterior falhava com 409. Itens com
+    `id` conhecido são atualizados no lugar; os demais são criados; os que
+    saíram da lista são removidos pelo próprio cascade.
+    """
+    # `seq` é UNIQUE por OS: usa valores temporários negativos para não violar
+    # a constraint no meio de uma reordenação (ex.: trocar item 1 pelo 2).
+    for posicao, item in enumerate(atuais, start=1):
+        item.seq = -posicao
+
+    por_id = {item.id: item for item in atuais}
+    usados: set[int] = set()
+    resultado: list[OrdemServicoItem] = []
+    for seq, payload in enumerate(payloads, start=1):
+        existente = por_id.get(payload.id) if payload.id is not None else None
+        if existente is not None and existente.id not in usados:
+            _aplicar_dados_item(existente, payload, seq)
+            usados.add(existente.id)
+            resultado.append(existente)
+        else:
+            # id desconhecido/duplicado = item novo (nunca reaproveita outro OS).
+            resultado.append(_montar_item(payload, seq))
+    return resultado
 
 
 def _totais(
@@ -218,7 +261,8 @@ def atualizar(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A lista de itens não pode ser nula.",
             )
-        os_obj.itens = _montar_itens(dados.itens)
+        # Mescla por `id`: substituir a coleção apagaria cotações/snapshot.
+        os_obj.itens = _mesclar_itens(list(os_obj.itens), dados.itens)
     valor_itens, valor_total = _totais(os_obj.itens, desconto)
     os_obj.desconto = desconto
     os_obj.valor_itens = valor_itens
