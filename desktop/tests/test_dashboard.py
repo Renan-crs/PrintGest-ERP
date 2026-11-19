@@ -449,3 +449,41 @@ def test_dashboard_tolera_resumo_vazio(app, pumpar):
     pumpar(lambda: not principal._pagina_inicio._lbl_estoque.text().startswith("Aguardando"))
     assert principal._pagina_inicio._kpi_vendas_valor.text() == "—"
     assert not principal._pagina_inicio._lbl_estoque.text().startswith("Aguardando")
+
+
+def test_voltar_ao_inicio_recarrega_kpis(app, pumpar, monkeypatch):
+    """Bug corrigido: PaginaInicial.recarregar() agora existe e recarrega o resumo."""
+    chamadas = []
+
+    def handler_com_contador(request):
+        caminho = request.url.path
+        if request.method == "GET" and caminho == "/v1/dashboard/resumo":
+            chamadas.append(request.url.params.get("dias", "7"))
+            return httpx.Response(200, json={"data": _resumo()})
+        return _handler(request)
+
+    api = Api(
+        base_url="http://daemon.test",
+        transport=httpx.MockTransport(handler_com_contador),
+    )
+    api.autenticar({"token": "tok", "usuario": {
+        "id": 1, "nome": "Admin", "login": "admin",
+        "nivel_acesso": "admin", "filial_nome": "Matriz",
+    }})
+    principal = TelaPrincipal(
+        api, usuario=api.usuario, base_url="127.0.0.1:8000"
+    )
+    principal.show()
+    app.processEvents()
+    pumpar(lambda: len(chamadas) >= 1)
+
+    inicio = principal._pagina_inicio
+    assert hasattr(inicio, "recarregar")
+
+    # Navega para outro módulo e volta — deve disparar nova chamada ao resumo.
+    principal._navegar("cliente")
+    app.processEvents()
+    antes = len(chamadas)
+    principal._navegar("inicio")
+    pumpar(lambda: len(chamadas) > antes)
+    assert len(chamadas) == antes + 1

@@ -9,6 +9,20 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.12] - 2026-11-19 — Verificação das chamadas da Tela Início
+
+### Corrigido
+- `PaginaInicial.recarregar()` não existia, então os KPIs não eram atualizados
+  ao voltar ao Início (apesar do código chamar o método). Agora recarrega o
+  resumo ao navegar de volta, com teste de regressão.
+
+### Verificado
+- Paths, query `dias`, envelope e todas as chaves do dashboard conferem com
+  `DashboardResumoOut`; `/v1/licenca` e `/health` corretamente registrados;
+  nenhuma chamada a rota inexistente.
+
+---
+
 ## [0.5.11] - 2026-11-19 — Cliente avulso persistido em O.S./Orçamento (Fase 2)
 
 ### Novidades

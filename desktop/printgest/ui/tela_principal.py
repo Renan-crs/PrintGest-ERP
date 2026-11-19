@@ -506,6 +506,11 @@ class PaginaInicial(QWidget):
         self._dias = int(self._combo_dias.currentData() or 7)
         self._carregar_resumo()
 
+    def recarregar(self) -> None:
+        """Recarrega KPIs/pendências ao voltar para o Início (chamado por
+        `TelaPrincipal._navegar`)."""
+        self._carregar_resumo()
+
     def _carregar_resumo(self) -> None:
         if not self._resumo_recebido:
             # Primeiro carregamento: skeleton nos cards de dados (recargas
