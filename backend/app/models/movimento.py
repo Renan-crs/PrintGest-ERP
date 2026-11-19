@@ -83,6 +83,8 @@ class OrdemServico(Base):
         BigInteger, ForeignKey("ordem_servico.id")
     )
     cliente_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("cliente.id"))
+    # Cliente não cadastrado no ato da O.S./orçamento (PDV/OS leve).
+    cliente_nome_avulso: Mapped[str | None] = mapped_column(String(160), nullable=True)
     vendedor_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("funcionario.id")
     )

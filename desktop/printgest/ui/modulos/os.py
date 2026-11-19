@@ -1040,6 +1040,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         tarefas.rodar(lambda: _buscar("atrasada"), on_ok=ok_atrasada, on_erro=lambda _m: None)
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
+        if chave == "cliente_nome":
+            return str(
+                dado.get("cliente_nome") or dado.get("cliente_nome_avulso") or "—"
+            )
         if chave == "status":
             valor = str(dado.get("status", "") or "")
             rotulos = {
@@ -1100,7 +1104,11 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             self._aplicar_padrao_usuario()
 
     def _preencher_campos(self, dado: dict) -> None:
-        self._cliente.definir(dado.get("cliente_id"))
+        cid = dado.get("cliente_id")
+        if cid is not None:
+            self._cliente.definir(cid)
+        else:
+            self._cliente.combo.setEditText(dado.get("cliente_nome_avulso") or "")
         self._vendedor.definir(dado.get("vendedor_id"))
         self._atendente.definir(dado.get("atendente_id"))
         previsao = dado.get("data_previsao_entrega")
@@ -1121,9 +1129,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     # ---------------------------------------------------------------- salvar
 
     def _validar(self):
-        if not self._cliente.valor() and not (
-            self._salvar_novo_cliente.valor() and self._cliente.texto
-        ):
+        if not self._cliente.valor() and not self._cliente.texto:
             return ("Informe o cliente.", self._cliente)
         if not self._itens.valor():
             return ("Adicione ao menos um item.", self._itens.widget)
@@ -1211,10 +1217,27 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             lambda: self._api.criar("clientes", payload_cliente), criado, erro
         )
 
+    def _cliente_da_os(self) -> tuple[int | None, str | None]:
+        """Resolve cliente cadastrado ou nome avulso (Fase 2).
+
+        - texto que casa com uma opção → `cliente_id`;
+        - texto livre (não cadastrado) → `cliente_nome_avulso`;
+        - campo vazio → (None, None) e a validação barra.
+        """
+        cid = self._cliente.valor()
+        if cid is not None:
+            return cid, None
+        texto = self._cliente.texto
+        if not texto:
+            return None, None
+        return None, texto
+
     def _payload(self) -> dict:
+        cliente_id, cliente_avulso = self._cliente_da_os()
         return {
             "tipo": self.TIPO,
-            "cliente_id": self._cliente.valor(),
+            "cliente_id": cliente_id,
+            "cliente_nome_avulso": cliente_avulso,
             "vendedor_id": self._vendedor.valor(),
             "atendente_id": self._atendente.valor(),
             "data_previsao_entrega": (

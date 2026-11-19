@@ -9,6 +9,22 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.11] - 2026-11-19 — Cliente avulso persistido em O.S./Orçamento (Fase 2)
+
+### Novidades
+- `cliente_nome_avulso` em `ordem_servico` (migration `a0b1c2d3e4f5`): é
+  possível lançar O.S./orçamento sem cadastrar o cliente.
+- Validação: informe `cliente_id` **ou** `cliente_nome_avulso` (nunca ambos).
+- Conversão orçamento → O.S. preserva o nome avulso; filtro `q` de `GET /v1/os`
+  encontra O.S. com cliente avulso.
+- A Fase 1 (checkbox "Salvar como novo cliente") continua disponível — agora
+  o operador escolhe entre cadastrar ou deixar como avulso.
+
+### Banco de dados
+- Migration `a0b1c2d3e4f5` aplicada no Neon em 19/11/2026.
+
+---
+
 ## [0.5.10] - 2026-11-19 — Autocomplete de Cliente em O.S./Orçamento (Fase 1)
 
 ### Novidades

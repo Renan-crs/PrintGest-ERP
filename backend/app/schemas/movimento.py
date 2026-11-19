@@ -43,7 +43,9 @@ class OsItemIn(BaseModel):
 
 class OsCreate(BaseModel):
     tipo: TipoOs = TipoOs.OS
-    cliente_id: int
+    cliente_id: int | None = None
+    # Cliente não cadastrado: pelo menos um dos dois deve ser informado.
+    cliente_nome_avulso: str | None = Field(default=None, max_length=160)
     vendedor_id: int | None = None
     atendente_id: int | None = None
     data_previsao_entrega: date | None = None
@@ -56,11 +58,20 @@ class OsCreate(BaseModel):
     pagamento_confirmado: bool = False
     itens: list[OsItemIn] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def _cliente_ou_avulso(self):
+        if self.cliente_id is None and not (self.cliente_nome_avulso or "").strip():
+            raise ValueError("Informe cliente_id ou cliente_nome_avulso.")
+        if self.cliente_id is not None and (self.cliente_nome_avulso or "").strip():
+            raise ValueError("Use cliente_id OU cliente_nome_avulso, não ambos.")
+        return self
+
 
 class OsUpdate(BaseModel):
     """Atualização parcial — só aplica campos enviados (exclude_unset)."""
 
     cliente_id: int | None = None
+    cliente_nome_avulso: str | None = Field(default=None, max_length=160)
     vendedor_id: int | None = None
     atendente_id: int | None = None
     data_previsao_entrega: date | None = None
@@ -185,6 +196,7 @@ class OsOut(ORMModel):
     # Cliente / responsáveis (dados denormalizados)
     cliente_id: int | None = None
     cliente_nome: str | None = None
+    cliente_nome_avulso: str | None = None
     vendedor_id: int | None = None
     vendedor_nome: str | None = None
     atendente_id: int | None = None

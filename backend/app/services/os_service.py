@@ -137,6 +137,9 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
         tipo=dados.tipo,
         status=StatusOs.ABERTO,
         cliente_id=dados.cliente_id,
+        cliente_nome_avulso=(
+            (dados.cliente_nome_avulso or "").strip() or None
+        ),
         vendedor_id=dados.vendedor_id,
         atendente_id=dados.atendente_id,
         data_previsao_entrega=dados.data_previsao_entrega,
@@ -194,6 +197,7 @@ def atualizar(
 
     for campo in (
         "cliente_id",
+        "cliente_nome_avulso",
         "vendedor_id",
         "atendente_id",
         "forma_pagamento",
@@ -357,6 +361,7 @@ def converter_em_os(
         status=StatusOs.ABERTO,
         orcamento_origem_id=orcamento.id,
         cliente_id=orcamento.cliente_id,
+        cliente_nome_avulso=orcamento.cliente_nome_avulso,
         vendedor_id=orcamento.vendedor_id,
         atendente_id=orcamento.atendente_id,
         data_previsao_entrega=orcamento.data_previsao_entrega,

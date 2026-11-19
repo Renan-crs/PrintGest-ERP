@@ -85,6 +85,7 @@ def listar(
         base = base.outerjoin(Cliente, OrdemServico.cliente_id == Cliente.id).filter(
             or_(
                 Cliente.nome_razao.ilike(f"%{termo}%"),
+                OrdemServico.cliente_nome_avulso.ilike(f"%{termo}%"),
                 cast(OrdemServico.numero, String).ilike(f"%{termo}%"),
             )
         )

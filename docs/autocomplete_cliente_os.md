@@ -40,8 +40,23 @@ Aplicado em `PaginaOS` — `PaginaOrcamento` herda tudo (mesmo campo).
 - Desktop: **424 passed, 4 xfailed**.
 - Evidência visual: `docs/evidencias/p3_1024x768/os_form_autocomplete_cliente.png`.
 
-## Limite desta fase (Fase 2, não implementada)
-Cliente **avulso de verdade** (nome livre persistido na O.S. sem cadastro)
-exige: migration em `ordem_servico`, `OsCreate/OsUpdate/OsOut`, service,
-conversão orçamento → O.S. e filtro `q` de `GET /v1/os`. A Fase 1 resolve o
-caso criando o cliente no ato do salvamento, sem tocar no contrato.
+## Fase 2 — cliente avulso persistido (implementada)
+
+- `ordem_servico.cliente_nome_avulso` (migration `a0b1c2d3e4f5`, aplicada no
+  Neon em 19/11): permite `cliente_id = NULL` com nome livre.
+- `OsCreate/OsUpdate/OsOut`: `cliente_id` é opcional; validação exige ao menos
+  um de `cliente_id` / `cliente_nome_avulso` (nunca ambos).
+- `os_service`: cria/atualiza com o nome avulso; `adiantamento_service` já
+  trata `cliente=None` (sem exigência de sinal).
+- **Conversão orçamento → O.S. preserva o nome avulso**.
+- `GET /v1/os?q=` agora encontra O.S. com cliente avulso.
+- Desktop: `_cliente_da_os()` resolve id ou nome livre (igual ao PDV); lista
+  exibe `cliente_nome` ou `cliente_nome_avulso`.
+
+A Fase 1 (criar cliente no ato do salvamento) continua disponível via o
+checkbox "Salvar como novo cliente" — agora o operador pode **escolher** não
+cadastrar, usando o avulso persistido.
+
+## Validação Fase 2
+`tests/test_os_cliente_avulso.py`: criar, validação, busca `q` e conversão.
+Backend: **399 passed**. Desktop: **424 passed, 4 xfailed**.
