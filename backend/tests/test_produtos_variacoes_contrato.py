@@ -188,3 +188,74 @@ def test_estoque_nao_movimenta_produto_inativo(client, admin_token):
         json={"produto_id": produto["id"], "tipo": "entrada", "quantidade": 1},
     )
     assert r.status_code == 404, r.text
+
+
+def test_campos_de_identidade_sao_imutaveis(client, admin_token):
+    """SKU, uuid, pai e tipo não podem ser trocados via PUT."""
+    pai = _criar(client, admin_token)
+    r = _gerar(
+        client, admin_token, pai["id"],
+        [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+    )
+    filha = r.json()["data"][0]
+    h = auth(client, admin_token)
+
+    # Mesmos valores: aceito (a UI reenvia o registro completo).
+    assert client.put(
+        f"/v1/produtos/{filha['id']}", headers=h,
+        json={
+            "sku": filha["sku"], "uuid": filha["uuid"],
+            "produto_pai_id": pai["id"], "tipo": "produto",
+        },
+    ).status_code == 200
+
+    for campo, valor in (
+        ("sku", "OUTRO-SKU"),
+        ("uuid", "00000000-0000-4000-8000-000000000000"),
+        ("produto_pai_id", None),
+        ("tipo", "servico"),
+    ):
+        resp = client.put(
+            f"/v1/produtos/{filha['id']}", headers=h, json={campo: valor}
+        )
+        assert resp.status_code == 400, (campo, resp.text)
+        assert campo in resp.json()["detail"]
+
+
+def test_put_nao_altera_saldo_de_estoque(client, admin_token):
+    """Saldo não é campo de cadastro — PUT não pode 'gravar' estoque."""
+    produto = _criar(client, admin_token)
+    h = auth(client, admin_token)
+    assert client.post(
+        "/v1/estoque/movimentar", headers=h,
+        json={"produto_id": produto["id"], "tipo": "entrada", "quantidade": 7},
+    ).status_code == 200
+
+    assert client.put(
+        f"/v1/produtos/{produto['id']}", headers=h,
+        json={"nome": "Nome novo", "estoque_minimo": 3},
+    ).status_code == 200
+
+    db = SessionLocal()
+    try:
+        saldo = (
+            db.query(ProdutoEstoque)
+            .filter(ProdutoEstoque.produto_id == produto["id"])
+            .one()
+            .saldo
+        )
+        assert saldo == 7
+    finally:
+        db.close()
+
+
+def test_schema_rejeita_variacao_sem_atributo():
+    """Validação de domínio reside no schema, não só no serviço."""
+    import pytest
+    from pydantic import ValidationError
+
+    from app.schemas.cadastros import VariacaoIn
+
+    with pytest.raises(ValidationError):
+        VariacaoIn(tamanho="", marca="", cor="")
+    assert VariacaoIn(tamanho="M", marca="", cor="").tamanho == "M"

@@ -47,6 +47,7 @@ def criar_router_crud(
     nivel_acesso: NivelAcesso = NivelAcesso.OPERADOR,
     ao_desativar: Callable[[Any, ModelT], None] | None = None,
     nivel_preco: NivelAcesso | None = None,
+    campos_immutaveis: set[str] | None = None,
 ) -> APIRouter:
     from app.deps import require_nivel
 
@@ -185,6 +186,22 @@ def criar_router_crud(
     ) -> ItemResponse[OutT]:
         dados = body.model_dump(exclude_unset=True)
         _exigir_nivel_preco(dados, usuario)
+        if campos_immutaveis:
+            alterados = campos_immutaveis & set(dados)
+            if alterados:
+                atual = buscar_por_id(db, model, item_id, filial_id=filial)
+                divergentes = [
+                    campo for campo in alterados
+                    if getattr(atual, campo, None) != dados[campo]
+                ]
+                if divergentes:
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            "Campos de identidade não podem ser alterados: "
+                            + ", ".join(sorted(divergentes))
+                        ),
+                    )
         if not dados:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -185,6 +185,8 @@ produtos_router = criar_router_crud(
     ao_desativar=lambda db, obj: db.query(Produto).filter(
         Produto.filial_id == obj.filial_id, Produto.produto_pai_id == obj.id
     ).update({"ativo": False}),
+    # Identidade da variante/produto é imutável via PUT.
+    campos_immutaveis={"sku", "uuid", "produto_pai_id", "tipo"},
 )
 router.include_router(produtos_router)
 

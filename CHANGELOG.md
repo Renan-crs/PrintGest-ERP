@@ -9,6 +9,21 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.20] - 2026-11-20 — Auditoria de mutabilidade de produtos/variações
+
+### Novidades
+- `scripts/testes_mutabilidade.py`: harness de mutation testing com 11 mutantes
+  sobre regras de produtos, variações, RBAC, kardex e cache do PDV. Resultado:
+  **11 mortos, 0 sobreviventes**. Restauração dos arquivos em `finally`.
+- Campos de identidade (`sku`, `uuid`, `produto_pai_id`, `tipo`) passaram a ser
+  imutáveis via `PUT /v1/produtos/{id}` (400 se alterados; 200 se reenviados
+  iguais). Saldo de estoque não é alterável por cadastro.
+
+### Validação
+Backend: 437 passed. Desktop: 455 passed, 4 xfailed. Nenhuma migration nova.
+
+---
+
 ## [0.5.19] - 2026-11-20 — Verificação de produtos, serviços, variações e estoque
 
 ### Corrigido

@@ -57,8 +57,35 @@ Desktop (`test_produtos.py` + `test_venda_balcao.py`, 4 casos novos): serviços
 sem botão de variações, payload/count reais no botão, linha vazia não chama a
 API, SKU exato resolvido pelo cache do PDV.
 
-**Suítes:** backend **434 passed**, desktop **455 passed, 4 xfailed**.
-Neon: head `a0b1c2d3e4f5` — nenhuma migration nova.
+**Suítes:** backend **437 passed**, desktop **455 passed, 4 xfailed**.
+Mutação: **11/11 mortos**. Neon: head `a0b1c2d3e4f5` — nenhuma migration nova.
+
+## Auditoria de mutabilidade (testes de mutação)
+
+Harness: `scripts/testes_mutabilidade.py` (executar com
+`backend/.venv/Scripts/python.exe scripts/testes_mutabilidade.py`). Ele aplica
+11 mutações controladas, roda o teste correspondente e **restaura o arquivo em
+`finally`**, inclusive se o pytest falhar. Resultado: **11 mortos, 0
+sobreviventes**.
+
+| Mutante (alteração injetada) | Teste que o matou |
+|---|---|
+| Serviço aceito como pai de variação | `test_variacao_exige_produto_pai` |
+| Filha com `controla_estoque=False` | `test_filha_tem_estoque_proprio_e_pai_nao` |
+| Saldo inicial da filha = 5 | `test_filha_tem_estoque_proprio_e_pai_nao` |
+| RBAC de preço desligado | `test_operador_nao_altera_preco` |
+| SKU/uuid/pai/tipo alteráveis via PUT | `test_campos_de_identidade_sao_imutaveis` |
+| Soft-delete sem cascata nas filhas | `test_soft_delete_do_pai_desativa_filhas` |
+| Produto inativo aceito em movimentação | `test_estoque_nao_movimenta_produto_inativo` |
+| Kardex de SAIDA com quantidade positiva | `test_venda_baixa_estoque_e_registra_kardex` |
+| `prefixo_sku` limitado a 10 | `test_prefixo_sku_de_30_caracteres_e_aceito` |
+| Variação sem atributo aceita pelo schema | `test_schema_rejeita_variacao_sem_atributo` |
+| PDV sem índice de SKU no cache | `test_sku_exato_adiciona_pelo_cache_sem_chamar_endpoint` |
+
+**Mutabilidade de cadastro (nova regra):** `sku`, `uuid`, `produto_pai_id` e
+`tipo` são campos de identidade — `PUT /v1/produtos/{id}` rejeita alterações
+com 400 (reenviar o mesmo valor é aceito, como faz a UI). O saldo de estoque
+não é campo de cadastro e permanece intacto após PUT (provado por teste).
 
 ## Ressalvas
 
