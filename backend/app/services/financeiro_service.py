@@ -178,7 +178,10 @@ def fechar_caixa(
         )
     entradas, saidas = _totais(db, caixa)
     esperado = _q(caixa.valor_abertura) + entradas - saidas
-    informado = _q(dados.valor_informado)
+    # Sem valor informado, adota o esperado (conferência dispensada) — mesma
+    # política do fechamento automático. Evita exigir "contagem" em dia sem
+    # movimento ou quando o serviço já estava pago por sinal.
+    informado = esperado if dados.valor_informado is None else _q(dados.valor_informado)
     caixa.valor_esperado = esperado
     caixa.valor_informado = informado
     caixa.diferenca = informado - esperado
@@ -332,6 +335,23 @@ def _baixar(db: Session, *, conta, usuario_id: int, dados) -> dict:
         conta.status = StatusConta.PAGA
     if dados.observacoes:
         conta.observacoes = dados.observacoes
+
+    # O recebimento entrou no caixa do operador que baixou o título. Se ele
+    # não tiver caixa aberto, o título é baixado na mesma forma (contábil),
+    # mas sem movimento físico — igual à política do adiantamento sem caixa.
+    if isinstance(conta, ContaReceber):
+        caixa = caixa_aberto(db, filial_id=conta.filial_id, usuario_id=usuario_id)
+        if caixa is not None:
+            db.add(
+                MovimentoCaixa(
+                    caixa_id=caixa.id,
+                    tipo=TipoMovCaixa.ENTRADA,
+                    conta_receber_id=conta.id,
+                    descricao=f"Baixa: {conta.descricao}"[:255],
+                    valor=pago_agora,
+                    usuario_id=usuario_id,
+                )
+            )
     db.commit()
     db.refresh(conta)
     return conta

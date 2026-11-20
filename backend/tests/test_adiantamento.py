@@ -160,8 +160,13 @@ def test_os_sinal_usa_percentual_do_cliente(client, admin_token, db_teste):
     )
     assert resp.status_code == 200, resp.text
     linhas = _contas_os(db_teste, resp.json()["data"]["id"])
-    assert len(linhas) == 1
+    # Sinal pago (60) + restante a receber (140).
+    assert len(linhas) == 2
     assert Decimal(linhas[0][0]) == Decimal("60.00")
+    assert linhas[0][2] == "paga"
+    assert Decimal(linhas[1][0]) == Decimal("140.00")
+    assert linhas[1][2] == "aberta"
+    assert Decimal(str(resp.json()["data"]["valor_sinal"])) == Decimal("60.00")
 
 
 def test_os_sinal_bloqueia_sem_confirmar(client, admin_token):

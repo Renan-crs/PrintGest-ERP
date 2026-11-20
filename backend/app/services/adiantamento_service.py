@@ -12,7 +12,7 @@ operador e grava o lançamento financeiro: uma `conta_receber` já baixada
 correspondente — tudo na mesma transação do documento.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
@@ -128,3 +128,56 @@ def exigir_e_registrar(
             )
         )
     return conta
+
+
+def registrar_saldo_devedor(
+    db: Session,
+    *,
+    filial_id: int,
+    cliente_id: int | None,
+    valor,
+    documento: str,
+    venda_balcao_id: int | None = None,
+    ordem_servico_id: int | None = None,
+    parcelas: int = 1,
+    descricao: str | None = None,
+) -> list[ContaReceber]:
+    """Cria títulos a receber para o valor ainda não pago na origem.
+
+    Usado quando o cliente pagou só o sinal (falta o restante), em vendas
+    FIADO e em pagamentos parcelados. Não lança movimento de caixa — o
+    dinheiro ainda não foi recebido. A última parcela absorve o arredondamento.
+    """
+    total = _q(Decimal(valor or 0))
+    if total <= 0:
+        return []
+    quantidade = max(int(parcelas or 1), 1)
+    parcela_base = _q(total / quantidade)
+    contas: list[ContaReceber] = []
+    rotulo_padrao = descricao or f"Saldo a receber — {documento}"
+    for indice in range(1, quantidade + 1):
+        valor_parcela = (
+            total - parcela_base * (quantidade - 1)
+            if indice == quantidade
+            else parcela_base
+        )
+        conta = ContaReceber(
+            filial_id=filial_id,
+            cliente_id=cliente_id,
+            venda_balcao_id=venda_balcao_id,
+            ordem_servico_id=ordem_servico_id,
+            descricao=(
+                f"{rotulo_padrao} ({indice}/{quantidade})"
+                if quantidade > 1 else rotulo_padrao
+            ),
+            parcela=indice,
+            total_parcelas=quantidade,
+            vencimento=date.today() + timedelta(days=30 * (indice - 1)),
+            valor=_q(valor_parcela),
+            valor_pago=Decimal("0.00"),
+            status=StatusConta.ABERTA,
+        )
+        db.add(conta)
+        contas.append(conta)
+    db.flush()  # IDs disponíveis para a transação do documento
+    return contas

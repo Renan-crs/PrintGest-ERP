@@ -80,9 +80,10 @@ de F10 em "Cotações" removida. OsUpdate agora valida cliente/avulso (antes só
 
 ## Ressalvas (não divergência de contrato)
 
-- `valor_sinal` continua informativo em orçamento: `adiantamento_service` calcula
-  a exigência pelos flags do cliente, e a conversão copia o campo. Não gera
-  conta a receber por si só (comportamento atual do produto).
+- Em orçamento, `valor_sinal` segue informativo (a exigência vem dos flags do
+  cliente). Na **conversão em O.S.**, o valor efetivamente recebido passou a ser
+  gravado em `valor_sinal` e o restante virou `ContaReceber` aberta — ver
+  `docs/verificacao_cenarios_financeiros.md`.
 - `os_service` não emite evento de sync outbox nem kardex (ao contrário de
   `venda_service`). Se a política passar a exigir replicação de OS/orçamento,
   é uma mudança de arquitetura — não feita aqui.

@@ -9,6 +9,25 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.18] - 2026-11-20 — Cenários financeiros reais (caixa, sinal, restante e parcelas)
+
+### Corrigido
+- Fechar caixa sem valor informado: API e tela agora permitem conferência
+  dispensada (backend adota o valor esperado). Resolve dias sem lançamento.
+- Venda com sinal/adiantamento contava o dinheiro **duas vezes** no caixa —
+  agora entra `valor_total − sinal`.
+- Cliente que pagou só o sinal: o restante passa a ser `ContaReceber` ABERTA;
+  `valor_sinal` reflete o valor realmente recebido e `OsOut.saldo` tem lastro.
+- Boleto parcelado gera N títulos (`parcela`/`total_parcelas`); FIADO gera
+  conta a receber em vez de ficar fora do financeiro.
+- Baixa de `ContaReceber` (parcial/total) agora gera `MovimentoCaixa` de
+  entrada com `conta_receber_id`.
+
+### Validação
+Backend: 426 passed. Desktop: 451 passed, 4 xfailed. Nenhuma migration nova.
+
+---
+
 ## [0.5.17] - 2026-11-19 — Auditoria do fluxo de Caixa
 
 ### Corrigido

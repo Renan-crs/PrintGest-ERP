@@ -116,12 +116,14 @@ def _handler(request: httpx.Request) -> httpx.Response:
     if path == "/v1/financeiro/caixa/7/fechar":
         caixa = ESTADO["caixa"]
         esperado = float(caixa["saldo_atual"])
+        # Sem valor informado o backend adota o esperado (conferência dispensada).
+        informado = float(corpo.get("valor_informado") or esperado)
         caixa.update(
             {
                 "status": "fechado",
                 "valor_esperado": caixa["saldo_atual"],
-                "valor_informado": corpo["valor_informado"],
-                "diferenca": f"{float(corpo['valor_informado']) - esperado:.2f}",
+                "valor_informado": f"{informado:.2f}",
+                "diferenca": f"{informado - esperado:.2f}",
             }
         )
         ESTADO["caixa"] = None
@@ -395,3 +397,32 @@ def test_423_de_usuario_bloqueado_titulo_especifico(app, monkeypatch):
     pagina = PaginaCaixa(_api())
     pagina._erro("Usuário temporariamente bloqueado por excesso de tentativas.", 423)
     assert vistos[-1] == "Usuário bloqueado"
+
+
+def test_fechamento_sem_valor_informado_confirma_dispensa(app, pumpar, monkeypatch):
+    """Dia sem lançamento: F9 com campo vazio deve fechar usando o esperado."""
+    perguntas = []
+    mensagens = []
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        lambda _pai, titulo, texto, *_a, **_k: (
+            perguntas.append(texto) or QMessageBox.StandardButton.Yes
+        ),
+    )
+    monkeypatch.setattr(
+        QMessageBox, "information",
+        lambda _pai, titulo, texto, *_a, **_k: mensagens.append(texto),
+    )
+
+    pagina = PaginaCaixa(_api())
+    pagina._f_abertura.definir("50")
+    pagina._btn_abrir.click()
+    pumpar(lambda: pagina._caixa is not None)
+
+    # Sem movimentos: saldo = 50, conferência dispensada.
+    pagina._btn_fechar.click()
+    pumpar(lambda: ESTADO["caixa"] is None)
+
+    assert any("conferência dispensada" in p.lower() for p in perguntas)
+    assert any("sem divergência" in m for m in mensagens)
+    assert pagina._btn_abrir.isEnabled()

@@ -221,13 +221,15 @@ def _registrar_no_caixa(
     filial_id: int,
     usuario_id: int,
     venda: VendaBalcao,
+    valor: Decimal | None = None,
 ) -> None:
-    """Lança a venda no caixa aberto do operador (entrada do valor total).
+    """Lança no caixa o valor **efetivamente recebido** nesta venda.
 
-    FIADO não entra no caixa (não houve recebimento — a conta fica a receber);
-    as demais formas entraram no caixa no momento da venda. Preenche
-    `venda.caixa_id` para o extrato rastrear o documento de origem.
+    FIADO não entra no caixa (a conta fica a receber). Quando existe
+    sinal/adiantamento, esse valor já entrou como movimento próprio — aqui
+    entra apenas a diferença, para não contar o mesmo dinheiro duas vezes.
     """
+    entrada = _q(valor if valor is not None else venda.valor_total)
     if venda.forma_pagamento == FormaPagamento.FIADO:
         return
     caixa = (
@@ -242,6 +244,8 @@ def _registrar_no_caixa(
     if caixa is None:
         return  # a rota já exige caixa aberto; resguardo para chamadas internas
     venda.caixa_id = caixa.id
+    if entrada <= 0:
+        return  # 100% adiantado: o único movimento é o do sinal
     db.add(
         MovimentoCaixa(
             caixa_id=caixa.id,
@@ -249,7 +253,7 @@ def _registrar_no_caixa(
             venda_balcao_id=venda.id,
             descricao=f"Venda de balcão Nº {venda.numero} "
             f"({FormaPagamento(venda.forma_pagamento).value})",
-            valor=_q(venda.valor_total),
+            valor=entrada,
             usuario_id=usuario_id,
         )
     )
@@ -300,9 +304,10 @@ def criar(
     db.add(venda)
     try:
         db.flush()  # garante venda.id para o kardex antes do commit
+        adiantamento = None
         if dados.cliente_id:
             cliente = db.get(Cliente, dados.cliente_id)
-            adiantamento_service.exigir_e_registrar(
+            adiantamento = adiantamento_service.exigir_e_registrar(
                 db,
                 filial_id=filial_id,
                 usuario_id=usuario_id,
@@ -312,8 +317,32 @@ def criar(
                 documento=f"Venda #{venda.id}",
                 venda_balcao_id=venda.id,
             )
+
+        # Valor que realmente entrou agora (sinal já tem movimento próprio).
+        recebido_agora = valor_total - (adiantamento.valor if adiantamento else Decimal(0))
+        if recebido_agora < 0:
+            recebido_agora = Decimal("0.00")
+
+        # FIADO e boleto parcelado: o restante fica como título a receber.
+        # Cartão/dinheiro recebem o valor na hora; parcelas são com o operador.
+        if dados.forma_pagamento in (FormaPagamento.FIADO, FormaPagamento.BOLETO):
+            adiantamento_service.registrar_saldo_devedor(
+                db,
+                filial_id=filial_id,
+                cliente_id=dados.cliente_id,
+                valor=recebido_agora,
+                documento=f"Venda #{venda.numero or venda.id}",
+                venda_balcao_id=venda.id,
+                parcelas=dados.parcelas if dados.forma_pagamento == FormaPagamento.BOLETO else 1,
+            )
+            # O título representa o recebimento futuro: não entra no caixa agora.
+            recebido_agora = Decimal("0.00")
+
         _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
-        _registrar_no_caixa(db, filial_id=filial_id, usuario_id=usuario_id, venda=venda)
+        _registrar_no_caixa(
+            db, filial_id=filial_id, usuario_id=usuario_id, venda=venda,
+            valor=recebido_agora,
+        )
         # PRD v3.3 RF-SY-01: evento de sync na MESMA transação da venda.
         filial_service.registrar_evento(
             db,

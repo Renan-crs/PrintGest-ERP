@@ -83,7 +83,9 @@ class AbrirCaixaIn(ORMModel):
 
 
 class FecharCaixaIn(ORMModel):
-    valor_informado: Decimal = Field(ge=0)
+    # Opcional: em dias sem movimento (ou com serviços já pagos por sinal) não
+    # há conferência física a fazer — o backend usa o valor esperado.
+    valor_informado: Decimal | None = Field(default=None, ge=0)
     observacoes: str | None = None
 
 

@@ -380,31 +380,41 @@ class PaginaCaixa(QWidget):
         if self._caixa is None or self._modo_leitura:
             return
         informado = self._f_informado.valor()
-        if informado is None:
-            QMessageBox.warning(self, "Caixa", "Informe o valor conferido.")
-            self._f_informado.widget.setFocus()
-            return
-        # Quantiza como o backend (`_q`) para o diálogo não divergir do que
-        # será gravado (ex.: 100,005 no campo).
-        informado = Decimal(informado).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
         caixa_id = self._caixa["id"]
         esperado = Decimal(str(self._caixa.get("saldo_atual") or "0")).quantize(
             _CENTAVOS, rounding=ROUND_HALF_UP
         )
-        diferenca = informado - esperado
-        if diferenca != 0:
+        if informado is None:
+            # Dia sem movimento (ou serviços já pagos por sinal): nada a
+            # conferir. O backend adota o valor esperado quando omitido.
             resposta = QMessageBox.question(
                 self,
                 "Fechar caixa",
-                f"Há divergência de {formatar_moeda(diferenca)}.\nConfirmar o "
-                "fechamento mesmo assim?",
+                f"Nenhum valor informado. Conferência dispensada — usar o valor "
+                f"esperado ({formatar_moeda(esperado)})?",
             )
             if resposta != QMessageBox.StandardButton.Yes:
+                self._f_informado.widget.setFocus()
                 return
-        payload = {
-            "valor_informado": str(informado),
-            "observacoes": limpo(self._f_obs_fech.valor()),
-        }
+            payload = {"observacoes": limpo(self._f_obs_fech.valor())}
+        else:
+            # Quantiza como o backend (`_q`) para o diálogo não divergir do que
+            # será gravado (ex.: 100,005 no campo).
+            informado = Decimal(informado).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
+            diferenca = informado - esperado
+            if diferenca != 0:
+                resposta = QMessageBox.question(
+                    self,
+                    "Fechar caixa",
+                    f"Há divergência de {formatar_moeda(diferenca)}.\nConfirmar o "
+                    "fechamento mesmo assim?",
+                )
+                if resposta != QMessageBox.StandardButton.Yes:
+                    return
+            payload = {
+                "valor_informado": str(informado),
+                "observacoes": limpo(self._f_obs_fech.valor()),
+            }
         self._btn_fechar.setEnabled(False)
         tarefas.rodar(
             lambda: self._api.fechar_caixa(caixa_id, payload),

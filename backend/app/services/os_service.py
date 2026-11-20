@@ -201,7 +201,7 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
         db.flush()  # garante os_obj.id para o lançamento de adiantamento
         if dados.tipo == TipoOs.OS:
             cliente = db.get(Cliente, dados.cliente_id) if dados.cliente_id else None
-            adiantamento_service.exigir_e_registrar(
+            adiantamento = adiantamento_service.exigir_e_registrar(
                 db,
                 filial_id=filial_id,
                 usuario_id=usuario_id,
@@ -211,6 +211,18 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
                 documento=f"O.S. #{os_obj.id}",
                 ordem_servico_id=os_obj.id,
             )
+            if adiantamento is not None:
+                # Cliente com sinal/adiantamento: o restante fica a receber e
+                # `valor_sinal` passa a refletir o valor realmente recebido.
+                os_obj.valor_sinal = adiantamento.valor
+                adiantamento_service.registrar_saldo_devedor(
+                    db,
+                    filial_id=filial_id,
+                    cliente_id=dados.cliente_id,
+                    valor=valor_total - adiantamento.valor,
+                    documento=f"O.S. #{os_obj.numero or os_obj.id}",
+                    ordem_servico_id=os_obj.id,
+                )
         db.commit()
     except HTTPException:
         db.rollback()
@@ -448,7 +460,7 @@ def converter_em_os(
             os_nova=nova,
             orcamento=orcamento,
         )
-        adiantamento_service.exigir_e_registrar(
+        adiantamento = adiantamento_service.exigir_e_registrar(
             db,
             filial_id=filial_id,
             usuario_id=usuario_id,
@@ -458,6 +470,16 @@ def converter_em_os(
             documento=f"O.S. #{nova.id}",
             ordem_servico_id=nova.id,
         )
+        if adiantamento is not None:
+            nova.valor_sinal = adiantamento.valor
+            adiantamento_service.registrar_saldo_devedor(
+                db,
+                filial_id=filial_id,
+                cliente_id=orcamento.cliente_id,
+                valor=orcamento.valor_total - adiantamento.valor,
+                documento=f"O.S. #{nova.numero or nova.id}",
+                ordem_servico_id=nova.id,
+            )
         db.commit()
     except HTTPException:
         db.rollback()
