@@ -9,6 +9,23 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.22] - 2026-11-20 — Licenciamento AGPL-3.0 + comercial e Apache-2.0
+
+### Licenças
+- Produto (backend, desktop/PDV, instalador, scripts): **AGPL-3.0-only** ou
+  licença comercial (`LicenseRef-PrintGest-Commercial`).
+- Componentes reutilizáveis (domínio, envelopes, segurança): **Apache-2.0**.
+- Arquivos adicionados: `LICENSE`, `LICENSE-APACHE-2.0`,
+  `LICENSE-COMMERCIAL.md`, `LICENCIAMENTO.md`, `NOTICE`,
+  `THIRD_PARTY_NOTICES.md`; cabeçalhos SPDX nos arquivos mapeados.
+- Instalador agora inclui a pasta `Licencas` com todos os avisos.
+- README documenta a distinção entre licença de código e ativação do produto.
+
+### Validação
+Backend: 439 passed. Desktop: 455 passed, 4 xfailed.
+
+---
+
 ## [0.5.21] - 2026-11-20 — Migration de integridade de produtos
 
 ### Banco de dados

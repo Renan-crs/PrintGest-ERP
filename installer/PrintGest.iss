@@ -10,7 +10,7 @@
 ; As duas instalacoes convivem na mesma maquina (AppIds e pastas distintos).
 
 #ifndef VersaoApp
-  #define VersaoApp "0.5.21"
+  #define VersaoApp "0.5.22"
 #endif
 
 #define NomeApp "PrintGest ERP"
@@ -66,6 +66,13 @@ Source: "..\build\dist\PrintGest\*"; DestDir: "{app}\PrintGest"; Flags: ignoreve
 Source: "..\build\dist\PrintGestAPI\*"; DestDir: "{app}\PrintGestAPI"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env,.env.*,*.dat,*.dump,*.log,backups\*,logs\*"
 Source: "..\build\pacote\LEIA-ME.txt"; DestDir: "{app}"; Flags: ignoreversion
 #endif
+; Licenças e avisos de terceiros — devem acompanhar toda redistribuição.
+Source: "..\LICENSE"; DestDir: "{app}\Licencas"; Flags: ignoreversion
+Source: "..\LICENSE-APACHE-2.0"; DestDir: "{app}\Licencas"; Flags: ignoreversion
+Source: "..\LICENSE-COMMERCIAL.md"; DestDir: "{app}\Licencas"; Flags: ignoreversion
+Source: "..\LICENCIAMENTO.md"; DestDir: "{app}\Licencas"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}\Licencas"; Flags: ignoreversion
+Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\Licencas"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#NomeExibicao}"; Filename: "{app}\PrintGest\PrintGest.exe"; WorkingDir: "{app}\PrintGest"

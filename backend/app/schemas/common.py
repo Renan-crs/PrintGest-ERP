@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Modelos Pydantic transversais: paginação e envelope de resposta padrão.
 
 Convenção de resposta da API:

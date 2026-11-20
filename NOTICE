@@ -1,0 +1,18 @@
+PrintGest ERP
+Copyright (c) 2026 Renan (Renan-crs)
+
+This product contains two classes of PrintGest-authored code:
+
+1. Product code (backend application, desktop UI, installer and scripts) is
+   licensed under the GNU Affero General Public License v3.0, or, alternatively,
+   under a commercial license. See LICENSE and LICENCIAMENTO.md.
+
+2. Reusable components (the list is maintained in LICENCIAMENTO.md) are licensed
+   under the Apache License, Version 2.0. The full text is in
+   LICENSE-APACHE-2.0. Per section 4(d) of that license, this NOTICE file must
+   be retained with any redistribution of those components.
+
+Third-party libraries keep their own licenses. Their attribution is in
+THIRD_PARTY_NOTICES.md; no PrintGest license changes the terms of those works.
+
+Contact: suporte@printgest.com.br

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Regras de domínio para Ordem de Serviço / Orçamento (PRD v2.1 §2.1).
 
 Extraído de `ui/modulos/os.py` para separar regras de negócio da camada de apresentação.

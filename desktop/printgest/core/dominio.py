@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Constantes de domínio compartilhadas entre páginas (protocolo: sem duplicação).
 
 Valores de negócio que não pertencem a nenhuma tela em particular ficam aqui —

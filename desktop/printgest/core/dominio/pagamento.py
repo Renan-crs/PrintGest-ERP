@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Regras de domínio para Condições de Pagamento (PRD v2.1 §2.4).
 
 Extraído de `ui/modulos/os.py` e `ui/modulos/condicao_pagamento.py`

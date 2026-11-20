@@ -218,4 +218,19 @@ Para questões de licenciamento, entre em contato com o provedor RedGest.
 
 ---
 
+## 📄 Licença do código-fonte
+
+O PrintGest adota **dual licensing**:
+
+- **Produto** (backend, PDV/desktop, instalador): **AGPL-3.0** ou licença
+  comercial (`LICENSE`, `LICENSE-COMMERCIAL.md`).
+- **Componentes reutilizáveis**: **Apache-2.0** (`LICENSE-APACHE-2.0`).
+
+O mapeamento arquivo a arquivo está em `LICENCIAMENTO.md`; avisos de
+terceiros (incluindo PySide6/Qt sob LGPL-3.0) em `THIRD_PARTY_NOTICES.md`.
+A licença de **ativação do produto** (Contrato B/C) descrita acima é um
+assunto separado da licença do código-fonte.
+
+---
+
 > PrintGest ERP — Sistema de Gestão Completo para Gráficas

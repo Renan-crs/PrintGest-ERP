@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Regras de domínio para Precificação e Reajuste de Preços (PRD v2.1 §2.6).
 
 Centraliza lógica de cálculo de preços, descontos, reajustes e margens.

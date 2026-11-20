@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Senhas e tokens de sessão — stdlib apenas (PDF/PBKDF2), sem dependência extra."""
 
 import hashlib

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PrintGest-Commercial
 """main — Local API Service PrintGest.
 
 Licenciamento por **chave de produto** (RedGest Contrato C): o lifespan inicia o
