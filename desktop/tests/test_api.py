@@ -210,3 +210,36 @@ def test_erro_crud_mapea_detail():
 
     with pytest.raises(ApiError, match="Modo leitura"):
         _api(handler).criar("clientes", _payload())
+
+def test_listar_integracoes_usa_envelope_com_meta():
+    """Contrato real do backend: {data, total, meta} — cliente normaliza."""
+
+    def handler(request):
+        assert request.url.path == "/v1/config/integracoes"
+        return httpx.Response(
+            200,
+            json={
+                "data": [{"id": 1, "nome": "Fiscal"}],
+                "total": 1,
+                "meta": {"total": 1, "limit": 50, "offset": 0},
+            },
+        )
+
+    api = _api(handler)
+    api.autenticar({"token": "t", "usuario": {"id": 1}})
+    saida = api.listar_integracoes()
+    assert saida["data"][0]["id"] == 1
+    assert saida["total"] == 1
+
+
+def test_eventos_integracao_aceita_lista_crua_do_backend():
+    """`/eventos` devolve `list[...]`, sem envelope `data`."""
+
+    def handler(request):
+        assert request.url.path == "/v1/config/integracoes/7/eventos"
+        return httpx.Response(200, json=[{"id": 3, "tipo": "TESTE_OK"}])
+
+    api = _api(handler)
+    api.autenticar({"token": "t", "usuario": {"id": 1}})
+    eventos = api.eventos_integracao(7)
+    assert eventos == [{"id": 3, "tipo": "TESTE_OK"}]

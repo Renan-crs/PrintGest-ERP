@@ -12,6 +12,7 @@ foram mantidas; a emissão antes indisponível agora usa o gateway.
 
 from __future__ import annotations
 
+import re
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -34,17 +35,39 @@ _STATUS_PENDENTES = (
     StatusFiscal.RASCUNHO,
     StatusFiscal.PROCESSANDO,
     StatusFiscal.REJEITADO,
+    # Contingência também exige acompanhamento — a UI já conta este status.
+    StatusFiscal.CONTINGENCIADO,
 )
 
 # Cache curto de disponibilidade para não consultar /health do gateway em
 # toda chamada ao resumo (a tela de contingência atualiza sozinha).
-_DISPONIBILIDADE: tuple[float, bool] | None = None
+# Cache por (filial, URL) — evitar que a disponibilidade de um inquilino
+# seja reaproveitada por outro (isolamento multi-tenant).
+_DISPONIBILIDADE: dict[tuple[int, str], tuple[float, bool]] = {}
 _CACHE_DISPONIBILIDADE_SEGUNDOS = 60
 
-_CHAVES_SENSIVEIS = {
+_CHAVES_SENSIVEIS = (
     "token", "api_key", "apikey", "senha", "password", "authorization",
-    "secret", "chave_privada", "private_key",
-}
+    "secret", "chave_privada", "private_key", "credencial", "certificado",
+)
+
+# Padrões que aparecem em texto de erro devolvido pelo gateway (ex.:
+# `Bearer abc123` ou `api_key=xyz`) e não podem ir para auditoria.
+_PADROES_SEGREDOS = (
+    re.compile(r"(Bearer\s+)\S+", re.IGNORECASE),
+    re.compile(
+        r"\b(token|api[_-]?key|apikey|senha|password|secret|authorization"
+        r"|chave[_-]?privada|private[_-]?key|credencial|certificado)"
+        r"\s*[:=]\s*\S+", re.IGNORECASE,
+    ),
+)
+
+
+def _mascarar_texto(texto: str) -> str:
+    """Mascara credenciais em mensagens livres antes de gravá-las."""
+    for padrao in _PADROES_SEGREDOS:
+        texto = padrao.sub(lambda m: f"{m.group(1)} ***", texto)
+    return texto
 
 
 def _sanitizar(valor: Any) -> Any:
@@ -53,13 +76,15 @@ def _sanitizar(valor: Any) -> Any:
         return {
             chave: (
                 "***"
-                if str(chave).lower() in _CHAVES_SENSIVEIS
+                if any(s in str(chave).lower() for s in _CHAVES_SENSIVEIS)
                 else _sanitizar(item)
             )
             for chave, item in valor.items()
         }
     if isinstance(valor, (list, tuple)):
         return [_sanitizar(item) for item in valor]
+    if isinstance(valor, str):
+        return _mascarar_texto(valor)
     return valor
 
 
@@ -153,8 +178,7 @@ def _doc(db: Session, *, item_id: int, filial_id: int) -> DocumentoFiscal:
 
 def invalidar_cache_disponibilidade() -> None:
     """Usado por testes e ao trocar a configuração em tempo de execução."""
-    global _DISPONIBILIDADE
-    _DISPONIBILIDADE = None
+    _DISPONIBILIDADE.clear()
 
 
 def _gateway(db, filial_id: int) -> FiscalGateway:
@@ -179,31 +203,35 @@ def _gateway(db, filial_id: int) -> FiscalGateway:
     return FiscalGateway(integracao=integracao, db=db, filial_id=filial_id)
 
 
-def gateway_configurado() -> bool:
-    return FiscalGateway().configurado
+def gateway_configurado(db=None, filial_id: int | None = None) -> bool:
+    return _gateway(db, filial_id or 0).configurado
 
 
-def gateway_disponivel() -> bool:
-    global _DISPONIBILIDADE
+def gateway_disponivel(db=None, filial_id: int | None = None) -> bool:
+    gateway = _gateway(db, filial_id or 0)
+    chave = (filial_id or 0, gateway.base_url)
     agora = time.monotonic()
-    if _DISPONIBILIDADE and agora - _DISPONIBILIDADE[0] < _CACHE_DISPONIBILIDADE_SEGUNDOS:
-        return _DISPONIBILIDADE[1]
-    disponivel = FiscalGateway().health()
-    _DISPONIBILIDADE = (agora, disponivel)
+    entrada = _DISPONIBILIDADE.get(chave)
+    if entrada and agora - entrada[0] < _CACHE_DISPONIBILIDADE_SEGUNDOS:
+        return entrada[1]
+    disponivel = gateway.health()
+    _DISPONIBILIDADE[chave] = (agora, disponivel)
     return disponivel
 
 
-def gateway_info() -> dict:
-    configurado = gateway_configurado()
+def gateway_info(db=None, filial_id: int | None = None) -> dict:
+    gateway = _gateway(db, filial_id or 0)
+    configurado = gateway.configurado
     if not configurado:
         disponivel = False
         mensagem = (
             "Gateway fiscal não configurado — a emissão de NFC-e/NF-e/NFS-e "
-            "está indisponível. Configure PRINTGEST_FISCAL_GATEWAY_URL na "
-            "instalação. Os documentos podem ser consultados nesta tela."
+            "está indisponível. Configure em Configurações > Integrações "
+            "(tipo Fiscal) ou PRINTGEST_FISCAL_GATEWAY_URL. "
+            "Os documentos podem ser consultados nesta tela."
         )
     else:
-        disponivel = gateway_disponivel()
+        disponivel = gateway_disponivel(db, filial_id)
         mensagem = (
             "Gateway fiscal operacional — emissão disponível."
             if disponivel
@@ -213,7 +241,7 @@ def gateway_info() -> dict:
     return {
         "gateway_configurado": configurado,
         "gateway_disponivel": disponivel,
-        "gateway_url": settings.fiscal_gateway_url or None,
+        "gateway_url": gateway.base_url or None,
         "ambiente": settings.fiscal_gateway_ambiente,
         "mensagem": mensagem,
     }
@@ -255,7 +283,7 @@ def resumo(db: Session, *, filial_id: int) -> dict:
         "por_modelo": por_modelo,
         "pendentes": pendentes,
         "em_contingencia": em_contingencia,
-        **gateway_info(),
+        **gateway_info(db, filial_id),
     }
 
 
@@ -433,7 +461,7 @@ def _aplicar_retorno(doc: DocumentoFiscal, resultado: Any) -> None:
     if resultado.protocolo is not None:
         doc.protocolo = str(resultado.protocolo)[:30]
     if resultado.mensagem is not None:
-        doc.mensagem_retorno = str(resultado.mensagem)[:2000]
+        doc.mensagem_retorno = _mascarar_texto(str(resultado.mensagem)[:2000])
     if resultado.xml_url is not None:
         doc.xml_path = str(resultado.xml_url)[:500]
     if resultado.danfe_url is not None:
@@ -563,7 +591,9 @@ def emitir(
             filial_id=filial_id,
             documento_id=doc.id,
             tipo="emitido",
-            mensagem=resultado.mensagem or "Documento enviado ao gateway.",
+            mensagem=_mascarar_texto(
+                resultado.mensagem or "Documento enviado ao gateway."
+            ),
             detalhes=resultado.dados,
             criado_por=usuario_id,
         )
@@ -578,7 +608,9 @@ def emitir(
             filial_id=filial_id,
             documento_id=doc.id,
             tipo="emissao_falhou",
-            mensagem=resultado.mensagem or "Falha na emissão via gateway.",
+            mensagem=_mascarar_texto(
+                resultado.mensagem or "Falha na emissão via gateway."
+            ),
             detalhes=resultado.dados,
             criado_por=usuario_id,
         )
@@ -599,13 +631,13 @@ def consultar(
             status.HTTP_409_CONFLICT,
             detail="Documento ainda não foi enviado ao gateway (sem ID de referência).",
         )
-    gateway = FiscalGateway()
+    gateway = _gateway(db, filial_id)  # integração/cofre da filial deste documento
     if not gateway.configurado:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Gateway fiscal não configurado nesta instalação.",
         )
-    resultado = gateway.consultar(doc.gateway_id)  # gateway com integração da filial
+    resultado = gateway.consultar(doc.gateway_id)
     doc.tentativas = (doc.tentativas or 0) + 1
     doc.ultima_consulta_em = datetime.now(UTC)
     if resultado.ok:
@@ -617,8 +649,10 @@ def consultar(
         filial_id=filial_id,
         documento_id=doc.id,
         tipo="consulta",
-        mensagem=resultado.mensagem or (
-            "Consulta ao gateway concluída." if resultado.ok else "Consulta falhou."
+        mensagem=_mascarar_texto(
+            resultado.mensagem or (
+                "Consulta ao gateway concluída." if resultado.ok else "Consulta falhou."
+            )
         ),
         detalhes=resultado.dados,
         criado_por=usuario_id,
@@ -665,8 +699,11 @@ def cancelar(
         filial_id=filial_id,
         documento_id=doc.id,
         tipo="cancelamento" if resultado.ok else "cancelamento_falhou",
-        mensagem=resultado.mensagem or (
-            "Cancelamento enviado ao gateway." if resultado.ok else "Cancelamento falhou."
+        mensagem=_mascarar_texto(
+            resultado.mensagem or (
+                "Cancelamento enviado ao gateway."
+                if resultado.ok else "Cancelamento falhou."
+            )
         ),
         detalhes=resultado.dados,
         criado_por=usuario_id,

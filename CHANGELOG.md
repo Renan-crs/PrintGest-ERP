@@ -9,6 +9,27 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.16] - 2026-11-19 — Verificação de Fiscal e Integrações
+
+### Corrigido
+- Tela de Integrações não listava nada (`KeyError: 'meta'` no cliente vs
+  envelope do backend), com falso "salvo". Envelope padronizado.
+- Atalhos fiscais tinham RBAC invertido: operador abria e levava 403; caixa
+  era barrado. Agora segue `require_perfis(CAIXA, GERENTE, ADMIN)`.
+- Gateway cadastrado em Integrações não era usado como URL/credencial —
+  emissão e consulta passam a priorizar a integração da filial; cache de
+  disponibilidade por filial/URL (isolamento multi-tenant).
+- `eventos_integracao` aceita a lista crua do backend.
+- Novo botão **Reemitir** na tela Fiscal (bloqueado em modo leitura).
+- Status 401/403/423/409 tratados; "Testar conexão" bloqueado em modo leitura.
+- Sanitização de segredos reforçada em mensagens do gateway; contingência
+  passou a contar como pendência.
+
+### Validação
+Backend: 413 passed. Desktop: 445 passed, 4 xfailed.
+
+---
+
 ## [0.5.15] - 2026-11-19 — Verificação das telas de Estoque e Caixa
 
 ### Corrigido

@@ -188,9 +188,14 @@ class PaginaIntegracoes(QWidget):
             self._itens = saida.get("data", []) if isinstance(saida, dict) else []
             self._tabela.preencher(self._itens)
 
-        def erro(msg: str) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
             estado_atencao(self._lbl_mascaras)
-            self._lbl_mascaras.setText(msg)
+            titulo = (
+                "Sessão encerrada" if status == 401
+                else "Modo leitura" if status == 423
+                else "Integrações"
+            )
+            self._lbl_mascaras.setText(f"{titulo}: {msg}")
 
         tarefas.rodar(self._api.listar_integracoes, ok, erro)
 
@@ -290,9 +295,14 @@ class PaginaIntegracoes(QWidget):
                 "Integração salva. Credenciais guardadas no cofre do SO.",
             )
 
-        def erro(msg: str) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
             self._btn_salvar.setEnabled(True)
-            QMessageBox.warning(self, "Integrações", msg)
+            titulo = (
+                "Sessão encerrada" if status == 401
+                else "Modo leitura" if status == 423
+                else "Integrações"
+            )
+            QMessageBox.warning(self, titulo, msg)
 
         if self._editando_id:
             acao = lambda: self._api.atualizar_integracao(self._editando_id, payload)
@@ -316,9 +326,14 @@ class PaginaIntegracoes(QWidget):
                 estado_atencao(self._lbl_mascaras)
                 self._lbl_mascaras.setText(f"Falha: {dado.get('mensagem')}")
 
-        def erro(msg: str) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
             self._btn_testar.setEnabled(True)
-            QMessageBox.warning(self, "Teste de conexão", msg)
+            titulo = (
+                "Sessão encerrada" if status == 401
+                else "Modo leitura" if status == 423
+                else "Teste de conexão"
+            )
+            QMessageBox.warning(self, titulo, msg)
 
         tarefas.rodar(
             lambda: self._api.testar_integracao(self._editando_id), ok, erro
@@ -343,6 +358,7 @@ class PaginaIntegracoes(QWidget):
     def _aplicar_modo_leitura(self) -> None:
         ligado = not self._modo_leitura
         self._btn_salvar.setEnabled(ligado)
+        self._btn_testar.setEnabled(ligado)
         for campo in (
             self._tipo,
             self._nome,

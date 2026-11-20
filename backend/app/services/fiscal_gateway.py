@@ -93,11 +93,20 @@ class FiscalGateway:
         self._filial_id = filial_id or 0
 
     @property
+    def base_url(self) -> str:
+        """URL efetiva: integração fiscal do banco tem prioridade sobre `.env`."""
+        if self._integracao is not None:
+            url = (getattr(self._integracao, "base_url", "") or "").strip()
+            if url:
+                return url
+        return (self._cfg.fiscal_gateway_url or "").strip()
+
+    @property
     def configurado(self) -> bool:
-        return bool((self._cfg.fiscal_gateway_url or "").strip())
+        return bool(self.base_url)
 
     def _url(self, template: str, **kwargs: Any) -> str:
-        base = self._cfg.fiscal_gateway_url.rstrip("/") + "/"
+        base = self.base_url.rstrip("/") + "/"
         caminho = template.lstrip("/").format(**kwargs)
         return urljoin(base, caminho)
 

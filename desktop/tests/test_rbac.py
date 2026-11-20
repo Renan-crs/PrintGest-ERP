@@ -139,3 +139,12 @@ def test_caixa_e_rbac_nao_hierarquico_no_desktop():
     assert pode_abrir("gerente", "caixa")
     assert pode_abrir("admin", "caixa")
     assert not pode_abrir("operador", "caixa")
+
+
+def test_atalhos_fiscais_seguem_rbac_do_backend():
+    """Backend: require_perfis(CAIXA, GERENTE, ADMIN) — operador é 403."""
+    for item in ("documentos_fiscais", "contingencia"):
+        assert pode_abrir("caixa", item)
+        assert pode_abrir("gerente", item)
+        assert pode_abrir("admin", item)
+        assert not pode_abrir("operador", item)

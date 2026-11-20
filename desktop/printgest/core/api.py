@@ -621,10 +621,18 @@ class Api:
             f"/v1/config/integracoes/{item_id}/testar", {}, self._token
         )
 
-    def eventos_integracao(self, item_id: int) -> dict:
-        return self._get(
-            f"/v1/config/integracoes/{item_id}/eventos", self._token
+    def eventos_integracao(self, item_id: int) -> list[dict]:
+        """`/eventos` devolve uma lista crua (sem envelope `data`)."""
+        resp = self._enviar(
+            "get",
+            f"/v1/config/integracoes/{item_id}/eventos",
+            headers=self._headers(self._token),
         )
+        self.ultimo_status = resp.status_code
+        if resp.status_code >= 400:
+            raise ApiError(_detalhe(resp), resp.status_code)
+        corpo = resp.json()
+        return corpo if isinstance(corpo, list) else corpo.get("data", [])
 
     # ------------------------------------------- plataforma PRD v3.3 (§4/§5)
 

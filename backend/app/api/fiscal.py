@@ -62,9 +62,9 @@ def resumo(db: DbDep, filial: FilialDep):
 
 
 @router.get("/gateway", response_model=ItemResponse[dict])
-def gateway():
-    """Estado do gateway sem expor token/credenciais."""
-    return ItemResponse(data=fiscal_service.gateway_info())
+def gateway(db: DbDep, filial: FilialDep):
+    """Estado do gateway da filial, sem expor token/credenciais."""
+    return ItemResponse(data=fiscal_service.gateway_info(db, filial))
 
 
 @router.post("/documentos/emitir", response_model=ItemResponse[DocumentoFiscalOut])

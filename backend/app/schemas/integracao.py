@@ -10,7 +10,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import TipoIntegracao
-from app.schemas.common import ORMModel
+from app.schemas.common import MetaPaginacao, ORMModel
 
 
 def _url_valida(valor: str | None) -> str | None:
@@ -126,3 +126,6 @@ class IntegracaoEventoOut(ORMModel):
 class ListaIntegracoes(BaseModel):
     data: list[IntegracaoOut]
     total: int
+    # `total` no topo é mantido por compatibilidade; `meta` segue a convenção
+    # das demais listagens e é o que o cliente desktop consome (`_paginar`).
+    meta: MetaPaginacao | None = None

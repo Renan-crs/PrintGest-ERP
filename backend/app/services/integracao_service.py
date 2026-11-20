@@ -42,7 +42,12 @@ def listar(db: Session, *, filial_id: int) -> dict:
         .order_by(Integracao.tipo, Integracao.id)
         .all()
     )
-    return {"data": [_para_out(i) for i in itens], "total": len(itens)}
+    total = len(itens)
+    return {
+        "data": [_para_out(i) for i in itens],
+        "total": total,
+        "meta": {"total": total, "limit": max(total, 1), "offset": 0},
+    }
 
 
 def obter(db: Session, *, item_id: int, filial_id: int) -> Integracao:

@@ -89,8 +89,11 @@ ITENS_INTERNOS = [
     {"id": "contas_receber", "rotulo": "Contas a Receber", "nivel": "gerente"},
     {"id": "contas_pagar", "rotulo": "Contas a Pagar", "nivel": "gerente"},
     {"id": "plano_contas", "rotulo": "Plano de Contas", "nivel": "gerente"},
-    {"id": "documentos_fiscais", "rotulo": "Documentos Fiscais", "nivel": "operador"},
-    {"id": "contingencia", "rotulo": "Contingência", "nivel": "operador"},
+    # Backend: require_perfis(CAIXA, GERENTE, ADMIN) — não hierárquico.
+    {"id": "documentos_fiscais", "rotulo": "Documentos Fiscais",
+     "niveis": ["caixa", "gerente", "admin"]},
+    {"id": "contingencia", "rotulo": "Contingência",
+     "niveis": ["caixa", "gerente", "admin"]},
     {"id": "rel_vendas", "rotulo": "Vendas por Período", "nivel": "gerente"},
     {"id": "rel_clientes", "rotulo": "Clientes que Mais Compram", "nivel": "gerente"},
     {"id": "rel_servicos", "rotulo": "Serviços Mais Executados", "nivel": "gerente"},

@@ -1,9 +1,9 @@
 """Testes do módulo Fiscal: host de abas, Documentos Fiscais (consulta) e
 Contingência (aviso de gateway + pendências).
 
-A emissão exige gateway externo (inexistente), então o módulo é somente leitura;
-o backend real é coberto por `backend/tests/test_fiscal.py`. Aqui um
-`MockTransport` emula documentos/resumo para exercitar a UI sem servidor.
+A emissão usa gateway externo; o backend real é coberto por
+`backend/tests/test_fiscal.py`. Aqui um `MockTransport` emula documentos,
+resumo, consulta/cancelamento/auditoria e reemissão para exercitar a UI.
 """
 
 from __future__ import annotations
@@ -100,6 +100,9 @@ def _handler(request: httpx.Request) -> httpx.Response:
         return _paginado(ESTADO["docs"])
     if path == "/v1/fiscal/resumo":
         return _item(ESTADO["resumo"])
+    if path == "/v1/fiscal/documentos/emitir" and request.method == "POST":
+        ESTADO.setdefault("emissoes", []).append(json.loads(request.read()))
+        return _item(ESTADO["docs"][0])
     if path.startswith("/v1/fiscal/documentos/"):
         item_id = int(path.rsplit("/", 1)[-1])
         doc = next((d for d in ESTADO["docs"] if d["id"] == item_id), None)
@@ -194,3 +197,28 @@ def test_contingencia_avisa_gateway_e_lista_pendencias(app, pumpar):
     # Só o rejeitado e o documento marcado em contingência entram na lista.
     ids = {pagina._tabela.item(r, 0).text() for r in range(pagina._tabela.rowCount())}
     assert ids == {"#00002", "#00003"}
+
+
+def test_reemitir_envia_origem_do_documento(app, pumpar):
+    """O PDV orienta reemitir em Fiscal — o botão deve existir e enviar a origem."""
+    pagina = PaginaDocumentosFiscais(_api())
+    pumpar(lambda: pagina._tabela.rowCount() == 3)
+    pagina._tabela.selectRow(1)  # DOC_REJEITADO → O.S. 1044
+    app.processEvents()
+    assert pagina._btn_reemitir.isEnabled()
+
+    pagina._btn_reemitir.click()
+    pumpar(lambda: len(ESTADO.get("emissoes", [])) == 1)
+    assert ESTADO["emissoes"][0] == {
+        "modelo": "nfce",
+        "contingencia": False,
+        "ordem_servico_id": 1044,
+    }
+
+
+def test_reemitir_bloqueado_em_modo_leitura(app, pumpar):
+    pagina = PaginaDocumentosFiscais(_api(), modo_leitura=True)
+    pumpar(lambda: pagina._tabela.rowCount() == 3)
+    assert not pagina._btn_reemitir.isEnabled()
+    assert not pagina._btn_cancelar_documento.isEnabled()
+    assert pagina._acoes_extra[1].isEnabled()  # Consultar gateway segue disponível

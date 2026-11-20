@@ -7,9 +7,10 @@ Duas telas sob o menu "Fiscal", reunidas num host com sub-abas:
 - **Contingência** — aviso de gateway indisponível + pendências (rascunhos,
   em processamento, rejeitados e documentos marcados em contingência).
 
-A **emissão** de NF-e/NFC-e depende de um gateway fiscal externo que não faz
-parte deste produto: por isso o módulo é somente leitura e a tela de
-contingência é explícita sobre a indisponibilidade (nada é simulado).
+A **emissão** de NF-e/NFC-e é feita por gateway fiscal de terceiro: o PDV
+dispara a NFC-e e esta tela permite consultar/cancelar/**reemitir**. Nada é
+simulado — o gateway precisa estar configurado em Configurações > Integrações
+(ou via `PRINTGEST_FISCAL_GATEWAY_URL`).
 """
 
 from __future__ import annotations
@@ -47,6 +48,15 @@ _STATUS_FISCAL = {
 }
 _MODELO = {"nfe": "NF-e", "nfce": "NFC-e", "nfse": "NFS-e"}
 _PENDENTES = ("rascunho", "processando", "rejeitado", "contingenciado")
+
+
+def _titulo_erro(status: int | None, titulo: str) -> str:
+    """Títulos de sessão/licença têm prioridade sobre o título do módulo."""
+    if status == 401:
+        return "Sessão encerrada"
+    if status == 423:
+        return "Modo leitura"
+    return titulo
 
 
 def _status_rotulo(valor) -> str:
@@ -191,8 +201,15 @@ class PaginaDocumentosFiscais(PaginaCrud):
     # ------------------------------------------------------- gateway (P0#3)
 
     def _acao_extra(self) -> list:
-        """Ações do gateway no rodapé: consultar, cancelar, auditoria."""
+        """Ações do gateway no rodapé: reemitir, consultar, cancelar, auditoria."""
         botoes = []
+        reemitir = QPushButton("Reemitir")
+        reemitir.setObjectName("acaoLinha")
+        reemitir.setToolTip("Reenvia a emissão ao gateway (idempotente se já autorizado)")
+        reemitir.clicked.connect(self._reemitir)
+        self._btn_reemitir = reemitir
+        botoes.append(reemitir)
+
         consultar = QPushButton("Consultar gateway")
         consultar.setObjectName("acaoLinha")
         consultar.setToolTip("Consulta o status do documento no gateway fiscal")
@@ -222,6 +239,43 @@ class PaginaDocumentosFiscais(PaginaCrud):
                 return linha
         return {"id": self._editando_id}
 
+    def _reemitir(self) -> None:
+        """Reenvia a emissão — o PDV orienta usar esta tela após falha."""
+        doc = self._doc_selecionado()
+        if doc is None:
+            return
+        modelo = doc.get("modelo")
+        venda_id = doc.get("venda_balcao_id")
+        os_id = doc.get("ordem_servico_id")
+        if not modelo or bool(venda_id) == bool(os_id):
+            QMessageBox.warning(
+                self, "Fiscal", "Documento sem origem identificada para reemissão."
+            )
+            return
+        payload = {
+            "modelo": modelo,
+            "contingencia": bool(doc.get("contingencia")),
+        }
+        if venda_id:
+            payload["venda_balcao_id"] = venda_id
+        if os_id:
+            payload["ordem_servico_id"] = os_id
+
+        self._btn_reemitir.setEnabled(False)
+
+        def ok(_resposta) -> None:
+            self._btn_reemitir.setEnabled(True)
+            self.recarregar(self._busca.texto())
+            QMessageBox.information(self, "Fiscal", "Emissão reenviada ao gateway.")
+
+        def erro(msg: str, status: int | None = None) -> None:
+            self._btn_reemitir.setEnabled(True)
+            QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
+
+        tarefas.rodar(
+            lambda: self._api.emitir_documento_fiscal(**payload), ok, erro
+        )
+
     def _consultar_gateway(self) -> None:
         doc = self._doc_selecionado()
         if doc is None:
@@ -232,8 +286,8 @@ class PaginaDocumentosFiscais(PaginaCrud):
             self.recarregar(self._busca.texto())
             QMessageBox.information(self, "Fiscal", "Status atualizado pelo gateway.")
 
-        def erro(msg: str) -> None:
-            QMessageBox.warning(self, "Fiscal", msg)
+        def erro(msg: str, status: int | None = None) -> None:
+            QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
 
         tarefas.rodar(
             lambda: self._api.consultar_documento_fiscal(item_id), ok, erro
@@ -258,8 +312,8 @@ class PaginaDocumentosFiscais(PaginaCrud):
             self.recarregar(self._busca.texto())
             QMessageBox.information(self, "Fiscal", "Cancelamento enviado ao gateway.")
 
-        def erro(msg: str) -> None:
-            QMessageBox.warning(self, "Fiscal", msg)
+        def erro(msg: str, status: int | None = None) -> None:
+            QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
 
         tarefas.rodar(
             lambda: self._api.cancelar_documento_fiscal(doc["id"], motivo.strip()),
@@ -290,8 +344,8 @@ class PaginaDocumentosFiscais(PaginaCrud):
                 self, "Auditoria fiscal", "\n".join(linhas)[:4000]
             )
 
-        def erro(msg: str) -> None:
-            QMessageBox.warning(self, "Auditoria", msg)
+        def erro(msg: str, status: int | None = None) -> None:
+            QMessageBox.warning(self, _titulo_erro(status, "Auditoria"), msg)
 
         tarefas.rodar(
             lambda: self._api.eventos_documento_fiscal(doc["id"]), ok, erro
@@ -303,13 +357,14 @@ class PaginaDocumentosFiscais(PaginaCrud):
             campo.habilitar(False)
         for botao in (self._btn_novo, self._btn_salvar, self._btn_cancelar):
             botao.hide()
-        # Consulta/auditoria também valem em modo leitura; só o cancelamento
-        # (escrita no gateway) obedece ao bloqueio da licença.
+        # Consulta/auditoria também valem em modo leitura; cancelamento e
+        # reemissão (escrita no gateway) obedecem ao bloqueio da licença.
+        escrita = (
+            getattr(self, "_btn_cancelar_documento", None),
+            getattr(self, "_btn_reemitir", None),
+        )
         for botao in getattr(self, "_acoes_extra", []):
-            botao.setEnabled(
-                botao is not getattr(self, "_btn_cancelar_documento", None)
-                or not self._modo_leitura
-            )
+            botao.setEnabled(not self._modo_leitura or botao not in escrita)
 
 
 # ============================================================= contingência
@@ -415,13 +470,13 @@ class PaginaContingencia(QWidget):
             tarefas.rodar(
                 lambda: self._api.documentos_fiscais(limit=200),
                 on_ok=lambda saida: self._com_lista(saida, seq),
-                on_erro=lambda msg: self._erro(msg, seq),
+                on_erro=lambda msg, status=None: self._erro(msg, seq, status),
             )
 
         tarefas.rodar(
             lambda: self._api.resumo_fiscal(),
             on_ok=_com_resumo,
-            on_erro=lambda msg: self._erro(msg, seq),
+            on_erro=lambda msg, status=None: self._erro(msg, seq, status),
         )
 
     def _aplicar_resumo(self, resumo: dict) -> None:
@@ -456,11 +511,11 @@ class PaginaContingencia(QWidget):
         pendentes = [d for d in saida.get("data", []) if _documento_pendente(d)]
         self._tabela.preencher(pendentes)
 
-    def _erro(self, msg: str, seq: int) -> None:
+    def _erro(self, msg: str, seq: int, status: int | None = None) -> None:
         if seq != self._seq:
             return
         self._tabela.limpar()
-        QMessageBox.warning(self, "Fiscal", msg)
+        QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
 
 
 # ==================================================================== host
