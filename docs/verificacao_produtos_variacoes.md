@@ -89,10 +89,13 @@ não é campo de cadastro e permanece intacto após PUT (provado por teste).
 
 ## Ressalvas
 
-- `uq(uuid)` e `uq(codigo_barras)` no banco, e o `CHECK` que impede
-  `servico + controla_estoque`, exigiriam migration em produção — não feitas
-  sem autorização. Hoje são garantidas na camada de serviço/API.
-- `schema.sql` está defasado (não tem `sku`/`uuid` e usa `codigo UNIQUE`
+- `uq(uuid)`, `uq(codigo_barras)` e o `CHECK` que impede
+  `servico + controla_estoque` **foram aplicados em produção** pela migration
+  `c2d3e4f5a6b7` em 20/11/2026, com autorização explícita. Backup: branch
+  Neon `backup-pre-migration-produtos-20261120` (LSN `0/3517E18`); snapshot
+  automático não foi possível (limite de snapshots excedido). Pré-checagem:
+  0 duplicatas, 0 serviços com estoque.
+- `schema.sql` segue defasado (não tem `sku`/`uuid` e usa `codigo UNIQUE`
   global); a fonte da verdade são as migrations Alembic.
 - `limit=1000` de categorias continua sendo reduzido a 200 pela fábrica de
   CRUD (mesmo padrão do PDV, que usa o espelho `/v1/pdv/produtos` com teto

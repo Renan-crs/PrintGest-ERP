@@ -9,6 +9,22 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.21] - 2026-11-20 — Migration de integridade de produtos
+
+### Banco de dados
+- Migration `c2d3e4f5a6b7` **aplicada no Neon**: índices únicos parciais
+  `uq_produto_uuid` e `uq_produto_codigo_barras`, e `CHECK`
+  `ck_produto_servico_sem_estoque`.
+- Pré-checagem: 0 duplicatas e 0 serviços com estoque. Backup: branch
+  `backup-pre-migration-produtos-20261120` (snapshot indisponível por limite).
+- Erros de constraint traduzidos (400 para serviço com estoque; 409 para
+  uuid/código de barras duplicados).
+
+### Validação
+Backend: 439 passed. Desktop: 455 passed, 4 xfailed.
+
+---
+
 ## [0.5.20] - 2026-11-20 — Auditoria de mutabilidade de produtos/variações
 
 ### Novidades

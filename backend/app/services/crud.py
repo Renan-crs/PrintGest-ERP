@@ -69,6 +69,30 @@ def buscar_por_id(
     return item
 
 
+def _erro_integridade(exc: IntegrityError) -> HTTPException:
+    """Traduz constraints do banco em mensagens úteis para a API."""
+    texto = str(exc)
+    if "ck_produto_servico_sem_estoque" in texto:
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Serviços não controlam estoque.",
+        )
+    if "uq_produto_uuid" in texto:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="UUID já cadastrado nesta instalação.",
+        )
+    if "uq_produto_codigo_barras" in texto:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Código de barras já cadastrado nesta instalação.",
+        )
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Dados duplicados: já existe um registro com esses valores.",
+    )
+
+
 def criar(
     db: Session,
     model: type[ModelT],
@@ -84,10 +108,7 @@ def criar(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Dados duplicados: já existe um registro com esses valores.",
-        ) from exc
+        raise _erro_integridade(exc) from exc
     db.refresh(item)
     return item
 
@@ -112,10 +133,7 @@ def atualizar(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Dados duplicados: já existe um registro com esses valores.",
-        ) from exc
+        raise _erro_integridade(exc) from exc
     db.refresh(item)
     return item
 

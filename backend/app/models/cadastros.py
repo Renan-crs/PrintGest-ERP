@@ -222,6 +222,18 @@ class Produto(Base):
         CheckConstraint("estoque_minimo >= 0", name="ck_produto_estoque_minimo"),
         UniqueConstraint("filial_id", "codigo", name="uq_produto_filial_codigo"),
         UniqueConstraint("filial_id", "sku", name="uq_produto_filial_sku"),
+        CheckConstraint(
+            "tipo::text <> 'servico' OR controla_estoque = false",
+            name="ck_produto_servico_sem_estoque",
+        ),
+        Index(
+            "uq_produto_uuid", "uuid", unique=True,
+            postgresql_where=text("uuid IS NOT NULL"),
+        ),
+        Index(
+            "uq_produto_codigo_barras", "codigo_barras", unique=True,
+            postgresql_where=text("codigo_barras IS NOT NULL"),
+        ),
         Index("idx_produto_nome", "nome"),
         Index("idx_produto_pai", "produto_pai_id"),
         Index("idx_produto_categoria", "categoria_id"),

@@ -20,6 +20,8 @@ def _u():
 
 def _criar(client, token, tipo="produto", **extra):
     corpo = {"codigo": f"PV{_u().upper()}", "nome": f"Item {_u()}", "tipo": tipo}
+    if tipo == "servico":
+        corpo["controla_estoque"] = False  # como a tela de Serviços envia
     corpo.update(extra)
     r = client.post("/v1/produtos", headers=auth(client, token), json=corpo)
     assert r.status_code == 200, r.text
@@ -259,3 +261,51 @@ def test_schema_rejeita_variacao_sem_atributo():
     with pytest.raises(ValidationError):
         VariacaoIn(tamanho="", marca="", cor="")
     assert VariacaoIn(tamanho="M", marca="", cor="").tamanho == "M"
+
+
+def test_banco_rejeita_servico_com_estoque(client, admin_token):
+    """CHECK criado pela migration c2d3e4f5a6b7."""
+    r = client.post(
+        "/v1/produtos",
+        headers=auth(client, admin_token),
+        json={
+            "codigo": f"SVC{_u().upper()}",
+            "nome": "Serviço inválido",
+            "tipo": "servico",
+            "controla_estoque": True,
+        },
+    )
+    assert r.status_code == 400, r.text
+    assert "servi" in r.json()["detail"].lower()
+
+
+def test_banco_rejeita_uuid_e_codigo_de_barras_duplicados(client, admin_token):
+    """Índices únicos parciais criados pela migration c2d3e4f5a6b7."""
+    h = auth(client, admin_token)
+    uuid_valor = str(uuid.uuid4())
+    barras = f"789{_u()}"
+
+    _criar(client, admin_token, uuid=uuid_valor, codigo_barras=barras)
+    r = client.post(
+        "/v1/produtos",
+        headers=h,
+        json={
+            "codigo": f"DUP{_u().upper()}",
+            "nome": "Duplicado",
+            "uuid": uuid_valor,
+        },
+    )
+    assert r.status_code == 409, r.text
+    assert "uuid" in r.json()["detail"].lower()
+
+    r = client.post(
+        "/v1/produtos",
+        headers=h,
+        json={
+            "codigo": f"DUP{_u().upper()}",
+            "nome": "Duplicado barras",
+            "codigo_barras": barras,
+        },
+    )
+    assert r.status_code == 409, r.text
+    assert "código de barras" in r.json()["detail"].lower()
