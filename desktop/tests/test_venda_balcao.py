@@ -50,6 +50,7 @@ _PRODUTOS = [
     {
         "id": 5,
         "codigo": "B015",
+        "sku": "B015-3MM-FROST",
         "nome": "Adesivo Frosted 3mm",
         "preco_venda": "100.00",
         "codigo_barras": "7891000100103",
@@ -799,3 +800,16 @@ def test_erro_401_nao_derruba_sessao(app, pagina, monkeypatch):
     assert vistos[-1] == "Sessão encerrada"
     # A sessão permanece carregada (não houve limpeza automática).
     assert pagina._api.autenticado is True
+
+
+def test_sku_exato_adiciona_pelo_cache_sem_chamar_endpoint(app, pumpar):
+    """Variante com SKU próprio entra em `b015` local, sem roundtrip."""
+    pagina = PaginaVendaBalcao(_api())
+    pumpar(lambda: "b015" in pagina._itens_editor._por_codigo)
+    assert "b015-3mm-frost" in pagina._itens_editor._por_codigo
+
+    editor = pagina._itens_editor
+    editor._entrada.setText("B015-3MM-FROST")
+    editor._adicionar_pela_busca()
+    assert editor._tabela.rowCount() == 1
+    assert editor._itens[0]["produto_id"] == 5

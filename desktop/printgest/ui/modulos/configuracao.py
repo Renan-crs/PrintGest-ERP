@@ -201,7 +201,7 @@ class PaginaFicha(QWidget):
         self._btn_salvar.setEnabled(not self._modo_leitura)
         self._status.setText("Alterações salvas.")
 
-    def _erro_salvar(self, msg: str) -> None:
+    def _erro_salvar(self, msg: str, status: int | None = None) -> None:
         self._btn_salvar.setEnabled(not self._modo_leitura)
         self._status.setText("")
         QMessageBox.critical(self, "Não foi possível salvar", msg)

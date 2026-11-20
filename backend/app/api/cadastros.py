@@ -179,6 +179,12 @@ produtos_router = criar_router_crud(
     campos_busca=["codigo", "sku", "uuid", "codigo_barras", "nome"],
     tags=["cadastros"],
     nivel_acesso=NivelAcesso.OPERADOR,
+    # Preço é restrito à gerência (a UI desabilita para operador).
+    nivel_preco=NivelAcesso.GERENTE,
+    # Soft-delete do pai também desativa as variantes filhas (evita órfãs).
+    ao_desativar=lambda db, obj: db.query(Produto).filter(
+        Produto.filial_id == obj.filial_id, Produto.produto_pai_id == obj.id
+    ).update({"ativo": False}),
 )
 router.include_router(produtos_router)
 

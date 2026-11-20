@@ -102,19 +102,38 @@ class PaginaProdutos(PaginaCrud):
                     self, "Variações", f"Linha inválida: {linha}\nUse TAMANHO|MARCA|COR."
                 )
                 return
+            if not any(partes):
+                QMessageBox.warning(
+                    self, "Variações", f"Linha sem atributos: {linha}"
+                )
+                return
             variacoes.append(
                 {"tamanho": partes[0], "marca": partes[1], "cor": partes[2]}
             )
-        if not any(v["tamanho"] or v["marca"] or v["cor"] for v in variacoes):
-            QMessageBox.warning(self, "Variações", "Informe ao menos um atributo.")
-            return
 
-        def feito(_resp) -> None:
+        botao = getattr(self, "_btn_variacoes", None)
+        if botao is not None:
+            botao.setEnabled(False)
+
+        def feito(resp) -> None:
+            if botao is not None:
+                botao.setEnabled(True)
             catalogos.invalidar("produtos")
             self.recarregar(self._busca.texto())
+            criados = resp if isinstance(resp, list) else resp.get("data", [])
             QMessageBox.information(
-                self, "Variações", f"{len(variacoes)} variante(s) processada(s)."
+                self, "Variações", f"{len(criados)} variante(s) criada(s)."
             )
+
+        def erro(msg: str, status: int | None = None) -> None:
+            if botao is not None:
+                botao.setEnabled(True)
+            titulo = (
+                "Sessão encerrada" if status == 401
+                else "Modo leitura" if status == 423
+                else "Variações"
+            )
+            QMessageBox.warning(self, titulo, msg)
 
         tarefas.rodar(
             lambda: self._api.gerar_variacoes(
@@ -125,7 +144,7 @@ class PaginaProdutos(PaginaCrud):
                 }
             ),
             feito,
-            lambda msg: QMessageBox.warning(self, "Variações", msg),
+            erro,
         )
 
     # ----------------------------------------------------------- formulário
@@ -234,10 +253,18 @@ class PaginaProdutos(PaginaCrud):
     # ------------------------------------------------------------ categorias
 
     def _carregar_categorias(self) -> None:
+        def erro(msg: str, status: int | None = None) -> None:
+            # Sem modal: a consulta de categorias é auxiliar e não pode travar
+            # a abertura da tela (nem o harness de layout).
+            self._categoria.widget.setToolTip(
+                f"Categorias indisponíveis ({status or 'erro'}): {msg}"
+            )
+
         catalogos.carregar(
             "categorias",
             lambda: self._api.listar("categorias", limit=1000),
             on_ok=self._categorias_recebidas,
+            on_erro=erro,
         )
 
     def _categorias_recebidas(self, saida: dict) -> None:
@@ -299,3 +326,7 @@ class PaginaServicos(PaginaProdutos):
         self._unidade.definir("un")
         self._controla.definir(False)
         self._tipo_mudou()
+
+    def _acao_extra(self) -> list:
+        # Serviço não tem variações com estoque — o backend também recusa.
+        return []

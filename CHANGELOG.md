@@ -9,6 +9,24 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.19] - 2026-11-20 — Verificação de produtos, serviços, variações e estoque
+
+### Corrigido
+- Serviço não pode mais gerar variações com estoque (backend 400, botão
+  oculto na tela de Serviços); filha é sempre produto acabado.
+- `prefixo_sku` de 21–30 caracteres não gera mais 422.
+- Preço passou a exigir GERENTE no backend (antes só a UI bloqueava).
+- Soft-delete do produto pai desativa as variantes filhas.
+- Kardex de venda usa quantidade negativa em SAIDA (padrão do módulo).
+- Variação sem atributo rejeitada; regerar após exclusão reativa a filha.
+- `codigo` da filha com mais entropia; conflito vira 409 com rollback.
+- Tela de produtos trata 401/403/423; PDV resolve SKU pelo cache local.
+
+### Validação
+Backend: 434 passed. Desktop: 455 passed, 4 xfailed. Nenhuma migration nova.
+
+---
+
 ## [0.5.18] - 2026-11-20 — Cenários financeiros reais (caixa, sinal, restante e parcelas)
 
 ### Corrigido

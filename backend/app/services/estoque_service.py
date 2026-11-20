@@ -58,7 +58,11 @@ def _status(saldo: Decimal, minimo: Decimal) -> str:
 def _buscar_produto(db: Session, filial_id: int, produto_id: int) -> Produto:
     produto = (
         db.query(Produto)
-        .filter(Produto.id == produto_id, Produto.filial_id == filial_id)
+        .filter(
+            Produto.id == produto_id,
+            Produto.filial_id == filial_id,
+            Produto.ativo.is_(True),
+        )
         .first()
     )
     if produto is None:
@@ -90,6 +94,7 @@ def _rows_produtos(
     """Linhas (Produto + categoria + saldo/reservado) dos insumos da filial."""
     filtros = [
         Produto.filial_id == filial_id,
+        Produto.ativo.is_(True),
         Produto.tipo == TipoProduto.PRODUTO,
         Produto.controla_estoque.is_(True),
     ]

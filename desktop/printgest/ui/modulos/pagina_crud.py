@@ -466,14 +466,14 @@ class PaginaCrud(QWidget):
             tarefas.rodar(
                 lambda: self._api.criar(self.ENTIDADE, payload),
                 on_ok=self._salvo,
-                on_erro=lambda msg: self._erro_salvar(msg),
+                on_erro=lambda msg, status=None: self._erro_salvar(msg, status),
             )
         else:
             item_id = self._editando_id
             tarefas.rodar(
                 lambda: self._api.atualizar(self.ENTIDADE, item_id, payload),
                 on_ok=self._salvo,
-                on_erro=lambda msg: self._erro_salvar(msg),
+                on_erro=lambda msg, status=None: self._erro_salvar(msg, status),
             )
 
     def _salvo(self, dado: dict) -> None:
@@ -484,9 +484,16 @@ class PaginaCrud(QWidget):
         self._tabela.selecionar_id(dado["id"])
         self.solicitado_detalhe.emit(dado["id"])
 
-    def _erro_salvar(self, msg: str) -> None:
+    def _erro_salvar(self, msg: str, status: int | None = None) -> None:
         self._btn_salvar.setEnabled(True)
-        QMessageBox.critical(self, "Não foi possível salvar", msg)
+        if status == 401:
+            QMessageBox.warning(self, "Sessão encerrada", msg)
+        elif status == 423:
+            QMessageBox.warning(self, "Modo leitura", msg)
+        elif status == 403:
+            QMessageBox.warning(self, "Sem permissão", msg)
+        else:
+            QMessageBox.critical(self, "Não foi possível salvar", msg)
 
     # --------------------------------------------------------------- extras
 

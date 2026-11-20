@@ -338,6 +338,7 @@ class EditorItensVenda(QWidget):
             r["id"]: {
                 "nome": r.get("nome", ""),
                 "codigo": r.get("codigo", ""),
+                "sku": r.get("sku"),
                 "codigo_barras": r.get("codigo_barras"),
                 "preco_venda": r.get("preco_venda"),
             }
@@ -348,10 +349,11 @@ class EditorItensVenda(QWidget):
         self._rotulos = {}
         for pid, produto in self._produtos.items():
             codigo = str(produto.get("codigo") or "").strip()
+            sku = str(produto.get("sku") or "").strip()
             barras = str(produto.get("codigo_barras") or "").strip()
             nome = str(produto.get("nome") or "").strip()
-            # Código de barras exato adiciona direto (bipe) — revisão nº 3.
-            for chave in (codigo, barras):
+            # SKU/código de barras exatos adicionam direto (bipe).
+            for chave in (codigo, sku, barras):
                 if chave:
                     self._por_codigo[chave.lower()] = pid
             if nome:

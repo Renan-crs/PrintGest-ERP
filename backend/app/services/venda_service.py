@@ -204,7 +204,11 @@ def _baixar_estoque(
                 tipo=tipo,
                 origem=OrigemMov.VENDA_BALCAO,
                 documento_id=venda.id,
-                quantidade=item.quantidade,
+                # Convenção do kardex: ENTRADA positiva, SAIDA negativa.
+                quantidade=(
+                    -item.quantidade if tipo == TipoMovEstoque.SAIDA
+                    else item.quantidade
+                ),
                 saldo_anterior=anterior,
                 saldo_posterior=est.saldo,
                 motivo="Venda de balcão"

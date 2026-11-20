@@ -11,12 +11,12 @@ Payloads são validados pelos schemas Pydantic de Create/Update antes de persist
 RBAC: o menor nível informado é exigido em todas as rotas do router (via Depends).
 """
 
-from typing import Any, TypeVar
+from typing import Any, Callable, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
-from app.deps import DbDep, FilialDep
+from app.deps import RANK, DbDep, FilialDep, UsuarioDep
 from app.models.enums import NivelAcesso
 from app.schemas import ItemResponse, ListaResponse
 from app.schemas.common import MetaPaginacao
@@ -45,6 +45,8 @@ def criar_router_crud(
     campos_filtro: list[str] | None = None,
     tags: list[str],
     nivel_acesso: NivelAcesso = NivelAcesso.OPERADOR,
+    ao_desativar: Callable[[Any, ModelT], None] | None = None,
+    nivel_preco: NivelAcesso | None = None,
 ) -> APIRouter:
     from app.deps import require_nivel
 
@@ -56,6 +58,19 @@ def criar_router_crud(
 
     def _out(item: ModelT) -> OutT:
         return schema_out.model_validate(item)
+
+    _CAMPOS_PRECO = {"preco_custo", "preco_venda", "bloqueado_reajuste"}
+
+    def _exigir_nivel_preco(dados: dict, usuario) -> None:
+        # Preço é dado sensível: a UI desabilita para OPERADOR, o backend TEM
+        # que reforçar (antes a restrição existia só no cliente).
+        if nivel_preco is None or not (_CAMPOS_PRECO & set(dados)):
+            return
+        if RANK.get(usuario.nivel_acesso, 0) < RANK[nivel_preco]:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: apenas gerência pode alterar preços.",
+            )
 
     def _registrar_sync(db, item: ModelT, operacao: str) -> None:
         """Emite evento de consolidação na MESMA transação (RF-SY-01).
@@ -145,7 +160,10 @@ def criar_router_crud(
         body: schema_in,
         db: DbDep,
         filial: FilialDep,  # type: ignore[valid-type]
+        usuario: UsuarioDep,
     ) -> ItemResponse[OutT]:
+        # `exclude_unset`: os defaults de preço (0) não contam como alteração.
+        _exigir_nivel_preco(body.model_dump(exclude_unset=True), usuario)
         return ItemResponse(
             data=_out(
                 criar(
@@ -163,8 +181,10 @@ def criar_router_crud(
         body: schema_update,
         db: DbDep,
         filial: FilialDep,  # type: ignore[valid-type]
+        usuario: UsuarioDep,
     ) -> ItemResponse[OutT]:
         dados = body.model_dump(exclude_unset=True)
+        _exigir_nivel_preco(dados, usuario)
         if not dados:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -187,12 +207,18 @@ def criar_router_crud(
     def remover(item_id: int, db: DbDep, filial: FilialDep) -> None:
         # Soft delete também gera evento de sync (RF-SY-01): a matriz/filiais
         # precisam saber que o cadastro foi desativado.
+        def _ao_desativar(sess, obj) -> None:
+            if ao_desativar is not None:
+                ao_desativar(sess, obj)
+
         desativar(
             db,
             model,
             item_id,
             filial_id=filial,
-            ao_salvar=lambda sess, obj: _registrar_sync(sess, obj, "DEL"),
+            ao_salvar=lambda sess, obj: (
+                _registrar_sync(sess, obj, "DEL"), _ao_desativar(sess, obj)
+            ),
         )
 
     return router

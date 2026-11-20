@@ -7,6 +7,7 @@ import json
 import json as _json
 
 import httpx
+from PySide6.QtWidgets import QPushButton
 
 from printgest.core.api import Api
 from printgest.ui.modulos.produtos import PaginaProdutos
@@ -59,6 +60,14 @@ def _handler(request: httpx.Request) -> httpx.Response:
     if request.method == "POST" and request.url.path == "/v1/produtos":
         _ESCRITAS.append(("POST", "", request.read().decode()))
         return httpx.Response(200, json={"data": {"id": 3, "nome": "Novo"}})
+    if request.method == "POST" and request.url.path == "/v1/produtos/variacoes/gerar":
+        corpo = request.read().decode()
+        _ESCRITAS.append(("GERAR", "variacoes", corpo))
+        filhas = [
+            {"id": 90 + i, "sku": f"VAR-{i}", "nome": f"Variante {i}"}
+            for i in range(len(json.loads(corpo)["variacoes"]))
+        ]
+        return httpx.Response(201, json={"data": filhas})
     if request.method == "PUT" and request.url.path == "/v1/produtos/1":
         _ESCRITAS.append(("PUT", "1", request.read().decode()))
         return httpx.Response(200, json={"data": {"id": 1, "nome": "Alterado"}})
@@ -205,3 +214,51 @@ def test_buscar_sku_no_cliente():
     a = Api(base_url="http://daemon.test", transport=_httpx.MockTransport(handler))
     a.autenticar({"token": "tok", "usuario": {"id": 1}})
     assert a.buscar_sku("CAR-M-X-AZUL")["sku"] == "CAR-M-X-AZUL"
+
+
+def test_servicos_nao_oferecem_gerar_variacoes(app):
+    """Serviço não tem estoque — o botão não deve aparecer."""
+    from printgest.ui.modulos.produtos import PaginaServicos
+
+    pagina = PaginaServicos(_pagina()._api)
+    assert not any(b.text() == "Gerar variações" for b in pagina.findChildren(QPushButton))
+
+
+def test_botao_gerar_variacoes_envia_payload_e_usa_contagem_real(app, pumpar, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._tabela.selectRow(0)
+    monkeypatch.setattr(
+        QInputDialog, "getText", lambda *_a, **_k: ("M|X|Azul", True)
+    )
+    mensagens = []
+    monkeypatch.setattr(
+        QMessageBox, "information",
+        lambda _pai, titulo, texto, *_a, **_k: mensagens.append(texto),
+    )
+
+    pagina._btn_variacoes.click()
+    pumpar(lambda: any(e[0] == "GERAR" for e in _ESCRITAS))
+
+    corpo = json.loads(next(e[2] for e in _ESCRITAS if e[0] == "GERAR"))
+    assert corpo["produto_pai_id"] == 1
+    assert corpo["variacoes"] == [{"tamanho": "M", "marca": "X", "cor": "Azul"}]
+    assert any("1 variante(s) criada(s)" in m for m in mensagens)
+    assert pagina._btn_variacoes.isEnabled()
+
+
+def test_variacao_sem_atributo_nao_chama_api(app, pumpar, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._tabela.selectRow(0)
+    monkeypatch.setattr(
+        QInputDialog, "getText", lambda *_a, **_k: ("||", True)
+    )
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_a, **_k: None)
+    antes = len(_ESCRITAS)
+    pagina._btn_variacoes.click()
+    assert len(_ESCRITAS) == antes

@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.enums import TipoPessoa, TipoProduto
 from app.schemas.common import ORMModel
@@ -193,11 +193,28 @@ class VariacaoIn(BaseModel):
     preco_venda: Decimal | None = Field(default=None, ge=0)
     codigo_barras: str | None = Field(default=None, max_length=30)
 
+    @field_validator("tamanho", "marca", "cor")
+    @classmethod
+    def _atributo_nao_vazio(cls, valor: str | None) -> str | None:
+        if valor is not None and not valor.strip():
+            return None
+        return valor
+
+    @model_validator(mode="after")
+    def _ao_menos_um_atributo(self):
+        if not any((self.tamanho, self.marca, self.cor)):
+            raise ValueError(
+                "Cada variação precisa de ao menos um atributo "
+                "(tamanho, marca ou cor)."
+            )
+        return self
+
 
 class GerarVariacoesIn(BaseModel):
     produto_pai_id: int
     variacoes: list[VariacaoIn] = Field(min_length=1, max_length=200)
-    prefixo_sku: str | None = Field(default=None, max_length=20)
+    # Mesmo limite de `Produto.codigo` — a UI envia o código do pai como prefixo.
+    prefixo_sku: str | None = Field(default=None, max_length=30)
 
 
 class ProdutoEstoqueOut(ORMModel):

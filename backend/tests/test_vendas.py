@@ -91,7 +91,8 @@ def test_venda_baixa_estoque_e_registra_kardex(client, admin_token, caixa_admin)
     assert mov["origem"] == "venda_balcao"
     assert mov["tipo"] == "saida"
     assert mov["documento_id"] == venda["id"]
-    assert Decimal(mov["quantidade"]) == Decimal(3)
+    # Convenção do kardex: SAIDA com quantidade negativa.
+    assert Decimal(mov["quantidade"]) == Decimal(-3)
 
 
 # --- M0 (PRD v3.0 §2): o PDV não opera com caixa fechado --------------------------

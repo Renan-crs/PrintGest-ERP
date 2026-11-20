@@ -796,7 +796,7 @@ class PaginaAgendamento(QWidget):
         self._carregar_lista()
         self._receber_compromisso(dado or {})
 
-    def _erro_salvar(self, msg: str) -> None:
+    def _erro_salvar(self, msg: str, status: int | None = None) -> None:
         self._btn_salvar.setEnabled(not self._modo_leitura)
         QMessageBox.critical(self, "Não foi possível salvar", msg)
 
