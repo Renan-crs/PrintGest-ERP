@@ -441,6 +441,9 @@ QLabel#vazioCard {
 QLabel#legendaSerie { color: %texto-muted%; font-size: 11px; font-weight: 600; }
 
 QWidget#sidebar { background-color: %surface%; border-right: 1px solid %borda%; }
+/* A lista de navegação rola quando o menu não cabe em 768px (ADMIN). */
+QScrollArea#menuScroll { background: transparent; border: none; }
+QScrollArea#menuScroll QWidget#menuConteudo { background: transparent; border: none; }
 QLabel#grupoMenu {
     color: %texto-muted%;
     font-size: 10px;

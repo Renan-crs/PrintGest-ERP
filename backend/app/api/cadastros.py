@@ -72,6 +72,9 @@ fornecedores_router = criar_router_crud(
     schema_out=FornecedorOut,
     campos_busca=["nome_razao", "cpf_cnpj", "email", "telefone", "celular"],
     tags=["cadastros"],
+    # Política do menu v2.1: fornecedores são gerenciais (o desktop só exibe
+    # o item para GERENTE/ADMIN). Antes o router inteiro exigia só OPERADOR.
+    nivel_acesso=NivelAcesso.GERENTE,
 )
 router.include_router(fornecedores_router)
 

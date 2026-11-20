@@ -99,6 +99,11 @@ def criar_pagina(
         "backup": PaginaBackup,
         "diagnostico": PaginaDiagnostico,
         "consolidacao": PaginaConsolidacao,
+        # Relatórios granulares abrem o host já na aba correspondente.
+        "rel_vendas": PaginaRelatorios,
+        "rel_clientes": PaginaRelatorios,
+        "rel_servicos": PaginaRelatorios,
+        "rel_aniversariantes": PaginaRelatorios,
     }
     construtora = paginas.get(item_id, PaginaEmConstrucao)
     if construtora is PaginaEmConstrucao:
@@ -112,6 +117,11 @@ def criar_pagina(
     if construtora is PaginaConfiguracoes:
         # O host de Configuração também recebe o nível (abas por perfil).
         return PaginaConfiguracoes(api, modo_leitura=modo_leitura, nivel=nivel)
+    if construtora is PaginaRelatorios:
+        # Abre direto na aba do id solicitado (evita fallback "em construção").
+        return PaginaRelatorios(
+            api, modo_leitura=True, nivel=nivel, item_id=item_id
+        )
     if construtora is PaginaVendaBalcao:
         # O PDV usa o nível para esconder ações que o perfil não pode executar.
         return PaginaVendaBalcao(api, modo_leitura=modo_leitura, nivel=nivel)

@@ -78,11 +78,9 @@ ITENS_INTERNOS = [
     {"id": "os", "rotulo": "Ordem de Serviço", "nivel": "operador"},
     {"id": "orcamento", "rotulo": "Orçamentos", "nivel": "operador"},
     {"id": "venda_balcao", "rotulo": "Venda Balcão", "nivel": "caixa"},
-    {"id": "pedido_compra", "rotulo": "Pedido de Compra", "nivel": "operador"},
     {"id": "estoque_consulta", "rotulo": "Consulta de Estoque", "nivel": "operador"},
     {"id": "estoque_movimento", "rotulo": "Movimentação Manual", "nivel": "operador"},
     {"id": "estoque_reposicao", "rotulo": "Relatório de Reposição", "nivel": "operador"},
-    {"id": "estoque_mais_vendidos", "rotulo": "Mais Vendidos", "nivel": "operador"},
     # RBAC não hierárquico: o backend usa require_perfis(CAIXA, GERENTE, ADMIN)
     # e recusa OPERADOR com 403, embora seu rank seja maior que o de caixa.
     {"id": "caixa", "rotulo": "Caixa", "niveis": ["caixa", "gerente", "admin"]},

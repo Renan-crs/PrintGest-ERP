@@ -53,7 +53,7 @@ from printgest.core.rbac import (
 )
 from printgest.core.tarefas import rodar
 from printgest.ui import animacao
-from printgest.ui.busca_global import BuscaGlobal
+from printgest.ui.busca_global import MODULO_POR_ENTIDADE, BuscaGlobal
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
 from printgest.ui.widgets import (
@@ -82,6 +82,19 @@ _PERFIL_CURTO = {
     "operador": "Operador",
     "caixa": "Caixa",
 }
+# Rótulos curtos para o trilho colapsado (64 px). Nunca escondemos os links:
+# o menu inteiro continua clicável, com tooltip/accessibleName completos.
+_ITEM_CURTO = {
+    "inicio": "⌂", "pdv": "PDV", "projetos": "PRJ", "agendamento": "AG",
+    "cliente": "CLI", "fornecedor": "FOR", "produto": "PRD", "servico": "SRV",
+    "categoria": "CAT", "funcionario": "FNC", "financeiro": "FIN",
+    "fiscal": "FIS", "estoque": "EST", "relatorios": "REL",
+    "configuracoes": "CFG", "filiais": "FIL", "consolidacao": "CON",
+}
+
+
+def _rotulo_curto(item_id: str, rotulo: str) -> str:
+    return _ITEM_CURTO.get(item_id, rotulo.strip()[:2].upper() or "•")
 
 
 def _eh_gerente_ou_mais(nivel: str) -> bool:
@@ -1008,6 +1021,18 @@ class TelaPrincipal(QMainWindow):
 
         self._busca = BuscaGlobal(self._api, self._nivel)
         self._busca.navegar.connect(self._navegar)
+        self._busca.abrir_registro.connect(self._abrir_registro)
+        # Caixa não pode abrir clientes/produtos/O.S.: esconder o campo evita
+        # uma busca que nunca retorna nada (antes ficava visível e morto).
+        self._entidades_busca = [
+            entidade for entidade, modulo in MODULO_POR_ENTIDADE.items()
+            if pode_abrir(self._nivel, modulo)
+        ]
+        self._busca.setVisible(bool(self._entidades_busca))
+        if self._entidades_busca:
+            self._busca.setToolTip(
+                "Buscar " + ", ".join(self._entidades_busca)
+            )
         linha.addWidget(self._busca)
 
         self._btn_alertas = QPushButton("🔔")
@@ -1286,31 +1311,65 @@ class TelaPrincipal(QMainWindow):
         layout.setSpacing(2)
 
         self._btn_colapso = self._botao_menu("«", checkavel=False)
+        self._btn_colapso.setToolTip("Recolher menu")
+        self._btn_colapso.setAccessibleName("Recolher menu")
         self._btn_colapso.clicked.connect(self._alternar_colapso)
         layout.addWidget(self._btn_colapso)
 
         inicio = self._botao_menu("Início", checkavel=True)
         inicio.setChecked(True)
+        inicio.setToolTip("Início")
+        inicio.setAccessibleName("Início")
         inicio.clicked.connect(lambda: self._navegar(ITEM_INICIO))
         layout.addWidget(inicio)
         self._btn_menu = {ITEM_INICIO: inicio}
+        self._rotulo_por_id = {ITEM_INICIO: "Início"}
         self._itens_lateral: list[QWidget] = []
+        self._grupos_menu: list[QLabel] = []
+        self._botoes_menu: list[QPushButton] = [inicio]
+
+        # A lista fica dentro de um QScrollArea: em 1366×768 o menu do ADMIN
+        # pede ~747 px contra ~688 px úteis — sem rolagem o grupo SISTEMA
+        # ficava cortado. O scroll não cresce a janela (política Ignored).
+        rolagem = QScrollArea()
+        rolagem.setObjectName("menuScroll")
+        rolagem.setWidgetResizable(True)
+        rolagem.setFrameShape(QFrame.Shape.NoFrame)
+        rolagem.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        rolagem.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        rolagem.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored
+        )
+        conteudo = QWidget()
+        conteudo.setObjectName("menuConteudo")
+        lista = QVBoxLayout(conteudo)
+        lista.setContentsMargins(0, 0, 0, 0)
+        lista.setSpacing(2)
 
         for grupo, itens in menu_visivel(self._nivel):
             rotulo = QLabel(grupo.upper())
             rotulo.setObjectName("grupoMenu")
-            layout.addWidget(rotulo)
+            lista.addWidget(rotulo)
             self._itens_lateral.append(rotulo)
+            self._grupos_menu.append(rotulo)
             for item in itens:
                 botao = self._botao_menu(item["rotulo"])
+                botao.setToolTip(item["rotulo"])
+                botao.setAccessibleName(item["rotulo"])
                 botao.clicked.connect(
                     lambda _=False, i=item["id"]: self._navegar(i)
                 )
                 self._btn_menu[item["id"]] = botao
+                self._rotulo_por_id[item["id"]] = item["rotulo"]
+                self._botoes_menu.append(botao)
                 self._itens_lateral.append(botao)
-                layout.addWidget(botao)
+                lista.addWidget(botao)
 
-        layout.addStretch(1)
+        lista.addStretch(1)
+        rolagem.setWidget(conteudo)
+        layout.addWidget(rolagem, 1)
 
         # As ações de criação ("Nova venda"/"Nova OS/Orçamento") vivem apenas no
         # "Acesso rápido" do Início — evita duplicar ações com rótulos diferentes.
@@ -1360,30 +1419,34 @@ class TelaPrincipal(QMainWindow):
             self._colapso_automatico = False
         largura_final = 64 if self._colapsada else 224
         self._btn_colapso.setText("»" if self._colapsada else "«")
+        self._aplicar_rotulos_menu(self._colapsada)
 
         if not animacao.animacoes_habilitadas():
             self._sidebar.setFixedWidth(largura_final)
-            for widget in self._itens_lateral:
-                widget.setVisible(not self._colapsada)
-            self._btn_menu[ITEM_INICIO].setVisible(True)
             aplicar_estilo(self._sidebar)
             return
 
-        if not self._colapsada:
-            # Expandir: revela os rótulos antes para a barra "crescer e mostrar".
-            for widget in self._itens_lateral:
-                widget.setVisible(True)
-
-        def _ao_terminar() -> None:
-            if self._colapsada:
-                for widget in self._itens_lateral:
-                    widget.setVisible(False)
-                self._btn_menu[ITEM_INICIO].setVisible(True)
-            aplicar_estilo(self._sidebar)
-
         animacao.animar_largura(
-            self._sidebar, self._sidebar.width(), largura_final, ao_fim=_ao_terminar
+            self._sidebar,
+            self._sidebar.width(),
+            largura_final,
+            ao_fim=lambda: aplicar_estilo(self._sidebar),
         )
+
+    def _aplicar_rotulos_menu(self, colapsada: bool) -> None:
+        """Trilho colapsado mantém TODOS os links clicáveis, só encurta o texto."""
+        for item_id, botao in self._btn_menu.items():
+            botao.setText(
+                _rotulo_curto(item_id, self._rotulo_por_id[item_id])
+                if colapsada else self._rotulo_por_id[item_id]
+            )
+        for grupo in self._grupos_menu:
+            grupo.setVisible(not colapsada)
+        for botao in self._botoes_menu:
+            botao.setVisible(True)
+        dica = "Expandir menu" if colapsada else "Recolher menu"
+        self._btn_colapso.setToolTip(dica)
+        self._btn_colapso.setAccessibleName(dica)
 
     def _botao_menu(self, texto: str, checkavel: bool = True) -> QPushButton:
         botao = QPushButton(texto)
@@ -1449,11 +1512,14 @@ class TelaPrincipal(QMainWindow):
         # resultado em vez de disparar uma 2ª chamada no arranque.
         self._pagina_inicio.conexao_verificada.connect(self._pintar_conexao)
 
-        for kbd, texto in [
-            ("F2", "Clientes"),
-            ("F3", "Produtos"),
-            ("F5", "PDV"),
+        for kbd, texto, modulo in [
+            ("F2", "Clientes", "cliente"),
+            ("F3", "Produtos", "produto"),
+            ("F5", "PDV", "pdv"),
         ]:
+            # Não anunciar atalho que este perfil não pode executar (caixa).
+            if not pode_abrir(self._nivel, modulo):
+                continue
             hint = ElideLabel(f"[{kbd}] {texto}")
             hint.setToolTip(f"{texto} ({kbd})")
             estado_muted(hint)
@@ -1499,8 +1565,21 @@ class TelaPrincipal(QMainWindow):
     def _instalar_atalhos(self) -> None:
         atalhos = {"F2": "cliente", "F3": "produto", "F5": "pdv"}
         for tecla, item_id in atalhos.items():
+            if not pode_abrir(self._nivel, item_id):
+                continue
             atalho = QShortcut(QKeySequence(tecla), self)
             atalho.activated.connect(lambda i=item_id: self._navegar(i))
+
+    def _abrir_registro(self, registro_id: str) -> None:
+        """BuscaGlobal: abrir a sugestão no módulo de destino."""
+        try:
+            alvo = int(registro_id)
+        except (TypeError, ValueError):
+            return
+        pagina = getattr(self, "_pagina_atual_id", None)
+        tabela = getattr(self._paginas.get(pagina), "_tabela", None) if pagina else None
+        if tabela is not None and hasattr(tabela, "selecionar_id"):
+            tabela.selecionar_id(alvo)
 
     def _navegar(self, item_id: str) -> None:
         if item_id != ITEM_INICIO and not pode_abrir(self._nivel, item_id):
@@ -1510,6 +1589,7 @@ class TelaPrincipal(QMainWindow):
             # inteira — só atualizava no construtor, troca de dias ou retry).
             if hasattr(self._pagina_inicio, "recarregar"):
                 self._pagina_inicio.recarregar()
+            self._pagina_atual_id = ITEM_INICIO
             self._marcar(ITEM_INICIO)
             self._stack_paginas.setCurrentWidget(self._pagina_inicio)
             self.navegado.emit(ITEM_INICIO)
@@ -1531,6 +1611,7 @@ class TelaPrincipal(QMainWindow):
         # alterado em outra tela). Executa em background — nunca bloqueia.
         if hasattr(pagina, "recarregar"):
             pagina.recarregar()
+        self._pagina_atual_id = item_id
         self._marcar(item_id)
         self._stack_paginas.setCurrentWidget(pagina)
         # A página "materializa" com um fade curto (§12): responder na hora,

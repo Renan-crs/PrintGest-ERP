@@ -32,7 +32,10 @@ from printgest.ui.widgets import ElideLabel, botao_com_atalho
 class PaginaRelatorios(QWidget):
     """Menu "Relatórios": hospeda as sub-abas conforme o perfil do usuário."""
 
-    def __init__(self, api, modo_leitura: bool = False, nivel: str | None = None) -> None:
+    def __init__(
+        self, api, modo_leitura: bool = False, nivel: str | None = None,
+        item_id: str | None = None,
+    ) -> None:
         super().__init__()
         self._api = api
         self._modo_leitura = modo_leitura
@@ -60,7 +63,12 @@ class PaginaRelatorios(QWidget):
         col.addWidget(self._corpo, 1)
 
         if self._abas:
-            self._trocar(0)
+            # Link granular (ex.: rel_clientes) abre direto na aba correta.
+            ids = [
+                "rel_vendas", "rel_clientes", "rel_servicos", "rel_aniversariantes"
+            ]
+            inicial = ids.index(item_id) if item_id in ids else 0
+            self._trocar(min(inicial, len(self._abas) - 1))
         else:
             restrito = QLabel("Acesso restrito a gerentes e administradores.")
             restrito.setObjectName("subtitulo")

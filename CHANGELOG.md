@@ -9,6 +9,25 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.23] - 2026-11-20 — Auditoria do sidebar (altura, espaçamento e links)
+
+### Corrigido
+- Colapso em 1024×768 escondia todos os links do menu — trilho de 64 px agora
+  mantém os 17 botões visíveis com rótulos curtos e tooltips completos.
+- Menu do ADMIN com fonte maior/DPI 125% podia cortar o grupo SISTEMA —
+  lista envolvida em `QScrollArea` com rolagem sob demanda.
+- Relatórios granulares abriam "Em construção" — agora abrem o host na aba
+  correta; ids sem implementação foram removidos do RBAC.
+- BuscaGlobal e atalhos F2/F3 eram anunciados para CAIXA sem permissão;
+  sinal `abrir_registro` agora seleciona o registro no módulo de destino.
+- `/v1/fornecedores` passou a exigir GERENTE+ (alinhado ao menu).
+
+### Validação
+Backend: 439 passed. Desktop: 461 passed, 4 xfailed.
+Medições em `docs/auditoria_sidebar.md` via `scripts/medir_sidebar.py`.
+
+---
+
 ## [0.5.22] - 2026-11-20 — Licenciamento AGPL-3.0 + comercial e Apache-2.0
 
 ### Licenças

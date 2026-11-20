@@ -378,3 +378,95 @@ def test_mensagem_tolerancia_traz_o_prazo_do_documento():
         "Sem conexão com o servidor de licenças. O PrintGest continuará "
         "funcionando normalmente até 21/10/2026 09:00."
     )
+
+
+def test_sidebar_colapsado_em_1024_mantem_todos_os_links(app):
+    """Regressão P0: antes todos os itens eram escondidos no trilho de 64px."""
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    principal.show()
+    app.processEvents()
+    principal.resize(1024, 768)
+    app.processEvents()
+
+    assert principal._colapsada
+    assert principal._sidebar.width() == 64
+    assert all(botao.isVisible() for botao in principal._botoes_menu)
+    assert principal._btn_menu["cliente"].text() == "CLI"
+    assert principal._btn_menu["financeiro"].toolTip() == "Financeiro"
+
+    principal._btn_menu["cliente"].click()
+    app.processEvents()
+    assert principal._pagina_atual_id == "cliente"
+
+
+def test_sidebar_tem_scroll_area_para_menu_do_admin(app):
+    from PySide6.QtWidgets import QScrollArea
+
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    principal.resize(1366, 768)
+    app.processEvents()
+
+    scroll = principal._sidebar.findChild(QScrollArea, "menuScroll")
+    assert scroll is not None
+    assert scroll.widgetResizable() is True
+
+
+def test_sidebar_com_fonte_maior_rola_ate_o_ultimo_grupo(app):
+    """DPI 125%/150%: fonte maior não pode cortar o grupo SISTEMA."""
+    from PySide6.QtGui import QFont
+    from PySide6.QtWidgets import QScrollArea
+
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    # Estilo local nos itens (evita repolir a aplicação inteira, que pendura
+    # os widgets com minimumSizeHint customizado no harness offscreen).
+    for botao in principal._botoes_menu:
+        botao.setStyleSheet("font-size: 22px; padding: 7px 10px;")
+    for grupo in principal._grupos_menu:
+        grupo.setStyleSheet("font-size: 16px; padding: 10px 5px 4px 5px;")
+    try:
+        principal.show()
+        app.processEvents()
+        principal.resize(1366, 768)
+        app.processEvents()
+        scroll = principal._sidebar.findChild(QScrollArea, "menuScroll")
+        barra = scroll.verticalScrollBar()
+        assert barra.maximum() > 0, "menu não rolou com fonte ampliada"
+        barra.setValue(barra.maximum())
+        app.processEvents()
+        assert principal._btn_menu["consolidacao"].isVisible()
+    finally:
+        for botao in principal._botoes_menu:
+            botao.setStyleSheet("")
+        for grupo in principal._grupos_menu:
+            grupo.setStyleSheet("")
+
+
+def test_caixa_sem_busca_global_e_sem_atalhos_de_cadastro(app):
+    principal = _principal({"id": 1, "nome": "Cx", "login": "cx", "nivel_acesso": "caixa"})
+    assert principal._busca.isHidden()
+    textos = [lbl.text() for lbl in principal._rodape_widget.findChildren(QLabel)]
+    assert not any("F2" in t or "F3" in t for t in textos)
+    assert any("F5" in t for t in textos)
+
+    admin = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    assert not admin._busca.isHidden()
+
+
+def test_busca_global_abre_registro_no_modulo(app, pumpar):
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    principal._navegar("cliente")
+    pumpar(lambda: principal._paginas["cliente"]._tabela.rowCount() == 2)
+
+    principal._busca.abrir_registro.emit("1")
+    app.processEvents()
+    assert principal._paginas["cliente"]._tabela.currentRow() == 0
+
+
+def test_links_granulares_de_relatorio_nao_caem_no_placeholder(app):
+    from printgest.ui.modulos import criar_pagina
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_cliente_handler))
+    api.autenticar({"token": "tok", "usuario": {"id": 1, "nivel_acesso": "admin"}})
+    pagina = criar_pagina("rel_clientes", "Clientes que Mais Compram", api, True, "admin")
+    assert isinstance(pagina, PaginaRelatorios)
+    assert pagina._botoes[1].isChecked()
