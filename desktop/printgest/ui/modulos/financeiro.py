@@ -14,7 +14,9 @@ GERENTE+ (mesma regra do RBAC do menu — `core/rbac.py`).
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+
+_CENTAVOS = Decimal("0.01")
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -87,6 +89,7 @@ class PaginaCaixa(QWidget):
         self._caixa_id_extrato: int | None = None
         self._fechado: dict | None = None
         self._seq = 0
+        self._seq_extrato = 0
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -284,9 +287,12 @@ class PaginaCaixa(QWidget):
             badge_.style().unpolish(badge_)
             badge_.style().polish(badge_)
 
-        if self._modo_leitura:
-            for botao in (self._btn_abrir, self._btn_lancar, self._btn_fechar):
-                botao.setEnabled(False)
+        # Fonte única de habilitação: após abrir/fechar (sucesso OU erro) os
+        # botões voltam ao estado correto. Antes só o erro os reabilitava.
+        ligado = not self._modo_leitura
+        self._btn_abrir.setEnabled(ligado and not aberto)
+        self._btn_lancar.setEnabled(ligado and aberto)
+        self._btn_fechar.setEnabled(ligado and aberto)
 
     # ---------------------------------------------------------------- extrato
 
@@ -296,9 +302,18 @@ class PaginaCaixa(QWidget):
             self._tabela.limpar()
             self._paginador.atualizar(0, 0, LOTE)
             return
+        self._seq_extrato += 1
+        seq = self._seq_extrato
+
+        def _recebido(saida: dict) -> None:
+            # Paginação antiga não pode sobrescrever o extrato atual.
+            if seq != self._seq_extrato:
+                return
+            self._extrato_recebido(saida, offset)
+
         tarefas.rodar(
             lambda: self._api.extrato_caixa(caixa_id, limit=LOTE, offset=offset),
-            on_ok=lambda saida: self._extrato_recebido(saida, offset),
+            on_ok=_recebido,
             on_erro=lambda msg, status=None: self._erro_leitura(
                 "Extrato do Caixa", msg, status
             ),
@@ -328,9 +343,15 @@ class PaginaCaixa(QWidget):
             "observacoes": limpo(self._f_obs_abertura.valor()),
         }
         self._btn_abrir.setEnabled(False)
+
+        def _aberto_ok(_caixa) -> None:
+            self._f_abertura.definir(None)
+            self._f_obs_abertura.definir(None)
+            self._acao_ok()
+
         tarefas.rodar(
             lambda: self._api.abrir_caixa(payload),
-            on_ok=lambda _c: self._acao_ok(),
+            on_ok=_aberto_ok,
             on_erro=self._erro,
         )
 
@@ -363,8 +384,13 @@ class PaginaCaixa(QWidget):
             QMessageBox.warning(self, "Caixa", "Informe o valor conferido.")
             self._f_informado.widget.setFocus()
             return
+        # Quantiza como o backend (`_q`) para o diálogo não divergir do que
+        # será gravado (ex.: 100,005 no campo).
+        informado = Decimal(informado).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
         caixa_id = self._caixa["id"]
-        esperado = Decimal(str(self._caixa.get("saldo_atual") or "0"))
+        esperado = Decimal(str(self._caixa.get("saldo_atual") or "0")).quantize(
+            _CENTAVOS, rounding=ROUND_HALF_UP
+        )
         diferenca = informado - esperado
         if diferenca != 0:
             resposta = QMessageBox.question(
@@ -394,12 +420,17 @@ class PaginaCaixa(QWidget):
     def _fechado_ok(self, caixa: dict) -> None:
         self._caixa = None
         self._caixa_id_extrato = caixa.get("id")
+        self._f_informado.definir(None)
+        self._f_obs_fech.definir(None)
         self._aplicar_estado()
-        diferenca = caixa.get("diferenca")
-        if diferenca not in (None, "", "0", "0.00"):
-            texto = formatar_moeda(diferenca)
-        else:
-            texto = "sem divergência"
+        # `0.0`, `Decimal("0")`, `None` e "" são todos "sem divergência".
+        try:
+            sem_divergencia = Decimal(str(caixa.get("diferenca") or 0)) == 0
+        except Exception:
+            sem_divergencia = False
+        texto = "sem divergência" if sem_divergencia else formatar_moeda(
+            caixa.get("diferenca")
+        )
         QMessageBox.information(
             self, "Caixa fechado", f"Caixa fechado — conferência: {texto}."
         )
@@ -410,12 +441,15 @@ class PaginaCaixa(QWidget):
         if status == 401:
             titulo = "Sessão encerrada"
         elif status == 423:
-            titulo = "Modo leitura"
+            titulo = (
+                "Usuário bloqueado" if "bloqueado" in str(msg).casefold()
+                else "Modo leitura"
+            )
         QMessageBox.warning(self, titulo, msg)
 
     def _erro(self, msg: str, status: int | None = None) -> None:
-        for botao in (self._btn_abrir, self._btn_lancar, self._btn_fechar):
-            botao.setEnabled(not self._modo_leitura)
+        # Reabilita conforme o estado real (aberto/fechado), não todos de uma vez.
+        self._aplicar_estado()
         if status in (401, 423, 409):
             self._erro_leitura("Caixa", msg, status)
         else:

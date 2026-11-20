@@ -177,9 +177,9 @@ class Caixa(Base):
     )
     valor_abertura: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     data_fechamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    valor_esperado: Mapped[float | None] = mapped_column(Numeric(14, 2))
-    valor_informado: Mapped[float | None] = mapped_column(Numeric(14, 2))
-    diferenca: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    valor_esperado: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    valor_informado: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    diferenca: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     observacoes: Mapped[str | None] = mapped_column(Text)
     closed_user_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("usuario.id")

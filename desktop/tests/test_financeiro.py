@@ -309,3 +309,89 @@ def test_plano_contas_cadastra(app, pumpar):
         "tipo": "receita",
         "ativo": True,
     }
+
+
+def test_botoes_reabilitados_em_ciclo_completo_de_cliques(app, pumpar):
+    """Regressão P0: botões só eram reabilitados no erro, nunca no sucesso."""
+    pagina = PaginaCaixa(_api())
+    pumpar(lambda: pagina._caixa is None)
+
+    pagina._btn_abrir.click()
+    pumpar(lambda: pagina._caixa is not None)
+    assert pagina._btn_lancar.isEnabled() and pagina._btn_fechar.isEnabled()
+    assert not pagina._btn_abrir.isEnabled()
+
+    pagina._f_tipo.definir("suprimento")
+    pagina._f_valor.definir("10")
+    pagina._btn_lancar.click()
+    pumpar(lambda: len(ESTADO["extrato"]) == 1)
+    assert pagina._btn_lancar.isEnabled()
+
+    pagina._f_informado.definir("10")
+    pagina._btn_fechar.click()
+    pumpar(lambda: ESTADO["caixa"] is None)
+    assert pagina._btn_abrir.isEnabled()
+    assert not pagina._btn_lancar.isEnabled()
+
+    # Segundo ciclo — antes o botão Abrir ficava morto para sempre.
+    pagina._btn_abrir.click()
+    pumpar(lambda: pagina._caixa is not None)
+    assert pagina._btn_lancar.isEnabled()
+
+
+def test_campos_sao_limpos_apos_abrir_e_fechar(app, pumpar):
+    pagina = PaginaCaixa(_api())
+    pagina._f_abertura.definir("100")
+    pagina._f_obs_abertura.definir("troco")
+    pagina._btn_abrir.click()
+    pumpar(lambda: pagina._caixa is not None)
+    assert pagina._f_abertura.valor() in (None, "", 0)
+    assert pagina._f_obs_abertura.valor() in (None, "")
+
+    pagina._f_informado.definir("100")
+    pagina._f_obs_fech.definir("conferido")
+    pagina._btn_fechar.click()
+    pumpar(lambda: ESTADO["caixa"] is None)
+    assert pagina._f_informado.valor() in (None, "", 0)
+    assert pagina._f_obs_fech.valor() in (None, "")
+
+
+def test_divergencia_recusada_nao_fecha_caixa(app, pumpar, monkeypatch):
+    pagina = PaginaCaixa(_api())
+    pagina._btn_abrir.click()
+    pumpar(lambda: pagina._caixa is not None)
+    pagina._f_informado.definir("90")  # esperado 100 → divergência -10
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        lambda *_a, **_k: QMessageBox.StandardButton.No,
+    )
+    pagina._btn_fechar.click()
+    assert ESTADO["caixa"] is not None
+    assert pagina._caixa is not None
+
+
+def test_sem_divergencia_mensagem_correta(app, pumpar, monkeypatch):
+    mensagens = []
+    monkeypatch.setattr(
+        QMessageBox, "information",
+        lambda _pai, titulo, texto, *_a, **_k: mensagens.append(texto),
+    )
+    pagina = PaginaCaixa(_api())
+    pagina._f_abertura.definir("100")
+    pagina._btn_abrir.click()
+    pumpar(lambda: pagina._caixa is not None)
+    pagina._f_informado.definir("100")
+    pagina._btn_fechar.click()
+    pumpar(lambda: ESTADO["caixa"] is None)
+    assert any("sem divergência" in m for m in mensagens)
+
+
+def test_423_de_usuario_bloqueado_titulo_especifico(app, monkeypatch):
+    vistos = []
+    monkeypatch.setattr(
+        QMessageBox, "warning",
+        lambda _pai, titulo, texto, *_a, **_k: vistos.append(str(titulo)),
+    )
+    pagina = PaginaCaixa(_api())
+    pagina._erro("Usuário temporariamente bloqueado por excesso de tentativas.", 423)
+    assert vistos[-1] == "Usuário bloqueado"

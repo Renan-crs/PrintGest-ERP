@@ -9,6 +9,24 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.17] - 2026-11-19 — Auditoria do fluxo de Caixa
+
+### Corrigido
+- Botões Abrir/Lançar/Fechar nunca reabilitavam após sucesso (só no erro) —
+  agora o estado dos botões é derivado do caixa; campos limpos a cada ciclo.
+- Abertura concorrente devolvia 500 (índice único estourava) — agora 409.
+- Fechamento/movimento concorrentes usam `SELECT ... FOR UPDATE`.
+- Sangria acima do saldo é rejeitada com 400.
+- Caixa de outro usuário da mesma filial não pode ser lido/movimentado/fechado.
+- Fechamento automático das 23:00 não pula mais o dia por janela de 60 s.
+- Arredondamento da conferência alinhado ao backend; extrato com guarda de
+  sequência; 423 de usuário bloqueado com título correto.
+
+### Validação
+Backend: 420 passed (7 novos de lógica). Desktop: 450 passed, 4 xfailed.
+
+---
+
 ## [0.5.16] - 2026-11-19 — Verificação de Fiscal e Integrações
 
 ### Corrigido

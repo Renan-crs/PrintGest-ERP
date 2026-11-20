@@ -88,7 +88,9 @@ async def _loop_fechamento_automatico_caixa() -> None:
     while True:
         try:
             agora = datetime.now()
-            if agora.hour == 23 and agora.minute == 0 and ultimo_dia != agora.date():
+            # Janela das 23:00 às 23:59: antes exigia minute == 0, então um
+            # restart após 23:00:59 ou um event loop ocupado pulava o dia.
+            if agora.hour == 23 and ultimo_dia != agora.date():
                 from app.db import SessionLocal
 
                 db = SessionLocal()

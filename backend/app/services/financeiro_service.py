@@ -14,6 +14,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.cadastros import Cliente, Fornecedor
@@ -86,17 +87,33 @@ def abrir_caixa(db: Session, *, filial_id: int, usuario_id: int, dados) -> Caixa
         observacoes=dados.observacoes,
     )
     db.add(caixa)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # Concorrência: duas estações abriram ao mesmo tempo. O índice único
+        # parcial (filial, usuario, status='aberto') decide — o perdedor deve
+        # receber 409, não um 500 opaco.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Já existe um caixa aberto para este usuário. Feche-o antes de abrir outro.",
+        ) from exc
     db.refresh(caixa)
     return caixa
 
 
-def _obter_caixa(db: Session, caixa_id: int, filial_id: int) -> Caixa:
-    caixa = (
-        db.query(Caixa)
-        .filter(Caixa.id == caixa_id, Caixa.filial_id == filial_id)
-        .first()
+def _obter_caixa(
+    db: Session, caixa_id: int, filial_id: int, usuario_id: int | None = None
+) -> Caixa:
+    consulta = db.query(Caixa).filter(
+        Caixa.id == caixa_id, Caixa.filial_id == filial_id
     )
+    # Caixa é por usuário: ninguém mexe no caixa de outro operador da filial.
+    if usuario_id is not None:
+        consulta = consulta.filter(Caixa.usuario_id == usuario_id)
+    # Lock de linha: fechar/lançar concorrentes não podem os dois passar pelo
+    # check de status ABERTO.
+    caixa = consulta.with_for_update().first()
     if caixa is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Caixa não encontrado."
@@ -104,26 +121,46 @@ def _obter_caixa(db: Session, caixa_id: int, filial_id: int) -> Caixa:
     return caixa
 
 
+def caixa_do_usuario(
+    db: Session, *, caixa_id: int, filial_id: int, usuario_id: int
+) -> Caixa:
+    """Acesso de leitura/verificação de propriedade para as rotas de caixa."""
+    return _obter_caixa(db, caixa_id, filial_id, usuario_id)
+
+
 def registrar_movimento(
-    db: Session, *, caixa_id: int, filial_id: int, dados
+    db: Session, *, caixa_id: int, filial_id: int, usuario_id: int, dados
 ) -> MovimentoCaixa:
     if dados.tipo not in (TipoMovCaixa.SANGRIA, TipoMovCaixa.SUPRIMENTO):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Lançamento manual aceita apenas sangria ou suprimento.",
         )
-    caixa = _obter_caixa(db, caixa_id, filial_id)
+    caixa = _obter_caixa(db, caixa_id, filial_id, usuario_id)
     if caixa.status != StatusCaixa.ABERTO:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="O caixa está fechado; não é possível lançar movimentos.",
         )
+    valor = _q(dados.valor)
+    if dados.tipo == TipoMovCaixa.SANGRIA:
+        entradas, saidas = _totais(db, caixa)
+        saldo = _q(caixa.valor_abertura) + entradas - saidas
+        if valor > saldo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Saldo insuficiente para sangria. "
+                    f"Saldo atual do caixa: {saldo}."
+                ),
+            )
     movimento = MovimentoCaixa(
         caixa_id=caixa.id,
         tipo=dados.tipo,
         descricao=dados.descricao or dados.tipo.value.capitalize(),
-        valor=_q(dados.valor),
-        usuario_id=caixa.usuario_id,
+        valor=valor,
+        # Quem lançou (pode ser o próprio dono do caixa).
+        usuario_id=usuario_id,
     )
     db.add(movimento)
     db.commit()
@@ -134,7 +171,7 @@ def registrar_movimento(
 def fechar_caixa(
     db: Session, *, caixa_id: int, filial_id: int, usuario_id: int, dados
 ) -> Caixa:
-    caixa = _obter_caixa(db, caixa_id, filial_id)
+    caixa = _obter_caixa(db, caixa_id, filial_id, usuario_id)
     if caixa.status != StatusCaixa.ABERTO:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Este caixa já está fechado."

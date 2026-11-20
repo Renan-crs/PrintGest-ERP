@@ -186,5 +186,5 @@ caixa aberto e extrato).
    dependeria de migração.
 4. **Rateio por plano de contas / DRE:** o plano de contas é cadastrável, mas
    relatórios contábeis (DRE, fluxo de caixa) não estavam no escopo desta rodada.
-5. **Fechamento automático de caixa** no fim do expediente: hoje é manual (a
+5. **Fechamento automático de caixa** no fim do expediente: implementado às 23:00 (hora local do daemon, fallback sem conferência física; a
    spec descreve o fechamento pelo operador).

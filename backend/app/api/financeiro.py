@@ -68,9 +68,14 @@ def extrato(
     caixa_id: int,
     db: DbDep,
     filial: FilialDep,
+    usuario: UsuarioDep,
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
+    # Somente o dono do caixa consulta o extrato (inclusive após fechamento).
+    financeiro_service.caixa_do_usuario(
+        db, caixa_id=caixa_id, filial_id=filial, usuario_id=usuario.id
+    )
     itens, total = financeiro_service.listar_movimentos(
         db, caixa_id=caixa_id, filial_id=filial, limit=limit, offset=offset
     )
@@ -85,10 +90,18 @@ def extrato(
     dependencies=_caixa,
 )
 def lancar_movimento(
-    caixa_id: int, payload: MovimentoCaixaIn, db: DbDep, filial: FilialDep
+    caixa_id: int,
+    payload: MovimentoCaixaIn,
+    db: DbDep,
+    filial: FilialDep,
+    usuario: UsuarioDep,
 ):
     movimento = financeiro_service.registrar_movimento(
-        db, caixa_id=caixa_id, filial_id=filial, dados=payload
+        db,
+        caixa_id=caixa_id,
+        filial_id=filial,
+        usuario_id=usuario.id,
+        dados=payload,
     )
     return ItemResponse(data=movimento)
 
