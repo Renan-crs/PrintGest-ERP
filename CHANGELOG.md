@@ -9,6 +9,22 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.25] - 2026-11-20 — Auditoria do cadastro de produtos e variações
+
+### Corrigido
+- Formulário reordenado: preço e estoque aparecem antes das fotos (antes
+  ficavam abaixo da dobra em 768px).
+- Coluna Ref alargada (`#00004` não vira mais `#00…`).
+- Botão "Gerar variações" só é habilitado com um produto salvo selecionado.
+- Diálogo de variações passa a sugerir tamanhos/marcas/cores já usados no
+  catálogo e avisa sobre idempotência.
+
+### Validação
+Desktop: 465 passed, 4 xfailed. Backend: 443 passed.
+Medições em `docs/auditoria_cadastro_produtos.md`.
+
+---
+
 ## [0.5.24] - 2026-11-20 — Execução silenciosa do console/daemon
 
 ### Verificado

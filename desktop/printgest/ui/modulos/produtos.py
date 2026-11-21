@@ -40,7 +40,8 @@ class PaginaProdutos(PaginaCrud):
     GRUPO_LISTA = "CATÁLOGO DE PRODUTOS E SERVIÇOS"
     CHAVES = CHAVES
     COLUNAS = COLUNAS
-    PESOS = [1, 2, 6, 2, 3, 3]
+    # Ref precisa de largura para "#00004" (antes virava "#00…").
+    PESOS = [2, 2, 5, 2, 3, 3]
     FILTROS = [("", "Todos"), ("produto", "Produtos"), ("servico", "Serviços")]
     CHAVE_FILTRO = "tipo"
     FILTRO_LOCAL = True  # a lista já filtra pelo tipo; o servidor não tem esse filtro
@@ -57,6 +58,8 @@ class PaginaProdutos(PaginaCrud):
         # forma síncrona), então o cache precisa existir antes.
         self._nomes_cat: dict[int, str] = {}
         super().__init__(api, modo_leitura)
+        # `_padroes_do_form()` roda antes do botão existir; aplica o estado agora.
+        self._atualizar_botao_variacoes()
         if nivel == "operador":
             # RBAC: operador consulta o catálogo, mas não altera preços.
             self._preco_custo.habilitar(False)
@@ -69,29 +72,56 @@ class PaginaProdutos(PaginaCrud):
         botao.setObjectName("acaoLinha")
         botao.setToolTip(
             "Cria variantes com SKU único e estoque próprio a partir de "
-            "combinações de tamanho, marca e cor"
+            "combinações de tamanho, marca e cor. Combinações repetidas ou já "
+            "existentes são ignoradas."
         )
         botao.clicked.connect(self._gerar_variacoes)
         self._btn_variacoes = botao
         return [botao]
 
+    @staticmethod
+    def _dominios_variacoes(produtos: list[dict]) -> dict[str, list[str]]:
+        """Valores já usados no catálogo para sugerir domínios consistentes."""
+        encontrado: dict[str, set[str]] = {
+            "tamanho": set(), "marca": set(), "cor": set()
+        }
+        for produto in produtos:
+            for chave in encontrado:
+                valor = str(produto.get(f"atrib_{chave}") or "").strip()
+                if valor:
+                    encontrado[chave].add(valor)
+        return {chave: sorted(valores)[:12] for chave, valores in encontrado.items()}
+
     def _gerar_variacoes(self) -> None:
         dado = self._tabela.objeto_selecionado()
-        if not dado:
+        if not dado or self._editando_id is None:
             QMessageBox.information(
                 self, "Variações", "Selecione o produto pai na lista."
             )
             return
         if getattr(self, "_modo_leitura", False):
             return
-        # Use domínios pré-definidos (P/M/G/GG, marcas e cores do catálogo)
-        # para evitar duplicidades como "Azul" vs "azul escuro".
-        especs, ok = QInputDialog.getText(
-            self,
-            "Gerar variações",
-            "Combinações (uma por linha): TAMANHO|MARCA|COR\n"
-            "Ex.: M|Marca X|Azul  (use sempre os mesmos valores de domínio)",
+
+        def _abrir(saida) -> None:
+            produtos = saida.get("data", []) if isinstance(saida, dict) else []
+            self._dialogo_variacoes(dado, self._dominios_variacoes(produtos))
+
+        # Carrega o catálogo para sugerir os domínios (P/M/G, marca, cor).
+        tarefas.rodar(
+            lambda: self._api.listar("produtos", limit=200),
+            _abrir,
+            lambda msg, status=None: self._dialogo_variacoes(dado, {}),
         )
+
+    def _dialogo_variacoes(self, dado: dict, dominios: dict[str, list[str]]) -> None:
+        partes = ["Combinações (uma por linha): TAMANHO|MARCA|COR", "Ex.: M|Marca X|Azul"]
+        for chave, rotulo in (
+            ("tamanho", "Tamanhos"), ("marca", "Marcas"), ("cor", "Cores")
+        ):
+            if dominios.get(chave):
+                partes.append(f"{rotulo}: " + ", ".join(dominios[chave]))
+        partes.append("Combinações já existentes são ignoradas (idempotente).")
+        especs, ok = QInputDialog.getText(self, "Gerar variações", "\n".join(partes))
         if not ok or not especs.strip():
             return
         variacoes = []
@@ -179,10 +209,10 @@ class PaginaProdutos(PaginaCrud):
                     self._tipo,
                     self._unidade,
                     self._categoria,
-                    self._foto1,
-                    self._foto2,
                 ],
             ),
+            # Preço e estoque antes das fotos: em 768px ficavam abaixo da
+            # dobra e o operador precisava rolar para conferir/alterar.
             (
                 "Precificação",
                 [self._preco_custo, self._preco_venda],
@@ -196,6 +226,7 @@ class PaginaProdutos(PaginaCrud):
                     self._bloqueado,
                 ],
             ),
+            ("Imagens", [self._foto1, self._foto2]),
         ]
 
     def _conectar_campos(self) -> None:
@@ -219,6 +250,20 @@ class PaginaProdutos(PaginaCrud):
         self._unidade.definir("un")
         self._controla.definir(self.TIPO_FIXO != "servico")
         self._tipo_mudou()
+        self._atualizar_botao_variacoes()
+
+    def _selecao_mudou(self) -> None:
+        super()._selecao_mudou()
+        self._atualizar_botao_variacoes()
+
+    def _atualizar_botao_variacoes(self) -> None:
+        """Só faz sentido gerar variações de um produto já salvo e selecionado."""
+        botao = getattr(self, "_btn_variacoes", None)
+        if botao is None:
+            return
+        botao.setEnabled(
+            self._editando_id is not None and not self._modo_leitura
+        )
 
     # -------------------------------------------------------------- leitura
 

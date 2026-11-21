@@ -262,3 +262,65 @@ def test_variacao_sem_atributo_nao_chama_api(app, pumpar, monkeypatch):
     antes = len(_ESCRITAS)
     pagina._btn_variacoes.click()
     assert len(_ESCRITAS) == antes
+
+
+def test_secoes_colocam_preco_e_estoque_antes_das_fotos(app):
+    pagina = _pagina()
+    titulos = [titulo for titulo, _campos in pagina._lista_secoes]
+    assert titulos == ["Cadastro", "Precificação", "Estoque", "Imagens"]
+    imagens = [
+        campos for titulo, campos in pagina._lista_secoes if titulo == "Imagens"
+    ]
+    assert imagens == [[pagina._foto1, pagina._foto2]]
+
+
+def test_coluna_ref_tem_largura_para_o_numero(app, pumpar):
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    assert pagina.PESOS[0] >= 2
+    assert pagina._tabela.columnWidth(0) >= 56
+
+
+def test_botao_variacoes_so_habilitado_com_produto_selecionado(app, pumpar):
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    assert not pagina._btn_variacoes.isEnabled()
+    pagina._tabela.selectRow(0)
+    app.processEvents()
+    assert pagina._btn_variacoes.isEnabled()
+
+
+def test_dialogo_variacoes_sugere_dominios_do_catalogo(app, pumpar, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._tabela.selectRow(0)
+    app.processEvents()
+
+    monkeypatch.setattr(
+        pagina._api,
+        "listar",
+        lambda *_a, **_k: {
+            "data": [
+                {"atrib_tamanho": "M", "atrib_marca": "Marca X", "atrib_cor": "Azul"},
+                {"atrib_tamanho": "G", "atrib_marca": "Marca X", "atrib_cor": "Preto"},
+            ],
+            "total": 2,
+        },
+    )
+    textos = []
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda _p, titulo, texto, *_a, **_k: (
+            textos.append(texto) or ("M|Marca X|Azul", True)
+        ),
+    )
+    monkeypatch.setattr(QMessageBox, "information", lambda *_a, **_k: None)
+
+    pagina._btn_variacoes.click()
+    assert "Tamanhos: G, M" in textos[-1]
+    assert "Marcas: Marca X" in textos[-1]
+    assert "Cores: Azul, Preto" in textos[-1]
+    assert "idempotente" in textos[-1].lower()
