@@ -7,7 +7,7 @@ identificação, precificação e controle de estoque. Fotos ficam como backlog.
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QInputDialog, QMessageBox, QPushButton
+from PySide6.QtWidgets import QMessageBox, QPushButton
 
 import printgest.core.tarefas as tarefas
 from printgest.core import catalogos
@@ -23,6 +23,7 @@ from printgest.ui.formulario import (
     limpo,
     numero,
 )
+from printgest.ui.modulos.dialogo_variacoes import DialogoVariacoes
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 
 ENTIDADE = "produtos"
@@ -42,7 +43,10 @@ class PaginaProdutos(PaginaCrud):
     COLUNAS = COLUNAS
     # Ref precisa de largura para "#00004" (antes virava "#00…").
     PESOS = [2, 2, 5, 2, 3, 3]
-    FILTROS = [("", "Todos"), ("produto", "Produtos"), ("servico", "Serviços")]
+    FILTROS = [
+        ("", "Todos"), ("produto", "Produtos"),
+        ("servico", "Serviços"), ("variante", "Variações"),
+    ]
     CHAVE_FILTRO = "tipo"
     FILTRO_LOCAL = True  # a lista já filtra pelo tipo; o servidor não tem esse filtro
     LUGAR_BUSCA = "Buscar por código, código de barras/EAN-13 ou descrição..."
@@ -114,32 +118,14 @@ class PaginaProdutos(PaginaCrud):
         )
 
     def _dialogo_variacoes(self, dado: dict, dominios: dict[str, list[str]]) -> None:
-        partes = ["Combinações (uma por linha): TAMANHO|MARCA|COR", "Ex.: M|Marca X|Azul"]
-        for chave, rotulo in (
-            ("tamanho", "Tamanhos"), ("marca", "Marcas"), ("cor", "Cores")
-        ):
-            if dominios.get(chave):
-                partes.append(f"{rotulo}: " + ", ".join(dominios[chave]))
-        partes.append("Combinações já existentes são ignoradas (idempotente).")
-        especs, ok = QInputDialog.getText(self, "Gerar variações", "\n".join(partes))
-        if not ok or not especs.strip():
+        dialogo = DialogoVariacoes(
+            produto_pai=dado, dominios=dominios, parent=self
+        )
+        if dialogo.exec() != dialogo.DialogCode.Accepted:
             return
-        variacoes = []
-        for linha in especs.splitlines():
-            partes = [p.strip() for p in linha.split("|")]
-            if len(partes) != 3:
-                QMessageBox.warning(
-                    self, "Variações", f"Linha inválida: {linha}\nUse TAMANHO|MARCA|COR."
-                )
-                return
-            if not any(partes):
-                QMessageBox.warning(
-                    self, "Variações", f"Linha sem atributos: {linha}"
-                )
-                return
-            variacoes.append(
-                {"tamanho": partes[0], "marca": partes[1], "cor": partes[2]}
-            )
+        variacoes = dialogo.valor()
+        if not variacoes:
+            return
 
         botao = getattr(self, "_btn_variacoes", None)
         if botao is not None:
@@ -268,6 +254,9 @@ class PaginaProdutos(PaginaCrud):
     # -------------------------------------------------------------- leitura
 
     def _formatar_texto(self, dado: dict, chave: str) -> str:
+        if chave == "nome" and dado.get("produto_pai_id"):
+            # Distingue a variante filha do produto pai na grade.
+            return f"↳ {dado.get('nome') or ''}"
         if chave == "tipo":
             return str(dado.get("tipo", "")).upper()
         if chave == "categoria_nome":
@@ -349,7 +338,10 @@ class PaginaProdutos(PaginaCrud):
     # --------------------------------------------------------------- filtros
 
     def _aplicar_filtro_local(self, linhas: list[dict]) -> list[dict]:
-        linhas = super()._aplicar_filtro_local(linhas)
+        if self._filtro == "variante":
+            linhas = [r for r in linhas if r.get("produto_pai_id") is not None]
+        else:
+            linhas = super()._aplicar_filtro_local(linhas)
         if self.TIPO_FIXO:
             linhas = [r for r in linhas if r.get("tipo") == self.TIPO_FIXO]
         return linhas

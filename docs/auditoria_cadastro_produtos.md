@@ -39,22 +39,27 @@ rolar para conferir/alterar preço e estoque.
 - Após gerar, `catalogos.invalidar("produtos")` + `recarregar()` atualizam a
   grade; a mensagem usa o número **real** de variantes criadas.
 
+## Melhorias aplicadas na sequência (v0.5.26)
+
+- **Diálogo estruturado** (`ui/modulos/dialogo_variacoes.py`): três combos
+  editáveis (tamanho/marca/cor) com os domínios do catálogo, lista de
+  combinações adicionadas, **preview do SKU** calculado com o mesmo slug do
+  backend (`CV01-M-MARCAX-AZUL`), dedupe local, remoção e OK desabilitado
+  enquanto não houver combinações.
+- **Distinção pai/filha na grade**: variantes aparecem com o prefixo `↳` na
+  coluna Item, e o filtro **Variações** mostra só registros com
+  `produto_pai_id`.
+
 ## Limitações restantes
 
-- O diálogo ainda é **texto livre** (QInputDialog): não há combos com os
-  domínios nem preview dos SKUs antes de confirmar. Os valores usados agora
-  são sugeridos no texto, mas ainda é possível digitar "Azul escuro" com
-  variação de caixa/espaço.
-- A listagem não distingue visualmente produto-pai de variante filha (não há
-  coluna "Pai/Variante" nem filtro), embora `produto_pai_id` exista.
-- Botão "Gerar variações" ainda não pergunta confirmação antes de criar N
-  variantes (mas desativa durante a requisição e mostra a contagem real).
+- O botão "Gerar variações" ainda não pede confirmação explícita antes de
+  criar N variantes (desativa durante a requisição e mostra a contagem real).
 - `schema.sql` segue defasado em relação às migrations (sem `sku`/`uuid`).
 
 ## Validação
 
-- `test_produtos.py`: 14 testes (4 novos de ordem das seções, largura da Ref,
-  estado do botão e domínios sugeridos).
-- Suíte desktop completa: 461 passed, 4 xfailed.
+- `test_produtos.py`: 17 testes (inclui preview SKU, dedupe, remoção,
+  exigência de atributo, domínios sugeridos, filtro Variações e marcador `↳`).
+- Suíte desktop completa: ver `CHANGELOG.md` da versão correspondente.
 - Capturas regeneráveis com `desktop/.venv/Scripts/python.exe scripts/medir_cadastro_produtos.py`
   (saem em `analysis-assets/`, não versionadas).

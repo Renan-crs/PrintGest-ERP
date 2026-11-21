@@ -9,6 +9,20 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.26] - 2026-11-20 — Melhorias em variações de produtos
+
+### Novidades
+- Diálogo estruturado de variações: combos com domínios do catálogo,
+  preview do SKU gerado, dedupe local, remoção e OK desabilitado sem
+  combinações. Substitui o campo de texto livre.
+- Grade de produtos distingue variante filha com prefixo `↳` no Item e
+  oferece filtro **Variações** (`produto_pai_id`).
+
+### Validação
+Desktop: 468 passed, 4 xfailed. Backend: 443 passed.
+
+---
+
 ## [0.5.25] - 2026-11-20 — Auditoria do cadastro de produtos e variações
 
 ### Corrigido

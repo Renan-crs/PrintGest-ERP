@@ -225,14 +225,25 @@ def test_servicos_nao_oferecem_gerar_variacoes(app):
 
 
 def test_botao_gerar_variacoes_envia_payload_e_usa_contagem_real(app, pumpar, monkeypatch):
-    from PySide6.QtWidgets import QInputDialog, QMessageBox
+    from PySide6.QtWidgets import QDialog, QMessageBox
+    from printgest.ui.modulos import produtos as produtos_mod
 
+    class DialogoFalso:
+        DialogCode = QDialog.DialogCode
+
+        def __init__(self, **_kwargs):
+            pass
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+        def valor(self):
+            return [{"tamanho": "M", "marca": "X", "cor": "Azul"}]
+
+    monkeypatch.setattr(produtos_mod, "DialogoVariacoes", DialogoFalso)
     pagina = _pagina()
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     pagina._tabela.selectRow(0)
-    monkeypatch.setattr(
-        QInputDialog, "getText", lambda *_a, **_k: ("M|X|Azul", True)
-    )
     mensagens = []
     monkeypatch.setattr(
         QMessageBox, "information",
@@ -250,15 +261,25 @@ def test_botao_gerar_variacoes_envia_payload_e_usa_contagem_real(app, pumpar, mo
 
 
 def test_variacao_sem_atributo_nao_chama_api(app, pumpar, monkeypatch):
-    from PySide6.QtWidgets import QInputDialog, QMessageBox
+    from PySide6.QtWidgets import QDialog
+    from printgest.ui.modulos import produtos as produtos_mod
 
+    class DialogoVazio:
+        DialogCode = QDialog.DialogCode
+
+        def __init__(self, **_kwargs):
+            pass
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+        def valor(self):
+            return []
+
+    monkeypatch.setattr(produtos_mod, "DialogoVariacoes", DialogoVazio)
     pagina = _pagina()
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     pagina._tabela.selectRow(0)
-    monkeypatch.setattr(
-        QInputDialog, "getText", lambda *_a, **_k: ("||", True)
-    )
-    monkeypatch.setattr(QMessageBox, "warning", lambda *_a, **_k: None)
     antes = len(_ESCRITAS)
     pagina._btn_variacoes.click()
     assert len(_ESCRITAS) == antes
@@ -291,13 +312,27 @@ def test_botao_variacoes_so_habilitado_com_produto_selecionado(app, pumpar):
 
 
 def test_dialogo_variacoes_sugere_dominios_do_catalogo(app, pumpar, monkeypatch):
-    from PySide6.QtWidgets import QInputDialog, QMessageBox
+    from PySide6.QtWidgets import QDialog, QMessageBox
+    from printgest.ui.modulos import produtos as produtos_mod
 
+    capturado: dict = {}
+
+    class DialogoFalso:
+        DialogCode = QDialog.DialogCode
+
+        def __init__(self, **kwargs):
+            capturado.update(kwargs)
+
+        def exec(self):
+            return QDialog.DialogCode.Rejected
+
+        def valor(self):
+            return []
+
+    monkeypatch.setattr(produtos_mod, "DialogoVariacoes", DialogoFalso)
     pagina = _pagina()
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     pagina._tabela.selectRow(0)
-    app.processEvents()
-
     monkeypatch.setattr(
         pagina._api,
         "listar",
@@ -309,18 +344,71 @@ def test_dialogo_variacoes_sugere_dominios_do_catalogo(app, pumpar, monkeypatch)
             "total": 2,
         },
     )
-    textos = []
-    monkeypatch.setattr(
-        QInputDialog,
-        "getText",
-        lambda _p, titulo, texto, *_a, **_k: (
-            textos.append(texto) or ("M|Marca X|Azul", True)
-        ),
-    )
     monkeypatch.setattr(QMessageBox, "information", lambda *_a, **_k: None)
 
     pagina._btn_variacoes.click()
-    assert "Tamanhos: G, M" in textos[-1]
-    assert "Marcas: Marca X" in textos[-1]
-    assert "Cores: Azul, Preto" in textos[-1]
-    assert "idempotente" in textos[-1].lower()
+    assert capturado["dominios"] == {
+        "tamanho": ["G", "M"], "marca": ["Marca X"], "cor": ["Azul", "Preto"]
+    }
+    assert capturado["produto_pai"]["id"] == 1
+"""Testes do diálogo estruturado de variações e da distinção pai/filha."""
+
+
+def test_preview_sku_dedupe_e_remocao(app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from printgest.ui.modulos.dialogo_variacoes import DialogoVariacoes
+
+    avisos = []
+    monkeypatch.setattr(
+        QMessageBox, "warning",
+        lambda _pai, titulo, texto, *_a, **_k: avisos.append(texto),
+    )
+    dialogo = DialogoVariacoes(
+        {"codigo": "cv01"},
+        {"tamanho": ["M"], "marca": ["Marca X"], "cor": ["Azul"]},
+    )
+    assert dialogo._prefixo == "CV01"
+    dialogo._campos["tamanho"].setCurrentText("M")
+    dialogo._campos["marca"].setCurrentText("Marca X")
+    dialogo._campos["cor"].setCurrentText("Azul")
+    dialogo._adicionar()
+
+    assert dialogo.valor() == [{"tamanho": "M", "marca": "Marca X", "cor": "Azul"}]
+    assert dialogo._lista.item(0).toolTip() == "CV01-M-MARCAX-AZUL"
+    assert dialogo._ok.isEnabled()
+
+    dialogo._adicionar()  # repetida: não duplica
+    assert dialogo._lista.count() == 1
+    assert avisos
+
+    dialogo._lista.setCurrentRow(0)
+    dialogo._remover()
+    assert dialogo._lista.count() == 0
+    assert not dialogo._ok.isEnabled()
+
+
+def test_dialogo_exige_ao_menos_um_atributo(app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from printgest.ui.modulos.dialogo_variacoes import DialogoVariacoes
+
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_a, **_k: None)
+    dialogo = DialogoVariacoes({"codigo": "cv01"})
+    dialogo._adicionar()
+    assert dialogo.valor() == []
+    assert not dialogo._ok.isEnabled()
+
+
+def test_filtro_variacoes_e_marcador_na_grade(app):
+    pagina = _pagina()
+    linhas = [
+        {"id": 1, "tipo": "produto", "nome": "Pai", "produto_pai_id": None},
+        {"id": 2, "tipo": "produto", "nome": "Filha", "produto_pai_id": 1},
+        {"id": 3, "tipo": "servico", "nome": "Serviço", "produto_pai_id": None},
+    ]
+    pagina._filtro = "variante"
+    filtradas = pagina._aplicar_filtro_local(linhas)
+    assert [linha["id"] for linha in filtradas] == [2]
+    assert pagina._formatar_texto(filtradas[0], "nome") == "↳ Filha"
+    assert pagina._formatar_texto(linhas[0], "nome") == "Pai"
