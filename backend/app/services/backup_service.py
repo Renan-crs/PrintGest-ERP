@@ -155,7 +155,13 @@ def executar_backup(db: Session, *, filial_id: int, usuario_id: int) -> dict:
     binario = _pg_bin() / "pg_dump.exe"
     try:
         comando = [str(binario), "-Fc", "-f", str(arquivo), url_cli]
-        processo = subprocess.run(comando, capture_output=True, text=True, timeout=600)
+        processo = subprocess.run(
+            comando,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
         ok = processo.returncode == 0 and arquivo.exists()
         tamanho = arquivo.stat().st_size if arquivo.exists() else None
         mensagem = (

@@ -82,12 +82,17 @@ o modo de leitura quando algo não está em ordem.
   Bônus: zero prompt de UAC.
 - **`API_HOST=127.0.0.1`** no `.env` da instalação: evita o prompt do firewall
   do Windows na primeira execução e não expõe a API local.
-- **`console=True` no daemon + `CREATE_NO_WINDOW` no desktop**: um exe
-  PyInstaller *windowed* trava no startup — uvicorn/logging escrevem em um
-  `sys.stderr` que não existe sem console. O desktop sobe o daemon com
-  `CREATE_NO_WINDOW | DETACHED_PROCESS`, então o usuário nunca vê console;
-  abrindo o `PrintGestAPI.exe` direto do Explorador ele aparece (útil para
-  suporte).
+- **`console=True` no daemon + `CREATE_NO_WINDOW` no desktop**: o console é
+  uma decisão de **robustez de logging**, não uma janela visível ao usuário.
+  O desktop sobe o daemon com `CREATE_NO_WINDOW | DETACHED_PROCESS` e
+  `stdin/stdout/stderr=DEVNULL` — nenhuma janela aparece no fluxo normal.
+  Abrindo `PrintGestAPI.exe` direto do Explorador, o console aparece para
+  suporte. Desde a v0.5.24 o `run_server.py` instala um `RotatingFileHandler`
+  **antes** do `basicConfig()` e substitui `sys.stdout/stderr` nulos, de modo
+  que trocar o spec para `console=False` é viável sem risco de travar no
+  startup (uvicorn/logging não dependem mais de `stderr`).
+- **Processos-filho sem flash**: as chamadas de hardware (PowerShell) e
+  `pg_dump` também usam `CREATE_NO_WINDOW`.
 - **Migrations no congelado**: um exe PyInstaller não tem `python -m alembic`.
   `app/core/migrations.py` detecta `sys.frozen` e roda `command.upgrade` da
   API Python, com `alembic.ini` + `alembic/` vindos de `sys._MEIPASS` (o

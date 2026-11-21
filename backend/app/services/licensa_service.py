@@ -290,6 +290,8 @@ def _consultar_hardware() -> dict[str, str]:
             text=True,
             timeout=15,
             check=False,
+            # Sem janela de console (o daemon roda "detached").
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         dados = json.loads(saida.stdout or "{}")
     except (OSError, subprocess.SubprocessError, ValueError):

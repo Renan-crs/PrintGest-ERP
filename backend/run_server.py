@@ -19,9 +19,8 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
-
-_CREATE_NO_WINDOW = 0x08000000
 
 
 def _carregar_env_do_executavel() -> None:
@@ -39,14 +38,32 @@ def _carregar_env_do_executavel() -> None:
         os.environ.setdefault(chave.strip(), valor.strip())
 
 
+def _garantir_streams() -> None:
+    """Evita `sys.stderr=None` em binário windowed (PyInstaller console=False)."""
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
 def _anexar_log_em_arquivo() -> None:
-    """Copia os logs de inicialização/serviço para `logs/printgest-api.log`."""
+    """Copia os logs para `logs/printgest-api.log` (rotativo, até 5 MB × 3).
+
+    Chamado ANTES de `basicConfig()` e de `import app.main`: com o FileHandler
+    já instalado, nenhum StreamHandler aponta para um `stderr` inexistente —
+    é o pré-requisito para trocar o spec do daemon para `console=False`.
+    """
     if not getattr(sys, "frozen", False):
         return
     try:
         pasta = Path(sys.executable).resolve().parent / "logs"
         pasta.mkdir(exist_ok=True)
-        manipulador = logging.FileHandler(pasta / "printgest-api.log", encoding="utf-8")
+        manipulador = RotatingFileHandler(
+            pasta / "printgest-api.log",
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+            encoding="utf-8",
+        )
         manipulador.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         )
@@ -79,8 +96,11 @@ def _log_configuracao_inicial() -> None:
 
 def main() -> None:
     _carregar_env_do_executavel()
+    _garantir_streams()
 
-    # Configurar logging antes de qualquer import
+    # Log em arquivo PRIMEIRO: basicConfig() não acrescenta StreamHandler
+    # quando a raiz já tem handler, e `import app.main` respeita isso.
+    _anexar_log_em_arquivo()
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("printgest")
     logger.info("PrintGest API Service inicializando...")
@@ -104,11 +124,9 @@ def main() -> None:
     logger.info("REDGEST_URL: %s", settings.redgest_url)
     logger.info("ENV: %s", settings.env)
 
-    # Importa o app primeiro para que o logging da aplicação (root + request_id)
-    # já esteja no lugar quando o FileHandler for anexado.
+    # O app herda o handler de arquivo instalado acima (sem stderr).
     from app.main import app
 
-    _anexar_log_em_arquivo()
     logger.info("Iniciando uvicorn em %s:%s", settings.api_host, settings.api_port)
     uvicorn.run(app, host=settings.api_host, port=settings.api_port, reload=False)
 

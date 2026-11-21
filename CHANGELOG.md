@@ -9,6 +9,29 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.24] - 2026-11-20 — Execução silenciosa do console/daemon
+
+### Verificado
+- O daemon **já roda sem console visível** quando iniciado pelo desktop
+  (`CREATE_NO_WINDOW | DETACHED_PROCESS` + DEVNULL nos 3 streams). O console
+  só aparece ao abrir `PrintGestAPI.exe` direto no Explorador (suporte).
+- `taskkill /IM`, diagnóstico HTTP/JSON, fechamento das 23:00 e modo estação
+  não dependem de console. Auto-update é código morto.
+- Serviço do Windows foi descartado: quebra zero-UAC, cofre DPAPI por usuário
+  e a regra de atualização do instalador.
+
+### Endurecido
+- `run_server.py` instala `RotatingFileHandler` (5 MB × 3) **antes** do
+  `basicConfig()` e substitui `stdout/stderr` nulos — pré-requisito para
+  trocar o spec para `console=False` sem travar no startup.
+- `licensa_service.py` e `backup_service.py` passam `CREATE_NO_WINDOW` nos
+  processos-filho (sem flash de janela).
+
+### Validação
+Backend: 443 passed. Desktop: 461 passed, 4 xfailed.
+
+---
+
 ## [0.5.23] - 2026-11-20 — Auditoria do sidebar (altura, espaçamento e links)
 
 ### Corrigido

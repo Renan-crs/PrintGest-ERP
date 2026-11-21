@@ -11,6 +11,8 @@ sempre liberadas para permitir a tela de ativação.
 
 import asyncio
 import logging
+import os
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -41,10 +43,14 @@ class _FiltroRequestId(logging.Filter):
 
 
 def _configurar_logging() -> None:
-    """Logging básico (INFO) com correlação por requisição (P15)."""
+    """Logging básico (INFO) com correlação por requisição (P15).
+
+    Em binário `console=False`, `sys.stderr` pode ser None — o stream é
+    substituído para não quebrar o startup (o log real vai para arquivo).
+    """
     root = logging.getLogger()
     if not root.handlers:
-        handler = logging.StreamHandler()
+        handler = logging.StreamHandler(stream=sys.stderr or open(os.devnull, "w"))
         handler.setFormatter(
             logging.Formatter(
                 "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"

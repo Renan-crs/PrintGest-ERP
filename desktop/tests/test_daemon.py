@@ -97,6 +97,9 @@ def test_subir_passa_cwd_e_flags_desanexados(monkeypatch, tmp_path):
     assert capturado["kwargs"]["creationflags"] == (
         subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
     )
+    # Nenhum stream pode ficar ligado ao console do desktop.
+    for nome in ("stdin", "stdout", "stderr"):
+        assert capturado["kwargs"][nome] is subprocess.DEVNULL
 
 
 def test_preparar_daemon_da_main_nao_abre_dialogo_quando_saudavel(
