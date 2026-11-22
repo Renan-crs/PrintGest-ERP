@@ -576,6 +576,12 @@ class Api:
     def gerar_variacoes(self, payload: dict) -> dict:
         return self._post("/v1/produtos/variacoes/gerar", payload, self._token)
 
+    def propagar_preco(self, produto_id: int) -> dict:
+        """Propaga preço/custo/mínimo do pai às variantes (GERENTE+)."""
+        return self._post(
+            f"/v1/produtos/{produto_id}/propagar-preco", {}, self._token
+        )
+
     def listar_transferencias(self, limit: int = 50, offset: int = 0) -> dict:
         """Lista paginada no mesmo envelope das demais (`data`/`total`).
 

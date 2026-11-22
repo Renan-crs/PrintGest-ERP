@@ -74,9 +74,27 @@ API, SKU exato resolvido pelo cache do PDV.
   vai no payload do evento como `gerado_por`.
 - Erros 401/403/409 no fluxo de geração com títulos e orientações específicos.
 
-**Suítes:** backend **446 passed**, desktop **470 passed, 4 xfailed**.
-Mutação: **13/13 mortos** (inclui filtro e RBAC de preço na geração).
-Neon: head `c2d3e4f5a6b7` — nenhuma migration nova.
+## Integridade e propagação (v0.5.28)
+
+Migration **`d4e5f6a7b8c9` aplicada no Neon** (backup: branch
+`backup-pre-migration-variantes-20261122`, LSN `0/3605DD0`; pré-checagem:
+0 duplicatas, 0 pais cross-tenant, 0 variantes):
+
+- `uq_produto_variante_atributos` — UNIQUE por
+  `(filial, pai, COALESCE(tamanho), COALESCE(marca), COALESCE(cor))`,
+  evitando duplicidade semântica quando o `codigo` do pai muda;
+- `uq_produto_id_filial` + FK composta
+  `fk_produto_pai_mesma_filial (produto_pai_id, filial_id) -> produto(id,
+  filial_id) ON DELETE RESTRICT` — um pai de outro inquilino é rejeitado.
+- Mensagens traduzidas: 409 "Já existe uma variante com estes atributos";
+  400 "O produto pai deve pertencer à mesma filial".
+- **Propagação explícita** de preço/custo/mínimo do pai às variantes ativas:
+  `POST /v1/produtos/{id}/propagar-preco` (GERENTE+), botão na tela, eventos
+  de sync por filha. Não há coluna nova — é ação sob demanda.
+
+**Suítes:** backend **449 passed**, desktop **471 passed, 4 xfailed**.
+Mutação: **15/15 mortos** (inclui filtro, RBAC de preço na geração e
+propagação). Neon: head `d4e5f6a7b8c9`.
 
 ## Auditoria de mutabilidade (testes de mutação)
 

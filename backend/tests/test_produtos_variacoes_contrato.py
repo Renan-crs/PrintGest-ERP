@@ -6,6 +6,7 @@ de preço e filtros de SKU/estoque.
 """
 
 import uuid
+from decimal import Decimal
 
 from app.db import SessionLocal
 from app.models.cadastros import Produto, ProdutoEstoque
@@ -399,3 +400,96 @@ def test_reativacao_emite_evento_de_sync(client, admin_token):
         db.close()
     assert reativada.ativo is True
     assert depois > antes
+
+
+def test_duplicidade_de_atributos_mesmo_pai_e_409(client, admin_token):
+    pai = _criar(client, admin_token)
+    r = _gerar(
+        client, admin_token, pai["id"],
+        [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+    )
+    assert r.status_code in (200, 201), r.text
+
+    # Mesmo pai + mesmos atributos, mas código/SKU diferentes: o índice único
+    # por (filial, pai, atributos) barra a duplicidade semântica.
+    resp = client.post(
+        "/v1/produtos",
+        headers=auth(client, admin_token),
+        json={
+            "codigo": f"DUP{_u().upper()}",
+            "sku": f"DUP{_u().upper()}",
+            "nome": "Duplicata semântica",
+            "tipo": "produto",
+            "controla_estoque": True,
+            "produto_pai_id": pai["id"],
+            "atrib_tamanho": "M", "atrib_marca": "X", "atrib_cor": "Azul",
+        },
+    )
+    assert resp.status_code == 409, resp.text
+    assert "variante" in resp.json()["detail"].lower()
+
+
+def test_pai_de_outra_filial_e_rejeitado(client, admin_token):
+    from app.models.core import Empresa, Filial
+
+    db = SessionLocal()
+    try:
+        empresa = db.query(Empresa).first()
+        outra = Filial(empresa_id=empresa.id, nome=f"Filial {_u()}")
+        db.add(outra)
+        db.commit()
+        pai = Produto(
+            filial_id=outra.id, codigo=f"EXT{_u().upper()}",
+            nome="Pai externo", tipo="produto", controla_estoque=True,
+        )
+        db.add(pai)
+        db.commit()
+        pai_id = pai.id
+    finally:
+        db.close()
+
+    resp = client.post(
+        "/v1/produtos",
+        headers=auth(client, admin_token),
+        json={
+            "codigo": f"FILHA{_u().upper()}",
+            "nome": "Filha cross-tenant",
+            "tipo": "produto",
+            "controla_estoque": True,
+            "produto_pai_id": pai_id,
+        },
+    )
+    assert resp.status_code == 400, resp.text
+    assert "mesma filial" in resp.json()["detail"].lower()
+
+
+def test_propagar_preco_para_variantes(client, admin_token):
+    pai = _criar(client, admin_token, preco_venda=100)
+    filha = _gerar(
+        client, admin_token, pai["id"],
+        [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+    ).json()["data"][0]
+    assert Decimal(str(filha["preco_venda"])) == Decimal("100.00")
+
+    assert client.put(
+        f"/v1/produtos/{pai['id']}", headers=auth(client, admin_token),
+        json={"preco_venda": 150},
+    ).status_code == 200
+
+    login, senha = _criar_usuario(client, admin_token, NivelAcesso.OPERADOR)
+    operador = auth(client, _login_usuario(client, login, senha))
+    assert client.post(
+        f"/v1/produtos/{pai['id']}/propagar-preco", headers=operador
+    ).status_code == 403
+
+    r = client.post(
+        f"/v1/produtos/{pai['id']}/propagar-preco",
+        headers=auth(client, admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["variantes_atualizadas"] == 1
+
+    det = client.get(
+        f"/v1/produtos/{filha['id']}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert Decimal(str(det["preco_venda"])) == Decimal("150.00")

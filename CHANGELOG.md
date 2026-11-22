@@ -9,6 +9,25 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.28] - 2026-11-22 — Integridade e propagação de variantes
+
+### Banco de dados
+- Migration `d4e5f6a7b8c9` aplicada no Neon: `UNIQUE(filial, pai, atributos)`
+  e FK composta `(produto_pai_id, filial_id)` com `ON DELETE RESTRICT`.
+- Pré-checagem: 0 duplicatas, 0 pais cross-tenant. Backup: branch
+  `backup-pre-migration-variantes-20261122`.
+
+### Novidades
+- Propagação explícita de preço/custo/mínimo do pai às variantes ativas
+  (`POST /v1/produtos/{id}/propagar-preco`, GERENTE+) com botão na tela e
+  eventos de sync por filha.
+
+### Validação
+Backend: 449 passed. Desktop: 471 passed, 4 xfailed.
+Mutação: 15/15 mortos.
+
+---
+
 ## [0.5.27] - 2026-11-22 — Gestão completa de variantes de produtos
 
 ### Novidades

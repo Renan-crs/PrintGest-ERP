@@ -194,6 +194,46 @@ def gerar(
     return criados
 
 
+def propagar_preco(
+    db: Session, *, filial_id: int, pai_id: int, usuario_id: int | None = None
+) -> int:
+    """Propaga preço/custo/mínimo do pai às variantes ativas (ação explícita)."""
+    pai = db.get(Produto, pai_id)
+    if pai is None or pai.filial_id != filial_id:
+        raise HTTPException(404, "Produto pai não encontrado nesta filial.")
+    filhas = (
+        db.query(Produto)
+        .filter(
+            Produto.filial_id == filial_id,
+            Produto.produto_pai_id == pai_id,
+            Produto.ativo.is_(True),
+        )
+        .all()
+    )
+    for filha in filhas:
+        filha.preco_venda = pai.preco_venda
+        filha.preco_custo = pai.preco_custo
+        filha.estoque_minimo = pai.estoque_minimo
+        filial_service.registrar_evento(
+            db,
+            filial_id=filial_id,
+            entidade="mestre:produto",
+            entidade_id=filha.id,
+            operacao="UPD",
+            payload={
+                "chave": filha.sku,
+                "id": filha.id,
+                "nome": filha.nome,
+                "preco_venda": str(filha.preco_venda),
+                "uuid": filha.uuid,
+                "operacao": "propagacao_preco",
+                "gerado_por": usuario_id,
+            },
+        )
+    db.commit()
+    return len(filhas)
+
+
 def buscar_por_sku(
     db: Session, *, filial_id: int, termo: str
 ) -> Produto | None:

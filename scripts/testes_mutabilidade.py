@@ -130,6 +130,20 @@ MUTANTES = [
         "tests/test_produtos_variacoes_contrato.py::test_gerar_com_preco_exige_gerente",
     ),
     Mutante(
+        "rbac_propagacao_desligado",
+        "backend/app/api/cadastros.py",
+        '"""Propaga preço/custo/mínimo do pai às variantes ativas (GERENTE+)."""\n    from app.deps import RANK\n\n    if RANK.get(usuario.nivel_acesso, 0) < RANK[NivelAcesso.GERENTE]:',
+        '"""Propaga preço/custo/mínimo do pai às variantes ativas (GERENTE+)."""\n    from app.deps import RANK\n\n    if False:',
+        "tests/test_produtos_variacoes_contrato.py::test_propagar_preco_para_variantes",
+    ),
+    Mutante(
+        "propagacao_nao_altera_preco",
+        "backend/app/services/variacao_service.py",
+        "filha.preco_venda = pai.preco_venda",
+        "filha.preco_venda = filha.preco_venda",
+        "tests/test_produtos_variacoes_contrato.py::test_propagar_preco_para_variantes",
+    ),
+    Mutante(
         "pdv_nao_indexa_sku",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "for chave in (codigo, sku, barras):",

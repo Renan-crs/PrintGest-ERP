@@ -66,7 +66,11 @@ def _vender(client, admin_token, produto_id, quantidade=1, **extra):
 
 
 def _saldo(client, admin_token, produto_id) -> Decimal:
-    resp = client.get("/v1/estoque", headers=auth(client, admin_token))
+    # limit alto: suíte cria dezenas de produtos e a lista padrão é paginada.
+    resp = client.get(
+        "/v1/estoque", headers=auth(client, admin_token),
+        params={"limit": 200},
+    )
     assert resp.status_code == 200, resp.text
     linha = next(i for i in resp.json()["data"] if i["produto_id"] == produto_id)
     return Decimal(linha["saldo"])

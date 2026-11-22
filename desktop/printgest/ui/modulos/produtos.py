@@ -83,7 +83,16 @@ class PaginaProdutos(PaginaCrud):
         )
         botao.clicked.connect(self._gerar_variacoes)
         self._btn_variacoes = botao
-        return [botao]
+
+        propagar = QPushButton("Propagar preço")
+        propagar.setObjectName("acaoLinha")
+        propagar.setToolTip(
+            "Atualiza preço, custo e mínimo das variantes com os valores do "
+            "produto pai (GERENTE+)"
+        )
+        propagar.clicked.connect(self._propagar_preco)
+        self._btn_propagar = propagar
+        return [botao, propagar]
 
     @staticmethod
     def _dominios_variacoes(produtos: list[dict]) -> dict[str, list[str]]:
@@ -179,6 +188,49 @@ class PaginaProdutos(PaginaCrud):
             ),
             feito,
             erro,
+        )
+
+    def _propagar_preco(self) -> None:
+        dado = self._tabela.objeto_selecionado()
+        if not dado or self._editando_id is None:
+            QMessageBox.information(
+                self, "Variações", "Selecione o produto pai na lista."
+            )
+            return
+        confirma = QMessageBox.question(
+            self,
+            "Propagar preço",
+            "Atualizar preço, custo e estoque mínimo das variantes com os "
+            "valores deste produto?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if confirma != QMessageBox.StandardButton.Yes:
+            return
+
+        self._btn_propagar.setEnabled(False)
+
+        def ok(resp) -> None:
+            self._btn_propagar.setEnabled(True)
+            catalogos.invalidar("produtos")
+            self.recarregar(self._busca.texto())
+            total = (resp or {}).get("variantes_atualizadas", 0)
+            QMessageBox.information(
+                self, "Propagar preço", f"{total} variante(s) atualizada(s)."
+            )
+
+        def erro(msg: str, status: int | None = None) -> None:
+            self._btn_propagar.setEnabled(True)
+            titulo = (
+                "Sessão encerrada" if status == 401
+                else "Modo leitura" if status == 423
+                else "Sem permissão" if status == 403
+                else "Propagar preço"
+            )
+            QMessageBox.warning(self, titulo, msg)
+
+        tarefas.rodar(
+            lambda: self._api.propagar_preco(dado["id"]), ok, erro
         )
 
     # ----------------------------------------------------------- formulário
@@ -286,9 +338,11 @@ class PaginaProdutos(PaginaCrud):
         botao = getattr(self, "_btn_variacoes", None)
         if botao is None:
             return
-        botao.setEnabled(
-            self._editando_id is not None and not self._modo_leitura
-        )
+        habilitado = self._editando_id is not None and not self._modo_leitura
+        botao.setEnabled(habilitado)
+        propagar = getattr(self, "_btn_propagar", None)
+        if propagar is not None:
+            propagar.setEnabled(habilitado)
 
     # -------------------------------------------------------------- leitura
 

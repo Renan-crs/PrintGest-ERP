@@ -90,6 +90,16 @@ def _erro_integridade(exc: IntegrityError) -> HTTPException:
             status_code=status.HTTP_409_CONFLICT,
             detail="Código de barras já cadastrado nesta instalação.",
         )
+    if "uq_produto_variante_atributos" in texto:
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Já existe uma variante com estes atributos para este produto.",
+        )
+    if "fk_produto_pai_mesma_filial" in texto:
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O produto pai deve pertencer à mesma filial.",
+        )
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail="Dados duplicados: já existe um registro com esses valores.",

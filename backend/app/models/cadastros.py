@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Numeric,
     String,
@@ -234,6 +235,22 @@ class Produto(Base):
             "uq_produto_codigo_barras", "codigo_barras", unique=True,
             postgresql_where=text("codigo_barras IS NOT NULL"),
         ),
+        UniqueConstraint("id", "filial_id", name="uq_produto_id_filial"),
+        ForeignKeyConstraint(
+            ["produto_pai_id", "filial_id"],
+            ["produto.id", "produto.filial_id"],
+            name="fk_produto_pai_mesma_filial",
+            ondelete="RESTRICT",
+        ),
+        Index(
+            "uq_produto_variante_atributos",
+            "filial_id", "produto_pai_id",
+            text("COALESCE(atrib_tamanho, '')"),
+            text("COALESCE(atrib_marca, '')"),
+            text("COALESCE(atrib_cor, '')"),
+            unique=True,
+            postgresql_where=text("produto_pai_id IS NOT NULL"),
+        ),
         Index("idx_produto_nome", "nome"),
         Index("idx_produto_pai", "produto_pai_id"),
         Index("idx_produto_categoria", "categoria_id"),
@@ -252,9 +269,8 @@ class Produto(Base):
     # apontam para o produto "pai" e herdam atributos de domínio fechado.
     sku: Mapped[str | None] = mapped_column(String(64))
     uuid: Mapped[str | None] = mapped_column(String(36))
-    produto_pai_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("produto.id")
-    )
+    # FK composta (produto_pai_id, filial_id) declarada em __table_args__.
+    produto_pai_id: Mapped[int | None] = mapped_column(BigInteger)
     atrib_tamanho: Mapped[str | None] = mapped_column(String(40))
     atrib_marca: Mapped[str | None] = mapped_column(String(60))
     atrib_cor: Mapped[str | None] = mapped_column(String(60))

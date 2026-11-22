@@ -232,6 +232,26 @@ def gerar_variacoes(
     return ItemResponse(data=[ProdutoOut.model_validate(p) for p in criados])
 
 
+@router.post("/produtos/{item_id}/propagar-preco")
+def propagar_preco_variantes(
+    item_id: int, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
+    """Propaga preço/custo/mínimo do pai às variantes ativas (GERENTE+)."""
+    from app.deps import RANK
+
+    if RANK.get(usuario.nivel_acesso, 0) < RANK[NivelAcesso.GERENTE]:
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado: apenas gerência pode alterar preços.",
+        )
+    from app.services import variacao_service
+
+    total = variacao_service.propagar_preco(
+        db, filial_id=filial, pai_id=item_id, usuario_id=usuario.id
+    )
+    return {"data": {"produto_id": item_id, "variantes_atualizadas": total}}
+
+
 @router.get("/produtos/buscar-sku/{termo}", response_model=ItemResponse[ProdutoOut])
 def buscar_sku(termo: str, db: DbDep, filial: FilialDep):
     from app.services import variacao_service

@@ -471,3 +471,31 @@ def test_dialogo_variacoes_inclui_preco_e_barras(app, monkeypatch):
     dados = dialogo.valor()[0]
     assert dados["preco_venda"] == "10.50"
     assert dados["codigo_barras"] == "7891000100103"
+
+
+def test_botao_propagar_preco_chama_api_e_reporta_contagem(app, pumpar, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    pagina = _pagina()
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._tabela.selectRow(0)
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        lambda *_a, **_k: QMessageBox.StandardButton.Yes,
+    )
+    mensagens = []
+    monkeypatch.setattr(
+        QMessageBox, "information",
+        lambda _pai, titulo, texto, *_a, **_k: mensagens.append(texto),
+    )
+    chamadas = []
+    monkeypatch.setattr(
+        pagina._api, "propagar_preco",
+        lambda produto_id: chamadas.append(produto_id)
+        or {"variantes_atualizadas": 2},
+    )
+
+    pagina._btn_propagar.click()
+    assert chamadas == [1]
+    assert any("2 variante(s) atualizada(s)" in m for m in mensagens)
+    assert pagina._btn_propagar.isEnabled()
