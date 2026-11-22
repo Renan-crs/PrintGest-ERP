@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PrintGest-Commercial
+import logging
 import os
 import sys
 import time
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
 from printgest import APP_NAME, __version__
 from printgest.core import daemon
 from printgest.core.api import Api, modo_estacao
+from printgest.core.logging_app import configurar_logging, mascarar
 from printgest.core.sessao import carregar_sessao, salvar_sessao, limpar_sessao
 from printgest.core.tarefas import rodar
 from printgest.ui.ativacao import AtivacaoWindow
@@ -81,19 +83,24 @@ def _aguardar_daemon_pronto(timeout: float = DAEMON_READY_TIMEOUT) -> bool:
 
 
 def _erro_inesperado(tipo: type, valor: BaseException, tb) -> None:
-    """Protocolo 4: exceção não tratada não derruba a app em silêncio."""
+    """Protocolo 4: exceção não tratada é detalhada no arquivo de log."""
     import traceback
 
+    logger = logging.getLogger("printgest.desktop")
+    logger.error(
+        "Erro não tratado no desktop | tipo=%s mensagem=%s",
+        tipo.__name__, mascarar(str(valor)), exc_info=(tipo, valor, tb),
+    )
     traceback.print_exception(tipo, valor, tb)
     try:
         QMessageBox.critical(
             None,
             "Erro inesperado",
             f"Ocorreu um erro inesperado.\n\n{tipo.__name__}: {valor}\n\n"
-            "Os detalhes completos foram gravados no console/log.",
+            "Os detalhes completos foram gravados em logs/printgest.log.",
         )
-    except Exception:
-        pass  # antes do QApplication existir: só o traceback no stderr
+    except Exception as exc:
+        logger.warning("Falha ao exibir diálogo de erro: %s", exc)
 
 
 class _Roteador:
@@ -408,6 +415,8 @@ def _preparar_daemon(app: QApplication) -> None:
 
 
 def main() -> None:
+    configurar_logging()  # antes do QApplication: captura falhas de startup
+    logging.getLogger("printgest.desktop").info("PrintGest ERP v%s iniciando", __version__)
     sys.excepthook = _erro_inesperado
     _carregar_env_do_executavel()  # estação: endereço do servidor (antes de tudo)
     app = QApplication(sys.argv)

@@ -1,5 +1,6 @@
 """Dependências FastAPI: sessão de banco, autenticação, RBAC e escopo de filial."""
 
+from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -71,6 +72,11 @@ def _autenticar(token: str, db: Session) -> Usuario:
     return usuario
 
 
+# Contexto de auditoria para os handlers de erro (preenchido nas dependencies).
+usuario_logado: ContextVar[int | None] = ContextVar("usuario_logado", default=None)
+filial_logada: ContextVar[int | None] = ContextVar("filial_logada", default=None)
+
+
 def get_usuario_atual(
     db: DbDep,
     authorization: Annotated[str | None, Header()] = None,
@@ -86,7 +92,10 @@ def get_usuario_atual(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de autenticação vazio.",
         )
-    return _autenticar(token, db)
+    usuario = _autenticar(token, db)
+    usuario_logado.set(usuario.id)
+    filial_logada.set(usuario.filial_id)
+    return usuario
 
 
 UsuarioDep = Annotated[Usuario, Depends(get_usuario_atual)]

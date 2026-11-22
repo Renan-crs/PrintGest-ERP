@@ -76,7 +76,12 @@ def test_configurar_logging_sobrevive_a_stderr_none():
         root.handlers = []
         sys.stderr = None
         _configurar_logging()  # não pode levantar AttributeError
-        assert len(root.handlers) == 1
+        # Arquivo rotativo + console (com stderr nulo) sempre são instalados.
+        assert any(isinstance(h, logging.FileHandler) for h in root.handlers)
+        assert any(
+            isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+            for h in root.handlers
+        )
     finally:
         root.handlers = handlers_originais
         sys.stderr = stderr_original

@@ -13,15 +13,18 @@ import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
 import time
 import uuid
 from contextlib import asynccontextmanager
-from contextvars import ContextVar
 from datetime import date, datetime
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import api
 from app.bootstrap import rodar_bootstrap
@@ -29,36 +32,70 @@ from app.core.config import settings
 from app.core.migrations import aplicar_migrations
 from app.services import financeiro_service, gating, licensa_service
 
+from app.core.log_seguranca import (  # noqa: E402
+    FiltroRequestId as _FiltroRequestId,
+    _LOG_FORMAT,
+    request_id as _request_id,
+    sanitizar,
+)
+
 logger = logging.getLogger("printgest")
-
-_request_id: ContextVar[str] = ContextVar("request_id", default="-")
-
-
-class _FiltroRequestId(logging.Filter):
-    """Injeta o `request_id` da requisição corrente no registro de log (P15)."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        record.request_id = _request_id.get()
-        return True
 
 
 def _configurar_logging() -> None:
-    """Logging básico (INFO) com correlação por requisição (P15).
+    """Log detalhado e sanitizado em arquivo rotativo + console.
 
-    Em binário `console=False`, `sys.stderr` pode ser None — o stream é
-    substituído para não quebrar o startup (o log real vai para arquivo).
+    - nível configurável por `PRINTGEST_LOG_NIVEL` (padrão INFO);
+    - arquivo configurável por `PRINTGEST_LOG_ARQUIVO`
+      (padrão `logs/printgest-api.log`);
+    - todos os handlers recebem `request_id` e `FiltroSeguranca`;
+    - idempotente: não duplica handlers já instalados por `run_server.py`.
     """
+    from logging.handlers import RotatingFileHandler
+
+    from app.core.log_seguranca import FiltroSeguranca
+
     root = logging.getLogger()
-    if not root.handlers:
-        handler = logging.StreamHandler(stream=sys.stderr or open(os.devnull, "w"))
-        handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"
+    nivel = os.environ.get("PRINTGEST_LOG_NIVEL", "INFO").upper()
+    root.setLevel(getattr(logging, nivel, logging.INFO))
+
+    filtros = (_FiltroRequestId(), FiltroSeguranca())
+    formatador = logging.Formatter(_LOG_FORMAT)
+
+    if not any(isinstance(h, logging.FileHandler) for h in root.handlers):
+        caminho = Path(os.environ.get(
+            "PRINTGEST_LOG_ARQUIVO", "logs/printgest-api.log"
+        ))
+        try:
+            caminho.parent.mkdir(parents=True, exist_ok=True)
+            arquivo = RotatingFileHandler(
+                caminho,
+                maxBytes=int(os.environ.get("PRINTGEST_LOG_MAX_MB", "5")) * 1024 * 1024,
+                backupCount=int(os.environ.get("PRINTGEST_LOG_BACKUPS", "3")),
+                encoding="utf-8",
             )
-        )
-        handler.addFilter(_FiltroRequestId())
-        root.addHandler(handler)
-    root.setLevel(logging.INFO)
+            arquivo.setFormatter(formatador)
+            for filtro in filtros:
+                arquivo.addFilter(filtro)
+            root.addHandler(arquivo)
+        except OSError:
+            pass  # log é best-effort: disco cheio/permissão não derruba a API
+
+    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+               for h in root.handlers):
+        console = logging.StreamHandler(stream=sys.stderr or open(os.devnull, "w"))
+        console.setFormatter(formatador)
+        for filtro in filtros:
+            console.addFilter(filtro)
+        root.addHandler(console)
+
+    # Handlers criados antes (ex.: run_server.py) também precisam dos filtros.
+    for handler in root.handlers:
+        if not any(isinstance(f, FiltroSeguranca) for f in handler.filters):
+            handler.addFilter(FiltroSeguranca())
+        if not any(isinstance(f, _FiltroRequestId) for f in handler.filters):
+            handler.addFilter(_FiltroRequestId())
+        handler.setFormatter(formatador)
 
 
 _configurar_logging()
@@ -218,13 +255,68 @@ if settings.cors_origins:
     )
 
 
+def _contexto_auditoria() -> tuple[int | None, int | None]:
+    """Filial/usuário do contexto preenchidos pelas dependencies."""
+    from app.deps import filial_logada, usuario_logado
+
+    return filial_logada.get(), usuario_logado.get()
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _erro_http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Todo 4xx/5xx explícito vira uma linha detalhada no log."""
+    filial, usuario = _contexto_auditoria()
+    logger.error(
+        "HTTP %s %s %s | filial=%s usuario=%s tipo=%s detail=%s",
+        exc.status_code,
+        request.method,
+        request.url.path,
+        filial,
+        usuario,
+        type(exc).__name__,
+        sanitizar(exc.detail),
+        exc_info=(type(exc), exc, exc.__traceback__) if exc.__traceback__ else None,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": jsonable_encoder(exc.detail)},
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _erro_validacao(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Erros 422 do Pydantic também são registrados com os campos afetados."""
+    filial, usuario = _contexto_auditoria()
+    detalhes = jsonable_encoder(sanitizar(exc.errors()))
+    logger.error(
+        "HTTP 422 %s %s | filial=%s usuario=%s tipo=RequestValidationError "
+        "detail=%s",
+        request.method,
+        request.url.path,
+        filial,
+        usuario,
+        detalhes,
+    )
+    return JSONResponse(status_code=422, content={"detail": detalhes})
+
+
 @app.exception_handler(Exception)
 async def _erro_nao_tratado(request: Request, exc: Exception) -> JSONResponse:
-    """Envelope de erro consistente e sem vazamento de stack trace (P4).
-
-    `HTTPException` (4xx) continua tratada pelo handler padrão do FastAPI.
-    """
-    logger.exception("Erro não tratado em %s %s", request.method, request.url.path)
+    """Envelope consistente; traceback sanitizado vai para o log."""
+    filial, usuario = _contexto_auditoria()
+    logger.exception(
+        "HTTP 500 %s %s | filial=%s usuario=%s tipo=%s erro=%s",
+        request.method,
+        request.url.path,
+        filial,
+        usuario,
+        type(exc).__name__,
+        sanitizar(str(exc)),
+        exc_info=(type(exc), exc, exc.__traceback__) if exc.__traceback__ else None,
+    )
     return JSONResponse(
         status_code=500, content={"detail": "Erro interno do servidor."}
     )
@@ -245,6 +337,17 @@ async def controle_modo_leitura(request: Request, call_next):
     ):
         return await call_next(request)
     if not settings.licenca_desabilitada and licensa_service.ESTADO["modo_leitura"]:
+        filial, usuario = _contexto_auditoria()
+        logger.warning(
+            "HTTP 423 %s %s | filial=%s usuario=%s motivo=modo_leitura "
+            "estado=%s detail=%s",
+            request.method,
+            request.url.path,
+            filial,
+            usuario,
+            licensa_service.ESTADO.get("modo_leitura"),
+            sanitizar(_MSG_MODO_LEITURA),
+        )
         return JSONResponse(
             status_code=423,
             content={"detail": _MSG_MODO_LEITURA},

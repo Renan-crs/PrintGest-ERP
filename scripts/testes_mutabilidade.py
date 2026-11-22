@@ -144,6 +144,20 @@ MUTANTES = [
         "tests/test_produtos_variacoes_contrato.py::test_propagar_preco_para_variantes",
     ),
     Mutante(
+        "log_http_desligado",
+        "backend/app/main.py",
+        '    logger.error(\n        "HTTP %s %s %s | filial=%s usuario=%s tipo=%s detail=%s",',
+        '    logger.info(\n        "HTTP %s %s %s | filial=%s usuario=%s tipo=%s detail=%s",',
+        "tests/test_logging_erros.py::test_404_e_detalhado_no_log",
+    ),
+    Mutante(
+        "sanitizacao_desligada",
+        "backend/app/core/log_seguranca.py",
+        "    for padrao in _PADROES_SEGREDOS:",
+        "    for padrao in ():",
+        "tests/test_logging_erros.py::test_segredos_sao_mascarados_no_log",
+    ),
+    Mutante(
         "pdv_nao_indexa_sku",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "for chave in (codigo, sku, barras):",

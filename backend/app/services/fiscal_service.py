@@ -12,7 +12,6 @@ foram mantidas; a emissão antes indisponível agora usa o gateway.
 
 from __future__ import annotations
 
-import re
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -46,46 +45,11 @@ _STATUS_PENDENTES = (
 _DISPONIBILIDADE: dict[tuple[int, str], tuple[float, bool]] = {}
 _CACHE_DISPONIBILIDADE_SEGUNDOS = 60
 
-_CHAVES_SENSIVEIS = (
-    "token", "api_key", "apikey", "senha", "password", "authorization",
-    "secret", "chave_privada", "private_key", "credencial", "certificado",
+# Fonte única de máscaras (compartilhada com os handlers de log de erro).
+from app.core.log_seguranca import (  # noqa: E402
+    mascarar_texto as _mascarar_texto,
+    sanitizar as _sanitizar,
 )
-
-# Padrões que aparecem em texto de erro devolvido pelo gateway (ex.:
-# `Bearer abc123` ou `api_key=xyz`) e não podem ir para auditoria.
-_PADROES_SEGREDOS = (
-    re.compile(r"(Bearer\s+)\S+", re.IGNORECASE),
-    re.compile(
-        r"\b(token|api[_-]?key|apikey|senha|password|secret|authorization"
-        r"|chave[_-]?privada|private[_-]?key|credencial|certificado)"
-        r"\s*[:=]\s*\S+", re.IGNORECASE,
-    ),
-)
-
-
-def _mascarar_texto(texto: str) -> str:
-    """Mascara credenciais em mensagens livres antes de gravá-las."""
-    for padrao in _PADROES_SEGREDOS:
-        texto = padrao.sub(lambda m: f"{m.group(1)} ***", texto)
-    return texto
-
-
-def _sanitizar(valor: Any) -> Any:
-    """Remove credenciais do retorno antes de gravar no evento/auditoria."""
-    if isinstance(valor, dict):
-        return {
-            chave: (
-                "***"
-                if any(s in str(chave).lower() for s in _CHAVES_SENSIVEIS)
-                else _sanitizar(item)
-            )
-            for chave, item in valor.items()
-        }
-    if isinstance(valor, (list, tuple)):
-        return [_sanitizar(item) for item in valor]
-    if isinstance(valor, str):
-        return _mascarar_texto(valor)
-    return valor
 
 
 def _decimal_str(valor: Any) -> str:

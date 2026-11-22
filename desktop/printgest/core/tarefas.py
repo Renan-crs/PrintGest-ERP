@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import atexit
 import inspect
+import logging
 from typing import Callable
 
 
@@ -30,6 +31,14 @@ class _Worker(QObject):
         try:
             self._resultado.emit(pedido_id, (True, chamada()))
         except Exception as exc:  # noqa: BLE001 — falha externa não derruba a app
+            # Detalhe completo (tipo, mensagem, traceback e status) no log.
+            logging.getLogger("printgest.desktop").error(
+                "Falha em tarefa em background (pedido=%s) | tipo=%s status=%s",
+                pedido_id,
+                type(exc).__name__,
+                getattr(exc, "status_code", None),
+                exc_info=True,
+            )
             # Preserva o status HTTP (ex.: 409 de estoque insuficiente) para
             # que a tela possa dar uma mensagem clara ao operador do PDV.
             status = getattr(exc, "status_code", None)

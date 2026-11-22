@@ -53,6 +53,12 @@ def _anexar_log_em_arquivo() -> None:
     já instalado, nenhum StreamHandler aponta para um `stderr` inexistente —
     é o pré-requisito para trocar o spec do daemon para `console=False`.
     """
+    from app.core.log_seguranca import (
+        FiltroRequestId,
+        FiltroSeguranca,
+        _LOG_FORMAT,
+    )
+
     if not getattr(sys, "frozen", False):
         return
     try:
@@ -64,9 +70,9 @@ def _anexar_log_em_arquivo() -> None:
             backupCount=3,
             encoding="utf-8",
         )
-        manipulador.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        )
+        manipulador.setFormatter(logging.Formatter(_LOG_FORMAT))
+        manipulador.addFilter(FiltroRequestId())
+        manipulador.addFilter(FiltroSeguranca())
         logging.getLogger().addHandler(manipulador)
     except OSError:
         pass  # disco cheio/permissão: o serviço segue — log é best-effort

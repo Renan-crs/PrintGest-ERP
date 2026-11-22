@@ -7,10 +7,13 @@ API — a UI só precisa apresentar a mensagem.
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 
 import httpx
+
+from printgest.core.logging_app import mascarar
 
 BASE_URL = "http://127.0.0.1:8000"
 # Folga para o daemon mediar com o banco na nuvem (Neon): quando o compute
@@ -636,6 +639,7 @@ class Api:
         )
         self.ultimo_status = resp.status_code
         if resp.status_code >= 400:
+            self._log_erro(resp)
             raise ApiError(_detalhe(resp), resp.status_code)
         corpo = resp.json()
         return corpo if isinstance(corpo, list) else corpo.get("data", [])
@@ -1009,6 +1013,7 @@ class Api:
         else:
             resp = self._enviar("delete", path, headers=headers)
         if resp.status_code >= 400:
+            self._log_erro(resp)
             raise ApiError(_detalhe(resp), resp.status_code)
 
     def _delete_data(self, path: str, token: str | None = None, json: dict | None = None) -> dict:
@@ -1024,11 +1029,22 @@ class Api:
     def _headers(token: str | None) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"} if token else {}
 
+    @staticmethod
+    def _log_erro(resp: httpx.Response) -> None:
+        logging.getLogger("printgest.desktop").error(
+            "API HTTP %s %s %s | detail=%s",
+            resp.status_code,
+            resp.request.method,
+            resp.request.url.path,
+            mascarar(_detalhe(resp)),
+        )
+
     def _tratar(self, resp: httpx.Response) -> dict:
         # Último status HTTP visto — a restauração de sessão usa para
         # distinguir token recusado (401) de daemon indisponível (transporte).
         self.ultimo_status = resp.status_code
         if resp.status_code >= 400:
+            self._log_erro(resp)
             raise ApiError(_detalhe(resp), resp.status_code)
         return resp.json()["data"]
 
@@ -1045,5 +1061,6 @@ class Api:
     @staticmethod
     def _resposta_completa(resp: httpx.Response) -> dict:
         if resp.status_code >= 400:
+            Api._log_erro(resp)
             raise ApiError(_detalhe(resp), resp.status_code)
         return resp.json()

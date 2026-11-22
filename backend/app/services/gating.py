@@ -18,11 +18,15 @@ licença PARCERIA ainda não carrega a lista.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.services import licensa_service
+
+logger = logging.getLogger("printgest")
 
 # Prefixo → módulo canônico (PRD v3.0 §2), na ordem: mais específico primeiro.
 # `caixa` (abertura/fechamento/sangria + contas a receber simples) é do plano
@@ -94,6 +98,13 @@ async def controle_modulos(request: Request, call_next):
     bloqueado = rota_bloqueada(request.url.path, licensa_service.MODULOS_HABILITADOS)
     if bloqueado is not None:
         nome = _NOMES_MODULOS.get(bloqueado, bloqueado)
+        logger.warning(
+            "HTTP 403 %s %s | modulo=%s motivo=plano detail=%s",
+            request.method,
+            request.url.path,
+            bloqueado,
+            f"O módulo {nome} não está habilitado no seu plano.",
+        )
         return JSONResponse(
             status_code=403,
             content={

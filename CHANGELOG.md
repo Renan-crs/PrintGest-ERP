@@ -9,6 +9,27 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.29] - 2026-11-22 — Log detalhado de todos os erros
+
+### Backend
+- Handlers centralizados logam todo `HTTPException` (400/401/403/404/409/503),
+  422 do Pydantic, 423/403 dos middlewares e 500 com traceback — com método,
+  path, status, filial, usuário, `request_id` e `detail`.
+- `app/core/log_seguranca.py`: máscaras centralizadas (Bearer, tokens, senhas,
+  URL de banco com credenciais, chaves de licença); filtro aplicado a console
+  e arquivo, inclusive ao traceback.
+- Arquivo rotativo configurável em **todo** ambiente (`PRINTGEST_LOG_*`).
+
+### Desktop
+- `logs/printgest.log` rotativo; `_Worker`, `ApiError` e `sys.excepthook`
+  gravam tipo, status e traceback (com sanitização).
+
+### Validação
+Backend: 455 passed. Desktop: 475 passed, 4 xfailed.
+Mutação: 17/17 mortos.
+
+---
+
 ## [0.5.28] - 2026-11-22 — Integridade e propagação de variantes
 
 ### Banco de dados
