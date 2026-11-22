@@ -5,7 +5,7 @@ Níveis de acesso (PRD v2.0 §5):
   - Usuários/Sistema: ADMIN (configurações de sistema)
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.crud_factory import criar_router_crud
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
@@ -172,6 +172,13 @@ categorias_router = criar_router_crud(
 router.include_router(categorias_router)
 
 
+def _filtro_produtos(request: Request) -> list:
+    """`somente_variantes=true` filtra no banco (paginação correta)."""
+    if request.query_params.get("somente_variantes", "").lower() == "true":
+        return [Produto.produto_pai_id.is_not(None)]
+    return []
+
+
 # Produtos via factory
 produtos_router = criar_router_crud(
     prefix="/produtos",
@@ -180,6 +187,8 @@ produtos_router = criar_router_crud(
     schema_update=ProdutoUpdate,
     schema_out=ProdutoOut,
     campos_busca=["codigo", "sku", "uuid", "codigo_barras", "nome"],
+    campos_filtro=["tipo"],
+    filtro_sql=_filtro_produtos,
     tags=["cadastros"],
     nivel_acesso=NivelAcesso.OPERADOR,
     # Preço é restrito à gerência (a UI desabilita para operador).
@@ -205,8 +214,18 @@ def gerar_variacoes(
     filial: FilialDep,
     usuario: UsuarioDep,
 ):
+    from app.deps import RANK
     from app.services import variacao_service
 
+    # Preço por variante é decisão de gerência (mesma regra do PUT de produto).
+    if (
+        any(v.preco_venda is not None for v in payload.variacoes)
+        and RANK.get(usuario.nivel_acesso, 0) < RANK[NivelAcesso.GERENTE]
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado: apenas gerência pode definir preços.",
+        )
     criados = variacao_service.gerar(
         db, filial_id=filial, dados=payload, usuario_id=usuario.id
     )

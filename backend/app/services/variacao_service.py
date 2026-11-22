@@ -107,6 +107,23 @@ def gerar(
                                 filial_id=filial_id, produto_id=existe.id, saldo=0
                             )
                         )
+                    # Reativação também replica (antes ficava sem evento).
+                    filial_service.registrar_evento(
+                        db,
+                        filial_id=filial_id,
+                        entidade="mestre:produto",
+                        entidade_id=existe.id,
+                        operacao="UPD",
+                        payload={
+                            "chave": existe.sku,
+                            "id": existe.id,
+                            "nome": existe.nome,
+                            "preco_venda": str(existe.preco_venda),
+                            "uuid": existe.uuid,
+                            "operacao": "reativacao",
+                            "gerado_por": usuario_id,
+                        },
+                    )
                 continue  # idempotente
 
             rotulo = " ".join(p for p in atributos if p)
@@ -163,6 +180,7 @@ def gerar(
                     "nome": filha.nome,
                     "preco_venda": str(filha.preco_venda),
                     "uuid": filha.uuid,
+                    "gerado_por": usuario_id,
                 },
             )
             criados.append(filha)

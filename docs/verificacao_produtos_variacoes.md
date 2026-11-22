@@ -57,8 +57,26 @@ Desktop (`test_produtos.py` + `test_venda_balcao.py`, 4 casos novos): serviços
 sem botão de variações, payload/count reais no botão, linha vazia não chama a
 API, SKU exato resolvido pelo cache do PDV.
 
-**Suítes:** backend **437 passed**, desktop **455 passed, 4 xfailed**.
-Mutação: **11/11 mortos**. Neon: head `a0b1c2d3e4f5` — nenhuma migration nova.
+## Gestão completa de variantes (v0.5.27)
+
+- **Filtro server-side**: `GET /v1/produtos?somente_variantes=true` usa
+  `produto_pai_id IS NOT NULL` no banco, com `meta.total`/paginação corretos
+  mesmo em catálogos >50 itens.
+- **Formulário da filha**: mostra `produto_pai_id`, SKU e UUID como
+  somente-leitura e permite editar `atrib_tamanho/marca/cor`; `sku`, `uuid` e
+  `produto_pai_id` continuam fora do payload (imutabilidade no backend).
+- **Confirmação antes de gerar**: diálogo informa quantas variantes serão
+  processadas e que combinações existentes são ignoradas.
+- **Preço/código de barras por variante** no diálogo, com RBAC: somente
+  GERENTE+ pode enviar `preco_venda` no payload de geração (antes um OPERADOR
+  burlava o `nivel_preco` do PUT).
+- **Reativação** de filha excluída agora emite evento de sync; `usuario_id`
+  vai no payload do evento como `gerado_por`.
+- Erros 401/403/409 no fluxo de geração com títulos e orientações específicos.
+
+**Suítes:** backend **446 passed**, desktop **470 passed, 4 xfailed**.
+Mutação: **13/13 mortos** (inclui filtro e RBAC de preço na geração).
+Neon: head `c2d3e4f5a6b7` — nenhuma migration nova.
 
 ## Auditoria de mutabilidade (testes de mutação)
 

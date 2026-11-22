@@ -48,6 +48,7 @@ def criar_router_crud(
     ao_desativar: Callable[[Any, ModelT], None] | None = None,
     nivel_preco: NivelAcesso | None = None,
     campos_immutaveis: set[str] | None = None,
+    filtro_sql: Callable[[Request], list] | None = None,
 ) -> APIRouter:
     from app.deps import require_nivel
 
@@ -144,6 +145,7 @@ def criar_router_crud(
             filtros=filtros,
             limit=limite,
             offset=desloc,
+            filtros_sql=filtro_sql(request) if filtro_sql is not None else None,
         )
         return ListaResponse(
             data=[_out(i) for i in itens],

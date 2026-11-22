@@ -309,3 +309,93 @@ def test_banco_rejeita_uuid_e_codigo_de_barras_duplicados(client, admin_token):
     )
     assert r.status_code == 409, r.text
     assert "código de barras" in r.json()["detail"].lower()
+
+
+def test_filtro_server_side_de_variantes(client, admin_token):
+    pai = _criar(client, admin_token)
+    r = _gerar(
+        client, admin_token, pai["id"],
+        [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+    )
+    filha = r.json()["data"][0]
+
+    todos = client.get("/v1/produtos", headers=auth(client, admin_token)).json()
+    variantes = client.get(
+        "/v1/produtos", headers=auth(client, admin_token),
+        params={"somente_variantes": "true"},
+    ).json()
+    ids_todos = {p["id"] for p in todos["data"]}
+    ids_variantes = {p["id"] for p in variantes["data"]}
+    assert pai["id"] in ids_todos
+    assert filha["id"] in ids_todos
+    assert filha["id"] in ids_variantes
+    assert pai["id"] not in ids_variantes
+    assert variantes["meta"]["total"] == len(ids_variantes)
+
+
+def test_gerar_com_preco_exige_gerente(client, admin_token):
+    login, senha = _criar_usuario(client, admin_token, NivelAcesso.OPERADOR)
+    operador = auth(client, _login_usuario(client, login, senha))
+    pai = _criar(client, admin_token)
+
+    r = client.post(
+        "/v1/produtos/variacoes/gerar",
+        headers=operador,
+        json={
+            "produto_pai_id": pai["id"],
+            "variacoes": [{
+                "tamanho": "M", "marca": "X", "cor": "Azul",
+                "preco_venda": 999,
+            }],
+        },
+    )
+    assert r.status_code == 403, r.text
+    assert "gerência" in r.json()["detail"].lower()
+
+    # Sem preço, operador pode gerar (herda o preço do pai).
+    r2 = client.post(
+        "/v1/produtos/variacoes/gerar",
+        headers=operador,
+        json={
+            "produto_pai_id": pai["id"],
+            "variacoes": [{"tamanho": "G", "marca": "X", "cor": "Preto"}],
+        },
+    )
+    assert r2.status_code in (200, 201), r2.text
+
+
+def test_reativacao_emite_evento_de_sync(client, admin_token):
+    from app.models.plataforma import EventoSync
+
+    pai = _criar(client, admin_token)
+    primeira = _gerar(
+        client, admin_token, pai["id"],
+        [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+    )
+    filha_id = primeira.json()["data"][0]["id"]
+    assert client.delete(
+        f"/v1/produtos/{filha_id}", headers=auth(client, admin_token)
+    ).status_code == 204
+
+    db = SessionLocal()
+    try:
+        antes = db.query(EventoSync).filter(
+            EventoSync.entidade_id == filha_id
+        ).count()
+    finally:
+        db.close()
+
+    _gerar(
+        client, admin_token, pai["id"],
+        [{"tamanho": "M", "marca": "X", "cor": "Azul"}],
+    )
+    db = SessionLocal()
+    try:
+        depois = db.query(EventoSync).filter(
+            EventoSync.entidade_id == filha_id
+        ).count()
+        reativada = db.get(Produto, filha_id)
+    finally:
+        db.close()
+    assert reativada.ativo is True
+    assert depois > antes

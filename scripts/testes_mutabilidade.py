@@ -116,6 +116,20 @@ MUTANTES = [
         "tests/test_produtos_variacoes_contrato.py::test_schema_rejeita_variacao_sem_atributo",
     ),
     Mutante(
+        "filtro_variantes_desligado",
+        "backend/app/api/cadastros.py",
+        'if request.query_params.get("somente_variantes", "").lower() == "true":',
+        'if False:',
+        "tests/test_produtos_variacoes_contrato.py::test_filtro_server_side_de_variantes",
+    ),
+    Mutante(
+        "rbac_preco_na_geracao",
+        "backend/app/api/cadastros.py",
+        "and RANK.get(usuario.nivel_acesso, 0) < RANK[NivelAcesso.GERENTE]",
+        "and False",
+        "tests/test_produtos_variacoes_contrato.py::test_gerar_com_preco_exige_gerente",
+    ),
+    Mutante(
         "pdv_nao_indexa_sku",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "for chave in (codigo, sku, barras):",

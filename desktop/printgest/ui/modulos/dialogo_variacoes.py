@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import re
 
+from printgest.ui.formulario import para_decimal
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
+    QLineEdit,
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
@@ -61,6 +63,10 @@ class DialogoVariacoes(QDialog):
 
         form = QFormLayout()
         self._campos: dict[str, QComboBox] = {}
+        self._preco = QLineEdit()
+        self._preco.setPlaceholderText("Opcional — herda do pai se vazio")
+        self._barras = QLineEdit()
+        self._barras.setPlaceholderText("Opcional — EAN-13/código de barras")
         opcoes_padrao = {
             "tamanho": ["P", "M", "G", "GG"],
             "marca": [],
@@ -78,6 +84,8 @@ class DialogoVariacoes(QDialog):
             combo.setCurrentText("")
             self._campos[chave] = combo
             form.addRow(rotulo, combo)
+        form.addRow("Preço de venda", self._preco)
+        form.addRow("Código de barras", self._barras)
         col.addLayout(form)
 
         linha = QHBoxLayout()
@@ -115,6 +123,12 @@ class DialogoVariacoes(QDialog):
                 self, "Variações", "Informe ao menos um atributo."
             )
             return
+        texto_preco = self._preco.text().strip()
+        preco = para_decimal(texto_preco) if texto_preco else None
+        if texto_preco and preco is None:
+            QMessageBox.warning(self, "Variações", "Preço inválido.")
+            return
+        barras = self._barras.text().strip()
         sku = self._sku(tamanho, marca, cor)
         if sku in self._skus:
             QMessageBox.warning(
@@ -122,11 +136,15 @@ class DialogoVariacoes(QDialog):
             )
             return
         self._skus.add(sku)
-        self._combos.append({
-            "tamanho": tamanho, "marca": marca, "cor": cor
-        })
+        combo: dict[str, str] = {"tamanho": tamanho, "marca": marca, "cor": cor}
+        if preco is not None:
+            combo["preco_venda"] = str(preco)
+        if barras:
+            combo["codigo_barras"] = barras
+        self._combos.append(combo)
+        detalhe = f" · R$ {preco:.2f}" if preco is not None else ""
         item = QListWidgetItem(
-            f"{tamanho or '—'} | {marca or '—'} | {cor or '—'}  →  {sku}"
+            f"{tamanho or '—'} | {marca or '—'} | {cor or '—'}{detalhe}  →  {sku}"
         )
         item.setToolTip(sku)
         self._lista.addItem(item)

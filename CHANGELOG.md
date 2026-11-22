@@ -9,6 +9,23 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.27] - 2026-11-22 — Gestão completa de variantes de produtos
+
+### Novidades
+- Filtro **server-side** `somente_variantes=true` com paginação/total corretos.
+- Formulário da filha mostra pai/SKU/UUID (somente-leitura) e permite editar
+  tamanho/marca/cor; pai e SKU permanecem imutáveis no backend.
+- Confirmação com contagem antes de gerar; preço e código de barras por
+  variante no diálogo.
+- RBAC de preço na geração: só GERENTE+ pode enviar `preco_venda` no payload.
+- Reativação de filha emite evento de sync; erros 401/403/409 específicos.
+
+### Validação
+Backend: 446 passed. Desktop: 470 passed, 4 xfailed.
+Mutação: 13/13 mortos. Nenhuma migration nova.
+
+---
+
 ## [0.5.26] - 2026-11-20 — Melhorias em variações de produtos
 
 ### Novidades

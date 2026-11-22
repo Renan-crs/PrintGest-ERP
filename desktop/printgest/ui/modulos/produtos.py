@@ -24,6 +24,7 @@ from printgest.ui.formulario import (
     numero,
 )
 from printgest.ui.modulos.dialogo_variacoes import DialogoVariacoes
+from printgest.ui.paginador import LOTE
 from printgest.ui.modulos.pagina_crud import PaginaCrud
 
 ENTIDADE = "produtos"
@@ -48,7 +49,8 @@ class PaginaProdutos(PaginaCrud):
         ("servico", "Serviços"), ("variante", "Variações"),
     ]
     CHAVE_FILTRO = "tipo"
-    FILTRO_LOCAL = True  # a lista já filtra pelo tipo; o servidor não tem esse filtro
+    # Filtros enviados ao servidor — essencial para catálogos >50 itens.
+    FILTRO_LOCAL = False
     LUGAR_BUSCA = "Buscar por código, código de barras/EAN-13 ou descrição..."
     CAMPO_NOME = "nome"
     VAZIO = "Nenhum produto ou serviço encontrado. Clique em Novo Produto / Serviço (F6)."
@@ -126,6 +128,16 @@ class PaginaProdutos(PaginaCrud):
         variacoes = dialogo.valor()
         if not variacoes:
             return
+        confirma = QMessageBox.question(
+            self,
+            "Gerar variações",
+            f"{len(variacoes)} variante(s) serão processadas.\n"
+            "Combinações já existentes são ignoradas (idempotente). Continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if confirma != QMessageBox.StandardButton.Yes:
+            return
 
         botao = getattr(self, "_btn_variacoes", None)
         if botao is not None:
@@ -147,9 +159,15 @@ class PaginaProdutos(PaginaCrud):
             titulo = (
                 "Sessão encerrada" if status == 401
                 else "Modo leitura" if status == 423
+                else "Sem permissão" if status == 403
+                else "Conflito de SKU" if status == 409
                 else "Variações"
             )
-            QMessageBox.warning(self, titulo, msg)
+            orientacao = (
+                "\n\nRevise os códigos de barras/SKU e tente novamente."
+                if status == 409 else ""
+            )
+            QMessageBox.warning(self, titulo, f"{msg}{orientacao}")
 
         tarefas.rodar(
             lambda: self._api.gerar_variacoes(
@@ -173,6 +191,14 @@ class PaginaProdutos(PaginaCrud):
         self._tipo = CampoCombo("Tipo", _TIPOS, padrao="produto")
         self._unidade = CampoTexto("Unidade de Medida", maximo=12, valor="un")
         self._categoria = CampoCombo("Categoria", [], padrao=None)
+
+        # Metadados da variante (somente-leitura) + atributos editáveis.
+        self._pai_id = CampoTexto("Produto pai (ID)", mono=True)
+        self._sku = CampoTexto("SKU", mono=True)
+        self._uuid = CampoTexto("UUID", mono=True)
+        self._atrib_tamanho = CampoTexto("Tamanho", maximo=40)
+        self._atrib_marca = CampoTexto("Marca", maximo=60)
+        self._atrib_cor = CampoTexto("Cor", maximo=60)
 
         self._preco_custo = CampoValor("Preço de Custo")
         self._preco_venda = CampoValor("Preço de Venda")
@@ -212,6 +238,13 @@ class PaginaProdutos(PaginaCrud):
                     self._bloqueado,
                 ],
             ),
+            (
+                "Variação (filha)",
+                [
+                    self._pai_id, self._sku, self._uuid,
+                    self._atrib_tamanho, self._atrib_marca, self._atrib_cor,
+                ],
+            ),
             ("Imagens", [self._foto1, self._foto2]),
         ]
 
@@ -236,6 +269,12 @@ class PaginaProdutos(PaginaCrud):
         self._unidade.definir("un")
         self._controla.definir(self.TIPO_FIXO != "servico")
         self._tipo_mudou()
+        for campo in (self._pai_id, self._sku, self._uuid):
+            campo.definir(None)
+            campo.habilitar(False)
+        for campo in (self._atrib_tamanho, self._atrib_marca, self._atrib_cor):
+            campo.definir(None)
+            campo.habilitar(False)
         self._atualizar_botao_variacoes()
 
     def _selecao_mudou(self) -> None:
@@ -274,6 +313,22 @@ class PaginaProdutos(PaginaCrud):
         self._tipo.definir(dado.get("tipo"))
         self._unidade.definir(dado.get("unidade") or "un")
         self._categoria.definir(dado.get("categoria_id"))
+
+        pai_id = dado.get("produto_pai_id")
+        self._pai_id.definir(f"#{pai_id}" if pai_id else None)
+        self._pai_id.habilitar(False)
+        self._sku.definir(dado.get("sku"))
+        self._sku.habilitar(False)
+        self._uuid.definir(dado.get("uuid"))
+        self._uuid.habilitar(False)
+        for campo, chave in (
+            (self._atrib_tamanho, "atrib_tamanho"),
+            (self._atrib_marca, "atrib_marca"),
+            (self._atrib_cor, "atrib_cor"),
+        ):
+            campo.definir(dado.get(chave))
+            campo.habilitar(pai_id is not None and not self._modo_leitura)
+
         self._preco_custo.definir(dado.get("preco_custo"))
         self._preco_venda.definir(dado.get("preco_venda"))
         self._controla.definir(dado.get("controla_estoque"))
@@ -317,7 +372,7 @@ class PaginaProdutos(PaginaCrud):
 
     def _payload(self) -> dict:
         servico = self._tipo_atual() == "servico"
-        return {
+        dados = {
             "codigo": self._codigo.valor(),
             "codigo_barras": limpo(self._barras.valor()),
             "nome": self._nome.valor(),
@@ -334,16 +389,34 @@ class PaginaProdutos(PaginaCrud):
             "foto2_path": limpo(self._foto2.valor()),
             "bloqueado_reajuste": self._bloqueado.valor(),
         }
+        # Atributos só são enviados para uma filha (pai é imutável no backend).
+        if self._pai_id.valor():
+            dados.update({
+                "atrib_tamanho": limpo(self._atrib_tamanho.valor()),
+                "atrib_marca": limpo(self._atrib_marca.valor()),
+                "atrib_cor": limpo(self._atrib_cor.valor()),
+            })
+        return dados
 
     # --------------------------------------------------------------- filtros
 
-    def _aplicar_filtro_local(self, linhas: list[dict]) -> list[dict]:
-        if self._filtro == "variante":
-            linhas = [r for r in linhas if r.get("produto_pai_id") is not None]
-        else:
-            linhas = super()._aplicar_filtro_local(linhas)
+    def _listar(self, q: str, offset: int, filtros: dict) -> dict:
+        parametros = dict(filtros)
         if self.TIPO_FIXO:
-            linhas = [r for r in linhas if r.get("tipo") == self.TIPO_FIXO]
+            parametros["tipo"] = self.TIPO_FIXO
+        if self._filtro == "variante":
+            parametros.pop("tipo", None)
+            parametros["somente_variantes"] = True
+        elif self._filtro in ("produto", "servico"):
+            parametros["tipo"] = self._filtro
+        return self._api.listar_com_filtros(
+            self.ENTIDADE, q=q, limit=LOTE, offset=offset, **parametros
+        )
+
+    def _aplicar_filtro_local(self, linhas: list[dict]) -> list[dict]:
+        # O filtro de variantes é server-side; aqui só o fixo da tela Serviços.
+        if self.TIPO_FIXO:
+            return [r for r in linhas if r.get("tipo") == self.TIPO_FIXO]
         return linhas
 
 

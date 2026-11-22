@@ -241,6 +241,10 @@ def test_botao_gerar_variacoes_envia_payload_e_usa_contagem_real(app, pumpar, mo
             return [{"tamanho": "M", "marca": "X", "cor": "Azul"}]
 
     monkeypatch.setattr(produtos_mod, "DialogoVariacoes", DialogoFalso)
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        lambda *_a, **_k: QMessageBox.StandardButton.Yes,
+    )
     pagina = _pagina()
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     pagina._tabela.selectRow(0)
@@ -288,7 +292,9 @@ def test_variacao_sem_atributo_nao_chama_api(app, pumpar, monkeypatch):
 def test_secoes_colocam_preco_e_estoque_antes_das_fotos(app):
     pagina = _pagina()
     titulos = [titulo for titulo, _campos in pagina._lista_secoes]
-    assert titulos == ["Cadastro", "Precificação", "Estoque", "Imagens"]
+    assert titulos == [
+        "Cadastro", "Precificação", "Estoque", "Variação (filha)", "Imagens"
+    ]
     imagens = [
         campos for titulo, campos in pagina._lista_secoes if titulo == "Imagens"
     ]
@@ -400,15 +406,68 @@ def test_dialogo_exige_ao_menos_um_atributo(app, monkeypatch):
     assert not dialogo._ok.isEnabled()
 
 
-def test_filtro_variacoes_e_marcador_na_grade(app):
+def test_filtro_variacoes_e_marcador_na_grade(app, monkeypatch):
     pagina = _pagina()
-    linhas = [
-        {"id": 1, "tipo": "produto", "nome": "Pai", "produto_pai_id": None},
-        {"id": 2, "tipo": "produto", "nome": "Filha", "produto_pai_id": 1},
-        {"id": 3, "tipo": "servico", "nome": "Serviço", "produto_pai_id": None},
-    ]
+    capturado: dict = {}
+
+    def falso_listar(entidade, **kwargs):
+        capturado.update(kwargs)
+        return {"data": [], "total": 0, "limit": 50, "offset": 0}
+
+    monkeypatch.setattr(pagina._api, "listar_com_filtros", falso_listar)
     pagina._filtro = "variante"
-    filtradas = pagina._aplicar_filtro_local(linhas)
-    assert [linha["id"] for linha in filtradas] == [2]
-    assert pagina._formatar_texto(filtradas[0], "nome") == "↳ Filha"
-    assert pagina._formatar_texto(linhas[0], "nome") == "Pai"
+    pagina._listar("", 0, {})
+    assert capturado["somente_variantes"] is True
+    assert "tipo" not in capturado
+
+    filha = {"id": 2, "tipo": "produto", "nome": "Filha", "produto_pai_id": 1}
+    pai = {"id": 1, "tipo": "produto", "nome": "Pai", "produto_pai_id": None}
+    assert pagina._formatar_texto(filha, "nome") == "↳ Filha"
+    assert pagina._formatar_texto(pai, "nome") == "Pai"
+
+
+def test_formulario_variante_mostra_pai_sku_e_atributos(app):
+    pagina = _pagina()
+    pagina._preencher_campos({
+        "id": 9,
+        "codigo": "CV01-M-MARCAX-AZUL-a1b2c3d4",
+        "nome": "Cartão de visita M Marca X Azul",
+        "tipo": "produto",
+        "unidade": "un",
+        "preco_venda": "120.00",
+        "produto_pai_id": 1,
+        "sku": "CV01-M-MARCAX-AZUL",
+        "uuid": "abc-123",
+        "atrib_tamanho": "M",
+        "atrib_marca": "Marca X",
+        "atrib_cor": "Azul",
+    })
+    assert pagina._pai_id.valor() == "#1"
+    assert not pagina._pai_id.widget.isEnabled()
+    assert pagina._sku.valor() == "CV01-M-MARCAX-AZUL"
+    assert not pagina._sku.widget.isEnabled()
+    assert pagina._atrib_tamanho.valor() == "M"
+    assert pagina._atrib_tamanho.widget.isEnabled()
+
+    dados = pagina._payload()
+    assert dados["atrib_tamanho"] == "M"
+    assert dados["atrib_marca"] == "Marca X"
+    assert dados["atrib_cor"] == "Azul"
+    assert "sku" not in dados and "produto_pai_id" not in dados
+
+
+def test_dialogo_variacoes_inclui_preco_e_barras(app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from printgest.ui.modulos.dialogo_variacoes import DialogoVariacoes
+
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_a, **_k: None)
+    dialogo = DialogoVariacoes({"codigo": "cv01"})
+    dialogo._campos["tamanho"].setCurrentText("M")
+    dialogo._preco.setText("10,50")
+    dialogo._barras.setText("7891000100103")
+    dialogo._adicionar()
+
+    dados = dialogo.valor()[0]
+    assert dados["preco_venda"] == "10.50"
+    assert dados["codigo_barras"] == "7891000100103"

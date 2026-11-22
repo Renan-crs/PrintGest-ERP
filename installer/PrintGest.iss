@@ -10,7 +10,7 @@
 ; As duas instalacoes convivem na mesma maquina (AppIds e pastas distintos).
 
 #ifndef VersaoApp
-  #define VersaoApp "0.5.26"
+  #define VersaoApp "0.5.27"
 #endif
 
 #define NomeApp "PrintGest ERP"

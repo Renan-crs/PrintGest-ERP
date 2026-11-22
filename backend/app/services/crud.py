@@ -36,11 +36,14 @@ def listar(
     filtros: dict[str, str] | None = None,
     limit: int = 50,
     offset: int = 0,
+    filtros_sql: list | None = None,
 ) -> tuple[list[ModelT], int]:
     query = _pagina(db, model, filial_id=filial_id)
     for campo, valor in (filtros or {}).items():
         if hasattr(model, campo):
             query = query.filter(getattr(model, campo) == valor)
+    for condicao in filtros_sql or []:
+        query = query.filter(condicao)
     termo = (q or "").strip()
     if termo and campos_busca and hasattr(model, "id"):
         ilike = [getattr(model, campo).ilike(f"%{termo}%") for campo in campos_busca]
