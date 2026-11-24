@@ -6,6 +6,59 @@ Nov 23, 2026 · @Renan Silva
 
 ---
 
+## Status de implementação (baseline v0.5.30 — 24/11/2026)
+
+> **Como ler:** este guia continua sendo uma **proposta para validação**. Os
+> marcadores abaixo apenas informam o ponto de partida no produto atual; o texto
+> das seções seguintes foi preservado. Legenda: ✅ implementado · 🚧 parcial ·
+> ⬜ proposta (não implementado).
+>
+> **Diferença estrutural relevante:** o modelo hoje **não** tem entidades
+> `eixo_variacao`/`opcao_variacao` nem `regra_preco`. A variação é uma linha de
+> `produto` com `produto_pai_id`, `sku`, `uuid` e três atributos fixos
+> (`tamanho`, `marca`, `cor`), com UNIQUE por `(filial, pai, atributos)`. O preço
+> é o campo `produto.preco_venda` (`Numeric(14,2)`), digitado ou propagado — não
+> uma regra com vigência. Serviço não gera variação e não controla estoque; não
+> existe entidade `insumo`/`ficha_consumo`. Ou seja: **V0 é parcial** (matriz,
+> SKU, uuid, estoque por variante e modo leitura já funcionam); **V1–V4 são
+> proposta**, com ilhas isoladas de reajuste em bloco, baixa atômica e outbox
+> de sincronização.
+
+| RF | Tema | Status | O que já existe / o que falta |
+| --- | --- | --- | --- |
+| RF-VR-01 | Produto vs serviço e unidade de venda | ✅ | `tipo` e `unidade` no cadastro; serviço bloqueado de estoque. O campo se chama `unidade`, não `unidade_venda` |
+| RF-VR-02 | Eixos e opções modelados | 🚧 | Três atributos fixos na tela (tamanho, marca, cor); sem entidades de eixo/opção, `ordem`, `obrigatorio` ou modificadores |
+| RF-VR-03 | Variações por combinação, chave canônica e SKU | 🚧 | Combinações informadas linha a linha (não produto cartesiano); SKU e uuid existem; a "chave canônica" é o UNIQUE `(filial, pai, atributos)`. SKU é único por filial, não global |
+| RF-VR-04 | Aviso de explosão > 100 variações | ⬜ | Sem limite funcional; só `max_length=200` do payload e confirmação genérica na UI |
+| RF-VR-05 | Compatibilidade e `COMBINACAO_INVALIDA` | ⬜ | Nenhuma tabela de compatibilidade nem esse código de erro |
+| RF-VR-06 | Estados rascunho/publicado/inativo | 🚧 | Só `ativo` (soft delete do pai desativa as filhas); sem rascunho/publicação nem bloqueio por preço/ficha faltando |
+| RF-VR-07 | Cálculo de preço no servidor (7.1) | ⬜ | Servidor só multiplica `valor_unitario` enviado pelo cliente; não há `calcular_linha` |
+| RF-VR-08 | Precedência cliente/filial/padrão e `PRECO_NAO_CADASTRADO` | ⬜ | Sem tabela de preços; `preco_venda` tem default `0` |
+| RF-VR-09 | Faixas de quantidade | ⬜ | Sem `qtd_min`/`qtd_max` nem `modo_faixa` |
+| RF-VR-10 | Modificadores e mínimo por linha | ⬜ | Só desconto de documento/item |
+| RF-VR-11 | `ROUND_HALF_UP`, unitário 4 casas, soma das linhas | 🚧 | `ROUND_HALF_UP` ok; unitário é 2 casas; total = soma das linhas − desconto, sem rateio de resíduo |
+| RF-VR-12 | Vigência de regras; regra usada nunca editada | ⬜ | Reajuste edita `preco_venda` in loco e guarda só histórico auditável |
+| RF-VR-13 | Preço manual e limite de desconto por perfil | 🚧 | Campos editáveis no PDV, mas sem permissão `preco.manual`, justificativa, limite ou aprovação. RBAC existe só para preço de cadastro |
+| RF-VR-14 | Explicação do preço na linha | ⬜ | `snapshot_preco` existe apenas para item terceirizado (VF/%/CP/VO) |
+| RF-VR-15 | Reprecificação em lote com simulação | 🚧 | Simular/aplicar/histórico existem, mas editam `preco_venda` sem vigência nem regras novas |
+| RF-VR-16 | Ficha de consumo e custo de processo | ⬜ | Não existem entidades `insumo`, `ficha_consumo` ou `custo_processo` |
+| RF-VR-17 | Custo, margem e alertas por variação | 🚧 | `preco_custo`/`preco_venda` por variante; sem cálculo de margem, custo de processo ou alertas |
+| RF-VR-18 | Estoque na variação vs no insumo | 🚧 | Toda filha é produto acabado com saldo próprio; serviço não gera variação; falta todo o modelo de insumo/produção |
+| RF-VR-19 | Baixa atômica | 🚧 | Baixa atômica de **produto/variante** no PDV (`UPDATE ... WHERE saldo >= qtd`, 409); não há baixa de insumo nem conversões |
+| RF-VR-20 | Consumo previsto, reserva e baixa real | ⬜ | Coluna `reservado` existe mas nunca é escrita |
+| RF-VR-21 | Snapshot completo em orçamento/OS | 🚧 | Só snapshot de item terceirizado; sem variação/opções/custo/dados fiscais. Orçamento é OS com `tipo='orcamento'` |
+| RF-VR-22 | `versao` e 409 em itens/regras/documentos | ⬜ | 409 existe para estoque/integridade; sem coluna `versao` em produto, OS ou venda |
+| RF-VR-23 | Quantidade final visível (cópias × páginas) | ⬜ | Só campo livre `dimensoes` |
+| RF-VR-24 | Catálogo mestre da matriz → filiais | 🚧 | Outbox com uuid idempotente e evento `mestre:produto`; a descida casa por `codigo`, não por uuid, e cada filial gera suas variantes localmente |
+| RF-VR-25 | Modo leitura da licença (423) | ✅ | Middleware global bloqueia escrita com 423 e mantém GET livre |
+| RF-VR-26 | Gating por módulo | 🚧 | Middleware e 403 existem, mas com os módulos do PRD v3.0 e desligado por padrão (`PRINTGEST_GATING_MODULOS=false`) |
+| RF-VR-27 | Assistente de agrupamento e importação de planilha | ⬜ | Sem CSV/XLSX; desktop mostra apenas "disponível na próxima etapa" |
+| RF-VR-28 | Relatórios por variação | ⬜ | Só faturamento por filial e aniversariantes |
+
+**Fases:** V0 parcial · V1 proposta · V2 proposta · V3 proposta · V4 proposta.
+
+---
+
 ## 1. Objetivo, público e premissas
 
 **Objetivo.** Orientar a equipe de desenvolvimento e de produto a modelar e construir o fluxo de **produtos e serviços com variações**: o mesmo item vendido com preço, custo, consumo de estoque e produção diferentes conforme material, tamanho, cor, acabamento e quantidade.
@@ -569,6 +622,9 @@ Ordem dos eixos: substrato, tamanho, cor, lados, acabamentos. Opções mais vend
 
 ### 15.1 Requisitos funcionais (RF-VR)
 
+> O status de cada requisito no produto atual está no início deste documento,
+> na seção **Status de implementação**.
+
 **Catálogo**
 
 - **RF-VR-01** O catálogo distingue **produto** (revenda) e **serviço** (produção), com unidade de venda.
@@ -664,6 +720,9 @@ Usar os dados do **Anexo A**. Valores marcados como ilustrativos nas seções 7 
 ---
 
 ## 17. Plano de implementação em fases
+
+> **Status atual:** V0 parcial; V1, V2, V3 e V4 ainda não iniciados (ver seção
+> de status no início). As entregas abaixo permanecem como plano proposto.
 
 | Fase | Entregas | Critério de pronto | Depende de |
 | --- | --- | --- | --- |
@@ -770,6 +829,10 @@ Dados ilustrativos para desenvolvimento e teste, a partir do exemplo do negócio
 ---
 
 ## Anexo B. Definição de pronto por fase
+
+> Checklist ainda integralmente em aberto — nenhum item foi marcado como
+> concluído; a seção de status no início registra o que o produto já cobre
+> parcialmente.
 
 - [ ] O cálculo de preço é uma função pura, no servidor, coberta pela tabela de casos da seção 16
 - [ ] Dinheiro e quantidade em `NUMERIC`; `ROUND_HALF_UP` explícito
