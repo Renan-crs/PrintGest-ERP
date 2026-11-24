@@ -21,7 +21,8 @@ Nov 23, 2026 · @Renan Silva
 > uma regra com vigência. Serviço não gera variação e não controla estoque; não
 > existe entidade `insumo`/`ficha_consumo`. Ou seja: **V0 está em andamento**
 > (matriz, SKU, uuid, estoque por variante e modo leitura já funcionam; o motor
-> de preço puro e o simulador foram entregues na v0.5.31); **V1–V4 são
+> de preço puro e o simulador vieram na v0.5.31 e foram integrados a venda/OS
+> na v0.5.32); **V1–V4 são
 > proposta**, com ilhas isoladas de reajuste em bloco, baixa atômica e outbox
 > de sincronização.
 
@@ -33,14 +34,14 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-04 | Aviso de explosão > 100 variações | ⬜ | Sem limite funcional; só `max_length=200` do payload e confirmação genérica na UI |
 | RF-VR-05 | Compatibilidade e `COMBINACAO_INVALIDA` | ⬜ | Nenhuma tabela de compatibilidade nem esse código de erro |
 | RF-VR-06 | Estados rascunho/publicado/inativo | 🚧 | Só `ativo` (soft delete do pai desativa as filhas); sem rascunho/publicação nem bloqueio por preço/ficha faltando |
-| RF-VR-07 | Cálculo de preço no servidor (7.1) | 🚧 | Motor puro `precificacao_variacao.calcular_linha` + `POST /v1/variacoes/preco/simular` (v0.5.31); ainda não integrado a venda/OS |
+| RF-VR-07 | Cálculo de preço no servidor (7.1) | 🚧 | Motor integrado em venda/orçamento/OS (v0.5.32): com `regra_preco` no item, o servidor calcula e ignora o unitário enviado. O PDV ainda envia só `valor_unitario` do cache porque a regra não está persistida |
 | RF-VR-08 | Precedência cliente/filial/padrão e `PRECO_NAO_CADASTRADO` | 🚧 | `selecionar_regra` e o erro implementados no motor; sem tabela de preços persistida (`preco_venda` ainda tem default `0`) |
 | RF-VR-09 | Faixas de quantidade | 🚧 | Modos `TODA_A_QUANTIDADE` e `PROGRESSIVA` no motor e no simulador; sem `qtd_min`/`qtd_max` persistidos |
 | RF-VR-10 | Modificadores e mínimo por linha | 🚧 | Multiplicador, acréscimo unitário, acréscimo fixo e mínimo no motor; sem cadastro persistido |
 | RF-VR-11 | `ROUND_HALF_UP`, unitário 4 casas, soma das linhas | 🚧 | Motor usa unitário 4 casas, `ROUND_HALF_UP` e `ratear_desconto` com resíduo na última linha; persistência e documentos seguem com 2 casas |
 | RF-VR-12 | Vigência de regras; regra usada nunca editada | ⬜ | Reajuste edita `preco_venda` in loco e guarda só histórico auditável |
 | RF-VR-13 | Preço manual e limite de desconto por perfil | 🚧 | Campos editáveis no PDV, mas sem permissão `preco.manual`, justificativa, limite ou aprovação. RBAC existe só para preço de cadastro |
-| RF-VR-14 | Explicação do preço na linha | 🚧 | Motor devolve `explicacao` com faixa, modificadores e mínimo; não é gravada no documento (só item terceirizado tem `snapshot_preco`) |
+| RF-VR-14 | Explicação do preço na linha | 🚧 | `explicacao` devolvida em venda/OS na resposta que calculou; é transiente e não sobrevive a um GET (só item terceirizado tem `snapshot_preco` gravado) |
 | RF-VR-15 | Reprecificação em lote com simulação | 🚧 | Simular/aplicar/histórico existem, mas editam `preco_venda` sem vigência nem regras novas |
 | RF-VR-16 | Ficha de consumo e custo de processo | ⬜ | Não existem entidades `insumo`, `ficha_consumo` ou `custo_processo` |
 | RF-VR-17 | Custo, margem e alertas por variação | 🚧 | `preco_custo`/`preco_venda` por variante; sem cálculo de margem, custo de processo ou alertas |
@@ -56,7 +57,7 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-27 | Assistente de agrupamento e importação de planilha | ⬜ | Sem CSV/XLSX; desktop mostra apenas "disponível na próxima etapa" |
 | RF-VR-28 | Relatórios por variação | ⬜ | Só faturamento por filial e aniversariantes |
 
-**Fases:** V0 em andamento (motor de preço + simulador entregues) · V1 proposta · V2 proposta · V3 proposta · V4 proposta.
+**Fases:** V0 em andamento (motor integrado em venda/OS; faltam persistência da regra e snapshot) · V1 proposta · V2 proposta · V3 proposta · V4 proposta.
 
 ---
 
@@ -722,9 +723,10 @@ Usar os dados do **Anexo A**. Valores marcados como ilustrativos nas seções 7 
 
 ## 17. Plano de implementação em fases
 
-> **Status atual:** V0 em andamento — o motor de preço determinístico e o
-> simulador já estão no produto; V1, V2, V3 e V4 ainda não iniciados (ver seção
-> de status no início). As entregas abaixo permanecem como plano proposto.
+> **Status atual:** V0 em andamento — motor determinístico, simulador e
+> integração em venda/orçamento/OS já estão no produto; V1, V2, V3 e V4 ainda
+> não iniciados (ver seção de status no início). As entregas abaixo permanecem
+> como plano proposto.
 
 | Fase | Entregas | Critério de pronto | Depende de |
 | --- | --- | --- | --- |

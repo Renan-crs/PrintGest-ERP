@@ -33,6 +33,7 @@ from app.models.movimento import (
 )
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
 from app.services import adiantamento_service
+from app.services.precificacao_documento import resolver_preco_linha
 
 _TWO = Decimal("0.01")
 
@@ -57,9 +58,21 @@ def _aplicar_dados_item(
     vêm no payload da UI e pertencem ao registro gravado — nunca devem ser
     sobrescritos num PUT.
     """
-    total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
-    if total < 0:
-        total = Decimal("0.00")
+    # Item de fornecedor: o preço é soberania de `cotacao_service` (snapshot
+    # VO). Nunca deixar o motor sobrescrever a cotação já selecionada.
+    usa_motor = payload.regra_preco is not None and payload.tipo != TipoItemOs.FORNECEDOR
+    if usa_motor:
+        unitario, total, explicacao = resolver_preco_linha(
+            valor_unitario=payload.valor_unitario,
+            quantidade=payload.quantidade,
+            desconto=payload.desconto,
+            regra=payload.regra_preco,
+        )
+    else:
+        total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
+        if total < 0:
+            total = Decimal("0.00")
+        unitario, explicacao = payload.valor_unitario, []
     item.seq = seq
     item.produto_id = payload.produto_id
     item.descricao_avulsa = payload.descricao_avulsa
@@ -67,10 +80,12 @@ def _aplicar_dados_item(
         Decimal("0.001"), rounding=ROUND_HALF_UP
     )
     item.dimensoes = payload.dimensoes
-    item.valor_unitario = payload.valor_unitario
+    item.valor_unitario = unitario
     item.desconto = payload.desconto
     item.valor_total = total
     item.tipo = payload.tipo
+    # Transiente: devolvido na resposta, nunca gravado (guia RF-VR-14 em V0).
+    item._explicacao = explicacao
 
 
 def _montar_item(payload: OsItemIn, seq: int) -> OrdemServicoItem:
@@ -140,7 +155,9 @@ def _para_out(os: OrdemServico) -> OsOut:
         dados["saldo"] = valor_total
     itens_out = []
     for item in os.itens:
-        saida = OsItemOut.model_validate(item)
+        dados_item = {c.name: getattr(item, c.name) for c in item.__table__.columns}
+        dados_item["explicacao"] = getattr(item, "_explicacao", [])
+        saida = OsItemOut.model_validate(dados_item)
         if item.tipo == TipoItemOs.FORNECEDOR:
             # Estado derivado (PRD §3.2.2): sem snapshot, o item está
             # "aguardando" (cotações ficam no orçamento — aqui o snapshot é a

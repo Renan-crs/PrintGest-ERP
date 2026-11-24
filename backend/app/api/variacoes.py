@@ -9,18 +9,14 @@ disponível inclusive em modo leitura da licença. A persistência de
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.deps import UsuarioDep
 from app.schemas import ItemResponse
+from app.schemas.precificacao import RegraPrecoIn
 from app.services.precificacao_variacao import (
-    MODO_TODA_A_QUANTIDADE,
-    TIPO_ACRESCIMO_FIXO,
-    TIPO_ACRESCIMO_UNITARIO,
-    TIPO_MULTIPLICADOR,
     FaixaInvalidaError,
     FaixaPreco,
     Modificador,
@@ -30,25 +26,8 @@ from app.services.precificacao_variacao import (
 )
 
 
-class FaixaIn(BaseModel):
-    qtd_min: int = Field(ge=1)
-    qtd_max: int | None = Field(default=None, ge=1)
-    preco_unitario: Decimal = Field(ge=0)
-
-
-class ModificadorIn(BaseModel):
-    tipo: Literal["MULTIPLICADOR", "ACRESCIMO_UNITARIO", "ACRESCIMO_FIXO"]
-    valor: Decimal
-    descricao: str | None = None
-
-
-class SimularPrecoIn(BaseModel):
-    preco_base: Decimal = Field(default=Decimal("0"), ge=0)
+class SimularPrecoIn(RegraPrecoIn):
     quantidade: int = Field(ge=1, le=1_000_000)
-    faixas: list[FaixaIn] = Field(default_factory=list)
-    modificadores: list[ModificadorIn] = Field(default_factory=list)
-    minimo: Decimal | None = Field(default=None, ge=0)
-    modo_faixa: Literal["TODA_A_QUANTIDADE", "PROGRESSIVA"] = MODO_TODA_A_QUANTIDADE
 
 
 class SimularPrecoOut(BaseModel):

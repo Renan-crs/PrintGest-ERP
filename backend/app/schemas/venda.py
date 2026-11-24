@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.models.enums import FormaPagamento, StatusVenda
 from app.schemas.common import ORMModel
+from app.schemas.precificacao import RegraPrecoIn
 
 
 class VendaItemIn(BaseModel):
@@ -20,6 +21,9 @@ class VendaItemIn(BaseModel):
     quantidade: Decimal = Field(default=Decimal(1), gt=0)
     valor_unitario: Decimal = Field(default=Decimal(0), ge=0)
     desconto: Decimal = Field(default=Decimal(0), ge=0)
+    # V0: quando enviada, o servidor calcula unitário/total com o motor de
+    # variações. Ausente = comportamento legado (valor_unitario do cliente).
+    regra_preco: RegraPrecoIn | None = Field(default=None)
 
 
 class VendaCreate(BaseModel):
@@ -49,6 +53,8 @@ class VendaItemOut(ORMModel):
     valor_unitario: Decimal
     desconto: Decimal
     valor_total: Decimal
+    # Transiente: devolvida só na resposta que calculou; não é coluna do banco.
+    explicacao: list[str] = Field(default_factory=list)
 
 
 class VendaCancelIn(BaseModel):

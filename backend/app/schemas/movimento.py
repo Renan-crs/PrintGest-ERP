@@ -19,6 +19,7 @@ from app.models.enums import (
     TipoOs,
 )
 from app.schemas.common import ORMModel
+from app.schemas.precificacao import RegraPrecoIn
 
 
 class OsItemIn(BaseModel):
@@ -35,6 +36,9 @@ class OsItemIn(BaseModel):
     # M1 (PRD v3.0 §3.2.2): item próprio ou serviço de fornecedor. Item de
     # fornecedor nasce "Aguardando cotação" (valor 0) até a cotação selecionada.
     tipo: TipoItemOs = TipoItemOs.PROPRIO
+    # V0: regra de preço enviada pelo cliente; o servidor calcula o unitário.
+    # Itens de fornecedor ignoram este campo (o preço vem da cotação).
+    regra_preco: RegraPrecoIn | None = Field(default=None)
 
     @model_validator(mode="after")
     def _item_requer_referencia(self) -> "OsItemIn":
@@ -145,6 +149,8 @@ class OsItemOut(ORMModel):
     # NÃO expõe VF/CP/snapshot — isso é informação interna (§3.2.3), disponível
     # apenas nas rotas de cotação para quem tem `ver_custo_terceiro`.
     estado_cotacao: str | None = None
+    # Transiente: explicação do cálculo do motor; não é coluna do banco.
+    explicacao: list[str] = Field(default_factory=list)
 
 
 class ConferenciaTerceirizadoIn(BaseModel):

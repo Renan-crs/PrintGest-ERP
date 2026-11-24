@@ -34,6 +34,7 @@ from app.schemas.venda import (
     VendaOut,
 )
 from app.services import adiantamento_service, filial_service
+from app.services.precificacao_documento import resolver_preco_linha
 
 _TWO = Decimal("0.01")
 
@@ -50,18 +51,24 @@ def _erro_integridade() -> HTTPException:
 
 
 def _montar_item(payload: VendaItemIn, seq: int) -> VendaBalcaoItem:
-    total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
-    if total < 0:
-        total = Decimal("0.00")
-    return VendaBalcaoItem(
+    unitario, total, explicacao = resolver_preco_linha(
+        valor_unitario=payload.valor_unitario,
+        quantidade=payload.quantidade,
+        desconto=payload.desconto,
+        regra=payload.regra_preco,
+    )
+    item = VendaBalcaoItem(
         seq=seq,
         produto_id=payload.produto_id,
         descricao_avulsa=payload.descricao_avulsa,
         quantidade=payload.quantidade,
-        valor_unitario=payload.valor_unitario,
+        valor_unitario=unitario,
         desconto=payload.desconto,
         valor_total=total,
     )
+    # Transiente: devolvido na resposta, nunca gravado (guia RF-VR-14 em V0).
+    item._explicacao = explicacao
+    return item
 
 
 def _montar_itens(itens: list[VendaItemIn]) -> list[VendaBalcaoItem]:
@@ -95,6 +102,7 @@ def _para_out(venda: VendaBalcao) -> VendaOut:
             valor_unitario=i.valor_unitario,
             desconto=i.desconto,
             valor_total=i.valor_total,
+            explicacao=getattr(i, "_explicacao", []),
         )
         for i in venda.itens
     ]

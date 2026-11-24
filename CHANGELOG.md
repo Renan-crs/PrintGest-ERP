@@ -9,6 +9,27 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.32] - 2026-11-24 — Motor de preço integrado em venda/OS (Fase V0)
+
+### Backend
+- `regra_preco` opcional nos itens de `POST /v1/vendas` e `POST|PUT /v1/os`:
+  quando enviada, o **servidor** calcula unitário e total com o motor de
+  variações e ignora o `valor_unitario` informado pelo cliente.
+- Sem regra, o comportamento legado é preservado (compatibilidade com o PDV
+  atual e com os payloads existentes). Itens `FORNECEDOR` continuam com o preço
+  soberano da cotação.
+- `explicacao` da linha devolvida na resposta de venda/OS (transiente: não é
+  coluna e não sobrevive a um GET enquanto a regra não for persistida).
+- Quantidade fracionária com regra é recusada com 422 — nunca convertida com
+  `int()` silencioso (evita mudar faixa e baixa de estoque).
+- Nenhuma migration nova.
+
+### Validação
+Backend: 500 passed (12 novos testes de integração).
+Desktop: 476 passed, 4 xfailed. Mutação: 31/31 mortos.
+
+---
+
 ## [0.5.31] - 2026-11-24 — Motor de preço de variações (Fase V0)
 
 ### Backend
