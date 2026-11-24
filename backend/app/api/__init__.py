@@ -11,6 +11,7 @@ from app.api import (
     integracoes,
     plataforma,
     projetos,
+    variacoes,
 )
 from app.api.auth import router as auth_router
 from app.api.balcao import router as balcao_router
@@ -32,6 +33,7 @@ config.registrar(api)
 integracoes.registrar(api)
 plataforma.registrar(api)
 projetos.registrar(api)
+variacoes.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)
 api.include_router(estoque_router)

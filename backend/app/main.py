@@ -114,6 +114,8 @@ _CAMINHOS_PERMITIDOS = (
     "/v1/auth/login",
     "/v1/auth/logout",
     "/v1/auth/me",
+    # Simulador de preço: cálculo puro, não grava nada (guia de variações §11.9).
+    "/v1/variacoes/preco/simular",
     "/v1/licenca",
     "/health",
     "/docs",

@@ -9,6 +9,31 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.31] - 2026-11-24 — Motor de preço de variações (Fase V0)
+
+### Backend
+- `app/services/precificacao_variacao.py`: cálculo de preço **determinístico e
+  puro** com faixas (`TODA_A_QUANTIDADE` e `PROGRESSIVA`), modificadores na
+  ordem multiplicador → acréscimo unitário → acréscimo fixo → mínimo, unitário
+  com 4 casas e total `ROUND_HALF_UP` em 2 casas.
+- `PRECO_NAO_CADASTRADO` quando não há regra (nunca preço zero em silêncio),
+  validação de faixas contínuas, precedência cliente/filial/padrão, rateio de
+  desconto com resíduo na última linha e `explicacao` da linha (RF-VR-14).
+- `POST /v1/variacoes/preco/simular`: simula sem gravar e continua disponível
+  em modo leitura da licença.
+- Nenhuma migration nova: regras são passadas como dados até a persistência
+  de `tabela_preco`/`regra_preco` (Fase V1).
+
+### Documentação
+- `docs/fluxo_variacoes_produtos_servicos.md`: anotação do status de cada
+  RF-VR (implementado/parcial/proposta) e do andamento das fases.
+
+### Validação
+Backend: 488 passed (25 novos testes, tabela de casos T-VR-02 a T-VR-08).
+Desktop: 476 passed, 4 xfailed. Mutação: 27/27 mortos.
+
+---
+
 ## [0.5.30] - 2026-11-24 — Funcionários, usuários e permissões
 
 ### Backend
