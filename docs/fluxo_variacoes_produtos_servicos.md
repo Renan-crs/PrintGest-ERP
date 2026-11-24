@@ -1,451 +1,784 @@
-# Fluxo de variações de produtos e serviços — guia de desenvolvimento
+# Variações de produtos e serviços no PrintGest
 
-**Status:** proposta para aprovação (documento de apoio, nenhum código alterado).
-**Data:** 22/11/2026 · **Baseline:** v0.5.29 (`1c64f40`), Alembic head `d4e5f6a7b8c9`.
+Nov 23, 2026 · @Renan Silva
+
+**Guia de modelagem e de fluxo para o desenvolvimento** · Status: proposta para validação · Base: exemplo de impressão informado pelo negócio e regras de plataforma do [PRD PrintGest v3.3](https://claude.ai/artifact/AxpTy5VZx11imZLqgARJjs).
 
 ---
 
-## 1. Objetivo
+## 1. Objetivo, público e premissas
 
-Documentar, de forma executável, como o PrintGest deve tratar **variações de
-produtos e de serviços**, usando o caso real de uma gráfica:
+**Objetivo.** Orientar a equipe de desenvolvimento e de produto a modelar e construir o fluxo de **produtos e serviços com variações**: o mesmo item vendido com preço, custo, consumo de estoque e produção diferentes conforme material, tamanho, cor, acabamento e quantidade.
 
-| Serviço "Impressão" conforme o substrato | Preço de venda |
-|---|---:|
+**Público:** desenvolvimento, produto, design e quem vai cadastrar o catálogo na gráfica.
+
+**Exemplo-guia do negócio (impressão):**
+
+| Variação (substrato) | Preço informado |
+| --- | --- |
 | Sulfite | R$ 1,00 |
-| Papel alto alvura | R$ 8,00 |
-| Fotográfico | R$ 10,00 |
+| Papel alta alvura | R$ 8,00 |
+| Papel fotográfico | R$ 10,00 |
 
-A pergunta que este documento responde: **como representar "Impressão" com seus
-três preços sem criar um "serviço com estoque" e sem perder o rastreio por
-SKU?** Hoje o sistema **rejeita exatamente esse caso** (item 3.4).
+### 1.1 Premissas assumidas (confirmar)
 
----
+O exemplo não diz a que o preço se refere. Para escrever este guia, assumi o seguinte, e cada item está marcado para confirmação na seção 18.
 
-## 2. Estado atual da implementação (v0.5.29)
+| Id | Premissa | Se for diferente |
+| --- | --- | --- |
+| A-01 | A unidade de venda é **uma impressão**, isto é, uma face de uma folha de tamanho padrão (por exemplo A4) | Se for por folha frente e verso, por centímetro quadrado ou por página, muda a unidade e o cálculo (seção 7.6) |
+| A-02 | O preço inclui o papel (o substrato faz parte do preço) | Se o papel for cobrado à parte, o substrato vira insumo e o preço vira serviço de impressão |
+| A-03 | O preço é o mesmo para qualquer cobertura de tinta e para cor ou preto e branco | Se variar, cor e cobertura entram como eixos ou modificadores (seções 4 e 7) |
+| A-04 | O PrintGest já tem cadastro de produtos e serviços, orçamento, OS, venda de balcão, estoque e custo real (escopo do PRD v3.0, **não analisado** para este guia) | O modelo de dados da seção 6 precisa ser conciliado com as tabelas existentes |
 
-### 2.1 Modelo de dados
+### 1.2 Regras de plataforma que este guia respeita
 
-Tudo vive na tabela única `produto` (`backend/app/models/cadastros.py:217-310`):
-
-| Campo | Papel na variação |
-|---|---|
-| `tipo` | `produto` ou `servico` (`models/enums.py:35-37`) |
-| `produto_pai_id` | aponta para o pai; FK composta `(produto_pai_id, filial_id)` garante mesmo inquilino |
-| `sku`, `uuid`, `codigo`, `codigo_barras` | identidade; `sku` e `codigo` únicos **por filial**, `uuid` global |
-| `atrib_tamanho`, `atrib_marca`, `atrib_cor` | eixos de variação (domínio fechado na UI) |
-| `controla_estoque`, `preco_custo`, `preco_venda`, `estoque_minimo` | dado econômico por variante |
-| `produto_estoque` | linha de saldo **por variante** (criada com saldo 0) |
-
-Restrições relevantes:
-
-- `ck_produto_servico_sem_estoque` — `tipo='servico' ⇒ controla_estoque=false`;
-- `uq_produto_variante_atributos` — UNIQUE por
-  `(filial, pai, COALESCE(tamanho), COALESCE(marca), COALESCE(cor))`;
-- `uq_produto_filial_sku`, `uq_produto_filial_codigo`, `uq_produto_uuid`,
-  `uq_produto_codigo_barras`;
-- `campos_immutaveis = {sku, uuid, produto_pai_id, tipo}` no PUT — identidade da
-  variante não pode ser trocada (`api/cadastros.py:201`).
-
-### 2.2 Geração (`backend/app/services/variacao_service.py`)
-
-`gerar()` (linhas 33-194):
-
-1. valida pai existente **na filial do usuário** (404);
-2. **rejeita pai `servico` com 400** — `"Serviços não possuem variações com estoque."` (linhas 39-44);
-3. exige ao menos um atributo por linha (422);
-4. monta `sku = prefixo-TAM-MARCA-COR` com `_slug()` (remove acentos/pontuação,
-   caixa alta, máximo 8 caracteres por segmento — linhas 28-30);
-5. cria filha com `tipo=PRODUTO`, `controla_estoque=True` (linhas 152-154), uma
-   linha em `produto_estoque` com saldo 0 (linhas 165-169) e evento de sync
-   `mestre:produto` (linhas 171-185);
-6. preço: `variacao.preco_venda` se informado, senão herda do pai (linhas 156-160);
-7. idempotente por SKU: reativa filha excluída e recria a linha de estoque se
-   faltando (linhas 92-127); `IntegrityError` → 409 com rollback.
-
-`propagar_preco()` (linhas 197-234) **sobrescreve** `preco_venda`, `preco_custo` e
-`estoque_minimo` de todas as filhas ativas com os valores do pai.
-
-`buscar_por_sku()` (linhas 237-258) casa `sku`/`uuid`/`codigo_barras`/`codigo`,
-mas filtra **somente** `Produto.tipo == PRODUTO` e `ativo=True`.
-
-### 2.3 API e UI
-
-- `POST /v1/produtos/variacoes/gerar` — `api/cadastros.py:206-232`; exige
-  OPERADOR para gerar e **GERENTE+ se qualquer `preco_venda` for enviado**.
-- `POST /v1/produtos/{id}/propagar-preco` — GERENTE+ (`api/cadastros.py:235-252`).
-- `GET /v1/produtos?somente_variantes=true` — filtro no banco (`api/cadastros.py:175-179`).
-- `GET /v1/produtos/buscar-sku/{termo}` (OPERADOR) e o espelho
-  `GET /v1/pdv/produtos/buscar-sku/{termo}` (CAIXA) — ambos usam
-  `buscar_por_sku()`.
-- `VariacaoIn` (`schemas/cadastros.py:187-210`) aceita
-  `tamanho | marca | cor | preco_venda | codigo_barras`.
-- Diálogo `DialogoVariacoes` (`desktop/.../dialogo_variacoes.py`) mostra o
-  preview do SKU e edita os três atributos + preço + barras. O botão "Gerar
-  variações" aparece em `produtos.py:77-94`, habilitado para qualquer registro
-  salvo (`_atualizar_botao_variacoes`, linhas 336-345) — o bloqueio hoje é
-  **server-side**, não visual.
-- PDV: `venda_balcao.py:326-360` carrega `/v1/pdv/produtos` (teto 5000) e indexa
-  `codigo`, `sku` e `codigo_barras` em `_por_codigo`; fallback ao servidor em
-  `_buscar_sku_no_servidor()` (linhas 428+).
-- OS: itens carregam `produto_id`, `valor_unitario` e `tipo`
-  (`services/os_service.py:60-73`); serviços não geram movimentação de estoque.
+- Dinheiro e quantidade em `NUMERIC`/`Decimal`, nunca `float`, com `ROUND_HALF_UP` explícito.
+- Toda entidade sincronizável tem `uuid` e `filial_id`; entidades editáveis têm `versao`, com `409` em conflito (orçamento e OS).
+- **Cadastros mestres** (produto, tabela de preços, parâmetros) nascem na matriz e descem para as filiais (RF-FL-03).
+- Parâmetros de precificação têm **data de vigência** e não alteram orçamentos já emitidos, que guardam um **snapshot** (RF-SY-06).
+- Gating por módulo no servidor (`OS_ORCAMENTO`, `VENDA_BALCAO`, `COMPRAS_ESTOQUE`) e **modo leitura** sem escrita quando a licença não estiver válida.
 
 ---
 
-## 3. Diagnóstico: por que o exemplo da gráfica não funciona hoje
+## 2. O problema em termos de negócio
 
-| # | Gap | Evidência | Consequência prática |
-|---|---|---|---|
-| 3.1 | Pai `servico` é recusado | `variacao_service.py:39-44` | Não dá para criar "Impressão" com 3 preços |
-| 3.2 | Filha é sempre `tipo=PRODUTO` com estoque | `variacao_service.py:152-154,165-169` | Mesmo que o pai fosse aceito, geraria "serviço com estoque" — exatamente o bug corrigido em v0.5.26 (`docs/verificacao_produtos_variacoes.md:35`) |
-| 3.3 | Não existe eixo "material/substrato" | `VariacaoIn` só tem tamanho/marca/cor | "Sulfite / Alto alvura / Fotográfico" só caberia como `marca` (gambiarra semântica) |
-| 3.4 | Busca por SKU ignora serviços | `variacao_service.py:249` | Mesmo criadas, as filhas-serviço não seriam encontradas pelo coletor do PDV |
-| 3.5 | Propagação sobrescreve preços distintos | `variacao_service.py:213-216` | Um clique em "Propagar preço" transformaria R$ 1/8/10 em um único preço |
-| 3.6 | Sem Distinção visual no cadastro | `produtos.py:336-345` | Operador não é avisado de que variações de serviço têm regras diferentes |
+O mesmo serviço aparece em várias formas. Sem um modelo de variações, a gráfica cai em um destes caminhos ruins:
 
-** workaround disponível hoje (sem código):** cadastrar três serviços independentes —
-"Impressão sulfite", "Impressão alto alvura", "Impressão fotográfico". Funciona
-para faturar, mas não agrupa os preços sob um pai, não mantém nomenclatura
-consistente, não oferece propagação controlada e atrapalha relatórios. É a
-solução temporária enquanto a funcionalidade não é entregue.
+| Caminho | Sintoma |
+| --- | --- |
+| Um cadastro por combinação («Impressão sulfite A4», «Impressão sulfite A3», «Impressão alta alvura A4»...) | Catálogo com centenas de itens parecidos; erro de digitação; relatórios que não somam «impressões» |
+| Um cadastro único com preço digitado na hora | Preço diferente para o mesmo caso; margem desconhecida; consumo de estoque impossível de calcular |
+| Planilha paralela de preços | Preço desatualizado; ninguém sabe qual é o vigente |
+
+**O que o fluxo precisa entregar:** escolher o item, escolher as opções, informar a quantidade e obter **preço, custo, margem, consumo de insumos e ficha de produção** de forma automática, explicável e consistente entre balcão, orçamento e OS.
 
 ---
 
-## 4. Modelo recomendado: duas trilhas explícitas
+## 3. Conceitos
 
-A mesma tabela `produto` continua servindo os dois casos; o que muda é a **regra
-de herança do pai para a filha**:
-
-| | **Trilha A — Produto (já existe)** | **Trilha B — Serviço (nova)** |
-|---|---|---|
-| Pai | `tipo=produto`, `controla_estoque=true` | `tipo=servico`, `controla_estoque=false` |
-| Filha | `tipo=produto`, `controla_estoque=true` | `tipo=servico`, `controla_estoque=false` |
-| `produto_estoque` | linha própria, saldo inicial 0 | **nenhuma linha** |
-| Baixa de estoque | sim, `UPDATE ... WHERE saldo >= qtd` (409 se insuficiente) | **nunca** |
-| Preço | por variante; herda do pai se omitido | por variante; **obrigatório/quase sempre distinto** |
-| SKU | `prefixo-TAM-MARCA-COR` | `prefixo-MATERIAL[-TAM]` |
-| Seleção | PDV (bip/código) e OS | PDV (bip/código) e OS — **sem baixa** |
-| Propagação de preço | permitida (GERENTE+) | **desabilitada** (preço é a própria variação) |
-| Sync | evento `mestre:produto` por filha | evento `mestre:produto` por filha (preço replicado) |
-
-**Invariante central:** *nenhuma filha de serviço poderá, em hipótese alguma,
-ter `controla_estoque=true` ou linha em `produto_estoque`.* O
-`CHECK ck_produto_servico_sem_estoque` já garante metade disso no banco; a
-outra metade é não criar a linha de estoque no gerador.
-
-### 4.1 Eixo de variação para serviços
-
-Para o exemplo, o eixo natural é o **substrato/material**. Duas opções:
-
-- **Curto prazo (sem migration):** usar `atrib_marca` como "material" e apenas
-  reler o rótulo na UI ("Material / substrato"). Custo zero, mas semântica
-  suja: o campo continua se chamando `marca` na API, nos eventos de sync e nos
-  relatórios.
-- **Recomendado:** novo campo `atrib_material` (String 60) em `Produto` e em
-  `VariacaoIn`, incluído na UNIQUE `uq_produto_variante_atributos`. É uma
-  migration pequena, compatível com os dados atuais (coluna nova NULL ⇒ o
-  conjunto de unicidade existente não muda). Mantém `tamanho/marca/cor` intactos
-  para produtos.
-
-**Recomendação deste documento:** adotar `atrib_material` já na primeira
-entrega, evitando retrabalho de renomear o campo depois. A migration segue a
-regra do projeto: **execução em branch de backup, com aprovação explícita
-antes de tocar em produção.**
+| Termo | Definição | Exemplo |
+| --- | --- | --- |
+| Item de catálogo | Algo que a gráfica vende. Pode ser **produto** (revenda, com estoque próprio) ou **serviço** (produção, que consome insumos) | Impressão (serviço); Caneta (produto) |
+| Eixo de variação | Uma característica que muda o item | Substrato, tamanho, cor, lados, acabamento |
+| Opção | Um valor possível de um eixo | Sulfite, alta alvura, fotográfico |
+| Variação | Uma combinação completa de opções de um item | Impressão, fotográfico, A4, colorida |
+| SKU | Código único de uma variação | `IMP-FOTO-A4-COR` |
+| Modificador | Um ajuste de preço ou de consumo por uma opção opcional | Laminação fosca: acréscimo por unidade |
+| Regra de preço | Define o preço de uma variação, de um modificador ou de uma faixa de quantidade, com vigência e prioridade | Sulfite de 50 a 199 unidades: R$ 0,80 |
+| Faixa de quantidade | Intervalo de quantidade com preço unitário próprio | 1 a 49, 50 a 199, 200 ou mais |
+| Ficha de consumo | Lista de insumos e quantidades gastas por unidade vendida de uma variação | 1 folha A4 de sulfite por impressão |
+| Snapshot | Cópia congelada dos valores usados em um orçamento ou OS | Preço unitário, regra aplicada, custo e opções no momento da emissão |
 
 ---
 
-## 5. Decisões de produto a confirmar antes de codar
+## 4. Tipos de variação em uma gráfica
 
-| # | Decisão | Recomendação | Por quê |
-|---|---|---|---|
-| D1 | Eixo do serviço | Novo `atrib_material` (§4.1) | Semântica correta; evita "marca" significando papel |
-| D2 | Preço obrigatório na filha-serviço | Obrigatório (422 se faltar) | No exemplo os 3 preços são diferentes; herdar do pai quase sempre seria erro. Para produtos, manter herança (retrocompatibilidade) |
-| D3 | Propagação de preço | Botão oculto para pai `servico` | Sobrescreveria R$ 1/8/10. Se no futuro fizer sentido, introduzir `preco_fixo` por filha e pular as fixas |
-| D4 | Onde selecionar | PDV **e** OS | Impressão é vendida no balcão e entra em O.S.; os dois fluxos usam o mesmo catálogo |
-| D5 | Pai com filhas já existentes | Mesma idempotência de hoje (SKU duplicado → reativa) | Evita duplicatas e mantém o comportamento conhecido |
-| D6 | Código fiscal da variante | Mesmo código do pai (a variante não muda a natureza do serviço) | Substrato é atributo comercial, não item de serviço distinto para a prefeitura |
-| D7 | Rótulo no cadastro | Mostrar `tipo=SERVICO` + aviso "sem estoque" no diálogo de variações | Reduz o risco de operador esperar baixa de estoque |
+Cada eixo afeta de maneira diferente o preço, o custo, o estoque, a produção e o fiscal. Essa tabela decide **como** cada tipo deve ser modelado.
 
----
+| Eixo | Exemplos | Preço | Custo | Estoque | Produção | Como modelar |
+| --- | --- | --- | --- | --- | --- | --- |
+| Substrato (material) | Sulfite, alta alvura, fotográfico, couchê, adesivo | **Define o preço base** | Muda | **Muda o insumo consumido** | Muda a bandeja e a máquina | Eixo obrigatório que gera variações |
+| Tamanho | A5, A4, A3, 10x15, 13x18 | Muda | Muda | Muda (corte e aproveitamento) | Muda o formato de saída | Eixo obrigatório, ou fórmula por área quando houver tamanho livre |
+| Cor | P&B, colorido | Costuma mudar | Muda (toner ou tinta) | Muda (consumo de toner) | Muda a máquina | Eixo obrigatório ou opcional com valor padrão |
+| Lados | Frente, frente e verso | Costuma multiplicar | Dobra a impressão | Idem | Muda o fluxo da máquina | Modificador multiplicador |
+| Gramatura | 75 g, 90 g, 120 g, 180 g | Muda | Muda | Muda o insumo | Muda a regulagem | Parte do substrato (uma opção por papel e gramatura) |
+| Acabamento | Laminação, corte, dobra, espiral, furo | Soma | Soma | Pode consumir insumo | Etapa extra | Modificador opcional (acréscimo fixo ou por unidade) |
+| Quantidade | 1 a 49, 50 a 199, 200 ou mais | Muda o preço unitário | Pode mudar (ganho de escala) | Proporcional | Lote | **Faixa de quantidade**, não eixo |
+| Prazo ou urgência | Normal, urgente | Acréscimo | Pode mudar | Nenhum | Prioridade na fila | Modificador de pedido (não de item) |
+| Cliente ou contrato | Tabela de preço do cliente | Muda | Não muda | Não muda | Não muda | Tabela de preço por cliente (seção 7.2) |
+| Filial | Matriz, filial A | Pode mudar | Pode mudar | Por filial | Por filial | Regra com `filial_id` (seção 11.8) |
 
-## 6. Plano de implementação (por fases)
-
-### Fase 1 — Modelo e regra de domínio
-
-1. `backend/app/models/cadastros.py`: acrescentar `atrib_material: Mapped[str | None]`
-   (String 60) e incluí-lo no índice `uq_produto_variante_atributos` (usar
-   `text("COALESCE(atrib_material, '')")` na lista de colunas).
-2. Migration Alembic nova (head após `d4e5f6a7b8c9`): `ADD COLUMN atrib_material`,
-   `DROP INDEX uq_produto_variante_atributos`, recriá-lo com a coluna nova.
-   Pré-checagem: 0 duplicatas; **backup branch antes de aplicar em produção**.
-3. `backend/app/schemas/cadastros.py`: `ProdutoBase.atrib_material` e
-   `VariacaoIn.material` (mesmo validador de "não vazio" dos demais atributos).
-4. Atualizar o validador `_ao_menos_um_atributo` para considerar `material`.
-
-### Fase 2 — Gerador com duas trilhas
-
-Arquivo: `backend/app/services/variacao_service.py`
-
-1. Substituir o bloqueio das linhas 39-44 por uma decisão de trilha:
-   ```python
-   eh_servico = pai.tipo == TipoProduto.SERVICO
-   tipo_filha = TipoProduto.SERVICO if eh_servico else TipoProduto.PRODUTO
-   controla_estoque = not eh_servico
-   ```
-   Mantém os 404 (pai inexistente / outra filial) e a recusa de pai inativo.
-2. Atributos passam a incluir `material`; ordem canônica
-   `(material, tamanho, marca, cor)` para **SKU e rótulo** (produtos existentes
-   têm `material=NULL`, então seus SKUs não mudam).
-3. Na criação da filha (linhas 139-169):
-   - `tipo=tipo_filha`, `controla_estoque=controla_estoque`;
-   - **criar `ProdutoEstoque` somente quando `controla_estoque` for True**;
-   - na reativação (linhas 95-109), o mesmo `if` — nunca criar estoque para serviço.
-4. Preço (D2): se `eh_servico` e `variacao.preco_venda is None` → 422
-   `"Variações de serviço exigem preço de venda explícito."`
-5. `propagar_preco()` (D3): se `pai.tipo == SERVICO`, não alterar nada e
-   devolver 0 (a UI já esconde o botão); alternativamente 400 com mensagem
-   orientando.
-6. `buscar_por_sku()` (linha 249): remover o filtro
-   `Produto.tipo == TipoProduto.PRODUTO` — passam a ser encontráveis produtos
-   **e** serviços ativos. O filtro `ativo=True` e o escopo por `filial_id`
-   permanecem.
-
-> Segurança: como o `CHECK` do banco impede `servico + controla_estoque`, um
-> bug no gerador que tentasse criar estoque para serviço estouraria em 500 —
-> o teste de mutação (§9) garante que isso continua sendo detectado.
-
-### Fase 3 — API e contrato
-
-Endpoints existentes são reaproveitados; nenhuma rota nova é necessária:
-
-| Endpoint | Ajuste |
-|---|---|
-| `POST /v1/produtos/variacoes/gerar` | aceita `material` no payload; mensagens de erro específicas para serviço |
-| `GET /v1/produtos?somente_variantes=true` | sem mudança — inclui filhas-serviço |
-| `POST /v1/produtos/{id}/propagar-preco` | devolve 0 para pai serviço (D3) |
-| `GET /v1/produtos/buscar-sku/{termo}` | passa a encontrar serviços |
-| `GET /v1/pdv/produtos/buscar-sku/{termo}` | idem (mesmo serviço) |
-| `GET /v1/pdv/produtos` | sem mudança — já devolve todos os tipos |
-
-RBAC inalterado: GERENTE+ para definir preço na geração e para propagação.
-
-### Fase 4 — Desktop
-
-1. `dialogo_variacoes.py`:
-   - novo combo/ campo "Material / substrato", com domínio sugerido
-     `["Sulfite", "Alto alvura", "Fotográfico"]` **quando o pai for serviço**;
-   - para produto, manter Tamanho/Marca/Cor;
-   - aviso no topo para serviço: *"Variações de serviço não controlam estoque;
-     cada preço é independente."*;
-   - preview do SKU já existente passa a incluir o material.
-2. `produtos.py::_atualizar_botao_variacoes` (linhas 336-345): manter habilitado
-   para serviço, mas trocar o tooltip do botão "Propagar preço" para
-   *"Não disponível para serviços — o preço é definido por variante."* e
-   desabilitá-lo quando `tipo == 'servico'`.
-3. `venda_balcao.py`: nenhuma mudança no cache — `_por_codigo` já indexa `sku`
-   (linha 352) e o catálogo `/v1/pdv/produtos` traz as filhas-serviço. Confirmar
-   que `_adicionar_produto` não tenta reservar estoque para serviço (já é o
-   comportamento do `venda_service`).
-4. `grade_itens.py` / `os.py`: ao selecionar uma variante-serviço, preencher
-   `valor_unitario` com `preco_venda` da filha. Nenhuma baixa de estoque.
-
-### Fase 5 — Validação e release
-
-Ver §9 e §10. Release com tag, instalador, GitHub Release e `CHANGELOG.md`,
-seguindo o ritual do projeto.
+**Regra de ouro:** o que muda o **insumo consumido** ou o **preço base** deve ser eixo que gera variação (substrato, tamanho, cor). O que apenas **soma ou multiplica** um valor sobre o preço base deve ser modificador (acabamento, lados, urgência). Quantidade é sempre faixa.
 
 ---
 
-## 7. Ex concreto: payload, SKU e nomes
+## 5. Como modelar: opções e recomendação
 
-### 7.1 Cadastro do pai
+| Opção | Descrição | Prós | Contras |
+| --- | --- | --- | --- |
+| **A. Um item por combinação** | Cada variação é um cadastro independente | Simples de implementar; preço e estoque diretos | Explosão combinatória; manutenção pesada; relatórios dispersos |
+| **B. Item base com eixos e variações geradas** | Um item, N eixos, uma variação por combinação | Catálogo organizado; relatórios por item e por variação | Ainda gera muitas variações se houver muitos eixos |
+| **C. Item base com modificadores** | Um preço base e acréscimos por opção | Poucos cadastros; ótimo para opcionais | Não separa consumo de insumo por substrato; preço fica opaco |
+| **D. Híbrido (recomendado)** | Eixos obrigatórios que **geram variações** (substrato, tamanho, cor), mais **modificadores** para opcionais (lados, acabamento, urgência) e **faixas de quantidade** | Equilíbrio: preço e consumo corretos onde importam; cadastro enxuto onde não importa | Exige regras de precedência claras (seção 7) |
 
-```json
-POST /v1/produtos
-{
-  "codigo": "IMP",
-  "nome": "Impressão",
-  "tipo": "servico",
-  "controla_estoque": false,
-  "unidade": "un",
-  "preco_venda": 1.00
-}
+### 5.1 Por que o híbrido
+
+1. O exemplo do negócio mostra que o substrato muda **muito** o preço (R$ 1,00, R$ 8,00, R$ 10,00) e também o insumo gasto. Isso pede variação de verdade (opção B).
+2. Acabamentos e lados somam ou multiplicam sobre qualquer substrato. Se cada um gerasse variações, o número explodiria (opção C evita isso).
+3. Quantidade é uma regra de preço, não um atributo do item.
+
+### 5.2 O limite da explosão
+
+Cinco tamanhos, dois modos de cor, três substratos e dois lados geram 5 × 2 × 3 × 2 = **60** variações de um único serviço. Por isso:
+
+- **Lados** fica como modificador multiplicador, o que reduz para 30.
+- O sistema **avisa** quando os eixos obrigatórios gerarem mais de \[100\] variações e pede confirmação.
+- As variações são criadas em **matriz editável**, com preenchimento em massa (seção 12).
+- Combinações que não existem na gráfica são **desativadas** (seção 10).
+
+### 5.3 Quando fugir do padrão
+
+| Situação | Tratamento |
+| --- | --- |
+| Produto de revenda com estoque próprio por cor e tamanho (caneta, caderno, camiseta) | Variação com **estoque no nível da variação** (seção 9.1) |
+| Preço por área (banner, adesivo em metro quadrado) | Serviço com **unidade de venda em m²** e tamanho livre (seção 7.6) |
+| Pedido totalmente sob encomenda, sem tabela | Item «personalizado» com preço digitado, **com justificativa e aprovação** (seção 7.7) |
+
+---
+
+## 6. Modelo de dados proposto
+
+Proposta de referência. Ela precisa ser conciliada com as tabelas já existentes do PRD v3.0 (premissa A-04). Todas as tabelas levam `uuid`, `filial_id` (quando operacionais), `criado_em`, `atualizado_em`, e `versao` nas editáveis.
+
+### 6.1 Catálogo e variações
+
+| Tabela | Campos principais | Observações |
+| --- | --- | --- |
+| `item_catalogo` | `id`, `uuid`, `tipo` (PRODUTO ou SERVICO), `nome`, `unidade_venda`, `usa_variacoes` (bool), `controla_estoque_na_variacao` (bool), `ativo`, `versao` | Mestre da matriz. `unidade_venda` é UN, M2, ML, FOLHA etc. |
+| `eixo_variacao` | `id`, `item_id`, `codigo`, `nome`, `tipo` (SELECAO ou NUMERICO), `obrigatorio`, `gera_variacao` (bool), `ordem` | `gera_variacao = false` indica modificador (não gera SKU) |
+| `opcao_variacao` | `id`, `eixo_id`, `codigo`, `rotulo`, `ordem`, `ativo` | Valor de um eixo |
+| `variacao` | `id`, `uuid`, `item_id`, `sku`, `chave_canonica`, `ativo`, `versao` | **Único** (`item_id`, `chave_canonica`). A chave é a lista ordenada de ids de opções |
+| `variacao_opcao` | `variacao_id`, `opcao_id` | Liga a variação às opções que a compõem |
+| `compatibilidade` | `id`, `item_id`, `opcao_a_id`, `opcao_b_id`, `regra` (PROIBIDO ou EXIGE) | Combinações inválidas (seção 10) |
+
+### 6.2 Preço
+
+| Tabela | Campos principais | Observações |
+| --- | --- | --- |
+| `tabela_preco` | `id`, `uuid`, `nome`, `padrao` (bool), `cliente_id` (nulo), `filial_id` (nulo) | Uma tabela padrão; tabelas por cliente ou por filial são opcionais |
+| `regra_preco` | `id`, `uuid`, `tabela_preco_id`, `item_id`, `variacao_id` (nulo), `opcao_id` (nulo, para modificador), `tipo` (UNITARIO, ACRESCIMO\_UNITARIO, ACRESCIMO\_FIXO, MULTIPLICADOR, MINIMO), `valor` NUMERIC(14,4), `qtd_min`, `qtd_max` (nulo = sem teto), `vigencia_inicio`, `vigencia_fim` (nulo), `prioridade`, `versao` | Uma regra por caso. Não pode haver sobreposição de faixa na mesma chave e vigência |
+
+### 6.3 Custo e consumo
+
+| Tabela | Campos principais | Observações |
+| --- | --- | --- |
+| `insumo` | `id`, `uuid`, `nome`, `unidade_estoque`, `custo_medio` NUMERIC(14,4), `estoque` NUMERIC(14,3) | Papel, toner, tinta, laminado, espiral |
+| `ficha_consumo` | `id`, `variacao_id` (ou `opcao_id` do modificador), `insumo_id`, `quantidade_por_unidade` NUMERIC(14,4), `perda_percentual` NUMERIC(6,3), `vigencia_inicio`, `vigencia_fim` | Receita de uma unidade vendida. Conversões (resma e folha) pelo cadastro do insumo |
+| `custo_processo` | `id`, `variacao_id` ou `opcao_id`, `descricao`, `valor_unitario`, `vigencia_inicio`, `vigencia_fim` | Máquina, mão de obra, toner por cobertura |
+
+### 6.4 Documentos (snapshot)
+
+| Tabela | Campos principais | Observações |
+| --- | --- | --- |
+| `documento_item` (orçamento, OS, venda) | `id`, `uuid`, `documento_id`, `item_id`, `variacao_id`, `opcoes_snapshot` (JSON), `quantidade`, `preco_unitario`, `custo_unitario`, `regras_aplicadas` (JSON), `desconto`, `total`, `versao` | **Congela** a explicação do preço: quais regras, em que vigência, com que valores |
+| `consumo_previsto` e `consumo_real` | `documento_item_id`, `insumo_id`, `quantidade` | Previsto na aprovação e real na produção (custo real do v3.0) |
+
+### 6.5 Regras de integridade
+
+1. Não existem duas variações do mesmo item com a mesma `chave_canonica`.
+2. Toda variação ativa de serviço tem ao menos uma regra de preço vigente e uma ficha de consumo, ou uma justificativa de que não consome insumo.
+3. Faixas de quantidade de uma mesma chave e vigência não podem se sobrepor nem deixar buracos a partir de `qtd_min = 1`.
+4. Variações com histórico (usadas em documentos) nunca são excluídas, apenas desativadas.
+5. Preços e quantidades usam `NUMERIC`; o arredondamento do total da linha é `ROUND_HALF_UP` em 2 casas.
+6. A edição de variação ou regra usa `versao`, com `409` em conflito.
+
+---
+
+## 7. Regras de preço
+
+### 7.1 Como o preço é calculado
+
+O cálculo é **determinístico** e roda no servidor (Local API Service), com o mesmo resultado no balcão, no orçamento e na OS.
+
+```
+funcao calcular_linha(item, opcoes, quantidade, cliente, filial, data):
+  1. variacao = resolver_variacao(item, opcoes que geram variação)       # chave_canonica
+  2. validar_compatibilidade(variacao, opcoes)                            # se inválida: erro COMBINACAO_INVALIDA
+  3. tabelas = [tabela do cliente, tabela da filial, tabela padrão]        # na ordem
+  4. regra = primeira regra UNITARIO vigente na data, da variação,
+             cuja faixa contém a quantidade                              # se nenhuma: erro PRECO_NAO_CADASTRADO
+  5. unitario = regra.valor
+  6. unitario = unitario x produto dos MULTIPLICADORES das opções escolhidas
+  7. unitario = unitario + soma dos ACRESCIMO_UNITARIO das opções escolhidas
+  8. total = quantidade x unitario + soma dos ACRESCIMO_FIXO
+  9. total = maximo(total, MINIMO da linha, se houver)
+ 10. total = arredondar_meio_para_cima(total, 2 casas)
+ 11. gravar snapshot: variação, opções, regra e tabela usadas, faixa, modificadores, valores
 ```
 
-O preço do pai funciona como *preço de referência* (sulfite). As variantes
-carregam os preços reais.
+O sistema **nunca** devolve preço zero em silêncio: sem regra vigente, a emissão é bloqueada (ver 7.7 para preço manual).
 
-### 7.2 Geração das três variações
+### 7.2 Precedência das regras
 
-```json
-POST /v1/produtos/variacoes/gerar
-{
-  "produto_pai_id": 123,
-  "prefixo_sku": "IMP",
-  "variacoes": [
-    {"material": "Sulfite",       "preco_venda": 1.00},
-    {"material": "Alto alvura",   "preco_venda": 8.00},
-    {"material": "Fotográfico",   "preco_venda": 10.00}
-  ]
-}
-```
+| Ordem | Regra | Quando vale |
+| --- | --- | --- |
+| 1 | Regra específica da variação para o **cliente** | Contrato ou acordo especial |
+| 2 | Tabela do cliente, por item | Cliente com tabela própria |
+| 3 | Tabela da **filial** | Filial com preço próprio |
+| 4 | Tabela **padrão** da variação | Caso geral |
+| 5 | Nenhuma regra | **Erro** `PRECO_NAO_CADASTRADO`; só segue com preço manual aprovado (7.7) |
 
-Resposta (201): três registros com `tipo="servico"`, `controla_estoque=false`,
-`produto_pai_id=123`, preços 1/8/10 e nenhuma linha em `produto_estoque`.
+No mesmo nível, vale a regra de maior `prioridade`; em empate, a de vigência mais recente. O cadastro **impede** regras ambíguas (mesma chave, faixa e vigência sobrepostas).
 
-### 7.3 SKU e nomenclatura gerados
+### 7.3 Faixas de quantidade
 
-`_slug()` remove acentos/pontuação, converte em caixa alta e limita cada
-segmento a 8 caracteres — por isso o preview da UI é importante:
+Exemplo ilustrativo de faixas para o sulfite: de 1 a 49, R$ 1,00; de 50 a 199, R$ 0,80; a partir de 200, R$ 0,60. Há dois jeitos de aplicar a faixa:
 
-| Material digitado | Segmento do SKU | SKU final | `nome` da filha |
-|---|---|---|---|
-| Sulfite | `SULFITE` | `IMP-SULFITE` | Impressão Sulfite |
-| Alto alvura | `ALTOALVU` | `IMP-ALTOALVU` | Impressão Alto alvura |
-| Fotográfico | `FOTOGRFI` | `IMP-FOTOGRFI` | Impressão Fotográfico |
+| Modo | Como calcula | 120 impressões em sulfite |
+| --- | --- | --- |
+| **A faixa vale para toda a quantidade** (recomendado) | Acha a faixa da quantidade total e aplica o preço a todas as unidades | 120 × R$ 0,80 = **R$ 96,00** |
+| Faixa progressiva | Cada unidade paga o preço da faixa em que cai | 49 × R$ 1,00 + 71 × R$ 0,80 = **R$ 105,80** |
 
-> Atenção: "Alto alvura" perde o espaço e é truncado em 8; "Fotográfico" perde
-> o acento. O operador vê o SKU antes de confirmar e pode ajustar o
-> `prefixo_sku` ou o texto do material para obter um código legível.
+O modo é configurável por item (`modo_faixa`: `TODA_A_QUANTIDADE` ou `PROGRESSIVA`). O primeiro é o mais comum em gráficas e o mais fácil de explicar, mas cria um efeito conhecido: 49 impressões custam R$ 49,00 e 50 custam R$ 40,00. O balcão deve **avisar** («a partir de 50 unidades o preço cai para R$ 0,80») em vez de esconder isso (decisão D-V1).
 
-`codigo` (único por filial) é gerado como `<sku>-<8 hex>`, ex.:
-`IMP-SULFITE-a1b2c3d4`.
+### 7.4 Modificadores
 
-### 7.4 Uso no PDV e na O.S.
+| Tipo | Efeito | Exemplo ilustrativo |
+| --- | --- | --- |
+| Multiplicador | Multiplica o preço unitário | Frente e verso: × 1,6 |
+| Acréscimo por unidade | Soma ao preço unitário | Laminação fosca: + R$ 2,00 por impressão |
+| Acréscimo fixo | Soma ao total da linha, uma vez | Taxa de arte ou de setup: + R$ 30,00 |
+| Mínimo por linha | Piso do total da linha | Mínimo de R$ 5,00 |
 
-- Operador bipa `IMP-FOTOGRFI` → `_por_codigo` resolve → item "Impressão
-  Fotográfico", `valor_unitario=10,00`, quantidade 1 → total R$ 10,00.
-- O `venda_service` **não** chama baixa de estoque (serviço não controla
-  estoque) e o kardex permanece intocado.
-- Na O.S., o mesmo item entra como linha de serviço próprio com
-  `valor_unitario=10,00` (`os_service.py:60-73`).
-- Se o SKU não estiver no cache (ex.: cadastro feito após a abertura da tela),
-  `_buscar_sku_no_servidor` consulta `/v1/pdv/produtos/buscar-sku/IMP-FOTOGRFI`
-  — que passa a encontrar serviços após a Fase 2.
+**Ordem de aplicação:** multiplicadores, depois acréscimos por unidade, depois acréscimos fixos, depois o mínimo. Essa ordem precisa estar escrita na tela de cadastro, porque muda o resultado.
 
----
+**Exemplos calculados** (preços base do negócio; modificadores e faixas ilustrativos):
 
-## 8. Invariantes que não podem regressar
+| Pedido | Cálculo | Total da linha |
+| --- | --- | --- |
+| 1 impressão em sulfite | 1 × 1,00 = 1,00; o mínimo de R$ 5,00 se aplica | **R$ 5,00** |
+| 10 impressões em alta alvura | 10 × 8,00 | **R$ 80,00** |
+| 25 impressões em fotográfico com laminação fosca | 25 × (10,00 + 2,00) | **R$ 300,00** |
+| 100 impressões em sulfite, frente e verso, com corte (+ R$ 0,10 por unidade) | Faixa de 50 a 199: 0,80 × 1,6 = 1,28; + 0,10 = 1,38; 100 × 1,38 | **R$ 138,00** |
 
-1. **Nenhum serviço com estoque.** `ck_produto_servico_sem_estoque` + nenhuma
-   linha em `produto_estoque` + nenhuma movimentação de kardex.
-2. **Isolamento por filial.** SKU/`codigo` únicos por filial; pai e filha na
-   mesma filial (FK composta); `buscar_por_sku` sempre com `filial_id`.
-3. **Identidade imutável.** `sku`, `uuid`, `produto_pai_id`, `tipo` não mudam
-   via PUT.
-4. **Preço é decisão de gerência.** Tanto na geração quanto na propagação.
-5. **Idempotência.** Regerar combinação existente reativa a filha; nunca cria
-   duplicata (UNIQUE composto + verificação por SKU).
-6. **Soft-delete em cascata.** Desativar o pai desativa as filhas na mesma
-   transação (`api/cadastros.py:197-199`).
-7. **Erro detalhado no log.** Qualquer 400/404/409/422 do novo fluxo continua
-   sendo registrado pelos handlers de `main.py` (v0.5.29), sem segredos.
+### 7.5 Arredondamento e exibição
 
----
+- O preço unitário é guardado com **4 casas**; o total da linha é arredondado com `ROUND_HALF_UP` em 2 casas.
+- O total do documento é a **soma dos totais das linhas**, nunca o preço unitário arredondado multiplicado pela quantidade.
+- A tela mostra o unitário com 2 casas e, se o arredondamento esconder diferença, mostra também as 4 casas (por exemplo, R$ 0,3333 × 300 = R$ 99,99).
+- Desconto de documento rateado entre as linhas: a última linha absorve o resíduo de centavos.
 
-## 9. Plano de testes
+### 7.6 Unidade de venda (premissa A-01)
 
-### 9.1 Backend (`backend/tests/`)
+| Unidade | Quando usar | Como a quantidade é obtida |
+| --- | --- | --- |
+| Impressão (uma face) | Padrão deste guia | Cópias × páginas × lados |
+| Folha | Quando o preço é por folha, frente e verso incluído | Cópias × folhas |
+| Metro quadrado | Banner, adesivo, lona, plotagem | Largura × altura em cm, convertida para m² com 3 casas, com **mínimo cobrável** configurável (decisão D-V6) |
+| Metro linear | Bobina, fita | Comprimento informado |
+| Unidade | Produto pronto (cartão, convite) | Quantidade informada |
 
-| Teste novo | O que prova |
-|---|---|
-| `test_servico_pode_ser_pai_de_variacao` | 201; 3 filhas com `tipo=servico`, `controla_estoque=false` |
-| `test_variante_servico_nao_tem_linha_de_estoque` | `SELECT` em `produto_estoque` → 0 linhas para as filhas |
-| `test_venda_de_variante_servico_nao_baixa_estoque` | venda conclui; kardex sem SAIDA; nenhum `UPDATE` em saldo |
-| `test_preco_explicito_obrigatorio_para_servico` | 422 quando falta `preco_venda` |
-| `test_propagacao_nao_altera_preco_de_servico` | preços 1/8/10 permanecem após `propagar-preco` |
-| `test_buscar_sku_encontra_variante_servico` | `buscar_por_sku` e `/v1/pdv/produtos/buscar-sku/...` |
-| `test_material_na_unique` | duas variações que diferem só por `material` são aceitas |
-| `test_pai_de_outra_filial_continua_404` | isolamento preservado |
-| `test_pai_inativo_continua_400` | regra antiga preservada |
+O produto precisa **mostrar a quantidade final** usada no cálculo, para o atendente conferir («100 cópias × 3 páginas = 300 impressões»).
 
-Ajustes em testes existentes: `test_produtos_variacoes_contrato.py` (hoje espera
-400 para pai serviço — passa a esperar 201) e o mutante correspondente no
-harness.
+### 7.7 Preço manual e desconto
 
-### 9.2 Desktop (`desktop/tests/`)
+| Situação | Regra |
+| --- | --- |
+| Item personalizado sem tabela | Permissão `preco.manual`; justificativa obrigatória; aparece no documento como «preço manual» |
+| Desconto | Limite por perfil (por exemplo, atendente até \[**\]%, gerente até \[**\]%); acima do limite exige aprovação |
+| Preço abaixo do custo ou da margem mínima | Alerta forte e aprovação do gerente; bloqueio configurável |
+| Auditoria | Quem alterou, quando, valor anterior, justificativa e regra original |
 
-- `test_dialogo_variacoes_servico_ofere_material` — domínio e aviso corretos;
-- `test_botao_propagar_desabilitado_para_servico`;
-- `test_pdv_bipa_sku_de_servico_sem_request` — SKU `IMP-FOTOGRFI` resolvido pelo
-  cache `_por_codigo`, sem chamada ao endpoint;
-- `test_os_variante_servico_preenche_valor_unitario`.
+### 7.8 Vigência e alteração de preços
 
-### 9.3 Mutação (`scripts/testes_mutabilidade.py`)
+1. Uma alteração de preço **cria uma regra nova** com vigência inicial; a regra anterior recebe `vigencia_fim` no dia anterior. A regra usada em documento nunca é editada.
+2. Antes de publicar, o sistema mostra uma **simulação de impacto** (preço antigo e novo, variação percentual, margem).
+3. Reprecificação em **lote** por filtro (item, eixo, percentual ou valor), sempre com simulação e confirmação.
+4. Documentos emitidos **não mudam** (snapshot). Orçamentos em aberto mantêm o preço até a validade; vencidos são recalculados (decisão D-V3).
+5. Alterações viram eventos para a sincronização com as filiais (a matriz publica; as filiais recebem).
 
-Novos mutantes, mantendo a meta **100% mortos**:
+### 7.9 Explicação do preço
 
-| Mutante | Teste que deve matar |
-|---|---|
-| `filha_servico_com_estoque` (forçar `controla_estoque=True`) | `test_variante_servico_nao_tem_linha_de_estoque` + CHECK |
-| `preco_servico_herdado` (remover 422) | `test_preco_explicito_obrigatorio_para_servico` |
-| `propagacao_sobrescreve_servico` | `test_propagacao_nao_altera_preco_de_servico` |
-| `busca_sku_ignora_servico` (readicionar filtro de tipo) | `test_buscar_sku_encontra_variante_servico` |
-| `material_fora_da_unique` | `test_material_na_unique` |
-
-Os 17 mutantes atuais continuam ativos (incluindo `log_http_desligado` e
-`sanitizacao_desligada`).
+Cada linha tem um detalhamento clicável: variação escolhida, tabela aplicada, faixa, preço base, modificadores com seus valores, mínimo, desconto, total e origem («tabela padrão», «tabela do cliente», «manual»). É o que resolve discussões de balcão e dá confiança ao atendente.
 
 ---
 
-## 10. Critérios de aceite
+## 8. Custo e margem
 
-- [ ] Cadastrar "Impressão" como serviço e gerar as 3 variações com preços
-      1,00 / 8,00 / 10,00 em uma única operação.
-- [ ] As 3 filhas aparecem com `↳` na grade, `tipo=SERVICO`, sem estoque.
-- [ ] Nenhuma linha em `produto_estoque` e nenhum kardex é criada para elas.
-- [ ] Bipar `IMP-SULFITE`, `IMP-ALTOALVU` e `IMP-FOTOGRFI` no PDV adiciona o
-      item com o preço correto e **sem baixa de estoque**.
-- [ ] Selecionar qualquer uma delas em O.S. preenche `valor_unitario` correto.
-- [ ] "Propagar preço" está indisponível para o pai serviço; os preços
-      permanecem distintos.
-- [ ] Tentativa de gerar variação de serviço sem preço → 422 com mensagem clara
-      e linha no log.
-- [ ] Regerar as mesmas três combinações não cria duplicatas (idempotência).
-- [ ] Tudo isso restrito à filial logada; pai de outra filial → 404.
-- [ ] Suítes: backend e desktop 100% verdes; mutação 22/22 mortos (17 atuais +
-      5 novos).
-- [ ] Migration aplicada primeiro em branch de backup, com aprovação e
-      registro do LSN.
+### 8.1 Fórmula
 
----
+- **Custo unitário** = Σ (consumo do insumo × custo do insumo × (1 + perda)) + Σ custos de processo + custos dos modificadores escolhidos.
+- **Margem bruta** = (preço unitário − custo unitário) ÷ preço unitário.
 
-## 11. Riscos e mitigação
+### 8.2 Exemplo ilustrativo (custos fictícios)
 
-| Risco | Mitigação |
-|---|---|
-| Reintroduzir o bug "serviço com estoque" que v0.5.26 corrigiu | `CHECK` no banco + gerador condicional + mutante `filha_servico_com_estoque` |
-| Migration da UNIQUE com dados reais | Pré-checagem de duplicatas; branch de backup; aprovação explícita |
-| Propagação acidental achatar os preços | Botão desabilitado no cliente **e** guarda no servidor (defesa em duas camadas) |
-| SKUs ilegíveis por acentos/truncamento | Preview no diálogo antes de confirmar |
-| Operador esperar baixa de estoque ao vender serviço | Aviso no diálogo e tooltip no botão (D7) |
-| Mudança quebrar cadastro de produtos existente | Trilha A intacta: herança de preço, estoque e SKU permanecem iguais |
+| Variação | Preço | Papel | Toner ou tinta | Processo | Custo | Margem bruta |
+| --- | --- | --- | --- | --- | --- | --- |
+| Impressão em sulfite | R$ 1,00 | 0,05 | 0,12 | 0,08 | 0,25 | 75,0% |
+| Impressão em alta alvura | R$ 8,00 | 2,00 | 0,15 | 0,10 | 2,25 | 71,9% |
+| Impressão em fotográfico | R$ 10,00 | 3,50 | 1,20 | 0,30 | 5,00 | 50,0% |
 
----
+O exemplo mostra por que o substrato precisa ser variação: o **custo** e a **margem** mudam bastante, e uma margem única para «Impressão» esconderia que o fotográfico rende menos.
 
-## 12. Fora de escopo desta proposta
+### 8.3 Fonte do custo
 
-- Preço por **faixa de quantidade** (ex.: 100 cópias sulfite mais barato) —
-  exigiria tabela de preços por faixa; registrado como evolução futura.
-- Atributos genéricos (EAV: nome/valor livres por produto) — hoje o modelo é de
-  colunas fixas; `atrib_material` é a extensão mínima.
-- Cálculo de custo por substrato na Produção/OS — hoje `preco_custo` é por
-  variante, sem consumo de bobina/papel.
-- Gating/licenciamento específico para "variações de serviço" — o módulo
-  `cadastros` já cobre o recurso.
+| Item | Regra proposta |
+| --- | --- |
+| Custo do insumo | Custo médio ponderado, atualizado a cada entrada de compra (decisão D-V4) |
+| Custo de processo | Cadastro com vigência (máquina, mão de obra) |
+| Custo no documento | **Snapshot** na emissão, para auditar a margem prevista |
+| Custo real | Apurado depois da produção, com o consumo real (escopo do v3.0) |
+
+### 8.3.1 Alertas de margem
+
+- Variação com preço abaixo do custo ou da margem mínima do item.
+- Variação sem ficha de consumo ou sem custo vigente.
+- Custo do insumo sem atualização há mais de \[\_\_\] dias.
+- Variação sem regra de preço vigente.
+
+### 8.4 Serviço terceirizado
+
+Quando uma variação é executada por fornecedor (por exemplo, encadernação externa), o custo vem da **cotação do fornecedor** e não da ficha de consumo. Isso depende do fluxo de orçamento com fornecedor do v3.0, que não foi analisado; a modelagem precisa de um campo de origem de execução (`INTERNA` ou `EXTERNA`) na variação.
 
 ---
 
-## 13. Referências
+## 9. Estoque e consumo
 
-- `docs/verificacao_produtos_variacoes.md` — histórico do fluxo e correções
-  anteriores (inclusive o bug do serviço com estoque).
-- `docs/auditoria_cadastro_produtos.md` — medições da tela de cadastro.
-- `docs/logging_erros.md` — requirement "sempre que houver erro, detalhar no log".
-- Código: `backend/app/services/variacao_service.py`,
-  `backend/app/models/cadastros.py`, `backend/app/schemas/cadastros.py`,
-  `backend/app/api/cadastros.py`, `backend/app/api/pdv.py`,
-  `desktop/printgest/ui/modulos/dialogo_variacoes.py`,
-  `desktop/printgest/ui/modulos/produtos.py`,
-  `desktop/printgest/ui/modulos/venda_balcao.py`.
+### 9.1 Dois modelos de estoque
+
+| Tipo de item | Onde fica o estoque | Exemplo | Movimento |
+| --- | --- | --- | --- |
+| **Produto de revenda** | **Na variação** (um saldo por SKU) | Caneta azul e caneta preta; camiseta M e G | Venda baixa o saldo da variação |
+| **Serviço de produção** | **No insumo**; a variação aponta para insumos pela ficha de consumo | Impressão em fotográfico consome papel fotográfico e tinta | Produção baixa os insumos |
+
+O campo `controla_estoque_na_variacao` do item decide qual dos dois vale. Um item nunca usa os dois.
+
+### 9.2 Momentos do consumo
+
+| Momento | O que acontece | Configurável |
+| --- | --- | --- |
+| Orçamento | Calcula o **consumo previsto** e mostra a disponibilidade de insumos | Sim |
+| Aprovação da OS | **Reserva** os insumos (opcional) | Sim |
+| Início ou conclusão da produção | **Baixa** o consumo real | Sim |
+| Perda | Registra perda real (diferente da prevista) com motivo | Sim |
+
+A baixa é **atômica** (`UPDATE ... WHERE saldo >= quantidade`, como no restante da plataforma). Sem saldo, o orçamento avisa e a produção só avança com permissão e justificativa.
+
+### 9.3 Unidades e conversões
+
+| Insumo | Unidade de compra | Unidade de uso | Fator |
+| --- | --- | --- | --- |
+| Papel sulfite | Resma | Folha | 500 |
+| Papel fotográfico | Pacote | Folha | \[\_\_\] |
+| Bobina de adesivo | Metro linear | m² | Largura da bobina |
+| Toner e tinta | Cartucho | Impressão estimada | Rendimento do fabricante |
+
+As conversões ficam no cadastro do insumo, e a ficha de consumo usa a unidade de uso.
+
+### 9.4 Toner e tinta
+
+- **Início (recomendado):** custo fixo por impressão, dentro do custo de processo (8.2).
+- **Depois:** consumo por cobertura estimada (percentual de cobertura × rendimento do cartucho). Só vale a pena quando o custo de tinta varia muito entre pedidos.
+
+### 9.5 Aproveitamento e perda
+
+- **Rendimento do corte:** se uma folha A3 rende 2 impressões A4, a ficha usa `quantidade_por_unidade = 0,5` folha A3 por impressão A4.
+- **Perda percentual** por variação (acertos de máquina, papel danificado), somada ao consumo previsto.
+- Diferença entre previsto e real alimenta o custo real e a revisão da ficha.
+
+### 9.6 Compras
+
+A reposição trabalha **por insumo**, com ponto de pedido e sugestão baseada no consumo previsto das OS abertas. Variações de produtos de revenda repõem por SKU.
+
+---
+
+## 10. Compatibilidade e restrições
+
+### 10.1 Tipos de restrição
+
+| Tipo | Significado | Exemplo ilustrativo |
+| --- | --- | --- |
+| Proibida | A combinação das opções A e B não pode ser vendida | Papel fotográfico não aceita frente e verso |
+| Exige | A opção A só existe com a opção B | Laminação exige substrato compatível |
+| Limite de quantidade | Mínimo e máximo por variação | Alta alvura de 120 g: mínimo de 10 unidades |
+| Limite de tamanho | Máximo físico da máquina | Tamanho máximo de impressão por equipamento |
+| Prazo mínimo | Dias para produzir a variação | Fotográfico: \[\_\_\] horas |
+| Disponibilidade | Variação só em certas filiais | Plotagem só na matriz |
+
+Os exemplos são ilustrativos; as regras reais vêm do chão de fábrica da gráfica.
+
+### 10.2 Comportamento
+
+1. O **servidor valida**; a tela apenas ajuda. Combinação inválida responde `422` com o código `COMBINACAO_INVALIDA` e a regra violada.
+2. Opção incompatível aparece **desabilitada, com o motivo** («não disponível para papel fotográfico»).
+3. Ao trocar um eixo, os eixos dependentes que ficaram inválidos voltam ao padrão, com aviso visível.
+4. Variação **inativa** deixa de aparecer no balcão, mas permanece no histórico e nos documentos antigos. Documento em aberto com variação desativada pode ser emitido ou deve ser revisto, conforme a decisão D-V5.
+
+---
+
+## 11. Fluxos
+
+### 11.1 Cadastro de um item com variações (assistente)
+
+O item tem três estados: **rascunho** (editável, não aparece no balcão), **publicado** e **inativo**.
+
+| Passo | O que o usuário faz | Validação |
+| --- | --- | --- |
+| 1. Dados básicos | Escolhe produto ou serviço, nome, unidade de venda e dados fiscais | Nome único; unidade obrigatória |
+| 2. Eixos | Cria os eixos (substrato, tamanho, cor...) e marca se cada um **gera variação** ou é **modificador** | Ao menos um eixo que gera variação, se usa variações |
+| 3. Opções | Cadastra as opções de cada eixo | Sem opções repetidas no mesmo eixo |
+| 4. Gerar variações | O sistema cria a matriz de combinações; o usuário desativa as que não existem | Aviso quando passar de \[100\] variações |
+| 5. Preço | Preenche o preço da tabela padrão por variação, as faixas de quantidade e os modificadores | Variação ativa sem preço bloqueia a publicação |
+| 6. Consumo e custo | Preenche a ficha de consumo e o custo de processo por variação; pode copiar de outra variação | Serviço de produção sem ficha exige justificativa |
+| 7. Revisão e publicação | Confere o resumo: variações sem preço, sem ficha, com margem baixa | Publica e o catálogo desce às filiais |
+
+### 11.2 Orçamento e OS
+
+1. O atendente escolhe o **item**.
+2. Escolhe as opções dos **eixos obrigatórios** (substrato, tamanho, cor), nessa ordem.
+3. Informa a **quantidade** (cópias × páginas, ou medidas, conforme a unidade).
+4. Marca os **opcionais** (frente e verso, acabamentos).
+5. Vê o **preço e a explicação** em tempo real.
+6. Ajusta desconto ou preço manual, se tiver permissão.
+7. Adiciona a linha ao documento.
+
+**Quando o preço congela:** enquanto o orçamento está em edição, o preço **recalcula** com o catálogo vigente. Ao **emitir** o orçamento ou **aprovar** a OS, a linha recebe o **snapshot** e não muda mais. A edição de um documento já emitido usa `versao` e responde `409` em conflito.
+
+### 11.3 Venda de balcão
+
+- **Favoritos:** as variações mais vendidas ficam em atalhos de um toque; o resto se escolhe pelos eixos.
+- Item **sem variações** não pergunta nada além da quantidade.
+- Produtos de revenda são lidos por **código de barras do SKU**.
+- O total aparece em destaque; a explicação do preço fica a um clique.
+- Meta de desempenho: cálculo e atualização da tela em menos de 300 ms em LAN.
+
+### 11.4 Produção
+
+A ficha de produção mostra: item, **variação e opções**, quantidade, **consumo previsto** de cada insumo, acabamentos e observações do cliente. O operador registra **perdas** e conclui; a conclusão baixa o consumo real.
+
+### 11.5 Estoque e compras
+
+Ver a seção 9. Reposição por insumo, e por SKU nos produtos de revenda.
+
+### 11.6 Alteração e inativação
+
+| Ação | Regra |
+| --- | --- |
+| Alterar preço | Cria regra nova com vigência (7.8); nunca edita a usada |
+| Alterar ficha de consumo | Cria nova versão com vigência |
+| Renomear opção | Permitido; documentos antigos preservam o rótulo do snapshot |
+| Remover opção já usada | **Proibido**; só inativar |
+| Adicionar opção a um eixo | Cria variações em rascunho, sem preço; bloqueia a publicação até preencher |
+| Inativar variação | Some do balcão; mantém histórico |
+| Mesclar variações duplicadas | Por assistente, com migração dos vínculos |
+
+### 11.7 Migração do catálogo existente
+
+Se a gráfica já tem itens como «Impressão sulfite» e «Impressão alta alvura», um **assistente de agrupamento** sugere unir itens de nome parecido em um item com eixo. Regras:
+
+1. O usuário confirma cada agrupamento; nada é automático.
+2. Os documentos antigos continuam apontando para o item antigo, que fica **inativo** com vínculo à variação nova (`variacao_origem`).
+3. A importação por **planilha** (CSV ou XLSX) tem prévia, validação linha a linha e é **idempotente**.
+4. A migração roda primeiro em cópia do banco de teste, com relatório de diferenças.
+
+### 11.8 Filiais
+
+| Tema | Regra |
+| --- | --- |
+| Dono do catálogo | A **matriz** (RF-FL-03): itens, eixos, opções, variações e a tabela de preço padrão descem às filiais |
+| Preço por filial | Só com tabela da filial permitida (D-V2); senão, a filial usa a padrão |
+| Disponibilidade | Variação pode ser limitada a algumas filiais (por exemplo, plotagem só na matriz) |
+| Ordem de aplicação na sincronização | Item, eixos, opções, variações, regras de preço, fichas |
+| Idempotência | Por `uuid` de cada entidade |
+| Filial sem internet | Usa o último catálogo sincronizado e mostra a data da última atualização |
+| Documentos da filial | Usam o snapshot do momento da emissão |
+
+### 11.9 Modo leitura da licença
+
+O catálogo continua **consultável** e um simulador de preço (sem salvar) pode ficar disponível. Criar ou alterar itens, variações, regras e documentos responde `423` (`LICENCA_RESTRITA`).
+
+### 11.10 Gating por módulo (a confirmar com a matriz do v3.0)
+
+| Função | Módulo sugerido |
+| --- | --- |
+| Catálogo, preço por variação, orçamento e OS | `OS_ORCAMENTO` |
+| Venda de balcão com variações | `VENDA_BALCAO` |
+| Ficha de consumo, baixa e reposição | `COMPRAS_ESTOQUE` |
+| Relatórios por variação | `RELATORIOS` |
+
+---
+
+## 12. Experiência de uso
+
+### 12.1 Princípios
+
+1. **Rapidez no balcão:** poucos toques, valores padrão inteligentes.
+2. **Preço visível enquanto se escolhe**, com a explicação a um clique.
+3. **Nada escondido:** efeitos como a quebra por faixa são avisados.
+4. **Erro com saída:** toda mensagem diz o que fazer.
+5. **Cadastro em massa:** quem cadastra 60 variações não pode fazer isso uma a uma.
+
+### 12.2 Cadastro: matriz editável
+
+- Linhas são as variações; colunas são preço, faixas, custo, SKU e ativo.
+- Preenchimento em massa: copiar de outra variação, aplicar percentual a um conjunto selecionado, preencher coluna.
+- Células obrigatórias vazias ficam destacadas; o botão de publicar mostra a contagem de pendências.
+- Filtro por eixo, contador de variações e aviso de explosão combinatória.
+- Atalhos de teclado e desfazer.
+
+### 12.3 Seleção no balcão e no orçamento
+
+| Situação | Componente |
+| --- | --- |
+| Eixo com até 5 opções | Botões segmentados |
+| Eixo com mais opções | Lista com busca |
+| Opcionais (modificadores) | Caixas de seleção com o valor ao lado |
+| Quantidade | Campo numérico, com soma de cópias × páginas visível |
+| Preço | Total e unitário em destaque; botão «Ver como foi calculado» |
+
+Ordem dos eixos: substrato, tamanho, cor, lados, acabamentos. Opções mais vendidas aparecem primeiro. O cliente recorrente pode usar «repetir o último pedido».
+
+### 12.4 Estados de tela e mensagens
+
+| Situação | Mensagem |
+| --- | --- |
+| Preço não cadastrado | Esta combinação não tem preço cadastrado. Peça ao gerente para cadastrar ou use preço manual. |
+| Combinação inválida | Esta opção não está disponível com \[opção escolhida\]. |
+| Sem estoque de insumo | Estoque de \[insumo\] insuficiente para esta quantidade. Disponível: \[n\]. |
+| Variação inativa | Esta variação foi desativada e não pode mais ser vendida. |
+| Modo leitura | Sistema em modo leitura: não é possível criar ou alterar registros. |
+| Conflito de edição | Este registro foi alterado por outra pessoa. Recarregue para ver a versão atual. |
+| Quebra de faixa | Compre \[n\] ou mais e o preço unitário cai para \[valor\]. |
+
+### 12.5 Acessibilidade e desempenho percebido
+
+- Contraste mínimo de 4,5:1, navegação completa por teclado, foco visível e rótulos em todos os campos.
+- O preço atualizado é anunciado a leitores de tela (região `aria-live` educada).
+- Estados nunca indicados só por cor.
+- Cálculo no servidor em menos de 100 ms; cache do catálogo no desktop; espera de 150 ms após digitar a quantidade antes de recalcular.
+
+---
+
+## 13. Fiscal (cuidado: não é aconselhamento tributário)
+
+- Os campos fiscais ficam no **item** e podem ser **sobrescritos na variação**: NCM, origem, CFOP padrão, CST ou CSOSN, código de serviço (lista da LC 116/2003) e descrição na nota.
+- **Produto de revenda** e **serviço de impressão** podem ter tratamento fiscal diferente. O papel fotográfico vendido como mercadoria é diferente da impressão sob encomenda. O enquadramento depende do caso e do regime da gráfica e **deve ser definido com o contador** (D-V7).
+- A descrição da linha na nota é **composta pelo item e pelas opções**, por modelo configurável (por exemplo, «Impressão em papel fotográfico A4»).
+- O snapshot do documento guarda os dados fiscais usados, para auditoria.
+- A emissão fiscal em modo leitura segue a decisão D-P4 do PRD do PrintGest.
+
+---
+
+## 14. Relatórios e análises
+
+| Relatório | Pergunta que responde | Agrupamentos |
+| --- | --- | --- |
+| Vendas por variação | O que mais vende? | Item, variação, eixo, período, filial |
+| Margem por variação | O que dá mais lucro? | Variação, cliente, período |
+| Mix e curva ABC | Onde está a receita? | Item e variação |
+| Consumo de insumos | Quanto papel e toner foram gastos? | Insumo, variação, período |
+| Previsto contra real | Onde há perda ou ficha errada? | Variação, insumo |
+| Descontos e preços manuais | Quem desconta mais e por quê? | Usuário, item, justificativa |
+| Variações sem venda | O que pode ser desativado? | Variação, período |
+| Efeito de reajuste | O que mudou depois da reprecificação? | Item, lote de reajuste |
+
+---
+
+## 15. Requisitos
+
+### 15.1 Requisitos funcionais (RF-VR)
+
+**Catálogo**
+
+- **RF-VR-01** O catálogo distingue **produto** (revenda) e **serviço** (produção), com unidade de venda.
+- **RF-VR-02** Um item pode ter **eixos** e **opções**. Cada eixo é marcado como **gerador de variação** ou **modificador**.
+- **RF-VR-03** O sistema gera as **variações** como combinações das opções dos eixos geradores, com `chave_canonica` única por item e SKU único.
+- **RF-VR-04** O sistema avisa e pede confirmação quando as combinações geradas passarem do limite configurado (padrão 100).
+- **RF-VR-05** Regras de **compatibilidade** (proibida, exige, limites, prazo, disponibilidade) são validadas **no servidor**, com `422` e o código `COMBINACAO_INVALIDA`.
+- **RF-VR-06** O item tem estados **rascunho**, **publicado** e **inativo**; só o publicado aparece no balcão. A publicação é bloqueada se houver variação ativa sem preço (ou sem ficha de consumo, em serviço de produção, salvo justificativa).
+
+**Preço**
+
+- **RF-VR-07** O preço é calculado pelas etapas do 7.1, no servidor, com o mesmo resultado em balcão, orçamento e OS.
+- **RF-VR-08** Precedência das regras: cliente, tabela do cliente, filial, padrão; sem regra vigente, erro `PRECO_NAO_CADASTRADO`, **nunca preço zero**.
+- **RF-VR-09** **Faixas de quantidade** por variação, com modo configurável por item (toda a quantidade ou progressiva); sem sobreposição nem buracos.
+- **RF-VR-10** **Modificadores** (multiplicador, acréscimo por unidade, acréscimo fixo) e **mínimo por linha**, na ordem definida no 7.4.
+- **RF-VR-11** Arredondamento `ROUND_HALF_UP` em 2 casas no total da linha; unitário com 4 casas; total do documento é a soma das linhas.
+- **RF-VR-12** Toda alteração de preço cria **regra nova com vigência**; a regra usada em documento nunca é editada.
+- **RF-VR-13** **Preço manual** exige permissão e justificativa; **desconto** respeita o limite por perfil, com aprovação acima dele.
+- **RF-VR-14** Cada linha tem a **explicação do preço** (7.9).
+- **RF-VR-15** Reprecificação em **lote** com simulação de impacto e confirmação.
+
+**Custo e estoque**
+
+- **RF-VR-16** **Ficha de consumo** e **custo de processo** por variação e por modificador, com vigência.
+- **RF-VR-17** Cálculo de **custo e margem** por variação e por linha, com alertas do 8.3.1.
+- **RF-VR-18** Item de revenda controla estoque **na variação**; item de produção controla estoque **no insumo**. Nunca os dois.
+- **RF-VR-19** **Baixa atômica** de insumo (`UPDATE ... WHERE saldo >= quantidade`), com perdas registráveis e conversões de unidade.
+- **RF-VR-20** Consumo previsto no orçamento, reserva opcional na aprovação e baixa real na produção.
+
+**Documentos**
+
+- **RF-VR-21** Orçamento emitido e OS aprovada guardam **snapshot** de variação, opções, regras, custo, valores e dados fiscais.
+- **RF-VR-22** Edição de documento usa `versao` e responde `409` em conflito.
+- **RF-VR-23** A tela mostra a **quantidade final** usada no cálculo (cópias × páginas, ou área).
+
+**Filiais, licença e migração**
+
+- **RF-VR-24** O catálogo é **mestre da matriz** e desce às filiais, em ordem e de forma idempotente (11.8).
+- **RF-VR-25** Em modo leitura da licença, o catálogo é consultável e as escritas respondem `423`.
+- **RF-VR-26** As funções avançadas respeitam o gating por módulo (11.10).
+- **RF-VR-27** Assistente de **agrupamento** e **importação por planilha**, com prévia, validação e idempotência.
+- **RF-VR-28** Relatórios da seção 14.
+
+### 15.2 Requisitos não funcionais
+
+| Área | Requisito |
+| --- | --- |
+| Desempenho | Cálculo de preço no servidor com p95 abaixo de 100 ms; tela do balcão atualiza em menos de 300 ms em LAN |
+| Escala | Meta de 5.000 variações por catálogo e 200 por item |
+| Precisão | `NUMERIC` em dinheiro e quantidade; nunca `float` |
+| Auditoria | Alterações de preço, de ficha, descontos e preços manuais com usuário, data, valor anterior e justificativa |
+| Concorrência | `versao` e `409` em itens, regras e documentos |
+| Resiliência | Filial sem internet opera com o último catálogo sincronizado |
+| Acessibilidade | WCAG 2.1 AA; mensagens do 12.4 |
+| Testabilidade | Cálculo de preço como função pura, coberta por tabela de casos (seção 16) |
+
+---
+
+## 16. Casos de teste
+
+Usar os dados do **Anexo A**. Valores marcados como ilustrativos nas seções 7 e 8 servem de dados de teste.
+
+| Id | Cenário | Resultado esperado |
+| --- | --- | --- |
+| T-VR-01 | Resolver a variação por opções em ordens diferentes | Mesma variação (a `chave_canonica` ignora a ordem) |
+| T-VR-02 | Variação sem regra de preço vigente | `PRECO_NAO_CADASTRADO`; emissão bloqueada |
+| T-VR-03 | Limites de faixa: 49, 50, 199 e 200 unidades | Faixas corretas nas bordas |
+| T-VR-04 | 120 impressões em sulfite nos dois modos de faixa | R$ 96,00 (toda a quantidade) e R$ 105,80 (progressiva) |
+| T-VR-05 | 100 sulfite, frente e verso, com corte | Unitário 1,38; total R$ 138,00 |
+| T-VR-06 | 1 impressão em sulfite com mínimo de R$ 5,00 | Total R$ 5,00 |
+| T-VR-07 | Arredondamento: R$ 0,3333 × 300; rateio de desconto | R$ 99,99; resíduo na última linha |
+| T-VR-08 | Precedência: regra do cliente, filial e padrão | Vale a de maior precedência |
+| T-VR-09 | Regra com vigência futura | A anterior termina no dia anterior; documentos antigos intactos |
+| T-VR-10 | Alterar preço depois de emitir o orçamento | O orçamento emitido não muda |
+| T-VR-11 | Combinação proibida | `422 COMBINACAO_INVALIDA` com a regra violada |
+| T-VR-12 | Variação inativada | Some do balcão; permanece no histórico |
+| T-VR-13 | Consumo previsto: 100 sulfite com 2% de perda | 102 folhas |
+| T-VR-14 | Baixa de insumo sem saldo | Falha atômica; produção só segue com permissão |
+| T-VR-15 | Rendimento de corte de 2 por folha | Consumo de 0,5 folha por unidade |
+| T-VR-16 | Custo e margem do exemplo 8.2 | 75,0%, 71,9% e 50,0% |
+| T-VR-17 | Desconto acima do limite do perfil | Exige aprovação |
+| T-VR-18 | Preço manual sem permissão ou sem justificativa | Bloqueado |
+| T-VR-19 | Edição simultânea de uma regra | `409` na segunda gravação |
+| T-VR-20 | Sincronização para a filial | Ordem correta e idempotente por `uuid` |
+| T-VR-21 | Filial sem internet | Usa o último catálogo e mostra a data |
+| T-VR-22 | Modo leitura | Consulta e simulador funcionam; criar variação responde `423` |
+| T-VR-23 | Ficha de consumo sem o módulo de estoque | `403 MODULO_NAO_LICENCIADO` |
+| T-VR-24 | Agrupar itens antigos em um item com variações | Histórico preservado; itens antigos inativos com vínculo |
+| T-VR-25 | Eixos que geram mais de 100 variações | Pede confirmação |
+| T-VR-26 | Metro quadrado: 120 cm × 80 cm | 0,96 m², com o mínimo cobrável configurado |
+| T-VR-27 | 100 cópias de documento com 3 páginas | Quantidade final de 300 impressões visível |
+
+---
+
+## 17. Plano de implementação em fases
+
+| Fase | Entregas | Critério de pronto | Depende de |
+| --- | --- | --- | --- |
+| **V0 (mínimo útil)** | Item com eixos e variações; preço fixo por variação na tabela padrão; seleção no balcão e no orçamento; snapshot; explicação do preço; inativação | Vender os três substratos do exemplo com preço correto e histórico congelado | Cadastro de itens e orçamento do v3.0 |
+| **V1** | Faixas de quantidade, modificadores, mínimo, compatibilidade, preço manual e descontos por perfil, matriz editável em massa | T-VR-01 a T-VR-12, T-VR-17 e T-VR-18 verdes | V0 |
+| **V2** | Ficha de consumo, custo e margem, estoque, baixa, perdas, alertas | T-VR-13 a T-VR-16 e T-VR-23 verdes | Módulo de estoque; V1 |
+| **V3** | Tabelas por cliente e por filial; sincronização completa; reprecificação em lote com simulação; importação e agrupamento do catálogo | T-VR-08, T-VR-19 a T-VR-21 e T-VR-24 verdes | Sync entre filiais (P5 do PrintGest) |
+| **V4** | Relatórios, curva ABC, previsto contra real, serviço terceirizado | Aceite dos relatórios pelo cliente piloto | V2 |
+
+**Primeira entrega recomendada:** V0 com o exemplo de impressão. É a menor parte que já resolve o problema relatado.
+
+---
+
+## 18. Decisões e perguntas em aberto
+
+### 18.1 Decisões
+
+| Id | Decisão | Recomendação |
+| --- | --- | --- |
+| D-V1 | Faixa de quantidade vale para toda a quantidade ou é progressiva | Toda a quantidade, com aviso de quebra no balcão; modo configurável por item |
+| D-V2 | A filial pode ter tabela de preço própria? | Só quando a matriz permitir por item |
+| D-V3 | Orçamento em aberto, depois de reajuste de preço | Mantém o preço até a validade; vencido é recalculado |
+| D-V4 | Custo do insumo: médio ponderado ou último custo | Médio ponderado |
+| D-V5 | Documento em aberto com variação inativada | Pode emitir uma vez, com aviso; novos itens não |
+| D-V6 | Mínimo cobrável em metro quadrado e arredondamento da área | Definir com a gráfica (por exemplo, 0,5 m²) |
+| D-V7 | Enquadramento fiscal de produto contra serviço por variação | Definir com o contador |
+| D-V8 | Formato e modelo da planilha de importação | CSV com colunas por eixo, preço e faixas |
+| D-V9 | Limite de variações por item | Alerta em 100; teto técnico em 200 |
+
+### 18.2 Perguntas ao negócio (precisam de resposta para fechar o modelo)
+
+1. **A que se refere o preço** (R$ 1,00, R$ 8,00 e R$ 10,00)? Uma face de uma folha A4? Uma folha frente e verso? Uma página?
+2. O preço **inclui o papel** ou o papel é cobrado à parte?
+3. O preço muda entre **colorido e preto e branco**? E por **cobertura de tinta**?
+4. Quais **tamanhos** são vendidos, e algum é livre (por medida)?
+5. Quais **acabamentos** existem e como são cobrados (por unidade, por pedido, por área)?
+6. Existem **faixas de quantidade**? Onde elas começam e terminam, e valem para toda a quantidade ou para cada unidade?
+7. Há **valor mínimo** por pedido ou taxa de arte e de setup?
+8. Há **tabelas por cliente** ou contratos com preço especial? Quantos?
+9. Algum item é **terceirizado** (encadernação, gráfica parceira)? Como o custo chega?
+10. Quais produtos são de **revenda** com estoque próprio por cor e tamanho?
+11. Quantos **itens ativos** o catálogo tem hoje e quantos têm nomes que repetem a mesma coisa («Impressão sulfite», «Impressão alta alvura»)?
+12. A **filial** pode definir preço, ou só a matriz?
+13. Quais combinações **não existem** na prática (para as regras de compatibilidade)?
+
+---
+
+## 19. Glossário
+
+| Termo | Definição |
+| --- | --- |
+| Eixo gerador | Eixo cujas opções geram variações (substrato, tamanho, cor) |
+| Modificador | Opção que soma ou multiplica sobre o preço base, sem gerar variação |
+| Chave canônica | Lista ordenada dos ids de opções de uma variação; identifica a variação |
+| Faixa de quantidade | Intervalo com preço unitário próprio |
+| Ficha de consumo | Insumos e quantidades gastos por unidade vendida |
+| Snapshot | Cópia congelada de preço, regras, custo e opções em um documento |
+| Insumo | Material de produção em estoque (papel, toner, laminado) |
+| Cliff | Efeito em que uma faixa maior torna o total menor que o de uma quantidade menor |
+
+---
+
+## Anexo A. Exemplo completo: serviço «Impressão»
+
+Dados ilustrativos para desenvolvimento e teste, a partir do exemplo do negócio e das premissas A-01 a A-03.
+
+### A.1 Item, eixos e opções
+
+| Item | Tipo | Unidade | Eixo | Gera variação | Opções |
+| --- | --- | --- | --- | --- | --- |
+| Impressão | Serviço | Impressão (uma face de A4) | Substrato | Sim | Sulfite, Alta alvura, Fotográfico |
+|  |  |  | Lados | Não (modificador) | Frente, Frente e verso |
+|  |  |  | Acabamento | Não (modificador) | Nenhum, Corte, Laminação fosca |
+
+### A.2 Variações geradas
+
+| SKU | Variação | Preço base (tabela padrão) |
+| --- | --- | --- |
+| IMP-SULF | Impressão em sulfite | R$ 1,00 |
+| IMP-ALVU | Impressão em papel alta alvura | R$ 8,00 |
+| IMP-FOTO | Impressão em papel fotográfico | R$ 10,00 |
+
+### A.3 Regras de preço ilustrativas
+
+| Regra | Alvo | Valor |
+| --- | --- | --- |
+| Faixa 1 a 49 | IMP-SULF | R$ 1,00 |
+| Faixa 50 a 199 | IMP-SULF | R$ 0,80 |
+| Faixa 200 ou mais | IMP-SULF | R$ 0,60 |
+| Multiplicador, frente e verso | Todas as variações | × 1,6 |
+| Acréscimo por unidade, corte | Todas as variações | + R$ 0,10 |
+| Acréscimo por unidade, laminação fosca | IMP-ALVU e IMP-FOTO | + R$ 2,00 |
+| Acréscimo fixo, taxa de arte | Pedido | + R$ 30,00 |
+| Mínimo por linha | Todas as variações | R$ 5,00 |
+
+### A.4 Ficha de consumo e custo ilustrativos
+
+| Variação | Insumo | Quantidade por impressão | Perda | Custo de processo |
+| --- | --- | --- | --- | --- |
+| IMP-SULF | Folha de sulfite A4 | 1 | 2% | R$ 0,20 (toner mais máquina) |
+| IMP-ALVU | Folha de alta alvura A4 | 1 | 2% | R$ 0,25 |
+| IMP-FOTO | Folha de fotográfico A4 | 1 | 3% | R$ 1,50 (tinta mais máquina) |
+
+---
+
+## Anexo B. Definição de pronto por fase
+
+- [ ] O cálculo de preço é uma função pura, no servidor, coberta pela tabela de casos da seção 16
+- [ ] Dinheiro e quantidade em `NUMERIC`; `ROUND_HALF_UP` explícito
+- [ ] Nenhum preço zero em silêncio: `PRECO_NAO_CADASTRADO` testado
+- [ ] Snapshot gravado na emissão e na aprovação; alteração posterior de preço não afeta o documento
+- [ ] Regras com vigência, sem sobreposição, e nunca editadas depois de usadas
+- [ ] `versao` e `409` em itens, regras e documentos
+- [ ] Compatibilidade validada no servidor (`422`), com mensagem na tela
+- [ ] Catálogo desce às filiais em ordem, de forma idempotente, e a filial offline mostra a data da última atualização
+- [ ] Modo leitura da licença e gating por módulo cobertos por teste
+- [ ] Mensagens do 12.4 e acessibilidade verificadas
+- [ ] Migração do catálogo existente testada em cópia, com relatório de diferenças
