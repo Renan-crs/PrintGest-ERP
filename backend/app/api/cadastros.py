@@ -5,7 +5,7 @@ Níveis de acesso (PRD v2.0 §5):
   - Usuários/Sistema: ADMIN (configurações de sistema)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.crud_factory import criar_router_crud
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
@@ -16,6 +16,7 @@ from app.models.cadastros import (
     Produto,
     ProdutoCategoria,
 )
+from app.models.core import Usuario
 from app.models.enums import NivelAcesso
 from app.schemas import ItemResponse
 from app.schemas.cadastros import (
@@ -36,6 +37,7 @@ from app.schemas.cadastros import (
     ProdutoUpdate,
     GerarVariacoesIn,
 )
+from app.services.auth_service import revogar_sessoes
 from app.services.crud import listar
 from app.services.funcionario_service import criar_com_usuario
 
@@ -124,22 +126,28 @@ def atualizar_funcionario(
     # `login` é imutável e não é coluna de `funcionario` (vive em `usuario`);
     # ignorar aqui evita `setattr` na property somente-leitura.
     dados.pop("login", None)
-    if dados:
-        item = (
-            db.query(Funcionario)
-            .filter(
-                Funcionario.id == item_id,
-                Funcionario.filial_id == filial,
-                Funcionario.ativo.is_(True),
-            )
-            .first()
+    # A8: `{}` (ou apenas `login`) deixava `item` sem atribuir e estourava
+    # UnboundLocalError → 500. Nada a atualizar é erro do cliente.
+    if not dados:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nenhum campo válido para atualizar.",
         )
-        if not item:
-            raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
-        for campo, valor in dados.items():
-            setattr(item, campo, valor)
-        db.commit()
-        db.refresh(item)
+    item = (
+        db.query(Funcionario)
+        .filter(
+            Funcionario.id == item_id,
+            Funcionario.filial_id == filial,
+            Funcionario.ativo.is_(True),
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
+    for campo, valor in dados.items():
+        setattr(item, campo, valor)
+    db.commit()
+    db.refresh(item)
     return ItemResponse(data=FuncionarioOut.model_validate(item))
 
 
@@ -156,6 +164,21 @@ def deletar_funcionario(
     )
     if item:
         item.ativo = False
+        # A5: desativar o funcionário precisa desativar também a conta de login
+        # vinculada e revogar suas sessões — senão o ex-funcionário continua
+        # acessando o sistema com o usuário órfão. A busca cobre as duas pontas
+        # do vínculo (Funcionario.usuario_id e Usuario.funcionario_id) para
+        # tolerar registros antigos com as FKs divergentes (A6).
+        usuario = None
+        if item.usuario_id:
+            usuario = db.get(Usuario, item.usuario_id)
+        if usuario is None:
+            usuario = (
+                db.query(Usuario).filter(Usuario.funcionario_id == item.id).first()
+            )
+        if usuario is not None:
+            usuario.ativo = False
+            revogar_sessoes(db, usuario.id)
         db.commit()
 
 

@@ -36,6 +36,17 @@ def login(db: Session, login_input: str, senha: str) -> tuple[str, datetime, Usu
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário ou senha inválidos.",
         )
+    # A1: usuário desativado não pode LOGAR. Antes, só `_autenticar` recusava o
+    # token na requisição seguinte — o login devolvia 200 e o desktop abria a
+    # sessão para logo depois receber 401. Mesma mensagem do "não existe" para
+    # não confirmar quais logins existem (enumeração); hash neutro mantém o
+    # tempo de resposta constante.
+    if not usuario.ativo:
+        verify_password(senha, _HASH_NEUTRO)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário ou senha inválidos.",
+        )
     verificar_bloqueio(usuario, agora)
 
     # M3 (§3.10): primeiro acesso - usuário sem senha definida precisa completar
@@ -155,12 +166,19 @@ def logout(db: Session, token: str) -> None:
         db.commit()
 
 
-def revogar_sessoes(db: Session, usuario_id: int) -> None:
-    """Encerra todas as sessões ativas de um usuário (P13/P16).
+def revogar_sessoes(
+    db: Session, usuario_id: int, preservar_token: str | None = None
+) -> None:
+    """Encerra as sessões ativas de um usuário (P13/P16).
 
     Usado no reset de senha por admin: quem redefine a credencial invalida os
     acessos abertos do alvo, forçando novo login com a senha nova.
+
+    `preservar_token` mantém a sessão que executou a operação — assim um admin
+    que redefine a PRÓPRIA senha não é deslogado (A4). Para outros usuários o
+    token do admin não pertence ao alvo e todas as sessões do alvo são cerradas.
     """
+    hash_preservado = hash_token(preservar_token) if preservar_token else None
     sessoes = (
         db.query(UsuarioSessao)
         .filter(
@@ -170,5 +188,6 @@ def revogar_sessoes(db: Session, usuario_id: int) -> None:
         .all()
     )
     for sessao in sessoes:
-        sessao.encerrada = True
+        if sessao.token_hash != hash_preservado:
+            sessao.encerrada = True
     db.commit()

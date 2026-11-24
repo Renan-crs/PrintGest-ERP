@@ -9,6 +9,30 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.30] - 2026-11-24 — Funcionários, usuários e permissões
+
+### Backend
+- Login recusa usuário inativo com 401 (sem enumeração de logins).
+- Bloqueio por tentativas reforçado em toda requisição autenticada (423), com
+  revogação imediata de sessões abertas.
+- Reset de senha por admin limpa `falhas_login`, `bloqueado_em` e
+  `primeiro_acesso`; o token da própria operação é preservado (admin não se
+  desloga ao redefinir a própria senha).
+- Novo endpoint `POST /v1/usuarios/{id}/desbloquear` (ADMIN).
+- Excluir funcionário desativa o usuário vinculado e revoga suas sessões
+  (tolerando FKs antigas divergentes).
+- `PUT /v1/funcionarios/{id}` com corpo vazio retorna 400 em vez de 500.
+
+### Desktop
+- Restauração de sessão trata 423 como revogação (limpa a cópia local e abre o
+  login com a mensagem do backend), não como daemon fora do ar.
+
+### Validação
+Backend: 463 passed. Desktop: 476 passed, 4 xfailed.
+Mutação: 22/22 mortos. Relatório: `docs/auditoria_usuarios_funcionarios.md`.
+
+---
+
 ## [0.5.29] - 2026-11-22 — Log detalhado de todos os erros
 
 ### Backend

@@ -273,3 +273,37 @@ def test_janela_da_estacao_sobrevive_a_funcao_que_a_criou(app):
     assert janela is not None
     assert janela.isVisibleTo(janela) or janela.isVisible()
     assert Shiboken.isValid(janela)  # objeto C++ vivo, não coletado
+
+
+# ------------------------------------------- restauração: 423 é revogação
+
+
+def test_falha_restauracao_423_nao_e_erro_de_transporte(app, monkeypatch):
+    """Bloqueio (423) em /auth/me encerra a sessão local — não é daemon caído."""
+    from printgest.main import _Roteador
+
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))
+    roteador = _Roteador(api)
+    vistos: list = []
+    monkeypatch.setattr(
+        roteador,
+        "_sessao_invalida",
+        lambda msg, status=None: vistos.append(("invalida", msg, status)),
+    )
+    monkeypatch.setattr(
+        roteador, "_sem_daemon", lambda msg: vistos.append(("daemon", msg))
+    )
+
+    api.ultimo_status = None
+    roteador._falha_restauracao("daemon fora")
+    assert vistos[-1][0] == "daemon"
+
+    api.ultimo_status = 401
+    roteador._falha_restauracao("Sessão inválida.")
+    assert vistos[-1] == ("invalida", "Sessão inválida.", 401)
+
+    api.ultimo_status = 423
+    roteador._falha_restauracao("Usuário temporariamente bloqueado.")
+    assert vistos[-1] == (
+        "invalida", "Usuário temporariamente bloqueado.", 423
+    )

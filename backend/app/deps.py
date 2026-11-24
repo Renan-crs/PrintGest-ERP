@@ -61,6 +61,12 @@ def _autenticar(token: str, db: Session) -> Usuario:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário inativo ou inexistente.",
         )
+    # A2: o bloqueio por tentativas precisa valer em TEMPO REAL também para
+    # sessões já abertas. Antes, `verificar_bloqueio` só rodava no login — um
+    # usuário bloqueado enquanto estava logado continuava usando o sistema até
+    # o token expirar. Agora toda requisição autenticada revalida o bloqueio
+    # (423), garantindo revogação imediata (P16).
+    verificar_bloqueio(usuario, agora)
     # Expiração deslizante ECONÔMICA por inatividade: o TTL renova a cada
     # requisição, mas a gravação só acontece quando falta menos da metade do
     # prazo. Antes, cada requisição fazia UPDATE+COMMIT — uma viagem extra ao

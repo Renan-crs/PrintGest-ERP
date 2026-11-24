@@ -189,13 +189,15 @@ class _Roteador:
     def _falha_restauracao(self, msg: str) -> None:
         """Falha ao validar a sessão salva na abertura.
 
-        Token recusado (401: sessão encerrada/revogada no servidor) → limpa e
+        Token recusado (401: sessão encerrada/revogada) ou bloqueio (423:
+        excesso de tentativas, agora reforçado em toda requisição) → limpa e
         pede login. Erro de transporte (daemon caído/rede) → mantém a sessão e
         oferece tentar de novo — destruir a cópia aqui devolvia o usuário à
         tela de login a cada boot frio do daemon.
         """
-        if getattr(self._api, "ultimo_status", None) == 401:
-            self._sessao_invalida(msg)
+        status = getattr(self._api, "ultimo_status", None)
+        if status in (401, 423):
+            self._sessao_invalida(msg, status)
             return
         self._sem_daemon(msg)
 
@@ -215,15 +217,20 @@ class _Roteador:
         else:
             self._abrir_dashboard(False, sit=sit)
 
-    def _sessao_invalida(self, msg: str) -> None:
-        """A sessão salva está expirada ou inválida - limpa e abre login."""
+    def _sessao_invalida(self, msg: str, status: int | None = None) -> None:
+        """A sessão salva está expirada/inválida/bloqueada - limpa e abre login."""
         limpar_sessao()
         self._token = None
         self._api.encerrar_sessao()
         self._sessao_salva = False
+        detalhe = (
+            msg
+            if status == 423
+            else "Sua sessão expirou ou foi encerrada em outro dispositivo."
+        )
         QMessageBox.information(
             None, "Sessão encerrada",
-            "Sua sessão expirou ou foi encerrada em outro dispositivo.\n\nPor favor, faça login novamente."
+            f"{detalhe}\n\nPor favor, faça login novamente."
         )
         if self._licenca_desabilitada or self._estacao:
             self._abrir_login()

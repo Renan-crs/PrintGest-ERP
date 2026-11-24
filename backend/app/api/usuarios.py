@@ -1,6 +1,8 @@
 """Routers de usuários do sistema — gestão restrita a ADMIN (RBAC §5)."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import or_
 
 from app.core.security import hash_password
@@ -113,7 +115,11 @@ def criar_usuario(
 
 @router.put("/{item_id}")
 def atualizar_usuario(
-    item_id: int, body: UsuarioUpdate, db: DbDep, usuario: UsuarioDep
+    item_id: int,
+    body: UsuarioUpdate,
+    db: DbDep,
+    usuario: UsuarioDep,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> ItemResponse[UsuarioOut]:
     _garantir_nao_auto_lockout(db, usuario, item_id, body)
     _buscar_no_escopo(db, item_id)  # 404 se fora do inquilino
@@ -123,11 +129,36 @@ def atualizar_usuario(
     redefine_senha = "senha" in dados
     if redefine_senha:
         dados["senha_hash"] = hash_password(dados.pop("senha"))
+        # A4: redefinir a senha também resolve o estado de acesso — limpa as
+        # tentativas falhas, o bloqueio temporário e a exigência de primeiro
+        # acesso (senão o usuário continuaria 423/407 após a nova senha).
+        dados["falhas_login"] = 0
+        dados["bloqueado_em"] = None
+        dados["primeiro_acesso"] = False
     atualizado = atualizar(db, Usuario, item_id, dados)
     if redefine_senha:
-        # P13/P16: o reset de senha por um admin encerra as sessões ativas do alvo.
-        revogar_sessoes(db, item_id)
+        # P13/P16: encerra as demais sessões do alvo, preservando a que executou
+        # a operação (um admin resetando a própria senha não perde o acesso).
+        token_atual = (authorization or "").removeprefix("Bearer ").strip() or None
+        revogar_sessoes(db, item_id, preservar_token=token_atual)
     return ItemResponse(data=UsuarioOut.model_validate(atualizado))
+
+
+@router.post("/{item_id}/desbloquear")
+def desbloquear_usuario(
+    item_id: int, db: DbDep, usuario: UsuarioDep
+) -> ItemResponse[UsuarioOut]:
+    """A11: desbloqueia um usuário após excesso de tentativas falhas.
+
+    Limpa apenas o estado de lockout (`falhas_login`/`bloqueado_em`); senha e
+    primeiro acesso permanecem intactos. Restrito a ADMIN pelo router.
+    """
+    alvo = _buscar_no_escopo(db, item_id)  # 404 se fora do inquilino
+    alvo.falhas_login = 0
+    alvo.bloqueado_em = None
+    db.commit()
+    db.refresh(alvo)
+    return ItemResponse(data=UsuarioOut.model_validate(alvo))
 
 
 @router.delete("/{item_id}", status_code=204)
