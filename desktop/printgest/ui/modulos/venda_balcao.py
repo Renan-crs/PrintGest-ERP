@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core import catalogos
 from printgest.core.api import Api
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 from printgest.core.dominio import FORMAS_PAGAMENTO
 from printgest.core.rbac import pode_abrir
 import printgest.core.tarefas as tarefas
@@ -452,8 +453,9 @@ class EditorItensVenda(QWidget):
             if status == 404:
                 self._produto_nao_encontrado(texto)
             elif status in (401, 423):
-                titulo = "Sessão encerrada" if status == 401 else "Modo leitura"
-                QMessageBox.warning(self, titulo, msg)
+                QMessageBox.warning(
+                    self, titulo_erro(status, msg), mensagem_segura(msg)
+                )
             else:
                 QMessageBox.warning(
                     self, "Item", f"Não foi possível consultar o SKU agora. {msg}"
@@ -1862,7 +1864,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         return status if status is not None else getattr(self._api, "ultimo_status", None)
 
     def _erro_sessao(self, status: int | None) -> bool:
-        """401 (sessão revogada) e 423 (modo leitura) bloqueiam a operação.
+        """401 (sessão revogada) e 423 (licença ou bloqueio) bloqueiam a venda.
 
         Não limpamos a sessão aqui: quedas de transporte e erros de licença não
         devem devolver o operador ao login no meio da venda.
@@ -1875,12 +1877,16 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             )
             return True
         if status == 423:
-            QMessageBox.warning(
-                self,
-                "Modo leitura",
-                "Esta estação está em modo leitura (licença). "
-                "A operação não foi registrada.",
-            )
+            detalhe = mensagem_segura(getattr(self._api, "ultimo_erro", ""))
+            titulo = titulo_erro(status, detalhe)
+            if titulo == "Modo leitura":
+                texto = (
+                    "Esta estação está em modo leitura (licença). "
+                    "A operação não foi registrada."
+                )
+            else:
+                texto = detalhe or "Usuário bloqueado. Tente novamente mais tarde."
+            QMessageBox.warning(self, titulo, texto)
             return True
         return False
 

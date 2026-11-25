@@ -17,6 +17,7 @@ from printgest import APP_NAME, __version__
 from printgest.core import daemon
 from printgest.core.api import Api, modo_estacao
 from printgest.core.logging_app import configurar_logging, mascarar
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 from printgest.core.sessao import carregar_sessao, salvar_sessao, limpar_sessao
 from printgest.core.tarefas import rodar
 from printgest.ui.ativacao import AtivacaoWindow
@@ -96,7 +97,8 @@ def _erro_inesperado(tipo: type, valor: BaseException, tb) -> None:
         QMessageBox.critical(
             None,
             "Erro inesperado",
-            f"Ocorreu um erro inesperado.\n\n{tipo.__name__}: {valor}\n\n"
+            f"Ocorreu um erro inesperado.\n\n"
+            f"{tipo.__name__}: {mensagem_segura(valor)}\n\n"
             "Os detalhes completos foram gravados em logs/printgest.log.",
         )
     except Exception as exc:
@@ -224,13 +226,14 @@ class _Roteador:
         self._api.encerrar_sessao()
         self._sessao_salva = False
         detalhe = (
-            msg
+            mensagem_segura(msg)
             if status == 423
             else "Sua sessão expirou ou foi encerrada em outro dispositivo."
         )
         QMessageBox.information(
-            None, "Sessão encerrada",
-            f"{detalhe}\n\nPor favor, faça login novamente."
+            None,
+            titulo_erro(status, msg, "Sessão encerrada"),
+            f"{detalhe}\n\nPor favor, faça login novamente.",
         )
         if self._licenca_desabilitada or self._estacao:
             self._abrir_login()
@@ -307,8 +310,8 @@ class _Roteador:
         caixa.setWindowTitle("Local API Service indisponível")
         caixa.setText("Não foi possível consultar o estado da licença.")
         caixa.setInformativeText(
-            f"{msg}\n\nVerifique se o daemon (127.0.0.1:8000) está em execução e "
-            "tente novamente."
+            f"{mensagem_segura(msg)}\n\nVerifique se o daemon (127.0.0.1:8000) "
+            "está em execução e tente novamente."
         )
         caixa.addButton("Tentar Novamente", QMessageBox.ButtonRole.AcceptRole)
         caixa.addButton("Sair", QMessageBox.ButtonRole.RejectRole)

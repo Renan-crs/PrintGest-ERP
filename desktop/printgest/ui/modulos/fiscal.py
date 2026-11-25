@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 import printgest.core.tarefas as tarefas
+from printgest.core.notificacao import mensagem_segura, titulo_erro as _titulo_padrao
 from printgest.ui.formulario import (
     CampoArea,
     CampoCheck,
@@ -50,13 +51,9 @@ _MODELO = {"nfe": "NF-e", "nfce": "NFC-e", "nfse": "NFS-e"}
 _PENDENTES = ("rascunho", "processando", "rejeitado", "contingenciado")
 
 
-def _titulo_erro(status: int | None, titulo: str) -> str:
-    """Títulos de sessão/licença têm prioridade sobre o título do módulo."""
-    if status == 401:
-        return "Sessão encerrada"
-    if status == 423:
-        return "Modo leitura"
-    return titulo
+def _titulo_erro(status: int | None, titulo: str, msg: str = "") -> str:
+    """423 de bloqueio != 423 de licença (A1 da auditoria)."""
+    return _titulo_padrao(status, msg, titulo)
 
 
 def _status_rotulo(valor) -> str:
@@ -270,7 +267,7 @@ class PaginaDocumentosFiscais(PaginaCrud):
 
         def erro(msg: str, status: int | None = None) -> None:
             self._btn_reemitir.setEnabled(True)
-            QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
+            QMessageBox.warning(self, _titulo_erro(status, "Fiscal", msg), mensagem_segura(msg))
 
         tarefas.rodar(
             lambda: self._api.emitir_documento_fiscal(**payload), ok, erro
@@ -287,7 +284,7 @@ class PaginaDocumentosFiscais(PaginaCrud):
             QMessageBox.information(self, "Fiscal", "Status atualizado pelo gateway.")
 
         def erro(msg: str, status: int | None = None) -> None:
-            QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
+            QMessageBox.warning(self, _titulo_erro(status, "Fiscal", msg), mensagem_segura(msg))
 
         tarefas.rodar(
             lambda: self._api.consultar_documento_fiscal(item_id), ok, erro
@@ -313,7 +310,7 @@ class PaginaDocumentosFiscais(PaginaCrud):
             QMessageBox.information(self, "Fiscal", "Cancelamento enviado ao gateway.")
 
         def erro(msg: str, status: int | None = None) -> None:
-            QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
+            QMessageBox.warning(self, _titulo_erro(status, "Fiscal", msg), mensagem_segura(msg))
 
         tarefas.rodar(
             lambda: self._api.cancelar_documento_fiscal(doc["id"], motivo.strip()),
@@ -345,7 +342,7 @@ class PaginaDocumentosFiscais(PaginaCrud):
             )
 
         def erro(msg: str, status: int | None = None) -> None:
-            QMessageBox.warning(self, _titulo_erro(status, "Auditoria"), msg)
+            QMessageBox.warning(self, _titulo_erro(status, "Auditoria", msg), mensagem_segura(msg))
 
         tarefas.rodar(
             lambda: self._api.eventos_documento_fiscal(doc["id"]), ok, erro
@@ -515,7 +512,7 @@ class PaginaContingencia(QWidget):
         if seq != self._seq:
             return
         self._tabela.limpar()
-        QMessageBox.warning(self, _titulo_erro(status, "Fiscal"), msg)
+        QMessageBox.warning(self, _titulo_erro(status, "Fiscal", msg), mensagem_segura(msg))
 
 
 # ==================================================================== host

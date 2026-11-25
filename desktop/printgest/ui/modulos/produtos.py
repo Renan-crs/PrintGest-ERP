@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QMessageBox, QPushButton
 import printgest.core.tarefas as tarefas
 from printgest.core import catalogos
 from printgest.core.api import Api
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 from printgest.ui.formulario import (
     CampoArea,
     CampoArquivo,
@@ -165,18 +166,20 @@ class PaginaProdutos(PaginaCrud):
         def erro(msg: str, status: int | None = None) -> None:
             if botao is not None:
                 botao.setEnabled(True)
-            titulo = (
-                "Sessão encerrada" if status == 401
-                else "Modo leitura" if status == 423
-                else "Sem permissão" if status == 403
-                else "Conflito de SKU" if status == 409
-                else "Variações"
-            )
+            titulo = titulo_erro(status, msg, "Variações")
+            if titulo == "Variações":
+                titulo = (
+                    "Sem permissão" if status == 403
+                    else "Conflito de SKU" if status == 409
+                    else titulo
+                )
             orientacao = (
                 "\n\nRevise os códigos de barras/SKU e tente novamente."
                 if status == 409 else ""
             )
-            QMessageBox.warning(self, titulo, f"{msg}{orientacao}")
+            QMessageBox.warning(
+                self, titulo, f"{mensagem_segura(msg)}{orientacao}"
+            )
 
         tarefas.rodar(
             lambda: self._api.gerar_variacoes(
@@ -221,13 +224,10 @@ class PaginaProdutos(PaginaCrud):
 
         def erro(msg: str, status: int | None = None) -> None:
             self._btn_propagar.setEnabled(True)
-            titulo = (
-                "Sessão encerrada" if status == 401
-                else "Modo leitura" if status == 423
-                else "Sem permissão" if status == 403
-                else "Propagar preço"
-            )
-            QMessageBox.warning(self, titulo, msg)
+            titulo = titulo_erro(status, msg, "Propagar preço")
+            if titulo == "Propagar preço" and status == 403:
+                titulo = "Sem permissão"
+            QMessageBox.warning(self, titulo, mensagem_segura(msg))
 
         tarefas.rodar(
             lambda: self._api.propagar_preco(dado["id"]), ok, erro

@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
 
 from printgest import APP_NAME, __version__
 from printgest.core.api import Api, modo_estacao
+from printgest.core.notificacao import mensagem_segura
 from printgest.core.rbac import (
     menu_visivel,
     nivel_rotulo,
@@ -808,7 +809,7 @@ class PaginaInicial(QWidget):
         # (revisão de telas P0#1) — nunca "R$ 0,00" sem dado.
         self._lbl_atualizado.setText("")
         self._btn_retry_resumo.setVisible(True)
-        self._btn_retry_resumo.setToolTip(f"Motivo: {msg}")
+        self._btn_retry_resumo.setToolTip(f"Motivo: {mensagem_segura(msg)}")
         self._kpi_vendas_valor.setText("—")
         self._kpi_vendas_sub.setText("")
         if _eh_gerente_ou_mais(self._nivel):
@@ -1352,7 +1353,7 @@ class TelaPrincipal(QMainWindow):
         if sit.get("plano"):
             linhas.append(f"Plano: {sit['plano']}")
         if sit.get("chave"):
-            linhas.append(f"Chave: {sit['chave']}")
+            linhas.append(f"Chave: {mensagem_segura(sit['chave'])}")
         if sit.get("limite_ativacoes"):
             linhas.append(
                 f"Estações autorizadas: {sit['limite_ativacoes']} "
@@ -1369,7 +1370,7 @@ class TelaPrincipal(QMainWindow):
                 f"Última verificação: {formatar_datahora(sit['ultima_tentativa_em'])}"
             )
         if sit.get("ultimo_erro"):
-            linhas.append(f"Último erro: {sit['ultimo_erro']}")
+            linhas.append(f"Último erro: {mensagem_segura(sit['ultimo_erro'])}")
         return "\n".join(linhas)
 
     def _banner_modo_leitura(self) -> QWidget:

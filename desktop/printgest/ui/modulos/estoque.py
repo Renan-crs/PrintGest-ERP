@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 import printgest.core.tarefas as tarefas
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 from printgest.ui import animacao
 from printgest.ui.formulario import (
     CampoArea,
@@ -432,14 +433,14 @@ class PaginaEstoqueMovimento(PaginaEstoqueBase):
 
     def _erro_movimentar(self, msg: str, status: int | None = None) -> None:
         self._btn_salvar.setEnabled(True)
+        texto = mensagem_segura(msg)
         if status in (401, 423):
-            titulo = "Sessão encerrada" if status == 401 else "Modo leitura"
-            QMessageBox.warning(self, titulo, msg)
+            QMessageBox.warning(self, titulo_erro(status, msg), texto)
         elif status == 409:
             # Saída sem saldo: o detail do servidor já traz o produto/saldo.
-            QMessageBox.warning(self, "Estoque insuficiente", msg)
+            QMessageBox.warning(self, "Estoque insuficiente", texto)
         else:
-            QMessageBox.critical(self, "Não foi possível movimentar", msg)
+            QMessageBox.critical(self, "Não foi possível movimentar", texto)
 
     def _movimentado(self, saida: dict) -> None:
         self._ultima_movimentacao = saida
@@ -663,10 +664,9 @@ class PaginaEstoqueTransferencias(QWidget):
     def _erro(self, msg: str, status: int | None = None) -> None:
         # `tarefas.rodar` só entrega o status a callbacks com 2 parâmetros.
         if status in (401, 423):
-            titulo = "Sessão encerrada" if status == 401 else "Modo leitura"
-            QMessageBox.warning(self, titulo, msg)
+            QMessageBox.warning(self, titulo_erro(status, msg), mensagem_segura(msg))
             return
-        QMessageBox.warning(self, "Transferências", msg)
+        QMessageBox.warning(self, "Transferências", mensagem_segura(msg))
 
     def _selecionada(self) -> dict | None:
         dado = self._tabela.objeto_selecionado()

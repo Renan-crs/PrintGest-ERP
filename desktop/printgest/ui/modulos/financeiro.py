@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 from printgest.core.rbac import tem_acesso
 import printgest.core.tarefas as tarefas
 from printgest.ui import animacao
@@ -448,14 +449,9 @@ class PaginaCaixa(QWidget):
 
     def _erro_leitura(self, titulo: str, msg: str, status: int | None = None) -> None:
         # Status só chega quando o callback aceita 2 parâmetros (tarefas.py).
-        if status == 401:
-            titulo = "Sessão encerrada"
-        elif status == 423:
-            titulo = (
-                "Usuário bloqueado" if "bloqueado" in str(msg).casefold()
-                else "Modo leitura"
-            )
-        QMessageBox.warning(self, titulo, msg)
+        QMessageBox.warning(
+            self, titulo_erro(status, msg, titulo), mensagem_segura(msg)
+        )
 
     def _erro(self, msg: str, status: int | None = None) -> None:
         # Reabilita conforme o estado real (aberto/fechado), não todos de uma vez.
@@ -629,15 +625,14 @@ class PaginaContas(PaginaCrud):
 
     def _baixa_erro(self, msg: str, status: int | None = None) -> None:
         self._btn_baixa.setEnabled(True)
-        if status == 401:
-            QMessageBox.warning(self, "Sessão encerrada", msg)
-        elif status == 423:
-            QMessageBox.warning(self, "Modo leitura", msg)
+        texto = mensagem_segura(msg)
+        if status in (401, 423):
+            QMessageBox.warning(self, titulo_erro(status, msg), texto)
         elif status == 409:
             # Título já baixado/cancelado — conflito de concorrência.
-            QMessageBox.warning(self, self.ROTULO_PAGINA, msg)
+            QMessageBox.warning(self, self.ROTULO_PAGINA, texto)
         else:
-            QMessageBox.critical(self, self.ROTULO_PAGINA, msg)
+            QMessageBox.critical(self, self.ROTULO_PAGINA, texto)
 
 
 class PaginaContasReceber(PaginaContas):

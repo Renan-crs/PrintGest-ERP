@@ -9,6 +9,25 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.37] - 2026-11-25 — Rótulo de 423 e mascaramento na UI (A1/A2)
+
+### Desktop
+- `core/notificacao.py`: `titulo_erro()` distingue 423 de **bloqueio por
+  tentativas** ("Usuário bloqueado") de 423 de **licença em modo leitura** —
+  antes tudo era rotulado "Modo leitura" em 7 telas.
+- `Api` guarda `ultimo_erro` (mascarado) e o PDV usa o `detail` do backend para
+  explicar o bloqueio ao operador.
+- `mensagem_segura()` aplica as máscaras do log a diálogos e tooltips: erro
+  inesperado, `_sem_daemon`, tooltip de retry do resumo, chave/último erro da
+  licença e diagnóstico da tela de modo leitura.
+- `ApiError` já nasce mascarado na origem, cobrindo todas as telas sem exigir
+  alteração em cada callback.
+
+### Validação
+Desktop: 512 passed, 4 xfailed. Mutação: 51/51 mortos (3 novos).
+
+---
+
 ## [0.5.36] - 2026-11-25 — Instalação da atualização em um clique (Fase 2)
 
 ### Desktop

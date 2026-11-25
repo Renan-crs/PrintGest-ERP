@@ -30,7 +30,8 @@ def mascarar(valor: str) -> str:
     texto = str(valor)
     for padrao in _PADROES:
         texto = padrao.sub(
-            lambda m: f"{m.group(1)} ***" if m.group(1) else "***", texto
+            lambda m: f"{m.group(1).rstrip()} ***" if m.group(1) else "***",
+            texto,
         )
     return texto
 

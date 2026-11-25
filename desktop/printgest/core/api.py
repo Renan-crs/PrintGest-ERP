@@ -117,8 +117,9 @@ class Api:
         )
         self._token: str | None = None
         self._usuario: dict | None = None
-        # Último status HTTP recebido (qualquer thread; leitura tolerante).
+        # Último status/erro HTTP recebido (qualquer thread; leitura tolerante).
         self.ultimo_status: int | None = None
+        self.ultimo_erro: str = ""
 
     @property
     def base_url_display(self) -> str:
@@ -640,7 +641,7 @@ class Api:
         self.ultimo_status = resp.status_code
         if resp.status_code >= 400:
             self._log_erro(resp)
-            raise ApiError(_detalhe(resp), resp.status_code)
+            raise ApiError(mascarar(_detalhe(resp)), resp.status_code)
         corpo = resp.json()
         return corpo if isinstance(corpo, list) else corpo.get("data", [])
 
@@ -1002,7 +1003,7 @@ class Api:
             resp = self._enviar("delete", path, headers=headers)
         if resp.status_code >= 400:
             self._log_erro(resp)
-            raise ApiError(_detalhe(resp), resp.status_code)
+            raise ApiError(mascarar(_detalhe(resp)), resp.status_code)
 
     def _delete_data(self, path: str, token: str | None = None, json: dict | None = None) -> dict:
         """DELETE que devolve o corpo `data` (ex.: remover membro de um cartão)."""
@@ -1017,14 +1018,17 @@ class Api:
     def _headers(token: str | None) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"} if token else {}
 
-    @staticmethod
-    def _log_erro(resp: httpx.Response) -> None:
+    def _log_erro(self, resp: httpx.Response) -> None:
+        detalhe = _detalhe(resp)
+        # Guardado para a UI distinguir 423 de bloqueio de 423 de licença.
+        self.ultimo_erro = mascarar(str(detalhe))
+        self.ultimo_status = resp.status_code
         logging.getLogger("printgest.desktop").error(
             "API HTTP %s %s %s | detail=%s",
             resp.status_code,
             resp.request.method,
             resp.request.url.path,
-            mascarar(_detalhe(resp)),
+            mascarar(detalhe),
         )
 
     def _tratar(self, resp: httpx.Response) -> dict:
@@ -1033,7 +1037,7 @@ class Api:
         self.ultimo_status = resp.status_code
         if resp.status_code >= 400:
             self._log_erro(resp)
-            raise ApiError(_detalhe(resp), resp.status_code)
+            raise ApiError(mascarar(_detalhe(resp)), resp.status_code)
         return resp.json()["data"]
 
     @staticmethod
@@ -1046,9 +1050,8 @@ class Api:
             "offset": corpo["meta"]["offset"],
         }
 
-    @staticmethod
-    def _resposta_completa(resp: httpx.Response) -> dict:
+    def _resposta_completa(self, resp: httpx.Response) -> dict:
         if resp.status_code >= 400:
-            Api._log_erro(resp)
-            raise ApiError(_detalhe(resp), resp.status_code)
+            self._log_erro(resp)
+            raise ApiError(mascarar(_detalhe(resp)), resp.status_code)
         return resp.json()

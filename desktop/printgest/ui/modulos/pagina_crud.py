@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from printgest.core import catalogos
 from printgest.core.api import Api
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 import printgest.core.tarefas as tarefas
 from printgest.ui.busca import CampoBusca
 from printgest.ui.formulario import (
@@ -486,14 +487,13 @@ class PaginaCrud(QWidget):
 
     def _erro_salvar(self, msg: str, status: int | None = None) -> None:
         self._btn_salvar.setEnabled(True)
-        if status == 401:
-            QMessageBox.warning(self, "Sessão encerrada", msg)
-        elif status == 423:
-            QMessageBox.warning(self, "Modo leitura", msg)
+        texto = mensagem_segura(msg)
+        if status in (401, 423):
+            QMessageBox.warning(self, titulo_erro(status, msg), texto)
         elif status == 403:
-            QMessageBox.warning(self, "Sem permissão", msg)
+            QMessageBox.warning(self, "Sem permissão", texto)
         else:
-            QMessageBox.critical(self, "Não foi possível salvar", msg)
+            QMessageBox.critical(self, "Não foi possível salvar", texto)
 
     # --------------------------------------------------------------- extras
 

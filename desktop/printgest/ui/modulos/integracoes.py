@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 import printgest.core.tarefas as tarefas
 from printgest.core.api import Api
+from printgest.core.notificacao import mensagem_segura, titulo_erro
 from printgest.ui.formulario import (
     CampoCheck,
     CampoCombo,
@@ -190,12 +191,8 @@ class PaginaIntegracoes(QWidget):
 
         def erro(msg: str, status: int | None = None) -> None:
             estado_atencao(self._lbl_mascaras)
-            titulo = (
-                "Sessão encerrada" if status == 401
-                else "Modo leitura" if status == 423
-                else "Integrações"
-            )
-            self._lbl_mascaras.setText(f"{titulo}: {msg}")
+            titulo = titulo_erro(status, msg, "Integrações")
+            self._lbl_mascaras.setText(f"{titulo}: {mensagem_segura(msg)}")
 
         tarefas.rodar(self._api.listar_integracoes, ok, erro)
 
@@ -297,12 +294,9 @@ class PaginaIntegracoes(QWidget):
 
         def erro(msg: str, status: int | None = None) -> None:
             self._btn_salvar.setEnabled(True)
-            titulo = (
-                "Sessão encerrada" if status == 401
-                else "Modo leitura" if status == 423
-                else "Integrações"
+            QMessageBox.warning(
+                self, titulo_erro(status, msg, "Integrações"), mensagem_segura(msg)
             )
-            QMessageBox.warning(self, titulo, msg)
 
         if self._editando_id:
             acao = lambda: self._api.atualizar_integracao(self._editando_id, payload)
@@ -328,12 +322,9 @@ class PaginaIntegracoes(QWidget):
 
         def erro(msg: str, status: int | None = None) -> None:
             self._btn_testar.setEnabled(True)
-            titulo = (
-                "Sessão encerrada" if status == 401
-                else "Modo leitura" if status == 423
-                else "Teste de conexão"
+            QMessageBox.warning(
+                self, titulo_erro(status, msg, "Teste de conexão"), mensagem_segura(msg)
             )
-            QMessageBox.warning(self, titulo, msg)
 
         tarefas.rodar(
             lambda: self._api.testar_integracao(self._editando_id), ok, erro

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from printgest.core.api import Api
+from printgest.core.notificacao import mensagem_segura
 from printgest.core.tarefas import rodar
 from printgest.ui.widgets import (
     aplicar_estilo,
@@ -259,7 +260,9 @@ class ModoLeituraWindow(QMainWindow):
             "obteve resposta do RedGest na última tentativa."
         ]
         if self._situacao.get("ultimo_erro"):
-            partes.append(f"Último erro: {self._situacao['ultimo_erro']}.")
+            partes.append(
+                f"Último erro: {mensagem_segura(self._situacao['ultimo_erro'])}."
+            )
         quando = formatar_datahora(self._situacao.get("ultima_tentativa_em"))
         if quando:
             partes.append(f"Última tentativa: {quando}.")
