@@ -9,6 +9,26 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.35] - 2026-11-25 — Aviso de nova versão (Fase 1)
+
+### Desktop
+- Manifesto `latest.json` publicado como asset da release (versão, arquivo,
+  SHA-256, data, URL e notas), gerado automaticamente pelo `empacotar.ps1`.
+- Checagem assíncrona no boot via `tarefas.rodar`, fora do daemon e sem token;
+  falha de rede/404/manifesto inválido vira `None` e só vai para o log.
+- Comparador SemVer por tupla de inteiros; validação de `github.com` na URL.
+- Banner não bloqueante no topo com até 3 notas e botões que abrem a release
+  no navegador; ação "Verificar atualização" no menu do usuário.
+- Widget resgatado de `ui/widgets/` (colidia com `ui/widgets.py` e era
+  excluído do bundle) para `ui/widgets_atualizacao.py`.
+- **Não há download nem instalação automática** — ver
+  `docs/atualizacao_notificacao.md`.
+
+### Validação
+Desktop: 493 passed, 4 xfailed. Mutação: 44/44 mortos (3 novos).
+
+---
+
 ## [0.5.34] - 2026-11-24 — Fichas de consumo e custo de produção (Fase V2)
 
 ### Banco de dados

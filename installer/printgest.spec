@@ -27,16 +27,9 @@ if DESKTOP not in sys.path:
 
 from PyInstaller.utils.hooks import collect_submodules
 
-# `desktop/printgest/ui/widgets.py` é um MÓDULO, mas existe também um
-# diretório `ui/widgets/` sem __init__.py (arquivo órfão atualizacao.py).
-# Os submodules desse diretório não são importáveis (colidem com o módulo)
-# e não são usados por ninguém — ficam fora para não poluir a análise.
-hiddenimports = [
-    modulo
-    for modulo in collect_submodules("printgest")
-    if not modulo.startswith("printgest.ui.widgets.")
-]
-hiddenimports.append("printgest.ui.widgets")
+# Todos os submódulos entram automaticamente, inclusive
+# `printgest.ui.widgets_atualizacao` (banner de atualização).
+hiddenimports = collect_submodules("printgest")
 
 a = Analysis(
     [os.path.join(DESKTOP, "main.py")],

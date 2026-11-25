@@ -340,7 +340,12 @@ def test_cabecalho_sem_duplicar_usuario_nem_daemon(app):
     assert "Ana Silva" in principal._menu_usuario.text()
     assert "Admin" in principal._menu_usuario.text()
     acoes = [a.text() for a in principal._menu_usuario.menu().actions() if a.text()]
-    assert acoes == ["Preferências", "Trocar senha", "Sair"]
+    assert acoes == [
+        "Preferências",
+        "Trocar senha",
+        "Verificar atualização",
+        "Sair",
+    ]
 
 
 def test_cabecalho_nao_repete_perfil_igual_ao_nome(app):

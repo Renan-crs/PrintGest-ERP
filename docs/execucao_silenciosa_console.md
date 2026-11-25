@@ -68,7 +68,9 @@ filhas.
   não lê console.
 - Fechamento automático das 23:00 é um loop `asyncio` no lifespan.
 - Modo estação não inicia daemon algum.
-- Auto-update do endpoint é código morto (rota inexistente no backend).
+- O antigo `GET /v1/atualizacao/verificar` era código morto; foi substituído
+  na v0.5.35 pelo manifesto `latest.json` da release (ver
+  `docs/atualizacao_notificacao.md`). A rota continua sem existir no backend.
 
 ## Lacunas que ainda existem
 

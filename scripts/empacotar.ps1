@@ -273,6 +273,24 @@ if ($Assinar -ne "") {
     Assinar-Exe $setup $signtool $Assinar
 }
 
+# Manifesto `latest.json` — publicado como asset da release para o aviso de
+# nova versao no desktop (Fase 1: apenas notifica, nunca instala sozinho).
+$hashSetup = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
+$manifesto = [ordered]@{
+    versao = $versao
+    arquivo = "PrintGest-Setup-$versao$sufixo.exe"
+    sha256 = $hashSetup
+    data = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
+    url = "https://github.com/Renan-crs/PrintGest-ERP/releases/tag/v$versao"
+    notas = @("Instalador $Modo - sem UAC, dados do cliente preservados.")
+}
+$jsonManifesto = $manifesto | ConvertTo-Json -Depth 4
+$destinoManifesto = Join-Path $saidaAbs "latest.json"
+[System.IO.File]::WriteAllText(
+    $destinoManifesto, $jsonManifesto, (New-Object System.Text.UTF8Encoding($false))
+)
+Write-Host "[i] Manifesto de atualizacao: $destinoManifesto"
+
 $mb = [math]::Round((Get-Item $setup).Length / 1MB, 1)
 Write-Host ""
 Write-Host "OK: $setup ($mb MB)"

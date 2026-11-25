@@ -20,8 +20,8 @@ from __future__ import annotations
 import socket
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QTimer, Qt, Signal
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtCore import QTimer, QUrl, Qt, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -56,6 +56,7 @@ from printgest.ui import animacao
 from printgest.ui.busca_global import MODULO_POR_ENTIDADE, BuscaGlobal
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
+from printgest.ui.widgets_atualizacao import NotificacaoAtualizacao
 from printgest.ui.widgets import (
     ConteudoRolavel,
     ElideLabel,
@@ -938,6 +939,8 @@ class TelaPrincipal(QMainWindow):
         coluna = QVBoxLayout(raiz)
         coluna.setContentsMargins(0, 0, 0, 0)
         coluna.setSpacing(0)
+        self._coluna_raiz = coluna
+        self._banner_atualizacao: NotificacaoAtualizacao | None = None
 
         if modo_leitura:
             coluna.addWidget(self._banner_modo_leitura())
@@ -988,6 +991,37 @@ class TelaPrincipal(QMainWindow):
         self._timer_licenca_refresh.setInterval(5 * 60 * 1000)
         self._timer_licenca_refresh.timeout.connect(self._carregar_licenca)
         self._timer_licenca_refresh.start()
+
+        # Aviso de versão: checagem assíncrona logo após o dashboard aparecer.
+        # Nunca bloqueia login/licença — falha de rede só vai para o log.
+        self._timer_atualizacao = QTimer(self)
+        self._timer_atualizacao.setSingleShot(True)
+        self._timer_atualizacao.setInterval(2000)
+        self._timer_atualizacao.timeout.connect(self._verificar_atualizacao)
+        self._timer_atualizacao.start()
+
+    # ------------------------------------------------------- atualização
+
+    def _verificar_atualizacao(self) -> None:
+        from printgest.core import atualizacao
+
+        rodar(
+            lambda: atualizacao.verificar(__version__),
+            on_ok=self._mostrar_atualizacao,
+            on_erro=lambda _msg: None,
+        )
+
+    def _mostrar_atualizacao(self, informacoes: dict | None) -> None:
+        if not informacoes or self._banner_atualizacao is not None:
+            return
+        banner = NotificacaoAtualizacao(informacoes, self)
+        banner.atualizar_solicitado.connect(self._abrir_release)
+        self._banner_atualizacao = banner
+        self._coluna_raiz.insertWidget(0, banner)
+
+    @staticmethod
+    def _abrir_release(url: str) -> None:
+        QDesktopServices.openUrl(QUrl(url))
 
     # -------------------------------------------------------------- topo
 
@@ -1078,6 +1112,7 @@ class TelaPrincipal(QMainWindow):
         menu = QMenu(self._menu_usuario)
         menu.addAction("Preferências", self._abrir_preferencias)
         menu.addAction("Trocar senha", self._abrir_trocar_senha)
+        menu.addAction("Verificar atualização", self._verificar_atualizacao)
         menu.addSeparator()
         menu.addAction("Sair", self._sair)
         self._menu_usuario.setMenu(menu)
