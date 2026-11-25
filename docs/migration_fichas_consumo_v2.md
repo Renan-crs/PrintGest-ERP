@@ -1,7 +1,9 @@
 # Migration `f6a7b8c9d0e1` — fichas de consumo (Fase V2)
 
-**Status:** pronta no repositório, **NÃO aplicada ao Neon de produção**.
-A execução exige autorização explícita e backup prévio.
+**Status:** **aplicada ao Neon de produção em 25/11/2026**, com autorização
+explícita do usuário e backup prévio em branch. Head do Alembic em produção:
+`f6a7b8c9d0e1`. Backup: `br-purple-dust-b5d7t5rm`
+(`backup-pre-migration-fichas-consumo-20261125`, LSN `0/3A86270`).
 
 ## O que a migration faz
 
@@ -43,6 +45,18 @@ entrega.
    ```
 
 4. Verificar `ficha_consumo`, `os_item_consumo` e seus índices.
+
+### Resultado da aplicação (25/11/2026)
+
+Aplicação concluída em uma transação com as 6 instruções do arquivo de
+migration e a atualização de `alembic_version`. Verificação pós-aplicação:
+
+- `alembic_version` = `f6a7b8c9d0e1`;
+- `ficha_consumo` e `os_item_consumo` presentes em `public`;
+- índices `uq_ficha_consumo_uuid`, `idx_ficha_consumo_vigencia`,
+  `uq_os_item_consumo` e `idx_os_item_consumo_filial` presentes;
+- nenhum dado existente alterado — as tabelas novas começam vazias e o fluxo
+  legado permanece intacto até uma ficha ser cadastrada.
 
 ## Reversão
 

@@ -13,7 +13,7 @@ de cada tag está indicado para rastreabilidade.
 
 ### Banco de dados
 - Migration aditiva `f6a7b8c9d0e1`: `ficha_consumo` e `os_item_consumo`.
-  **Aplicação em produção depende de autorização e backup** — ver
+  **Aplicada ao Neon com backup em branch** — ver
   `docs/migration_fichas_consumo_v2.md`.
 
 ### Backend

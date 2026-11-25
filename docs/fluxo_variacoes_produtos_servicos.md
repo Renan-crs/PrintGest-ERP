@@ -26,9 +26,9 @@ Nov 23, 2026 · @Renan Silva
 > margem e baixa real v0.5.34); **V3–V4 são proposta**, com ilhas isoladas de
 > reajuste em bloco e outbox de sincronização.
 >
-> **Migration V1 aplicada ao Neon:** `e5f6a7b8c9d0` (backup em branch — ver
-> `docs/migration_regras_preco_v1.md`). **Migration V2 pendente de autorização:**
-> `f6a7b8c9d0e1` (`ficha_consumo`, `os_item_consumo`), aditiva.
+> **Migrations aplicadas ao Neon:** `e5f6a7b8c9d0` (V1 — ver
+> `docs/migration_regras_preco_v1.md`) e `f6a7b8c9d0e1` (V2 — ver
+> `docs/migration_fichas_consumo_v2.md`), ambas com backup em branch.
 
 | RF | Tema | Status | O que já existe / o que falta |
 | --- | --- | --- | --- |
@@ -729,9 +729,8 @@ Usar os dados do **Anexo A**. Valores marcados como ilustrativos nas seções 7 
 
 > **Status atual:** V0, V1 e V2 em andamento — motor determinístico, regras com
 > vigência e fichas de consumo já estão no código; V3 e V4 não iniciados (ver
-> seção de status no início). A migration da V2 ainda precisa de autorização
-> para ser aplicada em produção. As entregas abaixo permanecem como plano
-> proposto.
+> seção de status no início). As migrations da V1 e da V2 já estão aplicadas em
+> produção. As entregas abaixo permanecem como plano proposto.
 
 | Fase | Entregas | Critério de pronto | Depende de |
 | --- | --- | --- | --- |
