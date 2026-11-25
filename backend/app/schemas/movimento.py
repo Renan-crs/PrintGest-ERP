@@ -151,6 +151,9 @@ class OsItemOut(ORMModel):
     estado_cotacao: str | None = None
     # Transiente: explicação do cálculo do motor; não é coluna do banco.
     explicacao: list[str] = Field(default_factory=list)
+    # V1: regra vigente usada (RF-VR-21). Nome sem "snapshot" para não
+    # confundir com `snapshot_preco` de terceirizado, que é informação interna.
+    regra_aplicada: dict | None = None
 
 
 class ConferenciaTerceirizadoIn(BaseModel):

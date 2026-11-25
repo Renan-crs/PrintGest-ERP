@@ -49,6 +49,7 @@ from app.models.movimento import (
     VendaBalcaoItem,
 )
 from app.models.consolidacao import SyncEstado
+from app.models.precificacao import RegraPreco, TabelaPreco
 from app.models.plataforma import (
     BackupConfig,
     Estacao,
@@ -94,6 +95,8 @@ __all__ = [
     "PlanoContas",
     "PrecoParametro",
     "PrecoReajusteHistorico",
+    "RegraPreco",
+    "TabelaPreco",
     "Produto",
     "ProdutoCategoria",
     "ProdutoEstoque",

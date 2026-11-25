@@ -55,6 +55,8 @@ class VendaItemOut(ORMModel):
     valor_total: Decimal
     # Transiente: devolvida só na resposta que calculou; não é coluna do banco.
     explicacao: list[str] = Field(default_factory=list)
+    # V1: regra vigente usada (RF-VR-21).
+    regra_aplicada: dict | None = None
 
 
 class VendaCancelIn(BaseModel):

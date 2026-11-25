@@ -180,6 +180,8 @@ class OrdemServicoItem(Base):
         pg_enum(TipoItemOs), nullable=False, server_default=TipoItemOs.PROPRIO.value
     )
     snapshot_preco: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V1: snapshot do motor de variações (distinto do snapshot de terceirizado).
+    preco_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     os: Mapped[OrdemServico] = relationship(back_populates="itens")
     cotacoes: Mapped[list["OrdemServicoItemCotacao"]] = relationship(
@@ -495,6 +497,8 @@ class VendaBalcaoItem(Base):
     valor_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     desconto: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
     valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), server_default="0")
+    # V1: snapshot da regra usada no cálculo (origem, faixa, explicação).
+    preco_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     venda: Mapped[VendaBalcao] = relationship(back_populates="itens")
 

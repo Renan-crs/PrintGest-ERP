@@ -14,17 +14,21 @@ Nov 23, 2026 · @Renan Silva
 > ⬜ proposta (não implementado).
 >
 > **Diferença estrutural relevante:** o modelo hoje **não** tem entidades
-> `eixo_variacao`/`opcao_variacao` nem `regra_preco`. A variação é uma linha de
-> `produto` com `produto_pai_id`, `sku`, `uuid` e três atributos fixos
-> (`tamanho`, `marca`, `cor`), com UNIQUE por `(filial, pai, atributos)`. O preço
-> é o campo `produto.preco_venda` (`Numeric(14,2)`), digitado ou propagado — não
-> uma regra com vigência. Serviço não gera variação e não controla estoque; não
-> existe entidade `insumo`/`ficha_consumo`. Ou seja: **V0 está em andamento**
-> (matriz, SKU, uuid, estoque por variante e modo leitura já funcionam; o motor
-> de preço puro e o simulador vieram na v0.5.31 e foram integrados a venda/OS
-> na v0.5.32); **V1–V4 são
-> proposta**, com ilhas isoladas de reajuste em bloco, baixa atômica e outbox
-> de sincronização.
+> `eixo_variacao`/`opcao_variacao`. A variação é uma linha de `produto` com
+> `produto_pai_id`, `sku`, `uuid` e três atributos fixos (`tamanho`, `marca`,
+> `cor`), com UNIQUE por `(filial, pai, atributos)`. O preço legado segue em
+> `produto.preco_venda` (`Numeric(14,2)`) — agora convive com as regras
+> persistidas da V1. Serviço não gera variação e não controla estoque; não
+> existe entidade `insumo`/`ficha_consumo`. Ou seja: **V0 e V1 estão em
+> andamento** (matriz, SKU, uuid, estoque por variante e modo leitura; motor
+> de preço v0.5.31, integração em venda/OS v0.5.32; tabelas/regras com
+> vigência e snapshot v0.5.33); **V2–V4 são proposta**, com ilhas isoladas de
+> reajuste em bloco, baixa atômica e outbox de sincronização.
+>
+> **Migration pendente de aplicação em produção:** `e5f6a7b8c9d0`
+> (`tabela_preco`, `regra_preco` e duas colunas JSONB `preco_snapshot`). É
+> aditiva e não apaga dados, mas só deve ser aplicada ao Neon com autorização
+> explícita e backup prévio.
 
 | RF | Tema | Status | O que já existe / o que falta |
 | --- | --- | --- | --- |
@@ -34,12 +38,12 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-04 | Aviso de explosão > 100 variações | ⬜ | Sem limite funcional; só `max_length=200` do payload e confirmação genérica na UI |
 | RF-VR-05 | Compatibilidade e `COMBINACAO_INVALIDA` | ⬜ | Nenhuma tabela de compatibilidade nem esse código de erro |
 | RF-VR-06 | Estados rascunho/publicado/inativo | 🚧 | Só `ativo` (soft delete do pai desativa as filhas); sem rascunho/publicação nem bloqueio por preço/ficha faltando |
-| RF-VR-07 | Cálculo de preço no servidor (7.1) | 🚧 | Motor integrado em venda/orçamento/OS (v0.5.32): com `regra_preco` no item, o servidor calcula e ignora o unitário enviado. O PDV ainda envia só `valor_unitario` do cache porque a regra não está persistida |
-| RF-VR-08 | Precedência cliente/filial/padrão e `PRECO_NAO_CADASTRADO` | 🚧 | `selecionar_regra` e o erro implementados no motor; sem tabela de preços persistida (`preco_venda` ainda tem default `0`) |
-| RF-VR-09 | Faixas de quantidade | 🚧 | Modos `TODA_A_QUANTIDADE` e `PROGRESSIVA` no motor e no simulador; sem `qtd_min`/`qtd_max` persistidos |
-| RF-VR-10 | Modificadores e mínimo por linha | 🚧 | Multiplicador, acréscimo unitário, acréscimo fixo e mínimo no motor; sem cadastro persistido |
+| RF-VR-07 | Cálculo de preço no servidor (7.1) | 🚧 | Motor integrado em venda/orçamento/OS; com regra vigente no banco o servidor calcula e ignora o unitário enviado (v0.5.33) |
+| RF-VR-08 | Precedência cliente/filial/padrão e `PRECO_NAO_CADASTRADO` | 🚧 | `tabela_preco`/`regra_preco` persistidas com precedência cliente → filial → padrão e erro `PRECO_NAO_CADASTRADO`; falta expor o cadastro na UI do desktop |
+| RF-VR-09 | Faixas de quantidade | 🚧 | `TODA_A_QUANTIDADE` e `PROGRESSIVA` no motor, com faixas persistidas em JSONB na regra |
+| RF-VR-10 | Modificadores e mínimo por linha | 🚧 | Multiplicador, acréscimo unitário, acréscimo fixo e mínimo persistidos na regra; falta tela de cadastro |
 | RF-VR-11 | `ROUND_HALF_UP`, unitário 4 casas, soma das linhas | 🚧 | Motor usa unitário 4 casas, `ROUND_HALF_UP` e `ratear_desconto` com resíduo na última linha; persistência e documentos seguem com 2 casas |
-| RF-VR-12 | Vigência de regras; regra usada nunca editada | ⬜ | Reajuste edita `preco_venda` in loco e guarda só histórico auditável |
+| RF-VR-12 | Vigência de regras; regra usada nunca editada | 🚧 | `POST /regras/{id}/suceder` encerra a atual e cria nova com vigência; o legado (reajuste em bloco) ainda edita `preco_venda` in loco |
 | RF-VR-13 | Preço manual e limite de desconto por perfil | 🚧 | Campos editáveis no PDV, mas sem permissão `preco.manual`, justificativa, limite ou aprovação. RBAC existe só para preço de cadastro |
 | RF-VR-14 | Explicação do preço na linha | 🚧 | `explicacao` devolvida em venda/OS na resposta que calculou; é transiente e não sobrevive a um GET (só item terceirizado tem `snapshot_preco` gravado) |
 | RF-VR-15 | Reprecificação em lote com simulação | 🚧 | Simular/aplicar/histórico existem, mas editam `preco_venda` sem vigência nem regras novas |
@@ -48,7 +52,7 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-18 | Estoque na variação vs no insumo | 🚧 | Toda filha é produto acabado com saldo próprio; serviço não gera variação; falta todo o modelo de insumo/produção |
 | RF-VR-19 | Baixa atômica | 🚧 | Baixa atômica de **produto/variante** no PDV (`UPDATE ... WHERE saldo >= qtd`, 409); não há baixa de insumo nem conversões |
 | RF-VR-20 | Consumo previsto, reserva e baixa real | ⬜ | Coluna `reservado` existe mas nunca é escrita |
-| RF-VR-21 | Snapshot completo em orçamento/OS | 🚧 | Só snapshot de item terceirizado; sem variação/opções/custo/dados fiscais. Orçamento é OS com `tipo='orcamento'` |
+| RF-VR-21 | Snapshot completo em orçamento/OS | 🚧 | `preco_snapshot` JSONB gravado em venda e OS com origem, regra, vigência e explicação; ainda sem variação/opções/custo/dados fiscais |
 | RF-VR-22 | `versao` e 409 em itens/regras/documentos | ⬜ | 409 existe para estoque/integridade; sem coluna `versao` em produto, OS ou venda |
 | RF-VR-23 | Quantidade final visível (cópias × páginas) | ⬜ | Só campo livre `dimensoes` |
 | RF-VR-24 | Catálogo mestre da matriz → filiais | 🚧 | Outbox com uuid idempotente e evento `mestre:produto`; a descida casa por `codigo`, não por uuid, e cada filial gera suas variantes localmente |
@@ -57,7 +61,7 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-27 | Assistente de agrupamento e importação de planilha | ⬜ | Sem CSV/XLSX; desktop mostra apenas "disponível na próxima etapa" |
 | RF-VR-28 | Relatórios por variação | ⬜ | Só faturamento por filial e aniversariantes |
 
-**Fases:** V0 em andamento (motor integrado em venda/OS; faltam persistência da regra e snapshot) · V1 proposta · V2 proposta · V3 proposta · V4 proposta.
+**Fases:** V0 em andamento · V1 em andamento (tabelas/regras com vigência e snapshot no documento; falta a UI de cadastro) · V2 proposta · V3 proposta · V4 proposta.
 
 ---
 
@@ -723,10 +727,11 @@ Usar os dados do **Anexo A**. Valores marcados como ilustrativos nas seções 7 
 
 ## 17. Plano de implementação em fases
 
-> **Status atual:** V0 em andamento — motor determinístico, simulador e
-> integração em venda/orçamento/OS já estão no produto; V1, V2, V3 e V4 ainda
-> não iniciados (ver seção de status no início). As entregas abaixo permanecem
-> como plano proposto.
+> **Status atual:** V0 e V1 em andamento — motor determinístico, simulador,
+> integração em venda/OS e persistência de regras com vigência já estão no
+> código; V2, V3 e V4 não iniciados (ver seção de status no início). A
+> migration da V1 ainda precisa de autorização para ser aplicada em produção.
+> As entregas abaixo permanecem como plano proposto.
 
 | Fase | Entregas | Critério de pronto | Depende de |
 | --- | --- | --- | --- |

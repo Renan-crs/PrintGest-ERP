@@ -33,7 +33,12 @@ from app.models.movimento import (
 )
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
 from app.services import adiantamento_service
-from app.services.precificacao_documento import resolver_preco_linha
+from app.services.precificacao_documento import (
+    gerar_snapshot,
+    resolver_preco_linha,
+    resolver_regras_dos_itens,
+)
+from app.services.regra_preco_service import RegraResolvida
 
 _TWO = Decimal("0.01")
 
@@ -50,7 +55,10 @@ def _erro_integridade() -> HTTPException:
 
 
 def _aplicar_dados_item(
-    item: OrdemServicoItem, payload: OsItemIn, seq: int
+    item: OrdemServicoItem,
+    payload: OsItemIn,
+    seq: int,
+    resolvida: RegraResolvida | None = None,
 ) -> None:
     """Aplica os campos editáveis do item, preservando o histórico da cotação.
 
@@ -60,13 +68,16 @@ def _aplicar_dados_item(
     """
     # Item de fornecedor: o preço é soberania de `cotacao_service` (snapshot
     # VO). Nunca deixar o motor sobrescrever a cotação já selecionada.
-    usa_motor = payload.regra_preco is not None and payload.tipo != TipoItemOs.FORNECEDOR
+    regra_efetiva = (
+        resolvida.regra if resolvida is not None else payload.regra_preco
+    )
+    usa_motor = regra_efetiva is not None and payload.tipo != TipoItemOs.FORNECEDOR
     if usa_motor:
         unitario, total, explicacao = resolver_preco_linha(
             valor_unitario=payload.valor_unitario,
             quantidade=payload.quantidade,
             desconto=payload.desconto,
-            regra=payload.regra_preco,
+            regra=regra_efetiva,
         )
     else:
         total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
@@ -84,22 +95,44 @@ def _aplicar_dados_item(
     item.desconto = payload.desconto
     item.valor_total = total
     item.tipo = payload.tipo
-    # Transiente: devolvido na resposta, nunca gravado (guia RF-VR-14 em V0).
+    # Transiente: devolvido na resposta (guia RF-VR-14 em V0).
     item._explicacao = explicacao
+    if resolvida is not None and usa_motor:
+        item.preco_snapshot = gerar_snapshot(
+            origem=resolvida.origem,
+            regra_id=resolvida.regra_id,
+            tabela_id=resolvida.tabela_id,
+            unitario=unitario,
+            total=total,
+            desconto=payload.desconto,
+            explicacao=explicacao,
+            vigencia_inicio=resolvida.vigencia_inicio,
+            vigencia_fim=resolvida.vigencia_fim,
+        )
 
 
-def _montar_item(payload: OsItemIn, seq: int) -> OrdemServicoItem:
+def _montar_item(
+    payload: OsItemIn, seq: int, resolvida: RegraResolvida | None = None
+) -> OrdemServicoItem:
     item = OrdemServicoItem()
-    _aplicar_dados_item(item, payload, seq)
+    _aplicar_dados_item(item, payload, seq, resolvida)
     return item
 
 
-def _montar_itens(itens: list[OsItemIn]) -> list[OrdemServicoItem]:
-    return [_montar_item(item, seq) for seq, item in enumerate(itens, start=1)]
+def _montar_itens(
+    itens: list[OsItemIn], resolvidas: list[RegraResolvida | None] | None = None
+) -> list[OrdemServicoItem]:
+    resolvidas = resolvidas or [None] * len(itens)
+    montados: list[OrdemServicoItem] = []
+    for indice, item in enumerate(itens):
+        montados.append(_montar_item(item, indice + 1, resolvidas[indice]))
+    return montados
 
 
 def _mesclar_itens(
-    atuais: list[OrdemServicoItem], payloads: list[OsItemIn]
+    atuais: list[OrdemServicoItem],
+    payloads: list[OsItemIn],
+    resolvidas: list[RegraResolvida | None] | None = None,
 ) -> list[OrdemServicoItem]:
     """Mescla a lista enviada pela UI com os itens já gravados.
 
@@ -117,15 +150,17 @@ def _mesclar_itens(
     por_id = {item.id: item for item in atuais}
     usados: set[int] = set()
     resultado: list[OrdemServicoItem] = []
+    resolvidas = resolvidas or [None] * len(payloads)
     for seq, payload in enumerate(payloads, start=1):
+        resolvida = resolvidas[seq - 1]
         existente = por_id.get(payload.id) if payload.id is not None else None
         if existente is not None and existente.id not in usados:
-            _aplicar_dados_item(existente, payload, seq)
+            _aplicar_dados_item(existente, payload, seq, resolvida)
             usados.add(existente.id)
             resultado.append(existente)
         else:
             # id desconhecido/duplicado = item novo (nunca reaproveita outro OS).
-            resultado.append(_montar_item(payload, seq))
+            resultado.append(_montar_item(payload, seq, resolvida))
     return resultado
 
 
@@ -157,6 +192,7 @@ def _para_out(os: OrdemServico) -> OsOut:
     for item in os.itens:
         dados_item = {c.name: getattr(item, c.name) for c in item.__table__.columns}
         dados_item["explicacao"] = getattr(item, "_explicacao", [])
+        dados_item["regra_aplicada"] = item.preco_snapshot
         saida = OsItemOut.model_validate(dados_item)
         if item.tipo == TipoItemOs.FORNECEDOR:
             # Estado derivado (PRD §3.2.2): sem snapshot, o item está
@@ -190,7 +226,13 @@ def buscar(db: Session, os_id: int, *, filial_id: int) -> OrdemServico:
 
 
 def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> OsOut:
-    itens = _montar_itens(dados.itens)
+    resolvidas = resolver_regras_dos_itens(
+        db,
+        filial_id=filial_id,
+        cliente_id=dados.cliente_id,
+        itens=dados.itens,
+    )
+    itens = _montar_itens(dados.itens, resolvidas)
     valor_itens, valor_total = _totais(itens, dados.desconto)
     os_obj = OrdemServico(
         filial_id=filial_id,
@@ -291,7 +333,13 @@ def atualizar(
                 detail="A lista de itens não pode ser nula.",
             )
         # Mescla por `id`: substituir a coleção apagaria cotações/snapshot.
-        os_obj.itens = _mesclar_itens(list(os_obj.itens), dados.itens)
+        resolvidas = resolver_regras_dos_itens(
+            db,
+            filial_id=filial_id,
+            cliente_id=os_obj.cliente_id,
+            itens=dados.itens,
+        )
+        os_obj.itens = _mesclar_itens(list(os_obj.itens), dados.itens, resolvidas)
     valor_itens, valor_total = _totais(os_obj.itens, desconto)
     os_obj.desconto = desconto
     os_obj.valor_itens = valor_itens

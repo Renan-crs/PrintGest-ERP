@@ -34,7 +34,12 @@ from app.schemas.venda import (
     VendaOut,
 )
 from app.services import adiantamento_service, filial_service
-from app.services.precificacao_documento import resolver_preco_linha
+from app.services.precificacao_documento import (
+    gerar_snapshot,
+    resolver_preco_linha,
+    resolver_regras_dos_itens,
+)
+from app.services.regra_preco_service import RegraResolvida
 
 _TWO = Decimal("0.01")
 
@@ -50,12 +55,17 @@ def _erro_integridade() -> HTTPException:
     )
 
 
-def _montar_item(payload: VendaItemIn, seq: int) -> VendaBalcaoItem:
+def _montar_item(
+    payload: VendaItemIn, seq: int, resolvida: RegraResolvida | None = None
+) -> VendaBalcaoItem:
+    # A regra persistida no servidor é soberana; a do payload só é usada quando
+    # não há regra vigente (simulação/compatibilidade).
+    regra = resolvida.regra if resolvida else payload.regra_preco
     unitario, total, explicacao = resolver_preco_linha(
         valor_unitario=payload.valor_unitario,
         quantidade=payload.quantidade,
         desconto=payload.desconto,
-        regra=payload.regra_preco,
+        regra=regra,
     )
     item = VendaBalcaoItem(
         seq=seq,
@@ -66,13 +76,31 @@ def _montar_item(payload: VendaItemIn, seq: int) -> VendaBalcaoItem:
         desconto=payload.desconto,
         valor_total=total,
     )
-    # Transiente: devolvido na resposta, nunca gravado (guia RF-VR-14 em V0).
+    # Transiente: devolvido na resposta (guia RF-VR-14 em V0).
     item._explicacao = explicacao
+    if resolvida is not None:
+        item.preco_snapshot = gerar_snapshot(
+            origem=resolvida.origem,
+            regra_id=resolvida.regra_id,
+            tabela_id=resolvida.tabela_id,
+            unitario=unitario,
+            total=total,
+            desconto=payload.desconto,
+            explicacao=explicacao,
+            vigencia_inicio=resolvida.vigencia_inicio,
+            vigencia_fim=resolvida.vigencia_fim,
+        )
     return item
 
 
-def _montar_itens(itens: list[VendaItemIn]) -> list[VendaBalcaoItem]:
-    return [_montar_item(item, seq) for seq, item in enumerate(itens, start=1)]
+def _montar_itens(
+    itens: list[VendaItemIn], resolvidas: list[RegraResolvida | None] | None = None
+) -> list[VendaBalcaoItem]:
+    resolvidas = resolvidas or [None] * len(itens)
+    montados: list[VendaBalcaoItem] = []
+    for indice, item in enumerate(itens):
+        montados.append(_montar_item(item, indice + 1, resolvidas[indice]))
+    return montados
 
 
 def _totais(itens: list[VendaBalcaoItem], desconto: Decimal) -> tuple[Decimal, Decimal]:
@@ -103,6 +131,7 @@ def _para_out(venda: VendaBalcao) -> VendaOut:
             desconto=i.desconto,
             valor_total=i.valor_total,
             explicacao=getattr(i, "_explicacao", []),
+            regra_aplicada=i.preco_snapshot,
         )
         for i in venda.itens
     ]
@@ -278,7 +307,13 @@ def criar(
     usuario_id: int,
     dados: VendaCreate,
 ) -> VendaOut:
-    itens = _montar_itens(dados.itens)
+    resolvidas = resolver_regras_dos_itens(
+        db,
+        filial_id=filial_id,
+        cliente_id=dados.cliente_id,
+        itens=dados.itens,
+    )
+    itens = _montar_itens(dados.itens, resolvidas)
     valor_itens, valor_total = _totais(itens, dados.desconto)
 
     cliente_nome_avulso = (dados.cliente_nome_avulso or "").strip() or None

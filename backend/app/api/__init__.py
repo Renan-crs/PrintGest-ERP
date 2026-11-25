@@ -9,6 +9,7 @@ from app.api import (
     financeiro,
     fiscal,
     integracoes,
+    precificacao,
     plataforma,
     projetos,
     variacoes,
@@ -34,6 +35,7 @@ integracoes.registrar(api)
 plataforma.registrar(api)
 projetos.registrar(api)
 variacoes.registrar(api)
+precificacao.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)
 api.include_router(estoque_router)

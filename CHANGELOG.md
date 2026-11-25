@@ -9,6 +9,32 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.33] - 2026-11-24 — Regras de preço com vigência (Fase V1)
+
+### Banco de dados
+- Migration aditiva `e5f6a7b8c9d0`: `tabela_preco`, `regra_preco` e colunas
+  JSONB `preco_snapshot` em item de venda e de OS. Nenhuma coluna existente é
+  alterada e nenhum dado é apagado. **Aplicação em produção depende de
+  autorização e backup** — ver `docs/migration_regras_preco_v1.md`.
+
+### Backend
+- CRUD de tabelas e regras em `/v1/precificacao` (leitura OPERADOR+, escrita
+  GERENTE+), sempre no escopo da filial do inquilino.
+- Resolução por precedência cliente → filial → padrão, com vigência e
+  prioridade; sem regra vigente o comportamento legado permanece.
+- Venda/orçamento/OS passam a usar a regra persistida no servidor, ignorando
+  o `valor_unitario` enviado pelo cliente.
+- `POST /regras/{id}/suceder` encerra a regra e cria outra com nova vigência
+  (a regra usada em documento nunca é editada).
+- Snapshot da regra (origem, vigência, faixa e explicação) gravado no item e
+  devolvido em venda/OS; sobrevive a um GET.
+
+### Validação
+Backend: 509 passed (9 novos testes). Desktop: 476 passed, 4 xfailed.
+Mutação: 35/35 mortos. Migration aplicada ao Neon com backup em branch.
+
+---
+
 ## [0.5.32] - 2026-11-24 — Motor de preço integrado em venda/OS (Fase V0)
 
 ### Backend
