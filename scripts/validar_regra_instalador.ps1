@@ -37,6 +37,10 @@ if ($conteudo -match 'filesandordirs;\s*Name:\s*"\{app\}\\PrintGestAPI"') {
 # 4) .env da estacao continua gravado pelo assistente (comportamento existente).
 Exigir 'assistente da estacao nao grava .env' 'PRINTGEST_API_URL='
 
+# 5) Atualizacao silenciosa NAO pode sobrescrever o .env da estacao (Fase 2).
+Exigir 'atualizacao silenciosa pode apagar o endereco do servidor' 'Endereco = ''''\) and FileExists\(EnvPath\)'
+Exigir 'guarda de preservacao do .env sem log' 'preservando \.env da estacao'
+
 if ($falhas.Count -gt 0) {
   Write-Host 'FALHA na regra do instalador:' -ForegroundColor Red
   $falhas | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }

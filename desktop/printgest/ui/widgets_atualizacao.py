@@ -24,6 +24,7 @@ class NotificacaoAtualizacao(QWidget):
     """Aviso no topo da tela principal; a ação abre a página da release."""
 
     atualizar_solicitado = Signal(str)
+    instalacao_solicitada = Signal(dict)
 
     def __init__(self, informacoes: dict, pai=None) -> None:
         super().__init__(pai)
@@ -70,6 +71,11 @@ class NotificacaoAtualizacao(QWidget):
 
         linha_acao = QHBoxLayout()
         linha_acao.addStretch(1)
+        self._btn_instalar = QPushButton("Instalar atualização")
+        self._btn_instalar.setObjectName("btnInstalarAtualizacao")
+        self._btn_instalar.clicked.connect(self._ao_instalar)
+        linha_acao.addWidget(self._btn_instalar)
+
         self._btn_atualizar = QPushButton("Ver atualização")
         self._btn_atualizar.setObjectName("btnAtualizar")
         self._btn_atualizar.clicked.connect(self._ao_atualizar)
@@ -89,6 +95,9 @@ class NotificacaoAtualizacao(QWidget):
             "border-bottom: 1px solid #fcd34d; }"
             "#containerAtualizacao { background: white; border-radius: 8px; }"
         )
+
+    def _ao_instalar(self) -> None:
+        self.instalacao_solicitada.emit(dict(self._inf))
 
     def _ao_atualizar(self) -> None:
         url = str(self._inf.get("download_url") or "")

@@ -10,7 +10,7 @@
 ; As duas instalacoes convivem na mesma maquina (AppIds e pastas distintos).
 
 #ifndef VersaoApp
-  #define VersaoApp "0.5.35"
+  #define VersaoApp "0.5.36"
 #endif
 
 #define NomeApp "PrintGest ERP"
@@ -80,7 +80,8 @@ Name: "{group}\Desinstalar {#NomeExibicao}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#NomeExibicao}"; Filename: "{app}\PrintGest\PrintGest.exe"; WorkingDir: "{app}\PrintGest"; Tasks: icone_area_trabalho
 
 [Run]
-Filename: "{app}\PrintGest\PrintGest.exe"; Description: "Executar {#NomeExibicao}"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}\PrintGest"
+; Sem `skipifsilent`: na atualização silenciosa (Fase 2) o app é reaberto.
+Filename: "{app}\PrintGest\PrintGest.exe"; Description: "Executar {#NomeExibicao}"; Flags: nowait postinstall; WorkingDir: "{app}\PrintGest"
 
 #ifndef ModoEstacao
 [UninstallRun]
@@ -145,13 +146,27 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  EnvPath: String;
+  Endereco: String;
 begin
-  if CurStep = ssPostInstall then
+  if CurStep <> ssPostInstall then
+    Exit;
+
+  EnvPath := ExpandConstant('{app}\PrintGest\.env');
+  Endereco := PaginaServidor.Values[0];
+
+  { Atualizacao silenciosa (Fase 2): a pagina nao aparece, entao Endereco vem
+    vazio. NUNCA sobrescrever um .env existente — isso apagaria o endereco do
+    servidor da grafica. Instalacao nova sem .env segue gravando o padrao. }
+  if (Endereco = '') and FileExists(EnvPath) then
   begin
-    { .env ao lado do exe: o PrintGest le ao iniciar (modo Estacao). }
-    SaveStringToFile(ExpandConstant('{app}\PrintGest\.env'),
-      'PRINTGEST_API_URL=' + PaginaServidor.Values[0] + #13#10 +
-      'PRINTGEST_MODO_ESTACAO=sim' + #13#10, False);
+    Log('PrintGest: atualizacao silenciosa - preservando .env da estacao.');
+    Exit;
   end;
+
+  SaveStringToFile(EnvPath,
+    'PRINTGEST_API_URL=' + Endereco + #13#10 +
+    'PRINTGEST_MODO_ESTACAO=sim' + #13#10, False);
 end;
 #endif

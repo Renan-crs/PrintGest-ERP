@@ -9,6 +9,34 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.36] - 2026-11-25 — Instalação da atualização em um clique (Fase 2)
+
+### Desktop
+- Botão "Instalar atualização" no banner: confirmação, download validado por
+  SHA-256 em `%LOCALAPPDATA%\PrintGest\updates` e disparo do Setup em processo
+  destacado (`/VERYSILENT /NORESTART`).
+- Gate de RBAC: somente ADMIN/GERENTE no servidor; qualquer usuário em estação.
+- Falhas de download/hash geram aviso com alternativa manual — nada é executado
+  e a sessão não é alterada.
+- **Instalador sem assinatura**: o SmartScreen pode avisar; isso é informado ao
+  usuário antes de instalar.
+
+### Instalador
+- `PrintGest.iss`: remoção de `skipifsilent` na `[Run]` para reabrir o app ao
+  fim da instalação silenciosa.
+- **Correção crítica (auditoria):** em modo estação, uma atualização silenciosa
+  regravava o `.env` com `PRINTGEST_API_URL=` vazio, apagando o endereço do
+  servidor. `CurStepChanged` agora preserva o `.env` existente quando a página
+  do assistente não aparece; o validador do instalador verifica a guarda.
+
+### Desktop
+- Banner de atualização fechado volta a aparecer em uma nova checagem manual.
+
+### Validação
+Desktop: 504 passed, 4 xfailed. Mutação: 48/48 mortos (4 novos).
+
+---
+
 ## [0.5.35] - 2026-11-25 — Aviso de nova versão (Fase 1)
 
 ### Desktop

@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
 )
 
 from printgest import APP_NAME, __version__
-from printgest.core.api import Api
+from printgest.core.api import Api, modo_estacao
 from printgest.core.rbac import (
     menu_visivel,
     nivel_rotulo,
@@ -1012,16 +1012,97 @@ class TelaPrincipal(QMainWindow):
         )
 
     def _mostrar_atualizacao(self, informacoes: dict | None) -> None:
-        if not informacoes or self._banner_atualizacao is not None:
+        if not informacoes:
+            return
+        if self._banner_atualizacao is not None:
+            # O usuário pode ter fechado o banner; uma checagem manual deve
+            # trazê-lo de volta em vez de ser silenciosamente ignorada.
+            self._banner_atualizacao.mostrar()
             return
         banner = NotificacaoAtualizacao(informacoes, self)
         banner.atualizar_solicitado.connect(self._abrir_release)
+        banner.instalacao_solicitada.connect(self._instalar_atualizacao)
         self._banner_atualizacao = banner
         self._coluna_raiz.insertWidget(0, banner)
 
     @staticmethod
     def _abrir_release(url: str) -> None:
         QDesktopServices.openUrl(QUrl(url))
+
+    def _pode_instalar_atualizacao(self) -> bool:
+        """Servidor: só gerência (afeta as estações). Estação: qualquer usuário."""
+        return modo_estacao() or self._nivel in ("admin", "gerente")
+
+    def _instalar_atualizacao(self, informacoes: dict) -> None:
+        from printgest.core.instalador_atualizacao import baixar_instalador
+
+        if not self._pode_instalar_atualizacao():
+            QMessageBox.warning(
+                self, "Atualização",
+                "Somente gerência pode atualizar o servidor da gráfica.",
+            )
+            return
+        resposta = QMessageBox.question(
+            self,
+            "Atualizar PrintGest",
+            f"Instalar a versão {informacoes.get('versao_nova', '')}?\n\n"
+            "O programa será fechado e reaberto automaticamente. "
+            "O instalador não é assinado — o Windows pode exibir um aviso "
+            "do SmartScreen; nesse caso, confirme a execução.\n\n"
+            "Finalize qualquer operação em andamento antes de continuar.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if resposta != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        except Exception:
+            pass
+        rodar(
+            lambda: baixar_instalador(informacoes),
+            on_ok=self._instalador_baixado,
+            on_erro=self._erro_atualizacao,
+        )
+
+    def _instalador_baixado(self, caminho) -> None:
+        from printgest.core.instalador_atualizacao import (
+            ErroAtualizacao,
+            iniciar_instalador,
+        )
+
+        self._restaurar_cursor()
+        try:
+            iniciar_instalador(caminho)
+        except ErroAtualizacao as exc:
+            self._erro_atualizacao(str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "Atualização iniciada",
+            "A instalação foi iniciada em segundo plano.\n\n"
+            "Se o Windows exibir um aviso do SmartScreen, confirme a execução "
+            "do instalador. O PrintGest será reaberto ao concluir.",
+        )
+
+    def _erro_atualizacao(self, msg: str) -> None:
+        self._restaurar_cursor()
+        QMessageBox.warning(
+            self,
+            "Não foi possível atualizar",
+            f"{msg}\n\nVocê pode baixar o instalador manualmente na página da release.",
+        )
+
+    def _restaurar_cursor(self) -> None:
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            QApplication.restoreOverrideCursor()
+        except Exception:
+            pass
 
     # -------------------------------------------------------------- topo
 

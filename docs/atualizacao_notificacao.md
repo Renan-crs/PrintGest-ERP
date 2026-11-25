@@ -1,8 +1,12 @@
-# Aviso de nova versão (Fase 1)
+# Aviso e instalação de nova versão (Fases 1 e 2)
 
-Implementado na v0.5.35. **Apenas notifica** — não baixa nem instala nada
-automaticamente. O fluxo continua sendo: ver o aviso → clicar → abrir a página
-da release no navegador → baixar e instalar.
+Fase 1 implementada na v0.5.35, Fase 2 na v0.5.36. O fluxo agora é: ver o aviso
+→ clicar em **Instalar atualização** → confirmar → baixar, validar e instalar.
+O botão "Ver atualização" continua disponível como alternativa manual.
+
+**O instalador ainda não é assinado**: o Windows SmartScreen pode exibir um
+aviso durante a instalação. Isso é informado na confirmação e não pode ser
+suprimido em código — a única correção é adquirir certificado de code signing.
 
 ## Como funciona
 
@@ -35,11 +39,36 @@ da release no navegador → baixar e instalar.
 
 5. Se houver versão nova, `TelaPrincipal` insere um banner amarelo não
    bloqueante no topo (mesmo padrão dos banners de modo leitura/tolerância),
-   com até 3 notas. Os botões "Ver atualização" e "Mais informações" abrem a
-   release no navegador via `QDesktopServices.openUrl`.
+   com até 3 notas. "Ver atualização" e "Mais informações" abrem a release no
+   navegador via `QDesktopServices.openUrl`; "Instalar atualização" inicia a
+   Fase 2.
 
 6. A checagem roda uma vez, 2 s após o dashboard, em `QThread` (`tarefas.rodar`).
    Também há a ação "Verificar atualização" no menu do usuário.
+
+## Fase 2 — um clique (v0.5.36)
+
+1. **Confirmação e RBAC:** diálogo avisa que o app será reiniciado e que pode
+   haver aviso do SmartScreen. No **servidor**, somente ADMIN/GERENTE pode
+   instalar (a API é compartilhada pelas estações); em **estação**, qualquer
+   usuário (instalação por usuário).
+
+2. **Download:** `core/instalador_atualizacao.py` baixa o `.exe` para
+   `%LOCALAPPDATA%\PrintGest\updates`, com stream, limite de 200 MB e validação
+   do SHA-256 do manifesto **antes de qualquer execução**. Se o arquivo já
+   existe e o hash confere, é reaproveitado. Hash divergente → nada é executado.
+
+3. **Disparo:** o Setup é lançado com `/VERYSILENT /NORESTART` em processo
+   destacado (`DETACHED_PROCESS | CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP`).
+   Isso é obrigatório porque o `PrepareToInstall` do `.iss` encerra
+   `PrintGest.exe` e `PrintGestAPI.exe` — o processo que disparou o download
+   não pode ser o desktop.
+
+4. **Reabertura:** a `[Run]` do `.iss` teve o sinalizador `skipifsilent`
+   removido, então o app é reaberto ao fim da instalação silenciosa.
+
+5. **Falhas:** qualquer erro (HTTP, rede, hash, arquivo ausente) gera aviso com
+   opção de baixar manualmente; nada é executado e a sessão local não é tocada.
 
 ## O que deliberadamente NÃO faz
 
@@ -49,12 +78,9 @@ da release no navegador → baixar e instalar.
   o uso do sistema (tolerância offline de 72 h continua valendo).
 - Não confia em URL de domínio arbitrário vinda do manifesto.
 
-## Próximas fases (analisadas, não implementadas)
+## Pendências
 
-- **Fase 2:** um clique baixa e instala. Exige certificado de code signing
-  (SmartScreen), validação SHA256 do download, lançamento do instalador em
-  processo destacado (o `PrepareToInstall` do `.iss` já mata desktop e API) e
-  reabertura do app — o `[Run]` atual usa `skipifsilent`. Gate de RBAC no
-  servidor (somente ADMIN/GERENTE) e confirmação se houver caixa aberto.
-- **Fase 3:** manifesto servido pelo próprio backend para estações sem
-  internet (reaproveitando a ideia do antigo `tipo=estacao|servidor`).
+- **Code signing:** sem certificado, o SmartScreen pode bloquear o instalador
+  baixado; pipeline e `-Assinar` já estão prontos, falta adquirir o certificado.
+- **Fase 3 (proposta):** manifesto servido pelo próprio backend para estações
+  sem internet (reaproveitando a ideia do antigo `tipo=estacao|servidor`).

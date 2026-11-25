@@ -128,3 +128,21 @@ def test_mostrar_atualizacao_sem_dados_nao_cria_banner(app):
     tela = TelaPrincipal(api=object(), usuario={"id": 1, "nome": "Ana", "login": "ana"})
     tela._mostrar_atualizacao(None)
     assert tela._banner_atualizacao is None
+
+
+def test_mostrar_atualizacao_reabre_banner_fechado(app):
+    tela = TelaPrincipal(api=object(), usuario={"id": 1, "nome": "Ana", "login": "ana"})
+    dados = {
+        "versao_nova": "0.5.36",
+        "data": "2026-11-25",
+        "revisoes": [],
+        "download_url": MANIFESTO["url"],
+    }
+    tela._mostrar_atualizacao(dados)
+    banner = tela._banner_atualizacao
+    banner.esconder()
+    assert not banner.esta_visivel()
+
+    tela._mostrar_atualizacao(dados)
+    assert tela._banner_atualizacao is banner
+    assert banner.esta_visivel()
