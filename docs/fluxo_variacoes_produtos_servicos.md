@@ -19,16 +19,16 @@ Nov 23, 2026 · @Renan Silva
 > `cor`), com UNIQUE por `(filial, pai, atributos)`. O preço legado segue em
 > `produto.preco_venda` (`Numeric(14,2)`) — agora convive com as regras
 > persistidas da V1. Serviço não gera variação e não controla estoque; não
-> existe entidade `insumo`/`ficha_consumo`. Ou seja: **V0 e V1 estão em
-> andamento** (matriz, SKU, uuid, estoque por variante e modo leitura; motor
-> de preço v0.5.31, integração em venda/OS v0.5.32; tabelas/regras com
-> vigência e snapshot v0.5.33); **V2–V4 são proposta**, com ilhas isoladas de
-> reajuste em bloco, baixa atômica e outbox de sincronização.
+> existe entidade `insumo` separada (o insumo reaproveita `produto`). Ou seja:
+> **V0, V1 e V2 estão em andamento** (matriz, SKU, uuid, estoque por variante e
+> modo leitura; motor de preço v0.5.31, integração em venda/OS v0.5.32;
+> tabelas/regras com vigência e snapshot v0.5.33; fichas de consumo, custo,
+> margem e baixa real v0.5.34); **V3–V4 são proposta**, com ilhas isoladas de
+> reajuste em bloco e outbox de sincronização.
 >
-> **Migration pendente de aplicação em produção:** `e5f6a7b8c9d0`
-> (`tabela_preco`, `regra_preco` e duas colunas JSONB `preco_snapshot`). É
-> aditiva e não apaga dados, mas só deve ser aplicada ao Neon com autorização
-> explícita e backup prévio.
+> **Migration V1 aplicada ao Neon:** `e5f6a7b8c9d0` (backup em branch — ver
+> `docs/migration_regras_preco_v1.md`). **Migration V2 pendente de autorização:**
+> `f6a7b8c9d0e1` (`ficha_consumo`, `os_item_consumo`), aditiva.
 
 | RF | Tema | Status | O que já existe / o que falta |
 | --- | --- | --- | --- |
@@ -47,12 +47,12 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-13 | Preço manual e limite de desconto por perfil | 🚧 | Campos editáveis no PDV, mas sem permissão `preco.manual`, justificativa, limite ou aprovação. RBAC existe só para preço de cadastro |
 | RF-VR-14 | Explicação do preço na linha | 🚧 | `explicacao` devolvida em venda/OS na resposta que calculou; é transiente e não sobrevive a um GET (só item terceirizado tem `snapshot_preco` gravado) |
 | RF-VR-15 | Reprecificação em lote com simulação | 🚧 | Simular/aplicar/histórico existem, mas editam `preco_venda` sem vigência nem regras novas |
-| RF-VR-16 | Ficha de consumo e custo de processo | ⬜ | Não existem entidades `insumo`, `ficha_consumo` ou `custo_processo` |
-| RF-VR-17 | Custo, margem e alertas por variação | 🚧 | `preco_custo`/`preco_venda` por variante; sem cálculo de margem, custo de processo ou alertas |
-| RF-VR-18 | Estoque na variação vs no insumo | 🚧 | Toda filha é produto acabado com saldo próprio; serviço não gera variação; falta todo o modelo de insumo/produção |
-| RF-VR-19 | Baixa atômica | 🚧 | Baixa atômica de **produto/variante** no PDV (`UPDATE ... WHERE saldo >= qtd`, 409); não há baixa de insumo nem conversões |
-| RF-VR-20 | Consumo previsto, reserva e baixa real | ⬜ | Coluna `reservado` existe mas nunca é escrita |
-| RF-VR-21 | Snapshot completo em orçamento/OS | 🚧 | `preco_snapshot` JSONB gravado em venda e OS com origem, regra, vigência e explicação; ainda sem variação/opções/custo/dados fiscais |
+| RF-VR-16 | Ficha de consumo e custo de processo | 🚧 | `ficha_consumo` com vigência, insumo (produto com estoque), `quantidade_por_unidade`, `perda_percentual` e `custo_processo_unitario`; sem tabela separada de insumo/custo de processo |
+| RF-VR-17 | Custo, margem e alertas por variação | 🚧 | Cálculo determinístico de custo e margem, gravado no snapshot de venda/OS; alerta só para insumo sem custo |
+| RF-VR-18 | Estoque na variação vs no insumo | 🚧 | Insumo reaproveita `produto`/`produto_estoque`; filha acabada mantém saldo próprio; serviço ainda não gera variação |
+| RF-VR-19 | Baixa atômica | 🚧 | Baixa atômica de produto no PDV **e de insumo na OS** (`UPDATE ... WHERE saldo >= qtd`, 409 + kardex); sem conversão de unidades |
+| RF-VR-20 | Consumo previsto, reserva e baixa real | 🚧 | Previsto congelado ao entrar em produção e real baixado por endpoint idempotente; coluna `reservado` continua sem uso |
+| RF-VR-21 | Snapshot completo em orçamento/OS | 🚧 | `regra_aplicada` JSONB com origem, regra, vigência, explicação, custo e margem; ainda sem variação/opções/dados fiscais |
 | RF-VR-22 | `versao` e 409 em itens/regras/documentos | ⬜ | 409 existe para estoque/integridade; sem coluna `versao` em produto, OS ou venda |
 | RF-VR-23 | Quantidade final visível (cópias × páginas) | ⬜ | Só campo livre `dimensoes` |
 | RF-VR-24 | Catálogo mestre da matriz → filiais | 🚧 | Outbox com uuid idempotente e evento `mestre:produto`; a descida casa por `codigo`, não por uuid, e cada filial gera suas variantes localmente |
@@ -61,7 +61,7 @@ Nov 23, 2026 · @Renan Silva
 | RF-VR-27 | Assistente de agrupamento e importação de planilha | ⬜ | Sem CSV/XLSX; desktop mostra apenas "disponível na próxima etapa" |
 | RF-VR-28 | Relatórios por variação | ⬜ | Só faturamento por filial e aniversariantes |
 
-**Fases:** V0 em andamento · V1 em andamento (tabelas/regras com vigência e snapshot no documento; falta a UI de cadastro) · V2 proposta · V3 proposta · V4 proposta.
+**Fases:** V0 em andamento · V1 em andamento (falta a UI de cadastro) · V2 em andamento (fichas, custo/margem, previsto e baixa real; falta conversão de unidades e reserva) · V3 proposta · V4 proposta.
 
 ---
 
@@ -727,11 +727,11 @@ Usar os dados do **Anexo A**. Valores marcados como ilustrativos nas seções 7 
 
 ## 17. Plano de implementação em fases
 
-> **Status atual:** V0 e V1 em andamento — motor determinístico, simulador,
-> integração em venda/OS e persistência de regras com vigência já estão no
-> código; V2, V3 e V4 não iniciados (ver seção de status no início). A
-> migration da V1 ainda precisa de autorização para ser aplicada em produção.
-> As entregas abaixo permanecem como plano proposto.
+> **Status atual:** V0, V1 e V2 em andamento — motor determinístico, regras com
+> vigência e fichas de consumo já estão no código; V3 e V4 não iniciados (ver
+> seção de status no início). A migration da V2 ainda precisa de autorização
+> para ser aplicada em produção. As entregas abaixo permanecem como plano
+> proposto.
 
 | Fase | Entregas | Critério de pronto | Depende de |
 | --- | --- | --- | --- |

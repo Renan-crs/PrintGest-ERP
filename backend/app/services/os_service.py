@@ -32,7 +32,7 @@ from app.models.movimento import (
     PedidoCompraItem,
 )
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
-from app.services import adiantamento_service
+from app.services import adiantamento_service, custo_service
 from app.services.precificacao_documento import (
     gerar_snapshot,
     resolver_preco_linha,
@@ -176,6 +176,29 @@ def _totais(
     return valor_itens, _q(valor_itens - desconto)
 
 
+def _anexar_custo_ao_snapshot(
+    db: Session,
+    filial_id: int,
+    itens: list[OrdemServicoItem],
+    resolvidas: list[RegraResolvida | None],
+) -> None:
+    """V2: grava custo/margem no snapshot quando há ficha de consumo vigente."""
+    for item, resolvida in zip(itens, resolvidas):
+        if resolvida is None or item.preco_snapshot is None:
+            continue
+        custo, margem = custo_service.custo_e_margem(
+            db,
+            filial_id=filial_id,
+            produto_id=item.produto_id,
+            preco_unitario=item.valor_unitario,
+        )
+        if custo is not None:
+            item.preco_snapshot["custo_unitario"] = str(custo)
+            item.preco_snapshot["margem_bruta"] = (
+                str(margem) if margem is not None else None
+            )
+
+
 def _para_out(os: OrdemServico) -> OsOut:
     dados = {c.name: getattr(os, c.name) for c in os.__table__.columns}
     dados["cliente_nome"] = os.cliente.nome_razao if os.cliente else None
@@ -233,6 +256,7 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
         itens=dados.itens,
     )
     itens = _montar_itens(dados.itens, resolvidas)
+    _anexar_custo_ao_snapshot(db, filial_id, itens, resolvidas)
     valor_itens, valor_total = _totais(itens, dados.desconto)
     os_obj = OrdemServico(
         filial_id=filial_id,
@@ -340,6 +364,7 @@ def atualizar(
             itens=dados.itens,
         )
         os_obj.itens = _mesclar_itens(list(os_obj.itens), dados.itens, resolvidas)
+        _anexar_custo_ao_snapshot(db, filial_id, os_obj.itens, resolvidas)
     valor_itens, valor_total = _totais(os_obj.itens, desconto)
     os_obj.desconto = desconto
     os_obj.valor_itens = valor_itens
@@ -425,6 +450,17 @@ def mudar_status(
                     f"(estado da arte: {estado}). Envie a versão e registre a "
                     "aprovação na tela de Arte."
                 ),
+            )
+
+    # V2: ao entrar em produção, congela o consumo previsto dos itens que têm
+    # ficha vigente. Item avulso/sem ficha não gera nada — o status continua
+    # funcionando exatamente como antes (RF-VR-20, opt-in).
+    if novo == StatusOs.PRODUCAO:
+        from app.services import producao_service
+
+        for item in os_obj.itens:
+            producao_service.prever_consumo(
+                db, filial_id=os_obj.filial_id, item=item
             )
 
     os_obj.status = novo

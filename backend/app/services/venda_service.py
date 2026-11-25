@@ -33,7 +33,7 @@ from app.schemas.venda import (
     VendaItemOut,
     VendaOut,
 )
-from app.services import adiantamento_service, filial_service
+from app.services import adiantamento_service, custo_service, filial_service
 from app.services.precificacao_documento import (
     gerar_snapshot,
     resolver_preco_linha,
@@ -314,6 +314,21 @@ def criar(
         itens=dados.itens,
     )
     itens = _montar_itens(dados.itens, resolvidas)
+    # V2: custo/margem entram no snapshot quando há ficha de consumo vigente.
+    for item, resolvida in zip(itens, resolvidas):
+        if resolvida is None or item.preco_snapshot is None:
+            continue
+        custo, margem = custo_service.custo_e_margem(
+            db,
+            filial_id=filial_id,
+            produto_id=item.produto_id,
+            preco_unitario=item.valor_unitario,
+        )
+        if custo is not None:
+            item.preco_snapshot["custo_unitario"] = str(custo)
+            item.preco_snapshot["margem_bruta"] = (
+                str(margem) if margem is not None else None
+            )
     valor_itens, valor_total = _totais(itens, dados.desconto)
 
     cliente_nome_avulso = (dados.cliente_nome_avulso or "").strip() or None

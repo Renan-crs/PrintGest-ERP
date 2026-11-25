@@ -9,6 +9,30 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.34] - 2026-11-24 — Fichas de consumo e custo de produção (Fase V2)
+
+### Banco de dados
+- Migration aditiva `f6a7b8c9d0e1`: `ficha_consumo` e `os_item_consumo`.
+  **Aplicação em produção depende de autorização e backup** — ver
+  `docs/migration_fichas_consumo_v2.md`.
+
+### Backend
+- `GET|POST /v1/producao/fichas` (escrita GERENTE+) com vigência, perda
+  percentual e custo de processo; insumo precisa ser produto com estoque.
+- `GET /v1/producao/produtos/{id}/custo`: custo unitário, margem bruta e
+  consumo previsto por unidade.
+- Custo e margem passam a compor o `regra_aplicada` de venda/OS quando há
+  ficha vigente.
+- Consumo previsto congelado ao entrar em produção; baixa real por
+  `POST /v1/producao/os/{id}/itens/{id}/baixar-consumo`, com UPDATE atômico,
+  kardex `OrigemMov.ORDEM_SERVICO`, marcação de `executado` e guarda de
+  idempotência por `baixado_em`.
+
+### Validação
+Backend: 521 passed (12 novos testes). Mutação: 41/41 mortos.
+
+---
+
 ## [0.5.33] - 2026-11-24 — Regras de preço com vigência (Fase V1)
 
 ### Banco de dados

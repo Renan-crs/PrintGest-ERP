@@ -118,6 +118,8 @@ def gerar_snapshot(
     explicacao: list[str],
     vigencia_inicio: datetime | None = None,
     vigencia_fim: datetime | None = None,
+    custo_unitario: Decimal | None = None,
+    margem_bruta: Decimal | None = None,
 ) -> dict:
     """Congela a explicação do preço no documento (RF-VR-21)."""
     return {
@@ -130,5 +132,7 @@ def gerar_snapshot(
         "valor_total": str(total),
         "desconto": str(desconto),
         "explicacao": list(explicacao),
+        "custo_unitario": str(custo_unitario) if custo_unitario is not None else None,
+        "margem_bruta": str(margem_bruta) if margem_bruta is not None else None,
         "calculado_em": datetime.now(UTC).isoformat(),
     }

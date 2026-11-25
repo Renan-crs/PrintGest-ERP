@@ -11,6 +11,7 @@ from app.api import (
     integracoes,
     precificacao,
     plataforma,
+    producao,
     projetos,
     variacoes,
 )
@@ -36,6 +37,7 @@ plataforma.registrar(api)
 projetos.registrar(api)
 variacoes.registrar(api)
 precificacao.registrar(api)
+producao.registrar(api)
 api.include_router(movimento_router)
 api.include_router(balcao_router)
 api.include_router(estoque_router)

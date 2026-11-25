@@ -50,6 +50,7 @@ from app.models.movimento import (
 )
 from app.models.consolidacao import SyncEstado
 from app.models.precificacao import RegraPreco, TabelaPreco
+from app.models.producao import FichaConsumo, OsItemConsumo
 from app.models.plataforma import (
     BackupConfig,
     Estacao,
@@ -95,6 +96,8 @@ __all__ = [
     "PlanoContas",
     "PrecoParametro",
     "PrecoReajusteHistorico",
+    "FichaConsumo",
+    "OsItemConsumo",
     "RegraPreco",
     "TabelaPreco",
     "Produto",
