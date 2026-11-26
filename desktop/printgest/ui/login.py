@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from printgest import APP_NAME, __version__
 from printgest.core.api import Api, ApiError
+from printgest.core.notificacao import mensagem_segura
 from printgest.core.tarefas import rodar
 from printgest.ui.widgets import aplicar_estilo, badge, botao_com_atalho, estado_sucesso, estado_erro, estado_muted
 
@@ -274,6 +275,7 @@ class LoginWindow(QMainWindow):
 
         def erro(msg: str) -> None:
             self._status.setText("● Local API Service sem resposta — verifique o daemon")
+            self._status.setToolTip(mensagem_segura(msg))
             estado_erro(self._status)
 
         rodar(checar, ok, erro)

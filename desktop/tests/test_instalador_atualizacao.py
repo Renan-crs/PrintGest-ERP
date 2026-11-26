@@ -129,6 +129,29 @@ def test_gate_de_perfil_para_instalar(app, monkeypatch):
     assert operador._pode_instalar_atualizacao() is True
 
 
+def test_confirmacao_explica_atualizacao_em_modo_leitura(app, monkeypatch, tmp_path):
+    from printgest.ui.tela_principal import TelaPrincipal
+    import printgest.ui.tela_principal as modulo
+
+    monkeypatch.setattr(modulo, "modo_estacao", lambda: False)
+    tela = TelaPrincipal(
+        api=object(),
+        usuario={"id": 1, "nome": "Admin", "login": "admin", "nivel_acesso": "admin"},
+        modo_leitura=True,
+    )
+    vistos: list[str] = []
+    monkeypatch.setattr(
+        modulo.QMessageBox,
+        "question",
+        lambda _pai, _titulo, texto, *_a, **_k: vistos.append(texto)
+        or modulo.QMessageBox.StandardButton.No,
+    )
+    tela._instalar_atualizacao(dict(INFO))
+    assert vistos
+    assert "modo leitura" in vistos[0].lower()
+    assert "regularizar" in vistos[0].lower()
+
+
 def test_fluxo_completo_de_instalacao(app, monkeypatch, tmp_path):
     """Confirma → baixa → valida → dispara, sem tocar no processo real."""
     from printgest.ui.tela_principal import TelaPrincipal

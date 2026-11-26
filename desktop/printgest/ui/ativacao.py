@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 )
 
 from printgest.core.api import Api
+from printgest.core.notificacao import mensagem_segura
 from printgest.core.tarefas import rodar
 from printgest.ui.widgets import (
     EtiquetaQuebra,
@@ -644,9 +645,10 @@ class AtivacaoWindow(QMainWindow):
                 estado_erro(self._status)
             aplicar_estilo(self._status)
 
-        def erro(_) -> None:
+        def erro(msg: str) -> None:
             self._botao_testar.setEnabled(True)
             self._status.setText("Servidor local: sem resposta")
+            self._status.setToolTip(mensagem_segura(msg))
             estado_erro(self._status)
             aplicar_estilo(self._status)
 

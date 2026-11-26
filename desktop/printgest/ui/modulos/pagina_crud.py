@@ -57,6 +57,8 @@ class PaginaCrud(QWidget):
     LUGAR_BUSCA = "Buscar..."
     CAMPO_NOME = "nome_razao"
     ROTULO_EXPORTAR = "Exportar Excel"
+    # Entidade usada no DELETE. Estoque aponta para `produtos` (soft delete).
+    ENTIDADE_EXCLUIR: str | None = None
     VAZIO = "Nenhum registro encontrado. Clique em {novo} (F6)."
     # Quando True, edição/novo ocupa a área inteira e a lista cede lugar
     # (útil para formulários complexos em 1024x768).
@@ -96,6 +98,7 @@ class PaginaCrud(QWidget):
     def _instalar_atalhos(self) -> None:
         """Atalhos do cadastro: F6 = Novo, F10 = Salvar, Esc = cancelar, Ctrl+F = busca."""
         QShortcut(QKeySequence("F6"), self, self._novo)
+        QShortcut(QKeySequence("Del"), self, self._excluir)
         QShortcut(QKeySequence("F10"), self, self._salvar)
         QShortcut(QKeySequence("Esc"), self, self._limpar_form)
         atalho_busca = QShortcut(QKeySequence("Ctrl+F"), self)
@@ -130,9 +133,16 @@ class PaginaCrud(QWidget):
         )
         novo, self._btn_novo = botao_com_atalho(self.ROTULO_NOVO, "F6", papel_novo)
         exp, self._btn_exportar = botao_com_atalho(self.ROTULO_EXPORTAR, "")
+        self._btn_excluir = QPushButton("Excluir")
+        self._btn_excluir.setObjectName("btnExcluir")
+        self._btn_excluir.setToolTip("Desativar o registro selecionado (Del)")
+        self._btn_excluir.setAccessibleName("Excluir registro")
+        self._btn_excluir.setEnabled(False)
         layout.addWidget(novo)
+        layout.addWidget(self._btn_excluir)
         layout.addWidget(exp)
         self._btn_novo.clicked.connect(self._novo)
+        self._btn_excluir.clicked.connect(self._excluir)
         self._btn_exportar.clicked.connect(self._exportar)
         return caixa
 
@@ -301,6 +311,8 @@ class PaginaCrud(QWidget):
     def _aplicar_modo_leitura_acoes(self) -> None:
         for botao in (self._btn_novo, self._btn_salvar, self._btn_cancelar):
             botao.setEnabled(not self._modo_leitura)
+        # Excluir depende de seleção — habilitado em `_selecao_mudou`.
+        self._btn_excluir.setEnabled(False)
         for extra in getattr(self, "_acoes_extra", []):
             extra.setEnabled(not self._modo_leitura)
             for botao in extra.findChildren(QPushButton):
@@ -375,7 +387,51 @@ class PaginaCrud(QWidget):
         dado = self._tabela.objeto_selecionado()
         if not dado:
             return
+        self._btn_excluir.setEnabled(not self._modo_leitura)
         self._carregar_no_form(dado)
+
+    # ------------------------------------------------------------- excluir
+
+    def _excluir(self) -> None:
+        """Desativa o registro via DELETE (soft delete no backend)."""
+        if self._modo_leitura:
+            return
+        dado = self._tabela.objeto_selecionado() or {}
+        # Estoque devolve `produto_id`; os demais cadastros devolvem `id`.
+        item_id = (dado.get("id") or dado.get("produto_id")) if isinstance(dado, dict) else None
+        if item_id is None:
+            return
+        rotulo = str(
+            dado.get(self.CAMPO_NOME) or dado.get("nome") or dado.get("id") or item_id
+        )
+        resposta = QMessageBox.question(
+            self,
+            "Excluir registro",
+            f"Desativar “{rotulo}”?\n\n"
+            "O registro não será apagado — ele apenas deixa de aparecer "
+            "nas consultas e não pode ser usado em novas operações.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if resposta != QMessageBox.StandardButton.Yes:
+            return
+
+        entidade = self.ENTIDADE_EXCLUIR or self.ENTIDADE
+
+        def ok(_saida) -> None:
+            self._limpar_form()
+            self.recarregar(self._busca.texto(), 0)
+            QMessageBox.information(
+                self, "Excluir registro", "Registro desativado com sucesso."
+            )
+
+        def erro(msg: str, status: int | None = None) -> None:
+            QMessageBox.warning(
+                self, titulo_erro(status, msg, "Não foi possível excluir"),
+                mensagem_segura(msg),
+            )
+
+        tarefas.rodar(lambda: self._api.excluir(entidade, item_id), ok, erro)
 
     def _entrar_form_cheio(self) -> None:
         """Modo OS/1024px: formulário ocupa a tela inteira, lista cede lugar."""
@@ -440,6 +496,7 @@ class PaginaCrud(QWidget):
 
     def _limpar_form(self, interno: bool = False) -> None:
         self._editando_id = None
+        self._btn_excluir.setEnabled(False)
         self._form_titulo.setText(self.ROTULO_NOVO)
         for campo in self._campos():
             if isinstance(campo, CampoCheck):

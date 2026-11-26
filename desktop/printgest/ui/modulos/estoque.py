@@ -98,6 +98,8 @@ class PaginaEstoqueBase(PaginaCrud):
     """Consulta de saldos usada pelas telas 4.1 (gestão) e 4.2 (movimento)."""
 
     ENTIDADE = "estoque"
+    # Não existe DELETE /v1/estoque: exclusão desativa o produto do catálogo.
+    ENTIDADE_EXCLUIR = "produtos"
     ROTULO_PAGINA = "Gestão de Estoque & Bobinas"
     ROTULO_NOVO = "Novo lançamento"
     ROTULO_EXPORTAR = "Exportar CSV"

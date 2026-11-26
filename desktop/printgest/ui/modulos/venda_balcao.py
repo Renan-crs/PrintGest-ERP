@@ -2119,10 +2119,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                 aplicar_estilo(self._lbl_estado_caixa)
             self._aplicar_bloqueio_caixa(fechado)
 
-        def erro(_msg) -> None:
+        def erro(msg) -> None:
             # Sem resposta do daemon: o estado fica como está — quem bloqueia
-            # é o servidor (409 com a mensagem clara no Finalizar).
-            pass
+            # é o servidor (409 com a mensagem clara no Finalizar). Ainda assim
+            # o motivo fica disponível no tooltip, sem modal no meio da venda.
+            self._lbl_estado_caixa.setToolTip(mensagem_segura(msg))
 
         tarefas.rodar(self._api.caixa_atual, ok, erro)
 

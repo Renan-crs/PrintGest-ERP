@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import logging
 import socket
 from datetime import datetime, timezone
 
@@ -239,14 +240,8 @@ class PaginaInicial(QWidget):
         saudacao.setObjectName("titulo")
         layout.addWidget(saudacao)
 
-        if modo_leitura:
-            aviso = QLabel(
-                "Licença sem renovação — sistema em modo leitura (consultas "
-                "apenas, escrita e emissão fiscal bloqueadas)."
-            )
-            aviso.setObjectName("bannerLeitura")
-            aviso.setWordWrap(True)
-            layout.addWidget(aviso)
+        # O aviso de modo leitura existe UMA vez, no topo da janela (fora do
+        # QStackedWidget). Antes era duplicado aqui dentro da página Início.
 
         # Alerta de conexão — só aparece quando o servidor local falha (o card
         # "Status operacional" foi removido do Início para não duplicar info).
@@ -787,7 +782,9 @@ class PaginaInicial(QWidget):
             self.navegar.emit(destino)
 
     def _status_conexao(self, conectado: bool) -> None:
-        if conectado or self._modo_leitura:
+        # Em modo leitura o daemon local ainda é necessário para consultas:
+        # esconder a falha aqui deixava o operador sem explicação.
+        if conectado:
             self._alerta_conexao.setVisible(False)
         else:
             self._alerta_conexao.setText(
@@ -943,8 +940,11 @@ class TelaPrincipal(QMainWindow):
         self._coluna_raiz = coluna
         self._banner_atualizacao: NotificacaoAtualizacao | None = None
 
-        if modo_leitura:
-            coluna.addWidget(self._banner_modo_leitura())
+        # Banner único de modo leitura — sempre no layout, oculto por padrão.
+        # Criado uma vez para poder aparecer quando a licença mudar em runtime.
+        self._banner_leitura = self._banner_modo_leitura()
+        self._banner_leitura.setVisible(False)
+        coluna.addWidget(self._banner_leitura)
 
         # Banner não bloqueante do estado `tolerancia` (doc de integração §9.3):
         # fica oculto por padrão e o layout ignora widget oculto.
@@ -969,6 +969,8 @@ class TelaPrincipal(QMainWindow):
         # Última situação conhecida da licença (o banner de tolerância e o
         # indicador vivem dela mesmo quando o daemon local não responde).
         self._situacao_licenca: dict = {}
+        self._watchdog_em_curso = False
+        self._sincronizar_modo_leitura()
 
         # Countdown do banner: recompõe o texto/dia a cada minuto, sem rede — a
         # situação é reconsultada pelo `_timer_licenca_refresh` (5 min).
@@ -1043,10 +1045,19 @@ class TelaPrincipal(QMainWindow):
                 "Somente gerência pode atualizar o servidor da gráfica.",
             )
             return
+        # M2: em modo leitura a atualização continua disponível — ela é o
+        # caminho para regularizar a licença — mas isso fica explícito.
+        aviso_leitura = (
+            "O sistema está em modo leitura; a atualização pode regularizar "
+            "a licença ao reconsultar o servidor.\n\n"
+            if self._modo_leitura
+            else ""
+        )
         resposta = QMessageBox.question(
             self,
             "Atualizar PrintGest",
             f"Instalar a versão {informacoes.get('versao_nova', '')}?\n\n"
+            f"{aviso_leitura}"
             "O programa será fechado e reaberto automaticamente. "
             "O instalador não é assinado — o Windows pode exibir um aviso "
             "do SmartScreen; nesse caso, confirme a execução.\n\n"
@@ -1256,12 +1267,28 @@ class TelaPrincipal(QMainWindow):
 
     def _sem_licenca(self, msg) -> None:
         self._pintar_licenca({})
+        # Motivo da falha de consulta disponível no indicador, sem modal.
+        self._lbl_licenca.setToolTip(mensagem_segura(msg))
+
+    def _sincronizar_modo_leitura(self) -> None:
+        """Banner/estado acompanham a licença mesmo quando muda após o boot."""
+        sit = self._situacao_licenca or {}
+        em_leitura = sit.get("modo_leitura") is True or sit.get("estado") in (
+            "leitura",
+            "revogada",
+        )
+        if em_leitura:
+            # Nunca reativa escritas automaticamente se o usuário entrou em
+            # "Continuar em Modo Consulta" — apenas agrava para leitura.
+            self._modo_leitura = True
+        self._banner_leitura.setVisible(bool(self._modo_leitura))
 
     def _pintar_licenca(self, sit: dict) -> None:
         if sit:
             # Guarda a última situação conhecida: se o daemon local não responder,
             # o indicador e o banner de tolerância não "somem" da tela.
             self._situacao_licenca = sit
+        self._sincronizar_modo_leitura()
         self._detalhe_licenca = self._detalhe_texto(sit, self._modo_leitura)
         self._lbl_licenca.setText(self._texto_indicador_licenca(sit, self._modo_leitura))
         self._lbl_licenca.setProperty(
@@ -1386,6 +1413,7 @@ class TelaPrincipal(QMainWindow):
         linha.setContentsMargins(24, 8, 24, 8)
         linha.setSpacing(10)
         titulo = QLabel("Sistema em modo leitura — apenas consultas")
+        titulo.setObjectName("bannerLeitura")
         titulo.setStyleSheet("font-weight: 700; font-size: 13px;")
         linha.addWidget(titulo)
         linha.addWidget(badge("Escritas bloqueadas", "atencao"))
@@ -1668,7 +1696,7 @@ class TelaPrincipal(QMainWindow):
         rodar(
             self._api.testar_comunicacao,
             on_ok=self._pintar_conexao,
-            on_erro=lambda _msg: self._pintar_conexao(False),
+            on_erro=self._daemon_offline,
         )
 
     def _pintar_conexao(self, ok: bool) -> None:
@@ -1682,6 +1710,40 @@ class TelaPrincipal(QMainWindow):
         else:
             estado_erro(self._lbl_conexao)
             estado_erro(self._lbl_servidor)
+
+    # ------------------------------------------------------------ watchdog
+
+    def _daemon_offline(self, msg: str) -> None:
+        """Tenta reanimar o daemon local; em estação não há daemon para subir."""
+        self._pintar_conexao(False)
+        if modo_estacao() or self._watchdog_em_curso:
+            return
+        self._watchdog_em_curso = True
+        rodar(
+            self._tentar_reanimar_daemon,
+            on_ok=self._watchdog_ok,
+            on_erro=self._watchdog_erro,
+        )
+
+    @staticmethod
+    def _tentar_reanimar_daemon() -> bool:
+        from printgest.core import daemon
+
+        return daemon.garantir(segundos=30.0)
+
+    def _watchdog_ok(self, ok: bool) -> None:
+        self._watchdog_em_curso = False
+        self._pintar_conexao(bool(ok))
+        if not ok:
+            logging.getLogger("printgest.desktop").warning(
+                "Watchdog: daemon não respondeu após tentativa de reinício."
+            )
+
+    def _watchdog_erro(self, msg: str) -> None:
+        self._watchdog_em_curso = False
+        logging.getLogger("printgest.desktop").warning(
+            "Watchdog falhou: %s", mensagem_segura(msg)
+        )
 
     # ------------------------------------------------------------ navegação
 

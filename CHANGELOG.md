@@ -9,6 +9,31 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.39] - 2026-11-26 — Exclusão nas telas de cadastro e notificações remanescentes
+
+### Desktop — exclusão
+- Botão **Excluir** (tecla Del) em `PaginaCrud`, disponível em produtos,
+  serviços, clientes, fornecedores e estoque. Confirmação explica que é
+  **soft delete** (desativa, não apaga). Desabilitado em modo leitura e sem
+  seleção. Estoque chama `DELETE /v1/produtos/{id}` (escolha do usuário).
+
+### Desktop — notificações (M1/M2/M3)
+- Banner de modo leitura único no topo, reativo a mudança da licença em runtime;
+  falha do daemon local deixa de ser silenciada em modo leitura.
+- Confirmação de atualização explicita o modo leitura (a atualização continua
+  disponível para regularizar a licença).
+- Motivos antes descartados agora aparecem em tooltips (licença, ativação,
+  login e consulta de caixa no PDV).
+
+### Desktop — inicialização
+- Watchdog: ao detectar daemon offline, tenta reanimá-lo uma vez por ciclo
+  (30 s); em estação não tenta. Falha de boot agora loga ERROR e avisa.
+
+### Validação
+Desktop: 544 passed, 4 xfailed. Mutação: 60/60 mortos (9 novos).
+
+---
+
 ## [0.5.38] - 2026-11-25 — Acessibilidade de notificações (M4/M5)
 
 ### Desktop

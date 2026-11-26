@@ -47,7 +47,12 @@ def _carregar_env_do_executavel(caminho: Path | None = None) -> None:
         caminho = Path(sys.executable).resolve().parent / ".env"
     try:
         linhas = caminho.read_text(encoding="utf-8-sig").splitlines()
-    except OSError:
+    except OSError as exc:
+        logging.getLogger("printgest.desktop").warning(
+            "Não foi possível ler %s: %s — usando variáveis de ambiente.",
+            caminho,
+            type(exc).__name__,
+        )
         return
     for linha in linhas:
         chave, separador, valor = linha.strip().partition("=")
@@ -420,8 +425,21 @@ def _preparar_daemon(app: QApplication) -> None:
     espera.setWindowModality(Qt.WindowModality.WindowModal)
     espera.setMinimumDuration(0)
     espera.show()
-    daemon.garantir(a_cada_iteracao=app.processEvents)
+    pronto = daemon.garantir(a_cada_iteracao=app.processEvents)
     espera.close()
+    if not pronto:
+        # Antes o retorno era descartado e o boot seguia como se nada tivesse
+        # acontecido — o primeiro erro virava um diálogo genérico de licença.
+        logging.getLogger("printgest.desktop").error(
+            "Falha ao iniciar o Local API Service no boot (ver logs/printgest.log)."
+        )
+        QMessageBox.warning(
+            None,
+            "Serviço local",
+            "Não foi possível iniciar o serviço local do PrintGest.\n\n"
+            "Consulte logs/printgest.log. O programa será aberto, mas as "
+            "operações podem falhar até que o serviço seja restabelecido.",
+        )
 
 
 def main() -> None:
