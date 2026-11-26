@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
     QCompleter,
     QFileDialog,
@@ -47,6 +47,7 @@ from printgest.ui.formulario import (
     CampoTexto,
     CampoValor,
     data_iso,
+    em_volta,
     formatar_data_iso,
     formatar_moeda,
     limpo,
@@ -70,10 +71,29 @@ from printgest.ui.widgets import (
 )
 
 
+class _MenuAcima(QToolButton):
+    """Menu do rodapé: abre acima e alinhado à direita do botão."""
+
+    def showMenu(self) -> None:  # noqa: N802 - API do Qt
+        menu = self.menu()
+        if menu is None:
+            return
+        origem = self.mapToGlobal(QPoint(0, 0))
+        largura = max(menu.sizeHint().width(), self.width())
+        menu.popup(
+            QPoint(
+                origem.x() + self.width() - largura,
+                origem.y() - menu.sizeHint().height(),
+            )
+        )
+
+
 # ------------------------------------------------------- diálogo de cotações
 
 _COTACAO_CHAVES = ["fornecedor_nome", "vf", "prazo_dias", "validade", "selecionada"]
-_COTACAO_ROTULOS = ["Fornecedor", "VF", "Prazo (dias)", "Validade", "✓"]
+_COTACAO_ROTULOS = [
+    "Fornecedor", "Valor fornecedor", "Prazo (dias)", "Validade", "Selecionada"
+]
 
 
 class DialogoCotacoes(QDialog):
@@ -132,8 +152,9 @@ class DialogoCotacoes(QDialog):
         form.setHorizontalSpacing(12)
         form.setVerticalSpacing(8)
 
-        rotulo_form = QLabel("Lançar cotação")
+        rotulo_form = QLabel("Nova cotação")
         rotulo_form.setObjectName("secaoForm")
+        rotulo_form.setToolTip("VF = valor do fornecedor · CP = custo interno · VO = valor de venda")
         form.addWidget(rotulo_form, 0, 0, 1, 2)
 
         self._campo_fornecedor = CampoCombo("Fornecedor", [])
@@ -143,17 +164,28 @@ class DialogoCotacoes(QDialog):
         self._campo_obs = CampoTexto("Observações", maximo=200)
         self._check_selecionar = CampoCheck("Selecionar esta cotação")
 
-        form.addWidget(self._campo_fornecedor.rotulo_widget, 1, 0)
-        form.addWidget(self._campo_fornecedor.widget, 1, 0)
-        form.addWidget(self._campo_vf.rotulo_widget, 1, 1)
-        form.addWidget(self._campo_vf.widget, 1, 1)
-        form.addWidget(self._campo_prazo.rotulo_widget, 2, 0)
-        form.addWidget(self._campo_prazo.widget, 2, 0)
-        form.addWidget(self._campo_validade.rotulo_widget, 2, 1)
-        form.addWidget(self._campo_validade.widget, 2, 1)
-        form.addWidget(self._campo_obs.rotulo_widget, 3, 0)
-        form.addWidget(self._campo_obs.widget, 3, 0)
-        form.addWidget(self._check_selecionar.widget, 3, 1)
+        # Rótulo acima do controle em cada célula (em_volta evita sobreposição).
+        form.addWidget(em_volta(self._campo_fornecedor), 1, 0)
+        form.addWidget(em_volta(self._campo_vf), 1, 1)
+        form.addWidget(em_volta(self._campo_prazo), 2, 0)
+        form.addWidget(em_volta(self._campo_validade), 2, 1)
+        form.addWidget(em_volta(self._campo_obs), 3, 0)
+        form.addWidget(self._check_selecionar.widget, 3, 1,
+                       Qt.AlignmentFlag.AlignBottom)
+
+        self._campo_fornecedor.widget.setPlaceholderText("Selecione o fornecedor")
+        self._campo_fornecedor.widget.setToolTip("Fornecedor que enviou esta cotação")
+        self._campo_vf.edicao.setPlaceholderText("0,00")
+        self._campo_vf.edicao.setToolTip(
+            "Valor do fornecedor (VF), antes do mark-up e dos custos internos"
+        )
+        self._campo_prazo.widget.setPlaceholderText("Ex.: 5")
+        self._campo_prazo.widget.setToolTip("Prazo de entrega em dias")
+        self._campo_validade._data.setToolTip("Data em que a cotação expira")
+        self._campo_validade._sem.setToolTip(
+            "Sem data: a cotação não expira (desmarque para informar a validade)"
+        )
+        self._campo_obs.widget.setPlaceholderText("Opcional")
         root.addWidget(card)
 
         # --- botões
@@ -195,6 +227,7 @@ class DialogoCotacoes(QDialog):
         item_id = self._item.get("id")
         if not item_id:
             self._lbl_estado.setText("Salve o orçamento antes de gerenciar cotações.")
+            self._tabela.estado_vazio("Salve o orçamento para lançar cotações.")
             self._tabela.setEnabled(False)
             self._btn_lancar.setEnabled(False)
             self._btn_selecionar.setEnabled(False)
@@ -226,7 +259,9 @@ class DialogoCotacoes(QDialog):
             self._lbl_estado.setText("✓ Item cotado — cotação selecionada define o valor.")
             estado_sucesso(self._lbl_estado)
         elif estado == "aguardando":
-            self._lbl_estado.setText("⚠ Item aguardando cotação — selecione uma para aprovar.")
+            self._lbl_estado.setText(
+                "⚠ Item aguardando cotação — lance uma abaixo e selecione a aprovada."
+            )
             estado_atencao(self._lbl_estado)
         else:
             self._lbl_estado.setText("")
@@ -245,6 +280,9 @@ class DialogoCotacoes(QDialog):
                 "selecionada": "✓" if c.get("selecionada") else "",
             })
         self._tabela.preencher(linhas)
+        self._tabela.estado_vazio(
+            "Nenhuma cotação lançada — use o formulário abaixo." if not linhas else ""
+        )
         self._tabela.setEnabled(True)
 
         # snapshot
@@ -706,6 +744,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._valor_sinal = CampoValor("Sinal (valor)")
         self._forma_sinal = CampoCombo("Forma do Sinal", FORMAS_PAGAMENTO)
         self._desconto = CampoValor("Desconto")
+        self._valor_sinal.edicao.setPlaceholderText("0,00")
+        self._desconto.edicao.setPlaceholderText("0,00")
         self._obs = CampoArea("Observações", linhas=2)
         self._pagamento_confirmado = CampoCheck("Pagamento já recebido")
         self._itens = GradeItens("", api=self._api)
@@ -734,40 +774,90 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._btn_novo_cliente = QPushButton("Novo cliente")
         self._btn_novo_cliente.setObjectName("acaoLinha")
         self._btn_novo_cliente.clicked.connect(self._novo_cliente_inline)
+        # Esquerda: cliente + ação inline + opção de cadastro rápido.
         cliente_widget = QWidget()
-        linha_cli = QHBoxLayout(cliente_widget)
-        linha_cli.setContentsMargins(0, 0, 0, 0)
+        coluna_cliente = QVBoxLayout(cliente_widget)
+        coluna_cliente.setContentsMargins(0, 0, 0, 0)
+        coluna_cliente.setSpacing(4)
+        linha_cli = QHBoxLayout()
         linha_cli.setSpacing(6)
         linha_cli.addWidget(self._cliente.widget, 1)
         linha_cli.addWidget(self._btn_novo_cliente)
+        coluna_cliente.addLayout(linha_cli)
+        coluna_cliente.addWidget(self._salvar_novo_cliente.widget)
+        cliente_widget.setFocusProxy(self._cliente.widget)
+
+        # Direita: telefone e e-mail empilhados, lado a lado com o cliente.
+        contato_widget = QWidget()
+        coluna_contato = QVBoxLayout(contato_widget)
+        coluna_contato.setContentsMargins(0, 0, 0, 0)
+        coluna_contato.setSpacing(4)
+        for campo in (self._telefone_cliente, self._email_cliente):
+            if campo.rotulo_widget is not None:
+                coluna_contato.addWidget(campo.rotulo_widget)
+            coluna_contato.addWidget(campo.widget)
 
         class _CampoClienteWrap:
             largo = False
-            def __init__(self, campo, widget):
+
+            def __init__(self, campo, widget, botao, check):
                 self._campo = campo
+                self._botao = botao
+                self._check = check
                 self.rotulo_widget = campo.rotulo_widget
                 self.widget = widget
+
             def valor(self):
                 return self._campo.valor()
+
             def definir(self, v):
-                return self._campo.definir(v)
+                self._campo.definir(v)
+                self._check.definir(False)
+
             def habilitar(self, ligado: bool):
                 self._campo.habilitar(ligado)
-                self.widget.setEnabled(ligado)
+                self._botao.setEnabled(ligado)
+                self._check.habilitar(ligado)
+
             def obrigatorio(self):
                 self._campo.obrigatorio()
                 return self
 
-        self._cliente_campo = _CampoClienteWrap(self._cliente, cliente_widget)
+        class _CampoContatoWrap:
+            largo = False
+            rotulo_widget = None  # os rótulos já estão dentro do composite
+
+            def __init__(self, campos, widget):
+                self._campos = campos
+                self.widget = widget
+
+            def valor(self):
+                return None
+
+            def definir(self, _v):
+                for campo in self._campos:
+                    campo.definir(None)
+
+            def habilitar(self, ligado: bool):
+                for campo in self._campos:
+                    campo.habilitar(ligado)
+
+        self._cliente_campo = _CampoClienteWrap(
+            self._cliente,
+            cliente_widget,
+            self._btn_novo_cliente,
+            self._salvar_novo_cliente,
+        )
+        self._contato_campo = _CampoContatoWrap(
+            (self._telefone_cliente, self._email_cliente), contato_widget
+        )
 
         return [
             (
                 "Cliente & Equipe",
                 [
                     self._cliente_campo,
-                    self._telefone_cliente,
-                    self._email_cliente,
-                    self._salvar_novo_cliente,
+                    self._contato_campo,
                     self._vendedor,
                     self._atendente,
                 ],
@@ -791,10 +881,22 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         self._cliente.combo.currentIndexChanged.connect(self._ao_mudar_cliente_os)
         # Ao selecionar um cliente, preenche telefone/e-mail (e desmarca "novo").
         self._cliente.combo.currentIndexChanged.connect(self._cliente_selecionado_os)
+        # Nome digitado sem correspondência ⇒ sugerir explicitamente o cadastro
+        # de cliente novo (o campo mostra o texto, mas nenhum id está selecionado).
+        self._cliente.correspondencia_mudou.connect(self._cliente_correspondencia_mudou)
         self._desconto.edicao.textChanged.connect(self._atualizar_totais_os)
         if hasattr(self._valor_sinal, "edicao"):
             self._valor_sinal.edicao.textChanged.connect(self._atualizar_totais_os)
         self._itens.alterado.connect(self._atualizar_totais_os)
+
+    def _cliente_correspondencia_mudou(self, sem_correspondencia: bool) -> None:
+        # Registro existente pode ter cliente avulso legítimo: não transformar
+        # a busca em cadastro novo sem autorização explícita do operador.
+        if self._editando_id is not None:
+            return
+        self._salvar_novo_cliente.definir(
+            bool(sem_correspondencia and self._cliente.texto)
+        )
 
     def _ao_mudar_cliente_os(self) -> None:
         self._cliente_mudou()
@@ -872,6 +974,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     def _rodape_pos_acoes(self, layout: QHBoxLayout) -> None:
         # P0#2 (refino): totais fixos no rodapé do formulário.
         self._lbl_totais_os = QLabel("Itens R$ 0,00 · Desconto R$ 0,00 · Total R$ 0,00")
+        self._lbl_totais_os.setObjectName("resumoFinanceiro")
         estado_muted(self._lbl_totais_os)
         self._lbl_totais_os.setWordWrap(True)
         self._lbl_totais_os.setToolTip(
@@ -921,9 +1024,10 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         except Exception:
             saldo_txt = ""
         self._lbl_totais_os.setText(
-            f"Itens {formatar_moeda(str(subtotal))} · "
-            f"Desconto {formatar_moeda(str(desconto))} · "
-            f"Total {formatar_moeda(str(total))}{saldo_txt}"
+            f"Itens {formatar_moeda(str(subtotal))} &nbsp;·&nbsp; "
+            f"Desconto {formatar_moeda(str(desconto))} &nbsp;·&nbsp; "
+            f'<span style="color:#0071E3; font-weight:700">'
+            f"Total {formatar_moeda(str(total))}</span>{saldo_txt}"
         )
 
     def _padroes_do_form(self) -> None:
@@ -1172,10 +1276,27 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
 
     def _salvar(self) -> None:
         """Cria o cliente marcado como novo antes de salvar a O.S./Orçamento."""
-        if not self._salvar_novo_cliente.valor() or self._cliente.valor() is not None:
+        nome = self._cliente.texto
+        sem_cliente = self._cliente.valor() is None
+        # Cadastro rápido: se o operador digitou nome/contato mas não marcou o
+        # checkbox, pergunta na hora de salvar (evita o clique extra no formulário).
+        if (
+            self._editando_id is None
+            and sem_cliente
+            and nome
+            and not self._salvar_novo_cliente.valor()
+        ):
+            resposta = QMessageBox.question(
+                self,
+                "Cliente",
+                f'Cadastrar “{nome}” como novo cliente?\n\n'
+                "Escolha “Não” para salvar com cliente avulso.",
+            )
+            if resposta == QMessageBox.StandardButton.Yes:
+                self._salvar_novo_cliente.definir(True)
+        if not self._salvar_novo_cliente.valor() or not sem_cliente:
             super()._salvar()
             return
-        nome = self._cliente.texto
         if not nome:
             QMessageBox.warning(
                 self, "Cliente", "Informe o nome do cliente ou desmarque 'Salvar como novo'."
@@ -1404,37 +1525,59 @@ class PaginaOrcamento(PaginaOS):
         layout.setSpacing(6)
 
         converter, self._btn_converter = botao_com_atalho(
-            "Converter em O.S.", "F9", "primary"
+            "Converter em O.S.", "F9", "secondary"
         )
         self._btn_converter.clicked.connect(self._converter_em_os)
+        self._widget_converter = converter
         layout.addWidget(converter)
 
         # Sem dica de atalho: F10 já é de "Salvar" no rodapé (botão_com_atalho
         # só desenha a dica, não instala QShortcut — a duplicata confundia).
         cotacoes, self._btn_cotacoes = botao_com_atalho("Cotações", "")
         self._btn_cotacoes.clicked.connect(self._abrir_cotacoes)
+        self._widget_cotacoes = cotacoes
         cancelar, self._btn_cancelar_os = botao_com_atalho(
             "Cancelar Orçamento", "F8"
         )
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
+        self._em_formulario = False
         for oculto in (cotacoes, cancelar):
             oculto.setVisible(False)
             layout.addWidget(oculto)
 
-        btn_mais = QToolButton()
+        btn_mais = _MenuAcima()
         btn_mais.setText("Mais ações")
         btn_mais.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         btn_mais.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         menu = QMenu(btn_mais)
-        act_cot = menu.addAction("Cotações")
-        act_cot.triggered.connect(self._btn_cotacoes.click)
+        self._act_cot = menu.addAction("Cotações")
+        self._act_cot.triggered.connect(self._btn_cotacoes.click)
         menu.addSeparator()
-        act_cancelar = menu.addAction("Cancelar orçamento")
-        act_cancelar.triggered.connect(self._btn_cancelar_os.click)
+        self._act_cancelar = menu.addAction("Cancelar orçamento")
+        self._act_cancelar.triggered.connect(self._btn_cancelar_os.click)
+        self._act_cot.setVisible(False)  # na lista não há item selecionado na grade
         btn_mais.setMenu(menu)
         layout.addWidget(btn_mais)
         self._btn_mais_acoes = btn_mais
         return [container]
+
+    def _conectar_campos(self) -> None:
+        super()._conectar_campos()
+        self._itens.selecao_alterada.connect(self._atualizar_botao_cotacoes)
+
+    def _sincronizar_acoes_form(self, em_formulario: bool) -> None:
+        """Converter/cancelar agem sobre a lista; Cotações agem sobre o item."""
+        self._em_formulario = em_formulario
+        self._widget_converter.setVisible(not em_formulario)
+        self._act_cancelar.setVisible(not em_formulario)
+        self._act_cot.setVisible(em_formulario)
+        self._atualizar_botao_cotacoes()
+
+    def _atualizar_botao_cotacoes(self) -> None:
+        item = self._itens.item_selecionado
+        fornecedor = bool(item) and (item.get("tipo") or "proprio") == "fornecedor"
+        self._btn_cotacoes.setEnabled(fornecedor)
+        self._widget_cotacoes.setVisible(self._em_formulario and fornecedor)
 
     def _abrir_cotacoes(self) -> None:
         """Diálogo de cotações para o item de fornecedor selecionado na grade."""

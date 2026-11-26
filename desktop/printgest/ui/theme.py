@@ -174,6 +174,7 @@ QPushButton[role="error"]:hover { background-color: %surface-muted%; border-radi
 /* Tipografia óptica: tracking negativo no título, neutro no corpo (§15). */
 QLabel#titulo { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 QLabel#subtitulo { color: %texto-muted%; font-size: 13px; }
+QLabel#resumoFinanceiro { font-size: 12px; }
 QLabel#labelForm { font-size: 11px; font-weight: 600; color: %texto-muted%; letter-spacing: 0.02em; }
 
 QLineEdit, QDateEdit, QTimeEdit, QSpinBox, QDoubleSpinBox {

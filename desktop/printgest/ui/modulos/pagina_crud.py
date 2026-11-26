@@ -125,7 +125,10 @@ class PaginaCrud(QWidget):
         for badge_extra in self._badges_barra():
             layout.addWidget(badge_extra)
 
-        novo, self._btn_novo = botao_com_atalho(self.ROTULO_NOVO, "F6", "primary")
+        papel_novo = (
+            "secondary" if getattr(self, "TIPO", None) == "orcamento" else "primary"
+        )
+        novo, self._btn_novo = botao_com_atalho(self.ROTULO_NOVO, "F6", papel_novo)
         exp, self._btn_exportar = botao_com_atalho(self.ROTULO_EXPORTAR, "")
         layout.addWidget(novo)
         layout.addWidget(exp)
@@ -382,6 +385,7 @@ class PaginaCrud(QWidget):
         self._barra_busca_widget.setVisible(False)
         self._painel_lista.setVisible(False)
         self._painel_direito.setVisible(True)
+        self._sincronizar_acoes_form(True)
 
     def _sair_form_cheio(self) -> None:
         if not self.FORM_EM_TELA_CHEIA:
@@ -390,6 +394,10 @@ class PaginaCrud(QWidget):
         self._barra_busca_widget.setVisible(True)
         self._painel_lista.setVisible(True)
         self._painel_direito.setVisible(False)
+        self._sincronizar_acoes_form(False)
+
+    def _sincronizar_acoes_form(self, em_formulario: bool) -> None:
+        """Hook: páginas com ações de lista ajustam o rodapé ao trocar de modo."""
 
     def _voltar_para_lista(self) -> None:
         self._limpar_form()

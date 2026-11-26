@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from PySide6.QtCore import QDate, QTime, Qt, QTimer
+from PySide6.QtCore import QDate, QObject, QTime, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -456,6 +456,12 @@ class CampoCombo(CampoForm):
         self._combo.blockSignals(False)
 
 
+class _SinaisCliente(QObject):
+    """Portador do sinal de correspondência (CampoForm não é QObject)."""
+
+    correspondencia_mudou = Signal(bool)
+
+
 class CampoClienteAutocomplete(CampoForm):
     """Combo de cliente com busca remota (debounce) e autopreenchimento.
 
@@ -478,6 +484,7 @@ class CampoClienteAutocomplete(CampoForm):
         super().__init__(rotulo)
         self._api = api
         self._obrigatorio = obrigatorio
+        self._sinais = _SinaisCliente()
         self._combo = QComboBox()
         self._combo.setEditable(True)
         self._combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
@@ -563,6 +570,15 @@ class CampoClienteAutocomplete(CampoForm):
         """Acesso direto ao combo (para conectar sinais na tela)."""
         return self._combo
 
+    @property
+    def correspondencia_mudou(self):
+        """Emite True quando o texto não casa com cliente cadastrado."""
+        return self._sinais.correspondencia_mudou
+
+    def _sem_correspondencia(self, valor: bool) -> None:
+        self.sem_correspondencia = valor
+        self._sinais.correspondencia_mudou.emit(valor)
+
     # Delegados usados por testes/código legado que tratavam `widget` como combo.
     def count(self) -> int:
         return self._combo.count()
@@ -594,6 +610,7 @@ class CampoClienteAutocomplete(CampoForm):
     def definir(self, valor) -> None:
         idx = self._combo.findData(valor)
         self._combo.setCurrentIndex(idx)
+        self._sem_correspondencia(False)
 
     @property
     def texto(self) -> str:
@@ -619,7 +636,7 @@ class CampoClienteAutocomplete(CampoForm):
 
     def _agendar(self, _texto: str = "") -> None:
         self._selecionado = None
-        self.sem_correspondencia = False
+        self._sem_correspondencia(False)
         if len(self.texto) < self.MIN_CARACTERES:
             self._timer.stop()
             self._dica.setText("")
@@ -631,7 +648,8 @@ class CampoClienteAutocomplete(CampoForm):
         from printgest.ui.widgets import estado_atencao, estado_muted
 
         self.estado_mensagem = mensagem
-        self._dica.setText(f"• {mensagem}" if mensagem else "")
+        prefixo = "⚠" if papel == "atencao" else "•"
+        self._dica.setText(f"{prefixo} {mensagem}" if mensagem else "")
         (estado_atencao if papel == "atencao" else estado_muted)(self._dica)
 
     def _buscar(self) -> None:
@@ -660,19 +678,23 @@ class CampoClienteAutocomplete(CampoForm):
                 # resultado — caso contrário o texto é um cliente AVULSO que
                 # casou parcialmente e deve ser preservado (edição de O.S./OS).
                 if nome.casefold().startswith(termo.casefold()):
-                    self.sem_correspondencia = False
                     self._combo.blockSignals(True)
                     self._combo.setCurrentIndex(0)
                     self._combo.blockSignals(False)
                     self._selecionado = self._clientes.get(self.valor())
                     self._combo.setEditText(nome)
+                    self._sem_correspondencia(False)
                 else:
                     self._selecionado = None
                     self._combo.setEditText(termo)
-                    self.sem_correspondencia = True
+                    self._sem_correspondencia(True)
             else:
-                self._estado("Nenhum cliente — salve como novo", "atencao")
-                self.sem_correspondencia = True
+                self._estado(
+                    f'“{termo}”: nenhum cliente encontrado — '
+                    'marque “Salvar como novo cliente”.',
+                    "atencao",
+                )
+                self._sem_correspondencia(True)
 
         def erro(_msg: str, _status: int | None = None) -> None:
             if geracao != self._geracao:
@@ -690,7 +712,7 @@ class CampoClienteAutocomplete(CampoForm):
         self._selecionado = self._clientes.get(cid) if cid is not None else None
         if self._selecionado is not None:
             self._estado("Cliente encontrado", "muted")
-            self.sem_correspondencia = False
+            self._sem_correspondencia(False)
 
     def habilitar(self, ligado: bool) -> None:
         super().habilitar(ligado)

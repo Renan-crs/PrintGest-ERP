@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QPushButton
 
 from printgest.core.api import Api
@@ -116,6 +117,79 @@ def test_grade_payload_inclui_tipo(app):
 
 
 # ------------------------------------------------------- DialogoCotacoes
+
+
+def test_valor_unitario_editavel_direto_na_grade(app):
+    grade = GradeItens(api=_api())
+    grade.definir([{
+        "id": 10, "tipo": "proprio", "descricao_avulsa": "Impressão",
+        "quantidade": "2", "valor_unitario": "10", "desconto": "0",
+    }])
+
+    celula = grade._tabela.item(0, 5)
+    assert celula.flags() & Qt.ItemFlag.ItemIsEditable
+    celula.setText("12,50")
+
+    assert grade.valor()[0]["valor_unitario"] == "12.50"
+    assert not grade._tabela.item(0, 2).flags() & Qt.ItemFlag.ItemIsEditable
+
+
+def test_item_aguardando_cotacao_tem_aviso_visual(app):
+    grade = GradeItens(api=_api())
+    grade._check_fornecedor.setChecked(True)
+    grade._descricao.setText("Adesivo Vinil")
+    grade._adicionar()
+
+    assert "⚠" in grade._linhas_display()[0]["tipo"]
+    assert not grade._aviso_pendente.isHidden()
+    assert "cotação" in grade._aviso_pendente.text().lower()
+
+
+def test_dialogo_explica_campos_e_abrevia_vf(app):
+    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
+
+    assert dialogo._tabela.horizontalHeaderItem(1).text() == "Valor fornecedor"
+    assert "Sem data" in dialogo._campo_validade._sem.toolTip()
+    assert "fornecedor" in dialogo._campo_vf.edicao.toolTip().lower()
+
+
+def test_selecao_de_item_abre_formulario_de_edicao(app):
+    grade = GradeItens(api=_api())
+    grade.definir([{
+        "id": 10, "tipo": "proprio", "descricao_avulsa": "Impressão",
+        "quantidade": "2", "valor_unitario": "10", "desconto": "0",
+    }])
+    grade._tabela.selectRow(0)
+
+    assert grade._btn_adicionar.text() == "Salvar item"
+    assert not grade._btn_cancelar_edicao.isHidden()
+    assert grade._unit.text() == "10"
+
+    grade._unit.setText("12")
+    grade._adicionar()
+
+    assert len(grade.valor()) == 1
+    assert grade.valor()[0]["valor_unitario"] == "12"
+    assert grade._btn_adicionar.text() == "Adicionar"
+    assert grade._btn_cancelar_edicao.isHidden()
+
+
+def test_grade_resumo_no_singular_e_estado_vazio(app):
+    grade = GradeItens(api=_api())
+    assert "Nenhum item" in grade._tabela._vazio.text()
+
+    grade._descricao.setText("Serviço avulso")
+    grade._adicionar()
+
+    assert grade._resumo.text().startswith("1 item •")
+    assert grade._resumo.text().count("1 item ") == 1
+
+
+def test_dialogo_exibe_rotulos_e_coluna_selecionada(app):
+    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
+    assert dialogo._campo_vf.rotulo_widget.parent() is not None
+    assert dialogo._campo_fornecedor.rotulo_widget.parent() is not None
+    assert dialogo._tabela.horizontalHeaderItem(4).text() == "Selecionada"
 
 
 def test_dialogo_mostra_tabela_com_vf_e_snapshot(app):

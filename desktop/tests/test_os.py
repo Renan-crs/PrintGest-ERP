@@ -509,6 +509,66 @@ def test_botoes_do_orcamento(app, pagina_orcamento):
     assert "orçamento" in pagina_orcamento._btn_salvar.toolTip().lower()
 
 
+def test_acoes_de_lista_se_escondem_no_formulario(app, pagina_orcamento):
+    """Converter/Cancelar agem sobre a lista; no formulário só faz sentido Cotações."""
+    assert not pagina_orcamento._widget_converter.isHidden()
+    assert not pagina_orcamento._act_cot.isVisible()
+
+    pagina_orcamento._novo()
+
+    assert pagina_orcamento._widget_converter.isHidden()
+    assert not pagina_orcamento._act_cancelar.isVisible()
+    assert pagina_orcamento._act_cot.isVisible()
+    assert pagina_orcamento._widget_cotacoes.isHidden()
+
+
+def test_botao_cotacoes_aparece_com_item_de_fornecedor(app, pagina_orcamento):
+    pagina_orcamento._novo()
+    grade = pagina_orcamento._itens
+    grade._check_fornecedor.setChecked(True)
+    grade._descricao.setText("Adesivo Vinil")
+    grade._adicionar()
+    grade._tabela.selectRow(0)
+    assert not pagina_orcamento._widget_cotacoes.isHidden()
+
+
+def test_hierarquia_de_botoes_primarios(pagina_orcamento):
+    assert pagina_orcamento._btn_novo.property("role") == "secondary"
+    assert pagina_orcamento._btn_converter.property("role") == "secondary"
+    assert pagina_orcamento._btn_salvar.property("role") == "primary"
+
+
+def test_salvar_pergunta_cadastro_rapido_de_cliente(app, monkeypatch, pagina_orcamento):
+    perguntas = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        staticmethod(
+            lambda *args, **kwargs: (
+                perguntas.append(args), QMessageBox.StandardButton.No
+            )[1]
+        ),
+    )
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+
+    pagina_orcamento._novo()
+    pagina_orcamento._cliente.combo.setEditText("Raquel Alves")
+    pagina_orcamento._salvar()
+
+    assert perguntas and "Cadastrar" in perguntas[0][2]
+
+
+def test_cliente_sem_correspondencia_marca_novo_no_orcamento_novo(app, pagina_orcamento):
+    pagina_orcamento._novo()
+    pagina_orcamento._cliente.combo.setEditText("Raquel Alves")
+    pagina_orcamento._cliente._buscar()
+    assert pagina_orcamento._salvar_novo_cliente.valor() is True
+    assert pagina_orcamento._cliente.sem_correspondencia is True
+
+    pagina_orcamento._cliente.definir(2)
+    assert pagina_orcamento._salvar_novo_cliente.valor() is False
+
+
 def test_payload_put_tem_tipo_item_id_e_avulso(app, pumpar, pagina_orcamento):
     """PUT de orçamento existente preserva o ID do item (merge no backend)."""
     _GETS.clear()
