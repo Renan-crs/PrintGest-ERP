@@ -235,6 +235,12 @@ QPushButton {
 }
 QPushButton:hover { background-color: %surface-muted%; border-color: %borda-forte%; }
 QPushButton:pressed { background-color: %borda%; }
+/* Foco visível por teclado (M5): nunca indicar estado só por cor/hover. */
+QPushButton:focus, QPushButton:focus-visible,
+QToolButton:focus, QToolButton:focus-visible {
+    border: 2px solid %primary%;
+    outline: none;
+}
 
 QPushButton[role="primary"] {
     background-color: %primary%;

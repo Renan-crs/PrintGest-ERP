@@ -1554,6 +1554,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             btn_mais = QToolButton()
             btn_mais.setText("⋯")
             btn_mais.setObjectName("acaoLinha")
+            btn_mais.setToolTip("Mais opções da venda")
+            btn_mais.setAccessibleName("Mais opções da venda")
             btn_mais.setMinimumHeight(30)
             btn_mais.setMinimumWidth(34)
             btn_mais.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)

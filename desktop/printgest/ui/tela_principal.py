@@ -1194,7 +1194,13 @@ class TelaPrincipal(QMainWindow):
         menu = QMenu(self._menu_usuario)
         menu.addAction("Preferências", self._abrir_preferencias)
         menu.addAction("Trocar senha", self._abrir_trocar_senha)
-        menu.addAction("Verificar atualização", self._verificar_atualizacao)
+        acao_atualizacao = menu.addAction(
+            "Verificar atualização", self._verificar_atualizacao
+        )
+        acao_atualizacao.setShortcut(QKeySequence("Ctrl+Alt+U"))
+        acao_atualizacao.setStatusTip(
+            "Verificar se existe uma versão mais nova do PrintGest"
+        )
         menu.addSeparator()
         menu.addAction("Sair", self._sair)
         self._menu_usuario.setMenu(menu)

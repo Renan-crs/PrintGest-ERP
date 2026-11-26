@@ -9,6 +9,22 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.38] - 2026-11-25 — Acessibilidade de notificações (M4/M5)
+
+### Desktop
+- Banner de atualização: `accessibleName` no aviso e em todos os botões,
+  tooltips explicativos, mnemonics (Alt+I/V/N) e texto das melhorias fora da
+  ordem de Tab (`NoFocus`).
+- Botão "⋯" da grade de vendas ganhou tooltip e nome acessível.
+- Tema: regra de foco visível para `QPushButton`/`QToolButton` (`:focus` e
+  `:focus-visible`), não apenas hover/pressed.
+- Menu "Verificar atualização" ganhou atalho `Ctrl+Alt+U` e `statusTip`.
+
+### Validação
+Desktop: 515 passed, 4 xfailed. Mutação: 54/54 mortos (3 novos).
+
+---
+
 ## [0.5.37] - 2026-11-25 — Rótulo de 423 e mascaramento na UI (A1/A2)
 
 ### Desktop

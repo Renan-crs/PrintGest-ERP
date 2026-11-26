@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QTextEdit
 
 from printgest.core import atualizacao
 from printgest.ui.tela_principal import TelaPrincipal
@@ -107,6 +109,48 @@ def test_banner_emite_url_do_release(app, monkeypatch):
     )
     TelaPrincipal._abrir_release(MANIFESTO["url"])
     assert MANIFESTO["url"] in vistos
+
+
+def test_banner_tem_nomes_acessiveis_e_tooltips(app):
+    banner = NotificacaoAtualizacao(
+        {
+            "versao_nova": "0.5.37",
+            "data": "2026-11-25",
+            "revisoes": ["Melhoria"],
+            "download_url": MANIFESTO["url"],
+        }
+    )
+    assert banner.accessibleName() == "Aviso de atualização"
+    assert banner._btn_fechar.toolTip() == "Fechar aviso de atualização"
+    assert banner._btn_fechar.accessibleName() == "Fechar aviso de atualização"
+    for botao, nome in (
+        (banner._btn_instalar, "Instalar atualização"),
+        (banner._btn_atualizar, "Ver atualização"),
+    ):
+        assert botao.accessibleName() == nome
+        assert botao.toolTip()
+    notas = banner.findChild(QTextEdit)
+    assert notas is not None
+    assert notas.focusPolicy() == Qt.FocusPolicy.NoFocus
+    assert notas.accessibleName() == "Principais melhorias"
+
+
+def test_tema_tem_foco_visivel_para_botoes(app):
+    estilo = QApplication.instance().styleSheet()
+    assert "QPushButton:focus," in estilo
+    assert "QToolButton:focus," in estilo
+
+
+def test_menu_de_atualizacao_tem_atalho_e_statustip(app):
+    tela = TelaPrincipal(api=object(), usuario={"id": 1, "nome": "Ana", "login": "ana"})
+    acoes = [
+        acao
+        for acao in tela._menu_usuario.menu().actions()
+        if "atualização" in acao.text().lower()
+    ]
+    assert len(acoes) == 1
+    assert not acoes[0].shortcut().isEmpty()
+    assert acoes[0].statusTip()
 
 
 def test_api_delega_para_o_manifesto(monkeypatch):
