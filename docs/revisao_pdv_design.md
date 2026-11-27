@@ -51,10 +51,10 @@ Itens 9–16, 18–21 e as ideias §6 ficam para a Fase B (reorganização no WP
 | --- | --- | --- |
 | D1 | "Pagamento já recebido" | Mantido por enquanto: é exigido pelo fluxo de sinal/condição do cliente (`CondicaoPagamentoCliente`). Remover depende de mover venda a prazo para O.S./Contas a receber (Fase B, quebra de UX validada antes) |
 | D2 | Limite de desconto por perfil | Pendente de valor do responsável; sem limite hoje (o desconto por item novo também não limita) |
-| D3 | Pagamento misto | Backlog (M6) |
-| D4 | Caixa fechado | Não há módulo de caixa aberto/fechado no backend; bloqueio fica para a fase financeira |
+| D3 | Pagamento misto | **Implementado (v0.5.42)**: toggles + "+ Adicionar forma de pagamento", tabela `venda_pagamento`; ver `docs/split_pagamento_pdv.md` |
+| D4 | Caixa fechado | **Implementado**: backend exige caixa aberto (409) e o PDV bloqueia a finalização com banner próprio |
 | D5 | Venda em espera | Backlog; no MVP, memória da estação |
-| D6 | Estoque insuficiente | Hoje não valida estoque no PDV; aviso-com-permissão quando houver consulta de saldo na busca (Fase B/§6.3) |
+| D6 | Estoque insuficiente | **Implementado**: baixa atômica no backend (`UPDATE ... WHERE saldo >= qtd`) → 409 com aviso no PDV |
 | D7 | Favoritos automáticos × marcados | Pendente (exige campo em produto — Fase C) |
 | D8 | Multiplicador `3*código` | Backlog (conflito com EAN contendo `*` a validar) |
 | D9 | Item repetido soma na linha | **Comportamento atual**: cada adição cria linha nova (contrato aceita); somar é melhoria de Fase B |

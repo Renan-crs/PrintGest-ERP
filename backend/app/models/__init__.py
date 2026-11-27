@@ -47,6 +47,7 @@ from app.models.movimento import (
     PedidoCompraItem,
     VendaBalcao,
     VendaBalcaoItem,
+    VendaPagamento,
 )
 from app.models.consolidacao import SyncEstado
 from app.models.precificacao import RegraPreco, TabelaPreco
@@ -124,4 +125,5 @@ __all__ = [
     "UsuarioSessao",
     "VendaBalcao",
     "VendaBalcaoItem",
+    "VendaPagamento",
 ]

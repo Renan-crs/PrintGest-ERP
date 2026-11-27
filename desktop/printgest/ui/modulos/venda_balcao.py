@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from PySide6.QtCore import QSize, QStringListModel, Qt, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QSize, QStringListModel, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -227,6 +227,11 @@ class EditorItensVenda(QWidget):
         # e os rótulos eram cortados. O FlowLayout quebra em duas linhas.
         linha = FlowLayout(caixa, margem=0, espaco_h=8, espaco_v=6)
 
+        lupa = QLabel("🔍")
+        lupa.setObjectName("lupaBusca")
+        lupa.setToolTip("Buscar produto (Ctrl+F)")
+        linha.addWidget(lupa)
+
         self._entrada = QLineEdit()
         self._entrada.setPlaceholderText("Código, nome ou código de barras")
         self._entrada.setClearButtonEnabled(True)
@@ -259,6 +264,7 @@ class EditorItensVenda(QWidget):
         linha.addWidget(self._btn_adicionar)
 
         self._btn_avulso = QPushButton("Item avulso")
+        self._btn_avulso.setObjectName("itemAvulso")
         self._btn_avulso.setMinimumHeight(40)
         self._btn_avulso.setToolTip(
             "Adiciona um item sem produto, usando o texto digitado como descrição"
@@ -610,13 +616,16 @@ class EditorItensVenda(QWidget):
                 self._COL_UNIT,
                 self._celula_editavel(_texto_moeda_editavel(item.get("valor_unitario"))),
             )
-            self._tabela.setItem(
-                linha,
-                self._COL_DESC_ITEM,
-                self._celula_editavel(
-                    _texto_moeda_editavel(max(Decimal("0"), _dec(item.get("desconto"))))
-                ),
+            desconto_item = max(Decimal("0"), _dec(item.get("desconto")))
+            celula_desconto = self._celula_editavel(
+                _texto_moeda_editavel(desconto_item)
             )
+            if desconto_item > 0:
+                celula_desconto.setToolTip(
+                    f"Desconto aplicado: {formatar_moeda(str(desconto_item))}"
+                )
+                celula_desconto.setBackground(QColor("#DCFCE7"))  # selo verde suave
+            self._tabela.setItem(linha, self._COL_DESC_ITEM, celula_desconto)
             self._tabela.setItem(
                 linha,
                 self._COL_TOTAL,
@@ -624,10 +633,11 @@ class EditorItensVenda(QWidget):
                     formatar_moeda(str(self._total_linha(linha))), direita=True
                 ),
             )
-            botao = QPushButton("✕")
+            botao = QPushButton("🗑")
             botao.setObjectName("acaoLinha")
             botao.setToolTip("Remover item")
-            botao.setFixedSize(26, 22)
+            botao.setAccessibleName("Remover item")
+            botao.setFixedSize(40, 40)  # alvo de toque confortável/no touch
             botao.clicked.connect(
                 lambda _=False, alvo=linha: self._remover_linha(alvo)
             )
@@ -803,6 +813,18 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha.addWidget(titulo)
         linha.addStretch(1)
 
+        # Indicador de conexão do servidor local dentro do PDV (auditoria UX).
+        self._lbl_conexao_pdv = QLabel("● online")
+        self._lbl_conexao_pdv.setObjectName("pdvConexao")
+        self._lbl_conexao_pdv.setToolTip(
+            "Status do servidor local. Sem conexão, a venda não pode ser registrada."
+        )
+        linha.addWidget(self._lbl_conexao_pdv)
+        self._timer_conexao_pdv = QTimer(self)
+        self._timer_conexao_pdv.setInterval(30_000)
+        self._timer_conexao_pdv.timeout.connect(self._verificar_conexao_pdv)
+        self._timer_conexao_pdv.start()
+
         # P1#16 (PDV+Hist+OS): controle segmentado Venda | Histórico.
         self._botao_venda = QPushButton("Venda (F6)")
         self._botao_venda.setCheckable(True)
@@ -819,6 +841,26 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._botao_historico.clicked.connect(self._ir_para_historico)
         linha.addWidget(self._botao_historico)
         return caixa
+
+    # ------------------------------------------------------- conexão PDV
+
+    def _verificar_conexao_pdv(self) -> None:
+        tarefas.rodar(
+            self._api.testar_comunicacao,
+            on_ok=self._pintar_conexao_pdv,
+            on_erro=lambda _msg: self._pintar_conexao_pdv(False),
+        )
+
+    def _pintar_conexao_pdv(self, ok: bool) -> None:
+        self._lbl_conexao_pdv.setText("● online" if ok else "○ offline")
+        self._lbl_conexao_pdv.setToolTip(
+            "Servidor local respondendo."
+            if ok else
+            "Sem conexão com o servidor local — as vendas não podem ser "
+            "registradas até a comunicação voltar."
+        )
+        (estado_sucesso if ok else estado_erro)(self._lbl_conexao_pdv)
+        aplicar_estilo(self._lbl_conexao_pdv)
 
     # ------------------------------------------------------- vista venda
 
@@ -890,6 +932,24 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._vendedor.widget.setPlaceholderText("Selecione o vendedor")
         self._vendedor.widget.setCurrentIndex(-1)
         self._forma = CampoCombo("Forma de pagamento", FORMAS_PAGAMENTO)
+        self._forma.widget.setVisible(False)  # mantido como estado interno
+        self._toggles_forma: dict[str, QPushButton] = {}
+        linha_toggles = QHBoxLayout()
+        linha_toggles.setSpacing(6)
+        for forma, rotulo in FORMAS_PAGAMENTO:
+            botao = QPushButton(rotulo)
+            botao.setCheckable(True)
+            botao.setObjectName("chaveRapida")
+            botao.setMinimumHeight(40)
+            botao.setToolTip(f"Forma de pagamento: {rotulo}")
+            botao.clicked.connect(
+                lambda _marcado=False, f=forma: self._definir_forma(f)
+            )
+            self._toggles_forma[forma] = botao
+            linha_toggles.addWidget(botao)
+        self._toggles_widget = QWidget()
+        self._toggles_widget.setLayout(linha_toggles)
+        self._linhas_pagamento: list[dict] = []
         self._parcelas = CampoTexto("Parcelas", valor="1", maximo=2)
         self._recebido = CampoValor("Valor recebido")
         self._desconto = CampoValor("Desconto")
@@ -912,7 +972,7 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._campo_cliente = _campo_rotulado("Cliente", self._cliente.widget)
         self._campo_vendedor = _campo_rotulado("Vendedor", self._vendedor.widget)
         self._campo_forma = _campo_rotulado(
-            "Forma de pagamento", self._forma.widget
+            "Forma de pagamento (toque para escolher)", self._toggles_widget
         )
         self._campo_parcelas = _campo_rotulado("Parcelas", self._parcelas.widget)
         self._campo_recebido = _campo_rotulado(
@@ -934,6 +994,18 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         grade.setColumnStretch(0, 1)
         grade.setColumnStretch(1, 1)
         col_f.addLayout(grade)
+
+        # Split payment: linhas adicionais de forma de pagamento.
+        self._pagamentos_extras = QWidget()
+        self._extras_layout = QVBoxLayout(self._pagamentos_extras)
+        self._extras_layout.setContentsMargins(0, 0, 0, 0)
+        self._extras_layout.setSpacing(6)
+        col_f.addWidget(self._pagamentos_extras)
+        self._btn_adicionar_pagamento = QPushButton("+ Adicionar forma de pagamento")
+        self._btn_adicionar_pagamento.setObjectName("btnAdicionarPagamento")
+        self._btn_adicionar_pagamento.setMinimumHeight(40)
+        self._btn_adicionar_pagamento.clicked.connect(self._adicionar_pagamento)
+        col_f.addWidget(self._btn_adicionar_pagamento)
 
         self._pagamento_confirmado = CampoCheck("Adiantamento/sinal já recebido")
         self._pagamento_confirmado.widget.setToolTip(
@@ -1007,6 +1079,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         linha2.addStretch(1)
         linha2.addWidget(self._lbl_total)
         col.addLayout(linha2)
+        # Explicação do preço calculado no servidor (faixas/modificadores).
+        self._lbl_regra = QLabel("")
+        self._lbl_regra.setObjectName("regraPrecoPdv")
+        self._lbl_regra.setWordWrap(True)
+        self._lbl_regra.setVisible(False)
+        estado_muted(self._lbl_regra)
+        col.addWidget(self._lbl_regra)
         return caixa
 
     def _montar_acoes(self) -> QWidget:
@@ -1223,8 +1302,80 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._completer_clientes.setModel(self._cliente.widget.model())
         self._completer_clientes.setCompletionRole(Qt.ItemDataRole.DisplayRole)
 
+    def _definir_forma(self, forma: str) -> None:
+        """Toggles grandes atualizam o estado interno (combo oculto)."""
+        self._forma.definir(forma)  # dispara currentIndexChanged → _forma_mudou
+
+    def _adicionar_pagamento(self) -> None:
+        if len(self._linhas_pagamento) >= 9:
+            return
+        linha = QWidget()
+        horizontal = QHBoxLayout(linha)
+        horizontal.setContentsMargins(0, 0, 0, 0)
+        horizontal.setSpacing(6)
+        combo = QComboBox()
+        for forma, rotulo in FORMAS_PAGAMENTO:
+            combo.addItem(rotulo, forma)
+        combo.setMinimumHeight(40)
+        valor = CampoValor("Valor")
+        valor.widget.setMinimumHeight(40)
+        if hasattr(valor, "edicao"):
+            valor.edicao.setMinimumHeight(40)
+        remover = QPushButton("✕")
+        remover.setToolTip("Remover esta forma de pagamento")
+        remover.setAccessibleName("Remover forma de pagamento")
+        remover.setFixedSize(40, 40)
+        horizontal.addWidget(combo, 1)
+        horizontal.addWidget(valor.widget, 1)
+        horizontal.addWidget(remover)
+        self._extras_layout.addWidget(linha)
+        registro = {"widget": linha, "combo": combo, "valor": valor}
+        remover.clicked.connect(
+            lambda _=False, alvo=registro: self._remover_pagamento(alvo)
+        )
+        self._linhas_pagamento.append(registro)
+        self._recalcular_totais()
+
+    def _remover_pagamento(self, registro: dict) -> None:
+        if registro in self._linhas_pagamento:
+            self._linhas_pagamento.remove(registro)
+        registro["widget"].setParent(None)
+        self._recalcular_totais()
+
+    def _pagamentos_payload(self) -> list[dict] | None:
+        extras = []
+        for registro in self._linhas_pagamento:
+            valor = _dec(registro["valor"].valor())
+            if valor <= 0:
+                continue
+            extras.append(
+                {
+                    "forma_pagamento": registro["combo"].currentData(),
+                    "valor": str(valor),
+                    "parcelas": 1,
+                }
+            )
+        if not extras:
+            return None
+        principal = self._total_venda - sum(
+            (_dec(p["valor"]) for p in extras), Decimal("0")
+        )
+        if principal < 0:
+            principal = Decimal("0")
+        principal_pagamento = {
+            "forma_pagamento": self._forma.valor(),
+            "valor": str(principal),
+            "parcelas": int((self._parcelas.valor() or "1").strip() or "1"),
+        }
+        recebido = _dec(self._recebido.valor())
+        if recebido > 0:
+            principal_pagamento["valor_recebido"] = str(recebido)
+        return [principal_pagamento, *extras]
+
     def _forma_mudou(self) -> None:
         forma = self._forma.valor()
+        for chave, botao in getattr(self, "_toggles_forma", {}).items():
+            botao.setChecked(chave == forma)
         parcelavel = forma in FORMAS_PAGAMENTO_PARCELAVEIS
         self._campo_parcelas.setVisible(parcelavel)
         dinheiro = forma == _FORMA_DINHEIRO
@@ -1294,6 +1445,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         else:
             self._btn_salvar.setEnabled(True)
             self._btn_salvar.setToolTip("Finalizar venda (F9)")
+        # Destaque progressivo: acende quando há itens no carrinho.
+        self._btn_salvar.setProperty("destaque", n > 0)
+        aplicar_estilo(self._btn_salvar)
 
     def _limpar_form(self) -> None:
         self._itens_editor.limpar()
@@ -1306,6 +1460,8 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._parcelas.definir("1")
         self._recebido.definir(None)
         self._desconto.definir(None)
+        for registro in list(self._linhas_pagamento):
+            self._remover_pagamento(registro)
         self._pagamento_confirmado.definir(False)
         self._nfce.definir(False)
         self._forma_mudou()
@@ -1784,6 +1940,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             "pagamento_confirmado": self._pagamento_confirmado.valor(),
             "itens": self._itens_editor.valor(),
         }
+        pagamentos = self._pagamentos_payload()
+        if pagamentos is not None:
+            payload["pagamentos"] = pagamentos
         if forma == _FORMA_DINHEIRO:
             recebido = _dec(self._recebido.valor())
             if recebido > 0:
@@ -1817,6 +1976,18 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         # real é o `self.recarregar(...)` logo abaixo.
         numero = (dado or {}).get("numero")
         venda_id = (dado or {}).get("id")
+        # Regra de preço/explicação devolvida pelo servidor (backend já calcula).
+        explicacoes = [
+            linha
+            for item in (dado or {}).get("itens", [])
+            for linha in (item.get("explicacao") or [])
+        ]
+        if hasattr(self, "_lbl_regra"):
+            self._lbl_regra.setText(
+                "Regra aplicada: " + " · ".join(explicacoes[:3])
+                if explicacoes else ""
+            )
+            self._lbl_regra.setVisible(bool(explicacoes))
         self._limpar_form()
         self.recarregar(self._busca.texto())
         # O backend lançou a entrada no caixa: atualiza o estado local para

@@ -26,6 +26,26 @@ class VendaItemIn(BaseModel):
     regra_preco: RegraPrecoIn | None = Field(default=None)
 
 
+class PagamentoVendaIn(BaseModel):
+    """Uma forma de pagamento dentro de uma venda (split payment)."""
+
+    forma_pagamento: FormaPagamento
+    valor: Decimal = Field(gt=0)
+    parcelas: int = Field(default=1, ge=1)
+    valor_recebido: Decimal | None = Field(default=None, ge=0)
+    troco: Decimal | None = Field(default=None, ge=0)
+
+
+class PagamentoVendaOut(ORMModel):
+    id: int
+    seq: int
+    forma_pagamento: FormaPagamento
+    valor: Decimal
+    parcelas: int
+    valor_recebido: Decimal | None = None
+    troco: Decimal | None = None
+
+
 class VendaCreate(BaseModel):
     cliente_id: int | None = None
     # Nome informado no PDV para cliente não cadastrado (consumidor identificado).
@@ -42,6 +62,9 @@ class VendaCreate(BaseModel):
     # Confirmação do recebimento antecipado (exigido pelo cliente, quando houver).
     pagamento_confirmado: bool = False
     itens: list[VendaItemIn] = Field(min_length=1)
+    # Split payment: quando informado, a soma dos valores deve fechar com o
+    # total da venda. Ausente = vendas legadas com uma única forma.
+    pagamentos: list[PagamentoVendaIn] | None = None
 
 
 class VendaItemOut(ORMModel):
@@ -105,3 +128,4 @@ class VendaOut(ORMModel):
     created_at: datetime
     updated_at: datetime
     itens: list[VendaItemOut] = Field(default_factory=list)
+    pagamentos: list[PagamentoVendaOut] = Field(default_factory=list)

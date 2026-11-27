@@ -9,6 +9,27 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.42] - 2026-11-27 — Split payment e melhorias UX do PDV
+
+### Backend
+- Tabela `venda_pagamento` (uma linha por forma) com migration aditiva
+  `d0e1f2a4b8c9` aplicada ao Neon com backup em branch; soma das formas deve
+  fechar com o total da venda. `forma_pagamento` permanece como principal para
+  compatibilidade com fiscal/relatórios/sync.
+
+### Desktop
+- Toggles grandes de forma de pagamento e botão "+ Adicionar forma de pagamento".
+- Finalizar em destaque ao primeiro item, lupa na busca, item avulso com borda
+  tracejada, lixeira 40 px por linha, destaque de desconto no carrinho.
+- Indicador online/offline no cabeçalho do PDV e explicação da regra de preço
+  no painel de totais.
+
+### Validação
+Backend: 532 passed. Desktop: 558 passed, 4 xfailed. Mutação: 66/66 mortos
+(3 novos). Documentação: `docs/split_pagamento_pdv.md`.
+
+---
+
 ## [0.5.41] - 2026-11-27 — VF unitário ou total do fornecedor
 
 ### Backend

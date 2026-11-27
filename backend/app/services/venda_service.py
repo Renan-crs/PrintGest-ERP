@@ -26,8 +26,10 @@ from app.models.enums import (
     TipoMovEstoque,
 )
 from app.models.financeiro import Caixa, MovimentoCaixa
-from app.models.movimento import VendaBalcao, VendaBalcaoItem
+from app.models.movimento import VendaBalcao, VendaBalcaoItem, VendaPagamento
 from app.schemas.venda import (
+    PagamentoVendaIn,
+    PagamentoVendaOut,
     VendaCreate,
     VendaItemIn,
     VendaItemOut,
@@ -134,6 +136,9 @@ def _para_out(venda: VendaBalcao) -> VendaOut:
             regra_aplicada=i.preco_snapshot,
         )
         for i in venda.itens
+    ]
+    dados["pagamentos"] = [
+        PagamentoVendaOut.model_validate(p) for p in (venda.pagamentos or [])
     ]
     return VendaOut.model_validate(dados)
 
@@ -263,6 +268,7 @@ def _registrar_no_caixa(
     usuario_id: int,
     venda: VendaBalcao,
     valor: Decimal | None = None,
+    forma: FormaPagamento | None = None,
 ) -> None:
     """Lança no caixa o valor **efetivamente recebido** nesta venda.
 
@@ -271,7 +277,8 @@ def _registrar_no_caixa(
     entra apenas a diferença, para não contar o mesmo dinheiro duas vezes.
     """
     entrada = _q(valor if valor is not None else venda.valor_total)
-    if venda.forma_pagamento == FormaPagamento.FIADO:
+    forma_efetiva = forma or venda.forma_pagamento
+    if forma_efetiva == FormaPagamento.FIADO:
         return
     caixa = (
         db.query(Caixa)
@@ -293,11 +300,34 @@ def _registrar_no_caixa(
             tipo=TipoMovCaixa.ENTRADA,
             venda_balcao_id=venda.id,
             descricao=f"Venda de balcão Nº {venda.numero} "
-            f"({FormaPagamento(venda.forma_pagamento).value})",
+            f"({FormaPagamento(forma_efetiva).value})",
             valor=entrada,
             usuario_id=usuario_id,
         )
     )
+
+
+def _validar_pagamentos(
+    dados: VendaCreate, valor_total: Decimal
+) -> list[PagamentoVendaIn]:
+    """Split payment: a soma das formas deve fechar exatamente com o total."""
+    if not dados.pagamentos:
+        return []
+    if len(dados.pagamentos) > 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Máximo de 10 formas de pagamento por venda.",
+        )
+    soma = sum((_q(p.valor) for p in dados.pagamentos), Decimal("0.00"))
+    if abs(soma - valor_total) > Decimal("0.01"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"A soma das formas de pagamento ({soma}) deve igualar o total "
+                f"da venda ({valor_total})."
+            ),
+        )
+    return list(dados.pagamentos)
 
 
 def criar(
@@ -330,6 +360,18 @@ def criar(
                 str(margem) if margem is not None else None
             )
     valor_itens, valor_total = _totais(itens, dados.desconto)
+    pagamentos = _validar_pagamentos(dados, valor_total)
+    principal = pagamentos[0] if pagamentos else None
+    forma_efetiva = principal.forma_pagamento if principal else dados.forma_pagamento
+    parcelas_efetivas = principal.parcelas if principal else dados.parcelas
+    recebido_informado = (
+        principal.valor_recebido if principal else dados.valor_recebido
+    )
+    troco_informado = principal.troco if principal else dados.troco
+    valor_principal = (
+        valor_total - sum((_q(p.valor) for p in pagamentos[1:]), Decimal("0.00"))
+        if pagamentos else valor_total
+    )
 
     cliente_nome_avulso = (dados.cliente_nome_avulso or "").strip() or None
     if dados.cliente_id:
@@ -337,13 +379,13 @@ def criar(
 
     valor_recebido = None
     troco = None
-    if dados.valor_recebido is not None:
-        valor_recebido = _q(dados.valor_recebido)
-    if dados.forma_pagamento == FormaPagamento.DINHEIRO and valor_recebido is not None:
-        troco_calc = valor_recebido - valor_total
+    if recebido_informado is not None:
+        valor_recebido = _q(recebido_informado)
+    if forma_efetiva == FormaPagamento.DINHEIRO and valor_recebido is not None:
+        troco_calc = valor_recebido - valor_principal
         troco = _q(troco_calc) if troco_calc > 0 else Decimal("0.00")
-    elif dados.troco is not None:
-        troco = _q(dados.troco)
+    elif troco_informado is not None:
+        troco = _q(troco_informado)
 
     venda = VendaBalcao(
         filial_id=filial_id,
@@ -356,12 +398,25 @@ def criar(
         valor_itens=valor_itens,
         desconto=dados.desconto,
         valor_total=valor_total,
-        forma_pagamento=dados.forma_pagamento,
-        parcelas=dados.parcelas,
+        forma_pagamento=forma_efetiva,
+        parcelas=parcelas_efetivas,
         valor_recebido=valor_recebido,
         troco=troco,
         observacoes=dados.observacoes,
         itens=itens,
+        pagamentos=[
+            VendaPagamento(
+                seq=indice,
+                forma_pagamento=p.forma_pagamento,
+                valor=_q(p.valor),
+                parcelas=p.parcelas,
+                valor_recebido=(
+                    _q(p.valor_recebido) if p.valor_recebido is not None else None
+                ),
+                troco=_q(p.troco) if p.troco is not None else None,
+            )
+            for indice, p in enumerate(pagamentos, start=1)
+        ],
     )
     db.add(venda)
     try:
@@ -387,24 +442,52 @@ def criar(
 
         # FIADO e boleto parcelado: o restante fica como título a receber.
         # Cartão/dinheiro recebem o valor na hora; parcelas são com o operador.
-        if dados.forma_pagamento in (FormaPagamento.FIADO, FormaPagamento.BOLETO):
-            adiantamento_service.registrar_saldo_devedor(
-                db,
-                filial_id=filial_id,
-                cliente_id=dados.cliente_id,
-                valor=recebido_agora,
-                documento=f"Venda #{venda.numero or venda.id}",
-                venda_balcao_id=venda.id,
-                parcelas=dados.parcelas if dados.forma_pagamento == FormaPagamento.BOLETO else 1,
-            )
-            # O título representa o recebimento futuro: não entra no caixa agora.
-            recebido_agora = Decimal("0.00")
-
         _baixar_estoque(db, filial_id=filial_id, venda=venda, usuario_id=usuario_id)
-        _registrar_no_caixa(
-            db, filial_id=filial_id, usuario_id=usuario_id, venda=venda,
-            valor=recebido_agora,
-        )
+
+        if pagamentos:
+            # Split: cada forma gera seu próprio movimento. FIADO/BOLETO viram
+            # título a receber; as demais entram no caixa até o adiantamento.
+            restante = recebido_agora
+            for pagamento in pagamentos:
+                if pagamento.forma_pagamento in (
+                    FormaPagamento.FIADO, FormaPagamento.BOLETO
+                ):
+                    adiantamento_service.registrar_saldo_devedor(
+                        db,
+                        filial_id=filial_id,
+                        cliente_id=dados.cliente_id,
+                        valor=_q(pagamento.valor),
+                        documento=f"Venda #{venda.numero or venda.id}",
+                        venda_balcao_id=venda.id,
+                        parcelas=(
+                            pagamento.parcelas
+                            if pagamento.forma_pagamento == FormaPagamento.BOLETO
+                            else 1
+                        ),
+                    )
+                    continue
+                valor_caixa = min(_q(pagamento.valor), restante)
+                restante -= valor_caixa
+                _registrar_no_caixa(
+                    db, filial_id=filial_id, usuario_id=usuario_id, venda=venda,
+                    valor=valor_caixa, forma=pagamento.forma_pagamento,
+                )
+        else:
+            if forma_efetiva in (FormaPagamento.FIADO, FormaPagamento.BOLETO):
+                adiantamento_service.registrar_saldo_devedor(
+                    db,
+                    filial_id=filial_id,
+                    cliente_id=dados.cliente_id,
+                    valor=recebido_agora,
+                    documento=f"Venda #{venda.numero or venda.id}",
+                    venda_balcao_id=venda.id,
+                    parcelas=parcelas_efetivas if forma_efetiva == FormaPagamento.BOLETO else 1,
+                )
+                recebido_agora = Decimal("0.00")
+            _registrar_no_caixa(
+                db, filial_id=filial_id, usuario_id=usuario_id, venda=venda,
+                valor=recebido_agora,
+            )
         # PRD v3.3 RF-SY-01: evento de sync na MESMA transação da venda.
         filial_service.registrar_evento(
             db,
@@ -438,6 +521,7 @@ def buscar(db: Session, venda_id: int, *, filial_id: int) -> VendaBalcao:
             joinedload(VendaBalcao.vendedor),
             joinedload(VendaBalcao.operador),
             selectinload(VendaBalcao.itens),
+            selectinload(VendaBalcao.pagamentos),
         )
         .filter(VendaBalcao.id == venda_id, VendaBalcao.filial_id == filial_id)
         .first()
@@ -489,6 +573,7 @@ def listar(
             joinedload(VendaBalcao.vendedor),
             joinedload(VendaBalcao.operador),
             selectinload(VendaBalcao.itens),
+            selectinload(VendaBalcao.pagamentos),
         )
         .order_by(VendaBalcao.numero.desc())
         .limit(min(max(limit, 1), 200))

@@ -474,6 +474,11 @@ class VendaBalcao(Base):
     )
 
     itens: Mapped[list["VendaBalcaoItem"]] = relationship(back_populates="venda")
+    # Split payment: uma linha por forma de pagamento (a primeira é espelhada
+    # em `forma_pagamento` para compatibilidade com relatórios/fiscal legados).
+    pagamentos: Mapped[list["VendaPagamento"]] = relationship(
+        back_populates="venda", cascade="all, delete-orphan"
+    )
 
     cliente: Mapped[Cliente | None] = relationship(foreign_keys=[cliente_id])
     vendedor: Mapped[Funcionario | None] = relationship(foreign_keys=[vendedor_id])
@@ -509,6 +514,43 @@ class VendaBalcaoItem(Base):
     preco_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     venda: Mapped[VendaBalcao] = relationship(back_populates="itens")
+
+
+class VendaPagamento(Base):
+    """Forma de pagamento de uma venda (split payment).
+
+    Uma venda pode ter várias linhas; a soma de `valor` deve fechar com
+    `venda_balcao.valor_total`. `valor_recebido`/`troco` só fazem sentido na
+    forma dinheiro.
+    """
+
+    __tablename__ = "venda_pagamento"
+    __table_args__ = (
+        UniqueConstraint("venda_balcao_id", "seq", name="uq_venda_pagamento_seq"),
+        CheckConstraint("valor >= 0", name="ck_venda_pagamento_valor"),
+        CheckConstraint("parcelas >= 1", name="ck_venda_pagamento_parcelas"),
+        Index("idx_venda_pagamento_venda", "venda_balcao_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    venda_balcao_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("venda_balcao.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    forma_pagamento: Mapped[FormaPagamento] = mapped_column(
+        pg_enum(FormaPagamento), nullable=False
+    )
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    parcelas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    valor_recebido: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    troco: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    venda: Mapped[VendaBalcao] = relationship(back_populates="pagamentos")
 
 
 class PedidoCompra(Base):

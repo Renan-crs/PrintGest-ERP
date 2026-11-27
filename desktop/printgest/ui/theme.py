@@ -236,6 +236,10 @@ QPushButton {
 }
 QPushButton:hover { background-color: %surface-muted%; border-color: %borda-forte%; }
 QPushButton:pressed { background-color: %borda%; }
+/* PDV: acende ao adicionar o primeiro item da venda. */
+QPushButton[destaque="true"] { background-color: %primary%; color: %on-primary%; border-color: %primary%; }
+QPushButton#itemAvulso { background: %surface-muted%; border: 1px dashed %borda-forte%; }
+QLabel#lupaBusca { font-size: 18px; padding-right: 2px; }
 /* Foco visível por teclado (M5): nunca indicar estado só por cor/hover. */
 QPushButton:focus, QPushButton:focus-visible,
 QToolButton:focus, QToolButton:focus-visible {
