@@ -9,6 +9,19 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.40] - 2026-11-26 — Orçamento com precificação transparente
+
+- Redesign da tela de orçamento e da grade de itens (commit `2deb8c6`,
+  origem: fluxo de trabalho paralelo): precificação transparente no orçamento,
+  ajustes em `grade_itens.py`, `os.py`, `os_service.py` e testes associados.
+- Esta versão consolida esse trabalho com a exclusão nas telas de cadastro,
+  notificações e watchdog entregues na v0.5.39.
+
+### Validação
+Backend: 521 passed. Desktop: 544 passed, 4 xfailed.
+
+---
+
 ## [0.5.39] - 2026-11-26 — Exclusão nas telas de cadastro e notificações remanescentes
 
 ### Desktop — exclusão
