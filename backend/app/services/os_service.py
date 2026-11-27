@@ -32,7 +32,7 @@ from app.models.movimento import (
     PedidoCompraItem,
 )
 from app.schemas.movimento import OsCreate, OsItemIn, OsItemOut, OsOut, OsUpdate
-from app.services import adiantamento_service, custo_service
+from app.services import adiantamento_service, custo_service, precificacao
 from app.services.precificacao_documento import (
     gerar_snapshot,
     resolver_preco_linha,
@@ -59,6 +59,9 @@ def _aplicar_dados_item(
     payload: OsItemIn,
     seq: int,
     resolvida: RegraResolvida | None = None,
+    *,
+    db: Session | None = None,
+    filial_id: int | None = None,
 ) -> None:
     """Aplica os campos editáveis do item, preservando o histórico da cotação.
 
@@ -68,22 +71,45 @@ def _aplicar_dados_item(
     """
     # Item de fornecedor: o preço é soberania de `cotacao_service` (snapshot
     # VO). Nunca deixar o motor sobrescrever a cotação já selecionada.
-    regra_efetiva = (
-        resolvida.regra if resolvida is not None else payload.regra_preco
+    # VF digitado diretamente na grade: sem cotação lançada, o servidor gera
+    # o snapshot (CP/VO) com os parâmetros vigentes da filial.
+    vf_manual = (
+        payload.tipo == TipoItemOs.FORNECEDOR
+        and payload.vf is not None
+        and payload.vf > 0
+        and item.snapshot_preco is None
+        and db is not None
+        and filial_id is not None
     )
-    usa_motor = regra_efetiva is not None and payload.tipo != TipoItemOs.FORNECEDOR
-    if usa_motor:
-        unitario, total, explicacao = resolver_preco_linha(
-            valor_unitario=payload.valor_unitario,
-            quantidade=payload.quantidade,
-            desconto=payload.desconto,
-            regra=regra_efetiva,
+    if vf_manual:
+        parametros = precificacao.parametros(db, filial_id=filial_id)
+        item.snapshot_preco = precificacao.snapshot_item_terceirizado(
+            payload.vf,
+            parametros["acrescimo_fornecedor_pct"],
+            parametros["markup_orcamento_pct"],
         )
-    else:
-        total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
+        unitario = Decimal(item.snapshot_preco["vo"])
+        total = _q(unitario * payload.quantidade - payload.desconto)
         if total < 0:
             total = Decimal("0.00")
-        unitario, explicacao = payload.valor_unitario, []
+        explicacao = []
+    else:
+        regra_efetiva = (
+            resolvida.regra if resolvida is not None else payload.regra_preco
+        )
+        usa_motor = regra_efetiva is not None and payload.tipo != TipoItemOs.FORNECEDOR
+        if usa_motor:
+            unitario, total, explicacao = resolver_preco_linha(
+                valor_unitario=payload.valor_unitario,
+                quantidade=payload.quantidade,
+                desconto=payload.desconto,
+                regra=regra_efetiva,
+            )
+        else:
+            total = _q(payload.valor_unitario * payload.quantidade - payload.desconto)
+            if total < 0:
+                total = Decimal("0.00")
+            unitario, explicacao = payload.valor_unitario, []
     item.seq = seq
     item.produto_id = payload.produto_id
     item.descricao_avulsa = payload.descricao_avulsa
@@ -112,20 +138,31 @@ def _aplicar_dados_item(
 
 
 def _montar_item(
-    payload: OsItemIn, seq: int, resolvida: RegraResolvida | None = None
+    payload: OsItemIn,
+    seq: int,
+    resolvida: RegraResolvida | None = None,
+    *,
+    db: Session | None = None,
+    filial_id: int | None = None,
 ) -> OrdemServicoItem:
     item = OrdemServicoItem()
-    _aplicar_dados_item(item, payload, seq, resolvida)
+    _aplicar_dados_item(item, payload, seq, resolvida, db=db, filial_id=filial_id)
     return item
 
 
 def _montar_itens(
-    itens: list[OsItemIn], resolvidas: list[RegraResolvida | None] | None = None
+    itens: list[OsItemIn],
+    resolvidas: list[RegraResolvida | None] | None = None,
+    *,
+    db: Session | None = None,
+    filial_id: int | None = None,
 ) -> list[OrdemServicoItem]:
     resolvidas = resolvidas or [None] * len(itens)
     montados: list[OrdemServicoItem] = []
     for indice, item in enumerate(itens):
-        montados.append(_montar_item(item, indice + 1, resolvidas[indice]))
+        montados.append(
+            _montar_item(item, indice + 1, resolvidas[indice], db=db, filial_id=filial_id)
+        )
     return montados
 
 
@@ -133,6 +170,9 @@ def _mesclar_itens(
     atuais: list[OrdemServicoItem],
     payloads: list[OsItemIn],
     resolvidas: list[RegraResolvida | None] | None = None,
+    *,
+    db: Session | None = None,
+    filial_id: int | None = None,
 ) -> list[OrdemServicoItem]:
     """Mescla a lista enviada pela UI com os itens já gravados.
 
@@ -155,12 +195,16 @@ def _mesclar_itens(
         resolvida = resolvidas[seq - 1]
         existente = por_id.get(payload.id) if payload.id is not None else None
         if existente is not None and existente.id not in usados:
-            _aplicar_dados_item(existente, payload, seq, resolvida)
+            _aplicar_dados_item(
+                existente, payload, seq, resolvida, db=db, filial_id=filial_id
+            )
             usados.add(existente.id)
             resultado.append(existente)
         else:
             # id desconhecido/duplicado = item novo (nunca reaproveita outro OS).
-            resultado.append(_montar_item(payload, seq, resolvida))
+            resultado.append(
+                _montar_item(payload, seq, resolvida, db=db, filial_id=filial_id)
+            )
     return resultado
 
 
@@ -255,7 +299,7 @@ def criar(db: Session, *, filial_id: int, usuario_id: int, dados: OsCreate) -> O
         cliente_id=dados.cliente_id,
         itens=dados.itens,
     )
-    itens = _montar_itens(dados.itens, resolvidas)
+    itens = _montar_itens(dados.itens, resolvidas, db=db, filial_id=filial_id)
     _anexar_custo_ao_snapshot(db, filial_id, itens, resolvidas)
     valor_itens, valor_total = _totais(itens, dados.desconto)
     os_obj = OrdemServico(
@@ -363,7 +407,9 @@ def atualizar(
             cliente_id=os_obj.cliente_id,
             itens=dados.itens,
         )
-        os_obj.itens = _mesclar_itens(list(os_obj.itens), dados.itens, resolvidas)
+        os_obj.itens = _mesclar_itens(
+            list(os_obj.itens), dados.itens, resolvidas, db=db, filial_id=filial_id
+        )
         _anexar_custo_ao_snapshot(db, filial_id, os_obj.itens, resolvidas)
     valor_itens, valor_total = _totais(os_obj.itens, desconto)
     os_obj.desconto = desconto

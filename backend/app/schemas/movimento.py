@@ -36,6 +36,9 @@ class OsItemIn(BaseModel):
     # M1 (PRD v3.0 §3.2.2): item próprio ou serviço de fornecedor. Item de
     # fornecedor nasce "Aguardando cotação" (valor 0) até a cotação selecionada.
     tipo: TipoItemOs = TipoItemOs.PROPRIO
+    # Edição rápida na grade: VF informado diretamente (sem abrir o modal de
+    # cotações). O servidor gera o snapshot e o VO com a precificação vigente.
+    vf: Decimal | None = Field(default=None, ge=0)
     # V0: regra de preço enviada pelo cliente; o servidor calcula o unitário.
     # Itens de fornecedor ignoram este campo (o preço vem da cotação).
     regra_preco: RegraPrecoIn | None = Field(default=None)

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QGroupBox,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -260,6 +261,15 @@ class PaginaCrud(QWidget):
             self._form_grade.addWidget(aviso)
 
         for titulo_secao, campos in self._lista_secoes:
+            if titulo_secao and titulo_secao in getattr(self, "SECOES_RECOLHEIS", ()):
+                grupo = QGroupBox(titulo_secao.upper())
+                grupo.setCheckable(True)
+                grupo.setChecked(getattr(self, "SECOES_ABERTAS_PADRAO", True))
+                grade = grade_campos()
+                dispor_campos(grade, campos)
+                grupo.setLayout(grade)
+                self._form_grade.addWidget(grupo)
+                continue
             if titulo_secao:
                 self._form_grade.addWidget(rotulo_secao(titulo_secao))
             grade = grade_campos()

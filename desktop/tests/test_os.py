@@ -231,7 +231,7 @@ def test_nova_os_posta_com_itens_e_cliente(app, pumpar, pagina):
     pagina._itens._qtd.setText("3")
     pagina._itens._unit.setText("10")
     pagina._itens._dimensoes.setText("1.00x2.00")
-    [b for b in pagina._itens.findChildren(QPushButton) if b.text() == "Adicionar"][0].click()
+    [b for b in pagina._itens.findChildren(QPushButton) if b.text() == "+ Adicionar Novo Item"][0].click()
     pumpar(lambda: len(pagina._itens.valor()) == 1)
 
     pagina._btn_salvar.click()
@@ -317,7 +317,7 @@ def test_orcamento_envia_tipo_orcamento_no_post(app, pumpar):
     combo.setCurrentIndex(combo.findData(6))
     pagina._itens._qtd.setText("1")
     pagina._itens._unit.setText("84")
-    [b for b in pagina._itens.findChildren(QPushButton) if b.text() == "Adicionar"][0].click()
+    [b for b in pagina._itens.findChildren(QPushButton) if b.text() == "+ Adicionar Novo Item"][0].click()
     pumpar(lambda: len(pagina._itens.valor()) == 1)
     pagina._btn_salvar.click()
     pumpar(lambda: any(escr[0] == "POST" for escr in _ESCRITAS))
@@ -334,7 +334,7 @@ def _adicionar_item(pagina, produto_id=5, qtd="1", unit="10"):
     pagina._itens._qtd.setText(qtd)
     pagina._itens._unit.setText(unit)
     botoes = [
-        b for b in pagina._itens.findChildren(QPushButton) if b.text() == "Adicionar"
+        b for b in pagina._itens.findChildren(QPushButton) if b.text() == "+ Adicionar Novo Item"
     ]
     botoes[0].click()
 
@@ -509,17 +509,39 @@ def test_botoes_do_orcamento(app, pagina_orcamento):
     assert "orçamento" in pagina_orcamento._btn_salvar.toolTip().lower()
 
 
-def test_acoes_de_lista_se_escondem_no_formulario(app, pagina_orcamento):
-    """Converter/Cancelar agem sobre a lista; no formulário só faz sentido Cotações."""
+def test_converter_fica_visivel_e_bloqueado_no_rascunho(app, pagina_orcamento):
+    """No formulário, Converter atua no rascunho e começa desabilitado."""
     assert not pagina_orcamento._widget_converter.isHidden()
     assert not pagina_orcamento._act_cot.isVisible()
 
     pagina_orcamento._novo()
 
-    assert pagina_orcamento._widget_converter.isHidden()
+    assert not pagina_orcamento._widget_converter.isHidden()
+    assert not pagina_orcamento._btn_converter.isEnabled()
+    assert "Salve" in pagina_orcamento._btn_converter.toolTip()
     assert not pagina_orcamento._act_cancelar.isVisible()
     assert pagina_orcamento._act_cot.isVisible()
     assert pagina_orcamento._widget_cotacoes.isHidden()
+
+
+def test_converter_bloqueia_com_item_aguardando_cotacao(app, pagina_orcamento):
+    pagina_orcamento._novo()
+    pagina_orcamento._editando_id = 99  # rascunho já salvo
+    grade = pagina_orcamento._itens
+    grade._check_fornecedor.setChecked(True)
+    grade._descricao.setText("Adesivo Vinil")
+    grade._adicionar()
+    pagina_orcamento._atualizar_converter()
+
+    assert grade.itens_pendentes()
+    assert not pagina_orcamento._btn_converter.isEnabled()
+    assert "aguardando cotação" in pagina_orcamento._btn_converter.toolTip()
+
+    grade.aplicar_cotacao(None, {"vf": "35", "cp": "80.50", "vo": "85.33"})
+    pagina_orcamento._atualizar_converter()
+
+    assert not grade.itens_pendentes()
+    assert pagina_orcamento._btn_converter.isEnabled()
 
 
 def test_botao_cotacoes_aparece_com_item_de_fornecedor(app, pagina_orcamento):
@@ -530,6 +552,22 @@ def test_botao_cotacoes_aparece_com_item_de_fornecedor(app, pagina_orcamento):
     grade._adicionar()
     grade._tabela.selectRow(0)
     assert not pagina_orcamento._widget_cotacoes.isHidden()
+
+
+def test_sinal_percentual_vira_valor_no_payload(app, pagina_orcamento):
+    pagina_orcamento._novo()
+    pagina_orcamento._cliente.definir(2)
+    grade = pagina_orcamento._itens
+    combo = grade._combo_produto
+    combo.setCurrentIndex(combo.findData(5))
+    grade._qtd.setText("2")
+    grade._unit.setText("100")
+    grade._adicionar()
+    pagina_orcamento._sinal_pct.definir("30")
+
+    payload = pagina_orcamento._payload()
+
+    assert payload["valor_sinal"] == "60.00"
 
 
 def test_hierarquia_de_botoes_primarios(pagina_orcamento):

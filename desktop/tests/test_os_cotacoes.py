@@ -1,15 +1,14 @@
-"""Testes da UI do orçamento com item de fornecedor e cotações (M1, §3.2.2)."""
+"""Testes da UI de orçamento: grade de precificação e modal de cotações."""
 
 from __future__ import annotations
 
 import httpx
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QComboBox, QRadioButton
 
 from printgest.core.api import Api
-from printgest.ui.grade_itens import GradeItens
+from printgest.ui.grade_itens import GradeItens, calcular_preco
 from printgest.ui.modulos.os import DialogoCotacoes
-from printgest.ui.tabela import TabelaDensa
 
 _PRODUTOS = [
     {"id": 5, "codigo": "B015", "nome": "Adesivo", "preco_venda": "10.00"},
@@ -34,9 +33,7 @@ def _handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": _PRODUTOS, "meta": {"total": 1, "limit": 50, "offset": 0}})
     if p.startswith("/v1/fornecedores"):
         return httpx.Response(200, json={"data": _FORNECEDORES, "meta": {"total": 2, "limit": 50, "offset": 0}})
-    if p.startswith("/v1/funcionarios"):
-        return httpx.Response(200, json={"data": [], "meta": {"total": 0, "limit": 50, "offset": 0}})
-    if p.startswith("/v1/clientes"):
+    if p.startswith("/v1/funcionarios") or p.startswith("/v1/clientes"):
         return httpx.Response(200, json={"data": [], "meta": {"total": 0, "limit": 50, "offset": 0}})
     if p == "/v1/os" and request.method == "GET":
         return httpx.Response(200, json={"data": [], "meta": {"total": 0, "limit": 50, "offset": 0}})
@@ -49,8 +46,6 @@ def _handler(request: httpx.Request) -> httpx.Response:
         })
     if "/cotacoes" in p and request.method == "POST":
         return httpx.Response(201, json={"data": {"id": 9}})
-    if "/selecionar" in p:
-        return httpx.Response(200, json={"data": {"id": 9, "selecionada": True}})
     return httpx.Response(200, json={"data": [], "meta": {"total": 0, "limit": 50, "offset": 0}})
 
 
@@ -60,7 +55,7 @@ def _api():
     return api
 
 
-# ------------------------------------------------------------- GradeItens (tipo)
+# ------------------------------------------------------------- GradeItens
 
 
 def test_grade_adiciona_item_de_fornecedor(app):
@@ -69,8 +64,28 @@ def test_grade_adiciona_item_de_fornecedor(app):
     grade._descricao.setText("Hot stamping fosco")
     grade._adicionar()
     assert grade._itens[0]["tipo"] == "fornecedor"
-    assert "Fornecedor" in grade._linhas_display()[0]["tipo"]
     assert "Aguardando" in grade._linhas_display()[0]["tipo"]
+    assert grade.itens_pendentes()
+
+
+def test_calculo_vf_cp_vo(app):
+    cp, vo = calcular_preco("87.35")
+    assert str(cp) == "200.91"
+    assert str(vo) == "212.96"
+
+
+def test_vf_digitado_na_grade_gera_cp_e_preco(app):
+    grade = GradeItens(api=_api())
+    grade._check_fornecedor.setChecked(True)
+    grade._descricao.setText("Adesivo Vinil")
+    grade._vf.setText("35,00")
+    grade._adicionar()
+
+    item = grade.valor()[0]
+    assert item["vf"] == "35.00"
+    assert item["custo"] == "80.50"
+    assert item["valor_unitario"] == "85.33"
+    assert not grade.itens_pendentes()
 
 
 def test_grade_proprio_por_padrao(app):
@@ -88,7 +103,6 @@ def test_grade_definir_le_tipo_e_estado_do_backend(app):
          "descricao_avulsa": "Hot stamping", "quantidade": "1",
          "valor_unitario": "212.96", "desconto": "0"},
     ])
-    assert grade._itens[0]["tipo"] == "fornecedor"
     assert grade._itens[0]["estado_cotacao"] == "cotado"
     assert "Cotado" in grade._linhas_display()[0]["tipo"]
 
@@ -98,25 +112,9 @@ def test_grade_item_selecionado_devolve_dados_internos(app):
     grade.definir([
         {"id": 10, "tipo": "fornecedor", "descricao_avulsa": "Hot stamping",
          "quantidade": "1", "valor_unitario": "0", "desconto": "0"},
-        {"id": 11, "tipo": "proprio", "descricao_avulsa": "Impressão",
-         "quantidade": "2", "valor_unitario": "5", "desconto": "0"},
     ])
     grade._tabela.selectRow(0)
-    item = grade.item_selecionado
-    assert item is not None
-    assert item["tipo"] == "fornecedor"
-    assert item["id"] == 10
-
-
-def test_grade_payload_inclui_tipo(app):
-    grade = GradeItens(api=_api())
-    grade._check_fornecedor.setChecked(True)
-    grade._descricao.setText("Corte e vinco")
-    grade._adicionar()
-    assert grade.valor()[0]["tipo"] == "fornecedor"
-
-
-# ------------------------------------------------------- DialogoCotacoes
+    assert grade.item_selecionado["id"] == 10
 
 
 def test_valor_unitario_editavel_direto_na_grade(app):
@@ -126,12 +124,11 @@ def test_valor_unitario_editavel_direto_na_grade(app):
         "quantidade": "2", "valor_unitario": "10", "desconto": "0",
     }])
 
-    celula = grade._tabela.item(0, 5)
+    celula = grade._tabela.item(0, 6)  # Preço Unit.
     assert celula.flags() & Qt.ItemFlag.ItemIsEditable
     celula.setText("12,50")
-
     assert grade.valor()[0]["valor_unitario"] == "12.50"
-    assert not grade._tabela.item(0, 2).flags() & Qt.ItemFlag.ItemIsEditable
+    assert not grade._tabela.item(0, 5).flags() & Qt.ItemFlag.ItemIsEditable
 
 
 def test_item_aguardando_cotacao_tem_aviso_visual(app):
@@ -141,16 +138,9 @@ def test_item_aguardando_cotacao_tem_aviso_visual(app):
     grade._adicionar()
 
     assert "⚠" in grade._linhas_display()[0]["tipo"]
+    assert grade._linhas_display()[0]["valor_unitario"] == "Aguard. Cotação"
     assert not grade._aviso_pendente.isHidden()
-    assert "cotação" in grade._aviso_pendente.text().lower()
-
-
-def test_dialogo_explica_campos_e_abrevia_vf(app):
-    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
-
-    assert dialogo._tabela.horizontalHeaderItem(1).text() == "Valor fornecedor"
-    assert "Sem data" in dialogo._campo_validade._sem.toolTip()
-    assert "fornecedor" in dialogo._campo_vf.edicao.toolTip().lower()
+    assert grade._tabela.cellWidget(0, 10) is not None
 
 
 def test_selecao_de_item_abre_formulario_de_edicao(app):
@@ -162,59 +152,46 @@ def test_selecao_de_item_abre_formulario_de_edicao(app):
     grade._tabela.selectRow(0)
 
     assert grade._btn_adicionar.text() == "Salvar item"
-    assert not grade._btn_cancelar_edicao.isHidden()
     assert grade._unit.text() == "10"
-
     grade._unit.setText("12")
     grade._adicionar()
 
-    assert len(grade.valor()) == 1
     assert grade.valor()[0]["valor_unitario"] == "12"
-    assert grade._btn_adicionar.text() == "Adicionar"
-    assert grade._btn_cancelar_edicao.isHidden()
+    assert grade._btn_adicionar.text() == "+ Adicionar Novo Item"
 
 
-def test_grade_resumo_no_singular_e_estado_vazio(app):
+def test_grade_resumo_e_estado_vazio(app):
     grade = GradeItens(api=_api())
     assert "Nenhum item" in grade._tabela._vazio.text()
 
     grade._descricao.setText("Serviço avulso")
     grade._adicionar()
 
-    assert grade._resumo.text().startswith("1 item •")
-    assert grade._resumo.text().count("1 item ") == 1
+    assert grade._resumo.text().startswith("Itens (1):")
 
 
-def test_dialogo_exibe_rotulos_e_coluna_selecionada(app):
-    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
-    assert dialogo._campo_vf.rotulo_widget.parent() is not None
-    assert dialogo._campo_fornecedor.rotulo_widget.parent() is not None
-    assert dialogo._tabela.horizontalHeaderItem(4).text() == "Selecionada"
+# ------------------------------------------------------- DialogoCotacoes
 
 
 def test_dialogo_mostra_tabela_com_vf_e_snapshot(app):
     dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "Hot stamping"})
-    # tabela tem as duas cotações
     assert dialogo._tabela.rowCount() == 2
-    # VF na primeira linha (selecionada)
     assert "87.35" in dialogo._tabela.item(0, 1).text()
-    # snapshot visível
+    assert isinstance(dialogo._tabela.cellWidget(0, 0), QComboBox)
+    assert isinstance(dialogo._tabela.cellWidget(0, 4), QRadioButton)
     assert "VF: R$ 87.35" in dialogo._lbl_snapshot.text()
-    assert "CP: R$ 200.91" in dialogo._lbl_snapshot.text()
-    assert "VO: R$ 212.96" in dialogo._lbl_snapshot.text()
-    # estado: cotado
-    assert "cotado" in dialogo._lbl_estado.text().lower()
+    assert "Preço Unit.: R$ 212.96" in dialogo._lbl_snapshot.text()
+    assert "aprovada" in dialogo._lbl_estado.text().lower()
 
 
 def test_dialogo_sem_item_salvo_desabilita(app):
-    dialogo = DialogoCotacoes(None, _api(), 7, {"descricao_avulsa": "X"})  # sem id
-    assert not dialogo._btn_lancar.isEnabled()
-    assert not dialogo._tabela.isEnabled()
+    dialogo = DialogoCotacoes(None, _api(), 7, {"descricao_avulsa": "X"})
+    assert not dialogo._btn_aprovar.isEnabled()
 
 
 def test_dialogo_sem_cotacoes_mostra_orientacao(app):
     def handler_vazio(request):
-        if "/cotacoes" in request.url.path:
+        if "/cotacoes" in request.url.path and request.method == "GET":
             return httpx.Response(200, json={"data": [], "estado_cotacao": "aguardando", "selecionado": None})
         return _handler(request)
 
@@ -226,15 +203,12 @@ def test_dialogo_sem_cotacoes_mostra_orientacao(app):
 
 
 def test_dialogo_vf_restrito_para_operador(app):
-    """Sem `ver_custo_terceiro`, o servidor omite vf — o diálogo mostra (restrito)."""
     def handler_operador(request):
-        if "/cotacoes" in request.url.path:
+        if "/cotacoes" in request.url.path and request.method == "GET":
             return httpx.Response(200, json={
                 "data": [{"id": 1, "fornecedor_id": 3, "fornecedor_nome": "Laminadora",
-                          "prazo_dias": 5, "validade": None, "selecionada": True,
-                          "criado_em": "2026-10-27T10:00:00"}],  # SEM vf
-                "estado_cotacao": "cotado",
-                "selecionado": None,  # SEM snapshot
+                          "prazo_dias": 5, "validade": None, "selecionada": True}],
+                "estado_cotacao": "cotado", "selecionado": None,
             })
         return _handler(request)
 
@@ -242,56 +216,54 @@ def test_dialogo_vf_restrito_para_operador(app):
     api.autenticar({"token": "t", "usuario": {"id": 1, "nome": "x", "login": "x"}})
     dialogo = DialogoCotacoes(None, api, 7, {"id": 10, "descricao_avulsa": "X"})
     assert "(restrito)" in dialogo._tabela.item(0, 1).text()
-    assert dialogo._lbl_snapshot.text() == ""  # snapshot não veio
+    assert dialogo._lbl_snapshot.text() == ""
 
 
-def _sem_dialogos(monkeypatch):
-    """Evita QMessageBox modal travar o offscreen."""
-    from PySide6.QtWidgets import QMessageBox
+def test_dialogo_radio_exclusivo(app):
+    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
+    radio = dialogo._tabela.cellWidget(1, 4)
+    radio.setChecked(True)
+    outro = dialogo._tabela.cellWidget(0, 4)
+    assert not outro.isChecked()
+
+
+def test_dialogo_aprovar_envia_vf_e_devolve_snapshot(app, monkeypatch):
+    from PySide6.QtWidgets import QDialog, QMessageBox
 
     monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
-    monkeypatch.setattr(QMessageBox, "critical", staticmethod(lambda *a, **k: None))
-    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(QDialog, "accept", lambda self: None)
 
-
-def test_dialogo_lancar_valida_campos_obrigatorios(app, monkeypatch):
-    _sem_dialogos(monkeypatch)
     dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
-    dialogo._campo_fornecedor.definir(None)  # sem fornecedor
-    dialogo._lancar()
-    assert dialogo._btn_lancar.isEnabled()
-    assert dialogo._btn_lancar.text() == "Lançar cotação"
+    dialogo._tabela.item(0, 1).setText("50,00")
+    radio = dialogo._tabela.cellWidget(0, 4)
+    radio.setChecked(True)
+
+    dialogo._aprovar()
+
+    assert dialogo.aprovado["vo"] == "212.96"
+    assert dialogo._btn_aprovar.isEnabled()
+    assert dialogo._btn_aprovar.text() == "Aprovar Cotação"
 
 
-def test_dialogo_lancar_envia_payload_e_limpa(app, monkeypatch):
-    _sem_dialogos(monkeypatch)
-    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
-    dialogo._campo_fornecedor.definir(3)  # Laminadora
-    dialogo._campo_vf.definir("50")  # VF 50
-    dialogo._campo_prazo.definir("7")
-    dialogo._check_selecionar.definir(True)
+def test_dialogo_aprovar_existente_usa_put_sem_duplicar(app, monkeypatch):
+    from PySide6.QtWidgets import QDialog
 
-    dialogo._lancar()
-    assert dialogo._btn_lancar.isEnabled()
-    assert dialogo._campo_vf.valor() is None
-    assert not dialogo._check_selecionar.valor()
+    chamadas: list[str] = []
 
+    def handler_com_registro(request):
+        chamadas.append(f"{request.method} {request.url.path}")
+        return _handler(request)
 
-def test_dialogo_selecionar_exige_linha(app, monkeypatch):
-    _sem_dialogos(monkeypatch)
-    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
-    dialogo._tabela.clearSelection()
-    dialogo._selecionar()  # sem linha: só avisa, não explode
-    assert dialogo._btn_selecionar.text() == "Selecionar marcada"
+    api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(handler_com_registro))
+    api.autenticar({"token": "t", "usuario": {"id": 1, "nome": "Admin", "nivel_acesso": "admin"}})
+    monkeypatch.setattr(QDialog, "accept", lambda self: None)
 
+    dialogo = DialogoCotacoes(None, api, 7, {"id": 10, "descricao_avulsa": "X"})
+    dialogo._tabela.cellWidget(0, 4).setChecked(True)
+    dialogo._aprovar()
 
-def test_dialogo_selecionar_envia_e_recarrega(app, monkeypatch):
-    _sem_dialogos(monkeypatch)
-    dialogo = DialogoCotacoes(None, _api(), 7, {"id": 10, "descricao_avulsa": "X"})
-    dialogo._tabela.selectRow(1)  # Gráfica B (id=2, não selecionada)
-    dialogo._selecionar()
-    assert dialogo._btn_selecionar.isEnabled()
-    assert dialogo._btn_selecionar.text() == "Selecionar marcada"
+    assert any(c.startswith("PUT") and "/selecionar" in c for c in chamadas)
+    assert not any(c.startswith("POST") and c.endswith("/cotacoes") for c in chamadas)
 
 
 # ------------------------------------------------------- Api (rotas de cotacao)
