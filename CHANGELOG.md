@@ -9,6 +9,25 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.45] - 2026-11-27 — Layout do PDV: formas de pagamento e estado vazio
+
+### Desktop
+- As 6 formas de pagamento usam `FlowLayout` e ocupam a largura toda do painel:
+  PIX, Boleto e Fiado não ficam mais cortados pela barra vertical (rolagem
+  horizontal do painel é desligada).
+- Instrução do estado vazio ("Busque um produto/serviço e pressione Enter...")
+  passa a ocupar a largura da grade e quebra corretamente, sem corte.
+- Margem à direita no formulário rolável evita que os campos fiquem sob a
+  barra vertical; `Parcelas/Valor recebido/Troco/Desconto` reorganizados em
+  duas colunas equilibradas.
+
+### Validação
+Backend: 540 passed. Desktop: 568 passed, 4 xfailed. Mutação: 74/74 mortos
+(1 novo). Captura offscreen conferida; teste de regressão para os 6 toggles em
+1280×720 e 1920×1080.
+
+---
+
 ## [0.5.44] - 2026-11-27 — Estações/Consolidação e log do daemon
 
 ### Backend

@@ -4,7 +4,7 @@ Roda a Tela Principal em 1280x720, 1366x768 e 1920x1080 (offscreen) já na visã
 "Nova venda" e verifica, programaticamente, os critérios de aceite:
 
   - nenhuma rolagem horizontal nas grades do PDV;
-  - a visão "Nova venda" não contém `QScrollArea` (nada de rolagem aninhada);
+  - o painel direito rola só na vertical, com rodapé de Total/ações fixo;
   - o botão "Finalizar venda" fica inteiro dentro da janela em qualquer tamanho;
   - rótulos e campos não são cortados verticalmente.
 """
@@ -140,6 +140,27 @@ def _pdv(pumpar):
     pagina = principal._paginas["pdv"]
     pumpar(lambda: pagina._total == 1)
     return principal, pagina
+
+
+@pytest.mark.parametrize("largura,altura", [(1280, 720), (1920, 1080)])
+def test_toggles_de_pagamento_cabem_no_painel(app, pumpar, largura, altura):
+    """As 6 formas não podem ficar cortadas pela barra vertical do painel."""
+    principal, pagina = _pdv(pumpar)
+    principal.resize(largura, altura)
+    principal.show()
+    app.processEvents()
+
+    botoes = list(pagina._toggles_forma.values())
+    assert len(botoes) == 6
+    painel = pagina._campo_forma
+    for botao in botoes:
+        origem = botao.mapTo(painel, QPoint(0, 0))
+        assert origem.x() >= -1, f"forma cortada à esquerda: {botao.text()}"
+        assert origem.x() + botao.width() <= painel.width() + 1, (
+            f"forma cortada à direita: {botao.text()}"
+        )
+    # FlowLayout: com 340–380 px as opções quebram em mais de uma linha.
+    assert len({botao.mapTo(painel, QPoint(0, 0)).y() for botao in botoes}) > 1
 
 
 @pytest.mark.parametrize("largura,altura", _RESOLUCOES)

@@ -282,9 +282,10 @@ class EditorItensVenda(QWidget):
         titulo = QLabel("🔍 Busque um produto/serviço e pressione Enter para adicionar")
         titulo.setObjectName("vazioTabela")
         titulo.setWordWrap(True)  # P3/125%: evita corte no painel estreito
-        titulo.setWordWrap(True)
         titulo.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        col.addWidget(titulo, 0, Qt.AlignmentFlag.AlignHCenter)
+        # Sem flag de alinhamento no addWidget: o rótulo ocupa a largura toda
+        # e o word-wrap realmente quebra a instrução (antes ficava cortado).
+        col.addWidget(titulo)
         chips = QHBoxLayout()
         chips.setSpacing(6)
         chips.addStretch(1)
@@ -913,8 +914,11 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         rolagem.setFrameShape(QFrame.Shape.NoFrame)
         rolagem.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         formulario = QWidget()
+        formulario.setMinimumWidth(0)  # encolhe com a barra vertical visível
         col_f = QVBoxLayout(formulario)
-        col_f.setContentsMargins(0, 0, 0, 0)
+        # Margem à direita reserva a largura da barra vertical: os campos não
+        # ficam sob o scrollbar (antes pareciam "cortados").
+        col_f.setContentsMargins(0, 0, 6, 0)
         col_f.setSpacing(10)
 
         self._cliente = CampoCombo("Cliente", [(None, "Consumidor final")])
@@ -934,8 +938,10 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         self._forma = CampoCombo("Forma de pagamento", FORMAS_PAGAMENTO)
         self._forma.widget.setVisible(False)  # mantido como estado interno
         self._toggles_forma: dict[str, QPushButton] = {}
-        linha_toggles = QHBoxLayout()
-        linha_toggles.setSpacing(6)
+        # 6 formas em 340–380 px numa QHBoxLayout cortavam PIX/Boleto/Fiado
+        # (a rolagem horizontal do painel está desligada). FlowLayout quebra
+        # em linhas e mantém todas as opções visíveis e tocáveis.
+        linha_toggles = FlowLayout(margem=0, espaco_h=6, espaco_v=6)
         for forma, rotulo in FORMAS_PAGAMENTO:
             botao = QPushButton(rotulo)
             botao.setCheckable(True)
@@ -986,11 +992,13 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
         grade.setVerticalSpacing(10)
         grade.addWidget(self._campo_cliente, 0, 0, 1, 2)
         grade.addWidget(self._campo_vendedor, 1, 0, 1, 2)
-        grade.addWidget(self._campo_forma, 2, 0)
-        grade.addWidget(self._campo_parcelas, 2, 1)
-        grade.addWidget(self._campo_recebido, 3, 0)
+        # Toggles ocupam a largura inteira: o FlowLayout reparte as 6 formas
+        # entre linhas em vez de espremer duas colunas de 150 px.
+        grade.addWidget(self._campo_forma, 2, 0, 1, 2)
+        grade.addWidget(self._campo_parcelas, 3, 0)
         grade.addWidget(self._campo_troco, 3, 1)
-        grade.addWidget(self._campo_desconto, 4, 0)
+        grade.addWidget(self._campo_recebido, 4, 0)
+        grade.addWidget(self._campo_desconto, 4, 1)
         grade.setColumnStretch(0, 1)
         grade.setColumnStretch(1, 1)
         col_f.addLayout(grade)

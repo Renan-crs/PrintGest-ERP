@@ -573,6 +573,14 @@ MUTANTES = [
         pasta="desktop",
     ),
     Mutante(
+        "toggles_pagamento_cortados",
+        "desktop/printgest/ui/modulos/venda_balcao.py",
+        "        linha_toggles = FlowLayout(margem=0, espaco_h=6, espaco_v=6)",
+        "        linha_toggles = QHBoxLayout()",
+        "tests/test_venda_balcao_layout.py::test_toggles_de_pagamento_cabem_no_painel",
+        pasta="desktop",
+    ),
+    Mutante(
         "pdv_nao_indexa_sku",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "for chave in (codigo, sku, barras):",
