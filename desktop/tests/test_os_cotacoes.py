@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import httpx
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QRadioButton
+from PySide6.QtWidgets import QComboBox, QLabel, QRadioButton
 
 from printgest.core.api import Api
-from printgest.ui.grade_itens import GradeItens, calcular_preco
+from printgest.ui.grade_itens import GradeItens, calcular_preco, calcular_preco_item
 from printgest.ui.modulos.os import DialogoCotacoes
 
 _PRODUTOS = [
@@ -86,6 +88,64 @@ def test_vf_digitado_na_grade_gera_cp_e_preco(app):
     assert item["custo"] == "80.50"
     assert item["valor_unitario"] == "85.33"
     assert not grade.itens_pendentes()
+
+
+def test_editor_empilha_rotulo_acima_do_campo(app):
+    """Correção de renderização: rótulo e campo na mesma célula, sem sobreposição."""
+    from printgest.ui.grade_itens import GradeItens
+
+    grade = GradeItens(api=_api())
+    for campo, texto in (
+        (grade._combo_produto, "1) Produto / serviço"),
+        (grade._descricao, "Descrição avulsa"),
+        (grade._qtd, "Qtd."),
+        (grade._vf, "VF (R$) — fornecedor"),
+        (grade._unit, "Preço Unit. (R$)"),
+    ):
+        celula = campo.parentWidget()
+        assert celula is not None
+        rotulos = [l for l in celula.findChildren(QLabel) if l.text() == texto]
+        assert rotulos, texto
+
+
+def test_calculo_preco_item_vf_total_24_unidades(app):
+    resultado = calcular_preco_item("35.00", Decimal("24"), "total")
+    assert str(resultado["vf_tipo"]) == "total"
+    assert str(resultado["cp"]) == "80.50"
+    assert str(resultado["vo_total"]) == "85.33"
+    assert str(resultado["vo_unitario"]) == "3.5554"
+
+
+def test_grade_vf_total_24_unidades(app):
+    """VF de R$ 35,00 é o TOTAL de 24 adesivos — não R$ 2.047,92."""
+    grade = GradeItens(api=_api())
+    grade._check_fornecedor.setChecked(True)
+    grade._descricao.setText("Adesivo Vinil Transparente")
+    grade._qtd.setText("24")
+    grade._vf.setText("35,00")
+    grade._chk_vf_total.setChecked(True)
+    grade._adicionar()
+
+    item = grade.valor()[0]
+    assert item["vf_tipo"] == "total"
+    assert item["valor_unitario"] == "3.56"
+    linha = grade._linhas_display()[0]
+    assert "85,33" in linha["valor_total"]
+
+
+def test_dialogo_envia_vf_tipo_total(app):
+    dialogo = DialogoCotacoes(
+        None, _api(), 1, {"id": 1, "descricao_avulsa": "Adesivo Vinil"}
+    )
+    dialogo._chk_vf_total.setChecked(True)
+    celula = dialogo._tabela.item(0, 1)
+    assert celula is not None
+    celula.setText("35,00")
+
+    dados = dialogo._dados_linha(0)
+    assert dados is not None
+    assert dados["vf"] == "35.00"
+    assert dados["vf_tipo"] == "total"
 
 
 def test_grade_proprio_por_padrao(app):

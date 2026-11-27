@@ -82,22 +82,66 @@ def _pct_texto(pct: Decimal) -> str:
     return texto or "0"
 
 
+_VF_TIPOS = ("unitario", "total")
+
+
+def _vf_tipo_valido(vf_tipo: str) -> str:
+    tipo = str(vf_tipo or "unitario").strip().lower()
+    if tipo not in _VF_TIPOS:
+        raise ValueError(f"Tipo de VF inválido: {vf_tipo}.")
+    return tipo
+
+
 def snapshot_item_terceirizado(
-    vf, acrescimo_fornecedor_pct, markup_orcamento_pct
+    vf,
+    acrescimo_fornecedor_pct,
+    markup_orcamento_pct,
+    *,
+    quantidade=None,
+    vf_tipo: str = "unitario",
 ) -> dict:
     """Snapshot do item terceirizado (PRD §3.2.1): valores em texto, prontos
-    para `ordem_servico_item` — o que foi aplicado fica registrado para sempre."""
+    para `ordem_servico_item` — o que foi aplicado fica registrado para sempre.
+
+    `vf_tipo='unitario'` (padrão): VF é o preço de **uma** unidade; `vo` é o
+    unitário e o total é `vo × quantidade`.
+
+    `vf_tipo='total'`: VF é o valor **cobrado pelo fornecedor para toda a
+    quantidade pedida** (ex.: R$ 35,00 por 24 adesivos); `vo` é o total e o
+    unitário é derivado por divisão — o total do documento NÃO pode ser
+    recalculado como unitário arredondado × quantidade (3,56 × 24 ≠ 85,33).
+    """
+    tipo = _vf_tipo_valido(vf_tipo)
     vf_dec = _vf_valido(vf)
     acrescimo = _pct_valido(acrescimo_fornecedor_pct, "acréscimo")
     markup = _pct_valido(markup_orcamento_pct, "markup")
+    if tipo == "total":
+        if quantidade is None or Decimal(str(quantidade)) <= 0:
+            raise ValueError("VF total exige quantidade maior que zero.")
+        qtd = Decimal(str(quantidade))
+    else:
+        qtd = Decimal("1") if quantidade is None else Decimal(str(quantidade))
+        if qtd <= 0:
+            raise ValueError("Quantidade deve ser maior que zero.")
+
     cp = calcular_cp(vf_dec, acrescimo)
     vo = calcular_vo(cp, markup)
+    if tipo == "unitario":
+        vo_unitario = vo
+        vo_total = (vo * qtd).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
+    else:
+        vo_total = vo
+        vo_unitario = (vo / qtd).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     return {
         "vf": f"{vf_dec:.2f}",
+        "vf_tipo": tipo,
+        "quantidade": f"{qtd.normalize()}",
         "acrescimo_fornecedor_pct": _pct_texto(acrescimo),
         "markup_orcamento_pct": _pct_texto(markup),
         "cp": f"{cp:.2f}",
         "vo": f"{vo:.2f}",
+        "vo_unitario": f"{vo_unitario}",
+        "vo_total": f"{vo_total:.2f}",
     }
 
 
@@ -179,7 +223,13 @@ def definir_parametros(
 
 
 def calcular_item_terceirizado(
-    db: Session, *, filial_id: int, vf, fornecedor_id: int | None = None
+    db: Session,
+    *,
+    filial_id: int,
+    vf,
+    fornecedor_id: int | None = None,
+    quantidade=None,
+    vf_tipo: str = "unitario",
 ) -> dict:
     """Conveniência para o fluxo do M1/M2: lê os parâmetros (com sobrescrita
     do fornecedor, quando informado) e devolve o snapshot do item."""
@@ -188,4 +238,6 @@ def calcular_item_terceirizado(
         vf,
         pcts["acrescimo_fornecedor_pct"],
         pcts["markup_orcamento_pct"],
+        quantidade=quantidade,
+        vf_tipo=vf_tipo,
     )

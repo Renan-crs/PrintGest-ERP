@@ -117,10 +117,14 @@ def test_cotacao_selecionada_calcula_vo_e_atualiza_a_os(client, admin_token):
     ).json()
     assert comp["selecionado"] == {
         "vf": "100.00",
+        "vf_tipo": "unitario",
+        "quantidade": "1",
         "acrescimo_fornecedor_pct": "130",
         "markup_orcamento_pct": "6",
         "cp": "230.00",
         "vo": "243.80",
+        "vo_unitario": "243.80",
+        "vo_total": "243.80",
     }
 
 

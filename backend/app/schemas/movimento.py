@@ -39,6 +39,8 @@ class OsItemIn(BaseModel):
     # Edição rápida na grade: VF informado diretamente (sem abrir o modal de
     # cotações). O servidor gera o snapshot e o VO com a precificação vigente.
     vf: Decimal | None = Field(default=None, ge=0)
+    # VF informado na grade: 'unitario' (padrão) ou 'total' da quantidade.
+    vf_tipo: Literal["unitario", "total"] = "unitario"
     # V0: regra de preço enviada pelo cliente; o servidor calcula o unitário.
     # Itens de fornecedor ignoram este campo (o preço vem da cotação).
     regra_preco: RegraPrecoIn | None = Field(default=None)
@@ -184,6 +186,8 @@ class CotacaoIn(BaseModel):
 
     fornecedor_id: int
     vf: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    # 'total' = VF cobrado pelo fornecedor pela quantidade inteira do item.
+    vf_tipo: Literal["unitario", "total"] = "unitario"
     validade: date | None = None
     prazo_dias: int | None = Field(default=None, ge=0)
     observacoes: str | None = None
@@ -202,6 +206,7 @@ class CotacaoOut(BaseModel):
     fornecedor_id: int
     fornecedor_nome: str | None = None
     vf: Decimal | None = None
+    vf_tipo: Literal["unitario", "total"] = "unitario"
     validade: date | None = None
     prazo_dias: int | None = None
     observacoes: str | None = None

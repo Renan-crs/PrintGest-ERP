@@ -13,6 +13,7 @@ from pathlib import Path
 from PySide6.QtCore import QDate, QPoint, Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QCompleter,
     QFileDialog,
@@ -150,9 +151,19 @@ class DialogoCotacoes(QDialog):
         self._tabela.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self._tabela, 1)
 
+        self._chk_vf_total = QCheckBox(
+            "VF informado é o TOTAL da quantidade (ex.: R$ 35,00 por 24 unidades)"
+        )
+        self._chk_vf_total.setToolTip(
+            "Desmarcado: VF é o preço de uma unidade (padrão). "
+            "Marcado: VF é o montante cobrado pelo fornecedor pela quantidade inteira."
+        )
+        root.addWidget(self._chk_vf_total)
+
         self._lbl_calculo = QLabel(
-            "O sistema calcula CP (VF × 2,30) e Preço Unitário (CP × 1,06) "
-            "automaticamente a partir do VF aprovado."
+            "CP = VF × 2,30 e Preço Unitário = CP × 1,06. Quando o VF é o total "
+            "da quantidade, o calculado é o TOTAL da linha e o unitário é apenas "
+            "informativo — o total não é recalculado por unitário × quantidade."
         )
         self._lbl_calculo.setWordWrap(True)
         estado_muted(self._lbl_calculo)
@@ -237,10 +248,16 @@ class DialogoCotacoes(QDialog):
         aplicar_estilo(self._lbl_estado)
 
         if snapshot:
+            natureza = (
+                "total da quantidade"
+                if snapshot.get("vf_tipo") == "total"
+                else "unitário"
+            )
             self._lbl_snapshot.setText(
-                f"VF: R$ {snapshot.get('vf', '?')}  ·  "
+                f"VF: R$ {snapshot.get('vf', '?')} ({natureza})  ·  "
                 f"CP: R$ {snapshot.get('cp', '?')} (interno)  ·  "
-                f"Preço Unit.: R$ {snapshot.get('vo', '?')}"
+                f"Preço Unit.: R$ {snapshot.get('vo_unitario', snapshot.get('vo', '?'))}  ·  "
+                f"Total: R$ {snapshot.get('vo_total', snapshot.get('vo', '?'))}"
             )
         else:
             self._lbl_snapshot.clear()
@@ -272,7 +289,9 @@ class DialogoCotacoes(QDialog):
         self._tabela.preencher([
             {
                 "fornecedor": "",
-                "vf": f"{c.get('vf')}" if c.get("vf") is not None else "(restrito)",
+                "vf": (
+                    f"{c.get('vf')}" if c.get("vf") is not None else "(restrito)"
+                ),
                 "prazo": str(c.get("prazo_dias") or ""),
                 "validade": self._validade_texto(c.get("validade")),
                 "selecionar": "",
@@ -283,6 +302,12 @@ class DialogoCotacoes(QDialog):
             self._tabela.setCellWidget(
                 linha, 0, self._combo_fornecedores(cotacao.get("fornecedor_id"))
             )
+            celula_vf = self._tabela.item(linha, 1)
+            if celula_vf is not None:
+                celula_vf.setToolTip(
+                    "VF total da quantidade" if cotacao.get("vf_tipo") == "total"
+                    else "VF unitário (padrão)"
+                )
             self._marcar_radio(linha, bool(cotacao.get("selecionada")))
         self._tabela.estado_vazio(
             "Nenhuma cotação — adicione um fornecedor abaixo."
@@ -344,6 +369,7 @@ class DialogoCotacoes(QDialog):
         return {
             "fornecedor_id": fornecedor_id,
             "vf": str(vf),
+            "vf_tipo": "total" if self._chk_vf_total.isChecked() else "unitario",
             "prazo_dias": prazo,
             "validade": validade.toString("yyyy-MM-dd") if validade.isValid() else None,
         }
@@ -376,6 +402,7 @@ class DialogoCotacoes(QDialog):
         alterada = bool(
             existente is None
             or para_decimal(existente.get("vf")) != para_decimal(dados["vf"])
+            or (existente.get("vf_tipo") or "unitario") != dados["vf_tipo"]
             or (existente.get("prazo_dias") or None) != dados["prazo_dias"]
             or (existente.get("validade") or None) != dados["validade"]
         )

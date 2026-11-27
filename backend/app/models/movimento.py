@@ -204,6 +204,9 @@ class OrdemServicoItemCotacao(Base):
     __table_args__ = (
         CheckConstraint("vf >= 0", name="ck_os_item_cotacao_vf"),
         CheckConstraint(
+            "vf_tipo IN ('unitario', 'total')", name="ck_os_item_cotacao_vf_tipo"
+        ),
+        CheckConstraint(
             "prazo_dias IS NULL OR prazo_dias >= 0", name="ck_os_item_cotacao_prazo"
         ),
         Index("idx_os_item_cotacao_item", "item_id"),
@@ -226,6 +229,11 @@ class OrdemServicoItemCotacao(Base):
         BigInteger, ForeignKey("fornecedor.id"), nullable=False
     )
     vf: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # 'unitario' (padrão) = preço de uma unidade; 'total' = valor cobrado pelo
+    # fornecedor pela quantidade inteira do item (ex.: R$ 35,00 por 24 unidades).
+    vf_tipo: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default="unitario"
+    )
     validade: Mapped[date | None] = mapped_column(Date, nullable=True)
     prazo_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
     observacoes: Mapped[str | None] = mapped_column(Text)

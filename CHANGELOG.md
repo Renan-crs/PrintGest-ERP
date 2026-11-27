@@ -9,6 +9,27 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.41] - 2026-11-27 — VF unitário ou total do fornecedor
+
+### Backend
+- `vf_tipo` (`unitario` padrão / `total`) em cotações e itens de fornecedor;
+  snapshot passa a registrar `quantidade`, `vo_unitario` e `vo_total`.
+- Com VF total, o total da linha vem do VO calculado sobre o montante e **não**
+  é recalculado como unitário arredondado × quantidade.
+- Migration aditiva `a7b8c9d0e1f2` aplicada ao Neon com backup em branch.
+
+### Desktop
+- Checkbox "VF é o total da quantidade" na grade de itens e no modal de
+  cotações; comparativo mostra natureza do VF, unitário e total.
+- Correção de renderização no editor de inclusão de itens: rótulo empilhado
+  sobre cada campo (sem sobreposição), aplicado também ao novo checkbox.
+
+### Validação
+Backend: 527 passed. Desktop: 548 passed, 4 xfailed. Mutação: 63/63 mortos
+(3 novos).
+
+---
+
 ## [0.5.40] - 2026-11-26 — Orçamento com precificação transparente
 
 - Redesign da tela de orçamento e da grade de itens (commit `2deb8c6`,

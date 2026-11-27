@@ -478,6 +478,27 @@ MUTANTES = [
         pasta="desktop",
     ),
     Mutante(
+        "vf_total_tratado_como_unitario",
+        "backend/app/services/precificacao.py",
+        "    if tipo == \"unitario\":\n        vo_unitario = vo",
+        "    if True:\n        vo_unitario = vo",
+        "tests/test_vf_total.py::test_snapshot_vf_total_24_unidades",
+    ),
+    Mutante(
+        "total_recalculado_do_unitario_arredondado",
+        "backend/app/services/cotacao_service.py",
+        "    if vf_tipo == \"total\":\n        total = Decimal(snapshot[\"vo_total\"])",
+        "    if False:\n        total = Decimal(snapshot[\"vo_total\"])",
+        "tests/test_vf_total.py::test_cotacao_vf_total_ao_lancar",
+    ),
+    Mutante(
+        "vf_tipo_nao_persistido_na_cotacao",
+        "backend/app/services/cotacao_service.py",
+        '        vf_tipo=dados.vf_tipo or "unitario",',
+        '        vf_tipo="unitario",',
+        "tests/test_vf_total.py::test_selecionar_cotacao_vf_total_preserva_tipo",
+    ),
+    Mutante(
         "pdv_nao_indexa_sku",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "for chave in (codigo, sku, barras):",

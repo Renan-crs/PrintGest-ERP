@@ -77,6 +77,35 @@ def calcular_preco(vf) -> tuple[Decimal, Decimal]:
     return custo, final
 
 
+def calcular_preco_item(
+    vf, quantidade=None, vf_tipo: str = "unitario"
+) -> dict:
+    """Preço do item terceirizado com VF unitário ou total da quantidade.
+
+    Mantém `calcular_preco()` intacto para compatibilidade; aqui o retorno é
+    detalhado para a grade saber unitário, total e a natureza do VF.
+    """
+    custo, final = calcular_preco(vf)
+    qtd = _dec(quantidade) or Decimal("1")
+    if str(vf_tipo).lower() == "total":
+        if qtd <= 0:
+            raise ValueError("VF total exige quantidade maior que zero.")
+        unitario = (final / qtd).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
+        total = final
+    else:
+        unitario = final
+        total = (final * qtd).quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
+    return {
+        "cp": custo,
+        "vo": final,
+        "vo_unitario": unitario,
+        "vo_total": total,
+        "vf_tipo": "total" if str(vf_tipo).lower() == "total" else "unitario",
+    }
+
+
 class GradeItens(QWidget):
     """Cumpre o contrato de `CampoForm` (widget, valor, definir, habilitar) + `largo`."""
 
@@ -137,10 +166,17 @@ class GradeItens(QWidget):
         for coluna, stretch in enumerate((2, 2, 2, 1, 1, 1)):
             grade.setColumnStretch(coluna, stretch)
 
-        def rotulo(texto: str) -> QLabel:
+        def empilhado(texto: str, widget: QWidget) -> QWidget:
+            """Rótulo acima do controle — evita sobreposição na inclusão (G1)."""
+            celula = QWidget()
+            coluna = QVBoxLayout(celula)
+            coluna.setContentsMargins(0, 0, 0, 0)
+            coluna.setSpacing(2)
             lbl = QLabel(texto)
             lbl.setObjectName("labelForm")
-            return lbl
+            coluna.addWidget(lbl)
+            coluna.addWidget(widget)
+            return celula
 
         self._combo_produto = QComboBox()
         self._combo_produto.setMinimumWidth(180)
@@ -158,12 +194,9 @@ class GradeItens(QWidget):
         )
         self._check_fornecedor.toggled.connect(self._origem_mudou)
 
-        grade.addWidget(rotulo("1) Produto / serviço"), 0, 0)
-        grade.addWidget(rotulo("Descrição avulsa"), 0, 1)
-        grade.addWidget(rotulo("Origem"), 0, 2)
-        grade.addWidget(self._combo_produto, 1, 0)
-        grade.addWidget(self._descricao, 1, 1)
-        grade.addWidget(self._check_fornecedor, 1, 2)
+        grade.addWidget(empilhado("1) Produto / serviço", self._combo_produto), 0, 0)
+        grade.addWidget(empilhado("Descrição avulsa", self._descricao), 0, 1)
+        grade.addWidget(empilhado("Origem", self._check_fornecedor), 0, 2)
 
         self._qtd = QLineEdit("1")
         self._qtd.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -177,6 +210,12 @@ class GradeItens(QWidget):
         self._vf.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._vf.setToolTip("2) VF — valor do fornecedor (gera CP e preço automaticamente)")
         self._vf.setEnabled(False)
+        self._chk_vf_total = QCheckBox("VF é o total da quantidade")
+        self._chk_vf_total.setToolTip(
+            "Marque quando o fornecedor cobrar o valor pela quantidade inteira "
+            "(ex.: R$ 35,00 por 24 unidades)."
+        )
+        self._chk_vf_total.setEnabled(False)
         self._unit = QLineEdit()
         self._unit.setPlaceholderText("0,00")
         self._unit.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -186,16 +225,12 @@ class GradeItens(QWidget):
         self._desconto.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._desconto.setToolTip("2) Desconto em reais (opcional)")
 
-        grade.addWidget(rotulo("Qtd."), 2, 0)
-        grade.addWidget(rotulo("Dimensões"), 2, 1)
-        grade.addWidget(rotulo("VF (R$) — fornecedor"), 2, 2)
-        grade.addWidget(rotulo("Preço Unit. (R$)"), 2, 3)
-        grade.addWidget(rotulo("Desc. (R$)"), 2, 4)
-        grade.addWidget(self._qtd, 3, 0)
-        grade.addWidget(self._dimensoes, 3, 1)
-        grade.addWidget(self._vf, 3, 2)
-        grade.addWidget(self._unit, 3, 3)
-        grade.addWidget(self._desconto, 3, 4)
+        grade.addWidget(empilhado("Qtd.", self._qtd), 1, 0)
+        grade.addWidget(empilhado("Dimensões", self._dimensoes), 1, 1)
+        grade.addWidget(empilhado("VF (R$) — fornecedor", self._vf), 1, 2)
+        grade.addWidget(empilhado("Preço Unit. (R$)", self._unit), 1, 3)
+        grade.addWidget(empilhado("Desc. (R$)", self._desconto), 1, 4)
+        grade.addWidget(self._chk_vf_total, 2, 0, 1, 3)
 
         self._btn_adicionar = QPushButton("+ Adicionar Novo Item")
         self._btn_adicionar.setToolTip("Adicionar item (Enter nos campos)")
@@ -222,7 +257,7 @@ class GradeItens(QWidget):
         botoes.addWidget(self._btn_cancelar_edicao)
         botoes.addStretch(1)
         botoes.addWidget(self._btn_adicionar)
-        grade.addLayout(botoes, 4, 0, 1, 6)
+        grade.addLayout(botoes, 3, 0, 1, 6)
         return caixa
 
     # ------------------------------------------------------------ produtos
@@ -258,6 +293,7 @@ class GradeItens(QWidget):
 
     def _origem_mudou(self, marcado: bool) -> None:
         self._vf.setEnabled(marcado)
+        self._chk_vf_total.setEnabled(marcado)
         self._unit.setEnabled(not marcado)
 
     # --------------------------------------------------------------- itens
@@ -279,8 +315,14 @@ class GradeItens(QWidget):
         for item in self._itens:
             if item.get("id") == item_id and snapshot:
                 item["vf"] = str(snapshot.get("vf") or "0")
+                item["vf_tipo"] = snapshot.get("vf_tipo") or "unitario"
                 item["custo"] = str(snapshot.get("cp") or "0")
-                item["valor_unitario"] = str(snapshot.get("vo") or "0")
+                item["valor_unitario"] = str(
+                    snapshot.get("vo_unitario") or snapshot.get("vo") or "0"
+                )
+                item["_vo_total"] = str(
+                    snapshot.get("vo_total") or snapshot.get("vo") or "0"
+                )
                 item["estado_cotacao"] = "cotado"
         self._atualizar()
 
@@ -307,10 +349,17 @@ class GradeItens(QWidget):
         if fornecedor:
             vf = _dec(self._vf.text())
             if vf > 0:
-                cp, vo = calcular_preco(vf)
+                tipo_vf = "total" if self._chk_vf_total.isChecked() else "unitario"
+                calculo = calcular_preco_item(vf, qtd, tipo_vf)
                 novo.update({
-                    "vf": str(vf), "custo": str(cp),
-                    "valor_unitario": str(vo), "estado_cotacao": "cotado",
+                    "vf": str(vf),
+                    "vf_tipo": calculo["vf_tipo"],
+                    "custo": str(calculo["cp"]),
+                    "valor_unitario": str(
+                        calculo["vo_unitario"].quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
+                    ),
+                    "_vo_total": str(calculo["vo_total"]),
+                    "estado_cotacao": "cotado",
                 })
             else:
                 novo.update({"valor_unitario": "0", "estado_cotacao": "aguardando"})
@@ -344,6 +393,7 @@ class GradeItens(QWidget):
             campo.clear()
         self._qtd.setText("1")
         self._check_fornecedor.setChecked(False)
+        self._chk_vf_total.setChecked(False)
         self._btn_adicionar.setText("+ Adicionar Novo Item")
         self._btn_adicionar.setToolTip("Adicionar item (Enter nos campos)")
         self._btn_cancelar_edicao.setVisible(False)
@@ -374,6 +424,7 @@ class GradeItens(QWidget):
         self._check_fornecedor.setChecked(
             (item.get("tipo") or "proprio") == "fornecedor"
         )
+        self._chk_vf_total.setChecked(item.get("vf_tipo") == "total")
         self._btn_adicionar.setText("Salvar item")
         self._btn_adicionar.setToolTip("Salvar alterações no item selecionado")
         self._btn_cancelar_edicao.setVisible(True)
@@ -400,10 +451,16 @@ class GradeItens(QWidget):
         if coluna == _COL_VF and (item.get("tipo") or "proprio") == "fornecedor":
             vf = _dec(celula.text())
             if vf > 0:
-                cp, vo = calcular_preco(vf)
+                calculo = calcular_preco_item(
+                    vf, item.get("quantidade"), item.get("vf_tipo") or "unitario"
+                )
                 item["vf"] = str(vf)
-                item["custo"] = str(cp)
-                item["valor_unitario"] = str(vo)
+                item["vf_tipo"] = calculo["vf_tipo"]
+                item["custo"] = str(calculo["cp"])
+                item["valor_unitario"] = str(
+                    calculo["vo_unitario"].quantize(_CENTAVOS, rounding=ROUND_HALF_UP)
+                )
+                item["_vo_total"] = str(calculo["vo_total"])
                 item["estado_cotacao"] = "cotado"
             else:
                 item["vf"] = None
@@ -438,10 +495,14 @@ class GradeItens(QWidget):
             else:
                 tipo_texto = "Próprio"
                 situacao = "—"
-            total = (
-                _dec(item.get("valor_unitario")) * _dec(item.get("quantidade"))
-                - _dec(item.get("desconto"))
-            )
+            if item.get("vf_tipo") == "total" and item.get("_vo_total"):
+                # Total vem do VF total (3,56 × 24 ≠ 85,33).
+                base_total = _dec(item["_vo_total"])
+            else:
+                base_total = (
+                    _dec(item.get("valor_unitario")) * _dec(item.get("quantidade"))
+                )
+            total = base_total - _dec(item.get("desconto"))
             linhas.append({
                 "seq": f"{seq:02d}",
                 "descricao": descricao,

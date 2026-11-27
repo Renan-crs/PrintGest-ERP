@@ -83,13 +83,23 @@ def _aplicar_dados_item(
     )
     if vf_manual:
         parametros = precificacao.parametros(db, filial_id=filial_id)
+        vf_tipo = getattr(payload, "vf_tipo", "unitario") or "unitario"
         item.snapshot_preco = precificacao.snapshot_item_terceirizado(
             payload.vf,
             parametros["acrescimo_fornecedor_pct"],
             parametros["markup_orcamento_pct"],
+            quantidade=payload.quantidade,
+            vf_tipo=vf_tipo,
         )
-        unitario = Decimal(item.snapshot_preco["vo"])
-        total = _q(unitario * payload.quantidade - payload.desconto)
+        unitario = Decimal(item.snapshot_preco["vo_unitario"]).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        base_total = (
+            Decimal(item.snapshot_preco["vo_total"])
+            if vf_tipo == "total"
+            else unitario * payload.quantidade
+        )
+        total = _q(base_total - payload.desconto)
         if total < 0:
             total = Decimal("0.00")
         explicacao = []
@@ -740,6 +750,7 @@ def _copiar_itens(db: Session, origem: OrdemServico) -> list[OrdemServicoItem]:
                 OrdemServicoItemCotacao(
                     fornecedor_id=cot.fornecedor_id,
                     vf=cot.vf,
+                    vf_tipo=cot.vf_tipo or "unitario",
                     validade=cot.validade,
                     prazo_dias=cot.prazo_dias,
                     observacoes=cot.observacoes,

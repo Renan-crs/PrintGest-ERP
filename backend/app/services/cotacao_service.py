@@ -75,6 +75,7 @@ def para_out(cotacao: OrdemServicoItemCotacao, *, ver_custo: bool) -> dict:
         "prazo_dias": cotacao.prazo_dias,
         "observacoes": cotacao.observacoes,
         "selecionada": cotacao.selecionada,
+        "vf_tipo": cotacao.vf_tipo or "unitario",
         "criado_em": cotacao.criado_em,
     }
     if ver_custo:
@@ -106,15 +107,27 @@ def _aplicar_selecao(
         outra.selecionada = outra.id == cotacao.id
     cotacao.selecionada = True
 
+    vf_tipo = cotacao.vf_tipo or "unitario"
     snapshot = precificacao.calcular_item_terceirizado(
         db,
         filial_id=filial_id,
         vf=cotacao.vf,
         fornecedor_id=cotacao.fornecedor_id,  # M2: sobrescrita do fornecedor
+        quantidade=item.quantidade,
+        vf_tipo=vf_tipo,
     )
     item.snapshot_preco = snapshot
-    item.valor_unitario = Decimal(snapshot["vo"])
-    item.valor_total = (item.valor_unitario * item.quantidade - item.desconto).quantize(
+    # VF total: o total vem do VO calculado sobre o montante inteiro; o
+    # unitário é apenas informativo (3,56 × 24 ≠ 85,33). VF unitário mantém
+    # a regra antiga (unitário × quantidade).
+    item.valor_unitario = Decimal(snapshot["vo_unitario"]).quantize(
+        _CENTAVOS, rounding=ROUND_HALF_UP
+    )
+    if vf_tipo == "total":
+        total = Decimal(snapshot["vo_total"])
+    else:
+        total = item.valor_unitario * item.quantidade
+    item.valor_total = (total - item.desconto).quantize(
         _CENTAVOS, rounding=ROUND_HALF_UP
     )
     if item.valor_total < 0:
@@ -167,6 +180,7 @@ def lancar(
         item_id=item.id,
         fornecedor_id=dados.fornecedor_id,
         vf=dados.vf,
+        vf_tipo=dados.vf_tipo or "unitario",
         validade=dados.validade,
         prazo_dias=dados.prazo_dias,
         observacoes=dados.observacoes,
