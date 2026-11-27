@@ -673,6 +673,14 @@ class Api:
     def status_sync(self) -> dict:
         return self._get("/v1/plataforma/sync/status", self._token)
 
+    def config_sync(self) -> dict:
+        """Configuração de consolidação da filial (URL nunca em claro)."""
+        return self._get("/v1/plataforma/sync/config", self._token)
+
+    def configurar_sync(self, url: str | None) -> dict:
+        """Grava/remove a URL cifrada no cofre da filial ativa."""
+        return self._put("/v1/plataforma/sync/config", {"url": url}, self._token)
+
     def diagnostico_licenca(self) -> dict:
         return self._get("/v1/plataforma/diagnostico", self._token)
 

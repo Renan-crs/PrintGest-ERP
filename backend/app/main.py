@@ -97,6 +97,16 @@ def _configurar_logging() -> None:
             handler.addFilter(_FiltroRequestId())
         handler.setFormatter(formatador)
 
+    # Uvicorn usa loggers próprios com `propagate=False` e handlers apontando
+    # para stdout/stderr — que o daemon empacotado abre em DEVNULL. Sem isso,
+    # access log e erros do servidor NUNCA chegam ao arquivo rotativo.
+    for nome in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        uv = logging.getLogger(nome)
+        uv.propagate = True
+        if getattr(sys, "frozen", False):
+            uv.handlers.clear()
+        uv.setLevel(logging.INFO)
+
 
 _configurar_logging()
 

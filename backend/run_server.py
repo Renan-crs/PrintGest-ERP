@@ -134,7 +134,15 @@ def main() -> None:
     from app.main import app
 
     logger.info("Iniciando uvicorn em %s:%s", settings.api_host, settings.api_port)
-    uvicorn.run(app, host=settings.api_host, port=settings.api_port, reload=False)
+    # `log_config=None`: não deixa o uvicorn substituir os handlers de arquivo
+    # instalados por `_anexar_log_em_arquivo()` (nem apontá-los para o DEVNULL).
+    uvicorn.run(
+        app,
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=False,
+        log_config=None,
+    )
 
 
 if __name__ == "__main__":

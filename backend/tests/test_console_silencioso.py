@@ -66,6 +66,20 @@ def test_log_em_arquivo_precede_basic_config_e_nao_usa_stderr(
         monkeypatch.setattr(sys, "executable", exe_original)
 
 
+def test_loggers_do_uvicorn_propagram_para_o_arquivo():
+    import app.main  # noqa: F401 — executa _configurar_logging() na importação
+
+    for nome in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        assert logging.getLogger(nome).propagate is True, (
+            f"{nome} não propaga para o handler de arquivo sanitizado"
+        )
+
+
+def test_run_server_nao_reconfigura_logging_do_uvicorn():
+    codigo = (RAIZ / "backend" / "run_server.py").read_text(encoding="utf-8")
+    assert "log_config=None" in codigo
+
+
 def test_configurar_logging_sobrevive_a_stderr_none():
     from app.main import _configurar_logging
 

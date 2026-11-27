@@ -10,6 +10,24 @@ from printgest.core.api import Api, ApiError
 from printgest.core.logging_app import configurar_logging
 
 
+def test_mascara_chave_de_licenca_e_dsn():
+    from printgest.core.logging_app import mascarar
+
+    texto = mascarar(
+        "chave_ativacao=ABCD-EFGH-IJKL-MNOP "
+        "database_url=postgresql://printgest:segredo@neon.host/db "
+        "chave_licenca=XXXX-YYYY-ZZZZ-WWWW sk_live_abc123 "
+        # Chave solta (sem `chave=`) — só o padrão de produto a pega.
+        "Licença informada pelo suporte: QWER-ASDF-ZXCV-POIU"
+    )
+    assert "ABCD-EFGH-IJKL-MNOP" not in texto
+    assert "XXXX-YYYY-ZZZZ-WWWW" not in texto
+    assert "QWER-ASDF-ZXCV-POIU" not in texto
+    assert "postgresql://printgest:segredo" not in texto
+    assert "sk_live_abc123" not in texto
+    assert texto.count("***") >= 3
+
+
 def test_configurar_logging_cria_arquivo_rotativo(tmp_path):
     destino = tmp_path / "logs" / "printgest.log"
     caminho = configurar_logging(destino)

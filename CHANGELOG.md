@@ -9,6 +9,31 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.44] - 2026-11-27 — Estações/Consolidação e log do daemon
+
+### Backend
+- `/v1/plataforma/estacoes` e `/v1/plataforma/filiais` passam a usar o mesmo
+  envelope `{"data": ...}` das demais rotas. Antes, o desktop tentava ler
+  `resp.json()["data"]` num corpo cru e mostrava o erro `'data'`.
+- Uvicorn não substitui mais os handlers de arquivo do daemon (`log_config=None`)
+  e seus loggers propagam para o arquivo rotativo sanitizado: access log e
+  erros do servidor deixam de se perder nos streams `DEVNULL`.
+
+### Desktop
+- Aba Consolidação consulta o cofre antes de acessar o Neon: sem URL para a
+  filial, mostra "Consolidação não configurada" no lugar de popup de erro.
+  Admin pode informar/remover a URL do role da filial na própria aba (campo de
+  senha; gravada cifrada, nunca em `.env`, banco ou log).
+- Mascaramento de log alinhado ao backend (chaves de licença/produto, DSN,
+  `chave_licenca`, `database_url`, `redgest_url`, `sk_/rk_`). Corrigido o
+  `IndexError` ao mascarar chaves de produto sem grupo de captura.
+
+### Validação
+Backend: 540 passed. Desktop: 566 passed, 4 xfailed. Mutação: 73/73 mortos
+(4 novos). Documentação: `docs/logging_erros.md`.
+
+---
+
 ## [0.5.43] - 2026-11-27 — Parametrização IBS/CBS (LC 214/2025)
 
 ### Backend

@@ -15,24 +15,39 @@ import traceback
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+# Mesmas chaves mascaradas pelo backend (`app/core/log_seguranca.py`), para que
+# um erro do cliente nunca grave licença, DSN ou credencial de integração.
 _PADROES = (
     re.compile(r"(Bearer\s+)\S+", re.IGNORECASE),
     re.compile(r"(postgresql(?:\+psycopg)?://)[^:@/\s]+:[^@/\s]+@", re.IGNORECASE),
     re.compile(
-        r"\b(token|api[_-]?key|senha|password|secret|authorization|credencial)"
-        r"\s*[:=]\s*\S+", re.IGNORECASE,
+        r"\b(token|api[_-]?key|apikey|senha|password|secret|authorization"
+        r"|chave[_-]?privada|private[_-]?key|credencial|certificado"
+        r"|client_secret|chave[_-]?ativacao|chave[_-]?licenca|codigo[_-]?licenca"
+        r"|codigo[_-]?ativacao|product[_-]?key|database[_-]?url|redgest[_-]?url"
+        r"|fiscal[_-]?gateway[_-]?token)\s*[:=]\s*\S+",
+        re.IGNORECASE,
     ),
+    re.compile(r"\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}\b"),
     re.compile(r"\b(sk_|rk_)[A-Za-z0-9_\-]+", re.IGNORECASE),
 )
+
+
+def _substituir(match: re.Match[str]) -> str:
+    # Nem todos os padrões têm grupo 1 (ex.: chave de produto completa).
+    try:
+        grupo = match.group(1)
+    except IndexError:
+        grupo = None
+    if grupo is None:
+        return "***"
+    return f"{grupo.rstrip()} ***"
 
 
 def mascarar(valor: str) -> str:
     texto = str(valor)
     for padrao in _PADROES:
-        texto = padrao.sub(
-            lambda m: f"{m.group(1).rstrip()} ***" if m.group(1) else "***",
-            texto,
-        )
+        texto = padrao.sub(_substituir, texto)
     return texto
 
 

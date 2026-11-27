@@ -68,7 +68,10 @@ def test_filial_papel_e_instalacao(client, admin_token):
     assert invalido.status_code == 400
 
     lista = client.get("/v1/plataforma/filiais", headers=h).json()
-    assert any(f["id"] == FILIAL and f["papel"] == "MATRIZ" for f in lista)
+    assert any(
+        f["id"] == FILIAL and f["papel"] == "MATRIZ" for f in lista["data"]
+    )
+    assert lista["meta"]["total"] == len(lista["data"])
 
 
 def test_filial_nao_pode_alterar_outra(client, admin_token):
@@ -118,7 +121,9 @@ def test_estacao_registro_limite_e_remocao(client, admin_token, monkeypatch):
     assert terceira.status_code == 409
     assert terceira.json()["detail"]["codigo"] == "ESTACAO_LIMITE_EXCEDIDO"
 
-    resumo = client.get("/v1/plataforma/estacoes", headers=h).json()
+    envelope = client.get("/v1/plataforma/estacoes", headers=h).json()
+    assert "data" in envelope  # contrato idêntico ao do desktop (_get)
+    resumo = envelope["data"]
     assert resumo["total"] == 2 and resumo["limite"] == 2 and resumo["vagas"] == 0
 
     # Reacesso da mesma estação não consome vaga e atualiza o nome.
@@ -127,13 +132,13 @@ def test_estacao_registro_limite_e_remocao(client, admin_token, monkeypatch):
         headers=h,
         json={"nome": "PC-0 renomeado", "fingerprint": "abc-0-123456"},
     )
-    assert client.get("/v1/plataforma/estacoes", headers=h).json()["total"] == 2
+    assert client.get("/v1/plataforma/estacoes", headers=h).json()["data"]["total"] == 2
 
     alvo = resumo["estacoes"][0]
     assert client.delete(
         f"/v1/plataforma/estacoes/{alvo['id']}", headers=h
     ).status_code == 204
-    assert client.get("/v1/plataforma/estacoes", headers=h).json()["total"] == 1
+    assert client.get("/v1/plataforma/estacoes", headers=h).json()["data"]["total"] == 1
 
 
 # ------------------------------------------------------------------- outbox

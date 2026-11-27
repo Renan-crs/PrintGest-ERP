@@ -41,9 +41,13 @@ admin = Depends(require_nivel(NivelAcesso.ADMIN))
 # ------------------------------------------------------------------ filiais
 
 
-@router.get("/filiais", response_model=list[FilialOut])
+@router.get("/filiais", response_model=ListaResponse[FilialOut])
 def filiais(db: DbDep, filial: FilialDep, _=admin):
-    return filial_service.listar(db, filial_id=filial)
+    itens = filial_service.listar(db, filial_id=filial)
+    # Mesmo envelope das demais listagens: o desktop desembrulha `data`.
+    return ListaResponse(
+        data=itens, meta=MetaPaginacao(total=len(itens), limit=200, offset=0)
+    )
 
 
 @router.put("/filiais/{item_id}", response_model=ItemResponse[FilialOut])
@@ -67,9 +71,10 @@ def atualizar_filial(
 # ----------------------------------------------------------------- estações
 
 
-@router.get("/estacoes", response_model=EstacaoResumo)
+@router.get("/estacoes", response_model=ItemResponse[EstacaoResumo])
 def estacoes(db: DbDep, filial: FilialDep, _=admin):
-    return estacao_service.listar(db, filial_id=filial)
+    # ItemResponse: o desktop `_get` sempre desembrulha `data`.
+    return ItemResponse(data=estacao_service.listar(db, filial_id=filial))
 
 
 @router.post("/estacoes/registrar", response_model=ItemResponse[dict])

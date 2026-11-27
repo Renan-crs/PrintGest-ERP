@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
@@ -450,12 +451,27 @@ class PaginaConsolidacao(_PaginaSimples):
         self._btn_descer_res = QPushButton("Descer resoluções")
         estado_secundario(self._btn_descer_res)
         self._btn_descer_res.clicked.connect(self._descer_resolucoes)
+        self._btn_config = QPushButton("Configurar consolidação")
+        estado_secundario(self._btn_config)
+        self._btn_config.clicked.connect(self._configurar)
+        self._btn_remover_config = QPushButton("Remover configuração")
+        estado_secundario(self._btn_remover_config)
+        self._btn_remover_config.clicked.connect(self._remover_config)
+        linha.addWidget(self._btn_config)
+        linha.addWidget(self._btn_remover_config)
         linha.addStretch(1)
         linha.addWidget(self._btn_descer)
         linha.addWidget(self._btn_relatorio)
         linha.addWidget(self._btn_conflitos)
         linha.addWidget(self._btn_descer_res)
         self._corpo.addLayout(linha)
+
+        self._lbl_config = QLabel("Consolidação: verificando configuração…")
+        self._lbl_config.setWordWrap(True)
+        estado_muted(self._lbl_config)
+        self._corpo.addWidget(self._lbl_config)
+        self._configurado = False
+        self._habilitar(False)
 
         self._lbl_mestres = QLabel("Mestres: —")
         self._lbl_mestres.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -473,8 +489,100 @@ class PaginaConsolidacao(_PaginaSimples):
         self._lbl_conflitos.setWordWrap(True)
         estado_muted(self._lbl_conflitos)
         self._corpo.addWidget(self._lbl_conflitos, 1)
-        self._carregar_relatorio()
-        self._carregar_conflitos()
+        # Checa o cofre ANTES de consultar o Neon: sem URL, a API responde 503
+        # e o operador veria popups de erro ao apenas abrir a tela.
+        self._carregar_config()
+
+    def _habilitar(self, ativo: bool) -> None:
+        for botao in (
+            self._btn_descer,
+            self._btn_relatorio,
+            self._btn_conflitos,
+            self._btn_descer_res,
+            self._btn_remover_config,
+        ):
+            botao.setEnabled(ativo and not self._modo_leitura)
+
+    def _carregar_config(self) -> None:
+        def ok(saida: dict) -> None:
+            dados = saida if isinstance(saida, dict) else {}
+            configurado = bool(dados.get("configurado"))
+            self._configurado = configurado
+            if configurado:
+                mascara = dados.get("url_mascarada")
+                self._lbl_config.setText(
+                    "Consolidação configurada para esta filial"
+                    + (f" ({mascara})" if mascara else "")
+                    + "."
+                )
+                estado_sucesso(self._lbl_config)
+            else:
+                self._lbl_config.setText(
+                    "Consolidação não configurada para esta filial. Informe a URL "
+                    "PostgreSQL do role desta filial em 'Configurar consolidação'."
+                )
+                estado_atencao(self._lbl_config)
+                self._lbl_relatorio.setText("Relatório: consolidação não configurada.")
+                self._lbl_conflitos.setText("Conflitos: consolidação não configurada.")
+            self._habilitar(configurado)
+            if configurado:
+                self._carregar_relatorio()
+                self._carregar_conflitos()
+
+        def erro(msg: str, status: int | None = None) -> None:
+            self._configurado = False
+            self._habilitar(False)
+            self._lbl_config.setText(f"Não foi possível consultar a configuração: {msg}")
+            estado_atencao(self._lbl_config)
+
+        tarefas.rodar(self._api.config_sync, ok, erro)
+
+    def _configurar(self) -> None:
+        if self._modo_leitura:
+            return
+        url, aceito = QInputDialog.getText(
+            self,
+            "Configurar consolidação",
+            "URL PostgreSQL do role desta filial (cifrada no cofre; nunca em .env/log):",
+            QLineEdit.EchoMode.Password,
+            "",
+        )
+        if not aceito or not url.strip():
+            return
+
+        def salvo(_saida: dict) -> None:
+            QMessageBox.information(
+                self, self.TITULO, "Configuração salva no cofre desta filial."
+            )
+            self._carregar_config()
+
+        tarefas.rodar(
+            lambda: self._api.configurar_sync(url.strip()), salvo, self._erro_operacao
+        )
+
+    def _remover_config(self) -> None:
+        if self._modo_leitura:
+            return
+        resp = QMessageBox.question(
+            self, self.TITULO, "Remover a configuração de consolidação desta filial?"
+        )
+        if resp != QMessageBox.StandardButton.Yes:
+            return
+
+        def salvo(_saida: dict) -> None:
+            self._carregar_config()
+
+        tarefas.rodar(lambda: self._api.configurar_sync(None), salvo, self._erro)
+
+    def _erro_operacao(self, msg: str, status: int | None = None) -> None:
+        """503 (sem URL/Neon fora) vira estado na tela, não popup de erro."""
+        if status == 503:
+            self._configurado = False
+            self._habilitar(False)
+            self._lbl_config.setText(f"Consolidação indisponível: {msg}")
+            estado_atencao(self._lbl_config)
+            return
+        self._erro(msg)
 
     def _descer(self) -> None:
         if self._modo_leitura:
@@ -489,7 +597,7 @@ class PaginaConsolidacao(_PaginaSimples):
             )
             estado_sucesso(self._lbl_mestres)
 
-        tarefas.rodar(self._api.descer_mestres, ok, self._erro)
+        tarefas.rodar(self._api.descer_mestres, ok, self._erro_operacao)
 
     def _descer_resolucoes(self) -> None:
         if self._modo_leitura:
@@ -504,7 +612,9 @@ class PaginaConsolidacao(_PaginaSimples):
             estado_sucesso(self._lbl_conflitos)
             self._carregar_conflitos()
 
-        tarefas.rodar(self._api.descer_resolucoes_conflitos, ok, self._erro)
+        tarefas.rodar(
+            self._api.descer_resolucoes_conflitos, ok, self._erro_operacao
+        )
 
     def _carregar_relatorio(self) -> None:
         def ok(saida: dict) -> None:
@@ -519,7 +629,7 @@ class PaginaConsolidacao(_PaginaSimples):
             linhas.append(str(dados.get("observacao") or ""))
             self._lbl_relatorio.setText("<br>".join(linhas))
 
-        tarefas.rodar(self._api.relatorio_consolidado, ok, self._erro)
+        tarefas.rodar(self._api.relatorio_consolidado, ok, self._erro_operacao)
 
     def _carregar_conflitos(self) -> None:
         def ok(saida: dict) -> None:
@@ -535,4 +645,4 @@ class PaginaConsolidacao(_PaginaSimples):
                     )
                 )
 
-        tarefas.rodar(self._api.conflitos_clientes, ok, self._erro)
+        tarefas.rodar(self._api.conflitos_clientes, ok, self._erro_operacao)
