@@ -18,6 +18,7 @@ from decimal import Decimal, InvalidOperation
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -752,6 +753,127 @@ class PaginaUsuarios(PaginaCrud):
 # ==================================================================== host
 
 
+class PaginaIbsCbs(QWidget):
+    """Alíquotas IBS/CBS informadas pelo contador (LC 214/2025).
+
+    Nenhum valor é sugerido pelo sistema: a gráfica só registra o que o
+    contador informou para o CNAE, com vigência. O envio ao gateway fiscal é
+    desligado por padrão (`PRINTGEST_FISCAL_ENVIAR_IBS_CBS`).
+    """
+
+    ROTULO_PAGINA = "IBS/CBS — Reforma Tributária"
+
+    def __init__(self, api: Api, modo_leitura: bool = False) -> None:
+        super().__init__()
+        self._api = api
+        self._modo_leitura = modo_leitura
+        col = QVBoxLayout(self)
+        col.setContentsMargins(20, 16, 20, 16)
+        col.setSpacing(10)
+
+        aviso = QLabel(
+            "A partir de 01/01/2027 o IBSCBS (IVA Dual) substitui ICMS/ISS e "
+            "PIS/COFINS. Informe aqui as alíquotas que o contador apurou para o "
+            "CNAE da gráfica. O sistema não calcula nem sugere alíquota."
+        )
+        aviso.setObjectName("bannerLeitura")
+        aviso.setWordWrap(True)
+        col.addWidget(aviso)
+
+        grade = QGridLayout()
+        grade.setHorizontalSpacing(12)
+        grade.setVerticalSpacing(8)
+        self._cnae = CampoTexto("CNAE", maximo=10).obrigatorio()
+        self._fonte = CampoCombo(
+            "Fonte", [("contador", "Informada pelo contador"),
+                      ("receita", "Conferida na calculadora da Receita")]
+        )
+        self._cbs = CampoTexto("CBS % (União)", maximo=8)
+        self._ibs_uf = CampoTexto("IBS % (UF)", maximo=8)
+        self._ibs_mun = CampoTexto("IBS % (Município)", maximo=8)
+        self._inicio = CampoTexto("Vigência início (AAAA-MM-DD)", maximo=10)
+        self._inicio.definir("2027-01-01")
+        self._fim = CampoTexto("Vigência fim (opcional)", maximo=10)
+        self._obs = CampoTexto("Observações", maximo=500)
+        for campo, posicao in (
+            (self._cnae, (0, 0)), (self._fonte, (0, 1)),
+            (self._cbs, (1, 0)), (self._ibs_uf, (1, 1)),
+            (self._ibs_mun, (2, 0)), (self._inicio, (2, 1)),
+            (self._fim, (3, 0)), (self._obs, (3, 1)),
+        ):
+            grade.addWidget(campo.widget, *posicao)
+        col.addLayout(grade)
+
+        self._btn_salvar = QPushButton("Salvar alíquota (F10)")
+        self._btn_salvar.setEnabled(not modo_leitura)
+        self._btn_salvar.clicked.connect(self._salvar)
+        col.addWidget(self._btn_salvar)
+        QShortcut(QKeySequence("F10"), self, self._salvar)
+
+        self._tabela = TabelaDensa(
+            ["id", "cnae", "cbs_pct", "ibs_uf_pct", "ibs_municipio_pct",
+             "vigencia_inicio", "vigencia_fim", "fonte"],
+            ["Nº", "CNAE", "CBS %", "IBS UF %", "IBS Mun %", "Início", "Fim", "Fonte"],
+            [1, 3, 2, 2, 2, 3, 3, 3],
+        )
+        col.addWidget(self._tabela, 1)
+        self.recarregar()
+
+    def _payload(self) -> dict:
+        corpo = {
+            "cnae": limpo(self._cnae.valor()),
+            "fonte": self._fonte.valor(),
+            "vigencia_inicio": limpo(self._inicio.valor()),
+            "vigencia_fim": limpo(self._fim.valor()) or None,
+            "observacoes": limpo(self._obs.valor()) or None,
+        }
+        for chave, campo in (
+            ("cbs_pct", self._cbs),
+            ("ibs_uf_pct", self._ibs_uf),
+            ("ibs_municipio_pct", self._ibs_mun),
+        ):
+            texto = (campo.valor() or "").strip().replace(",", ".")
+            if texto:
+                try:
+                    corpo[chave] = str(Decimal(texto))
+                except InvalidOperation:
+                    QMessageBox.warning(self, "IBS/CBS", f"{chave} inválida.")
+                    return {}
+        return corpo
+
+    def recarregar(self) -> None:
+        def ok(saida: dict) -> None:
+            self._tabela.preencher(saida.get("data", []))
+
+        tarefas.rodar(
+            self._api.ibs_cbs_aliquotas,
+            on_ok=ok,
+            on_erro=lambda msg: QMessageBox.warning(self, "IBS/CBS", msg),
+        )
+
+    def _salvar(self) -> None:
+        if self._modo_leitura:
+            return
+        corpo = self._payload()
+        if not corpo:
+            return
+        if not corpo["vigencia_inicio"]:
+            QMessageBox.warning(self, "IBS/CBS", "Informe a vigência inicial.")
+            return
+
+        def ok(_saida: dict) -> None:
+            QMessageBox.information(
+                self, "IBS/CBS", "Alíquota registrada com sucesso."
+            )
+            self.recarregar()
+
+        tarefas.rodar(
+            lambda: self._api.criar_ibs_cbs_aliquota(corpo),
+            on_ok=ok,
+            on_erro=lambda msg: QMessageBox.warning(self, "IBS/CBS", msg),
+        )
+
+
 class PaginaConfiguracoes(QWidget):
     """Menu "Configurações": hospeda as sub-abas conforme o perfil do usuário."""
 
@@ -761,6 +883,7 @@ class PaginaConfiguracoes(QWidget):
         self._modo_leitura = modo_leitura
         candidatas = [
             ("dados_empresa", "Dados da Empresa", PaginaEmpresa),
+            ("ibs_cbs", "IBS/CBS", PaginaIbsCbs),
             ("personalizacao", "Personalização", PaginaPersonalizacao),
             ("reajuste_bloco", "Reajuste de Preços", PaginaReajuste),
             ("usuarios", "Usuários e Níveis", PaginaUsuarios),

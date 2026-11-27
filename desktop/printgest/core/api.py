@@ -742,6 +742,18 @@ class Api:
         """Dados da Empresa / Personalização (parcial): `PUT /v1/config/empresa`."""
         return self._put("/v1/config/empresa", payload, self._token)
 
+    def ibs_cbs_aliquotas(self) -> dict:
+        """Alíquotas IBS/CBS cadastradas: `GET /v1/config/ibs-cbs-aliquotas`."""
+        return self._get("/v1/config/ibs-cbs-aliquotas", self._token)
+
+    def criar_ibs_cbs_aliquota(self, payload: dict) -> dict:
+        return self._post("/v1/config/ibs-cbs-aliquotas", payload, self._token)
+
+    def encerrar_ibs_cbs_aliquota(self, aliquota_id: int) -> dict:
+        return self._put(
+            f"/v1/config/ibs-cbs-aliquotas/{aliquota_id}/encerrar", {}, self._token
+        )
+
     def simular_reajuste(self, payload: dict) -> dict:
         """Prévia do reajuste em bloco: `POST /v1/config/reajuste/simular`."""
         return self._post("/v1/config/reajuste/simular", payload, self._token)

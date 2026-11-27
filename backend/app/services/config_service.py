@@ -12,15 +12,19 @@ conta em `bloqueados` e o `aplicar` não os toca.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import verify_password
 from app.models.cadastros import Produto
 from app.models.config import PrecoReajusteHistorico
 from app.models.core import Empresa, Filial, Usuario
+from app.models.fiscal import IbsCbsAliquota
 
 _DUAS_CASAS = Decimal("0.01")
 _MAX_ITENS_PREVIA = 500
@@ -62,6 +66,109 @@ def atualizar_empresa(db: Session, *, filial_id: int, dados: dict) -> Empresa:
     db.commit()
     db.refresh(empresa)
     return empresa
+
+
+# --------------------------------------------------------------- IBS/CBS (LC 214)
+def aliquotas_ibs_cbs(db: Session, *, filial_id: int) -> list:
+    empresa = empresa_atual(db, filial_id=filial_id)
+    return (
+        db.query(IbsCbsAliquota)
+        .filter(IbsCbsAliquota.empresa_id == empresa.id)
+        .order_by(IbsCbsAliquota.vigencia_inicio.desc(), IbsCbsAliquota.id.desc())
+        .all()
+    )
+
+
+def criar_aliquota_ibs_cbs(
+    db: Session, *, filial_id: int, dados, usuario_id: int
+) -> IbsCbsAliquota:
+    """Grava alíquota informada pelo contador — nunca inventa valor padrão."""
+    empresa = empresa_atual(db, filial_id=filial_id)
+    informadas = (
+        dados.cbs_pct, dados.ibs_uf_pct, dados.ibs_municipio_pct
+    )
+    if all(valor is None for valor in informadas):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Informe ao menos uma alíquota (CBS, IBS-UF ou IBS-município).",
+        )
+    inicio = dados.vigencia_inicio or datetime.now(UTC)
+    if dados.vigencia_fim is not None and dados.vigencia_fim <= inicio:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="vigencia_fim deve ser maior que vigencia_inicio.",
+        )
+    aliquota = IbsCbsAliquota(
+        empresa_id=empresa.id,
+        cnae=dados.cnae.strip(),
+        cbs_pct=dados.cbs_pct,
+        ibs_uf_pct=dados.ibs_uf_pct,
+        ibs_municipio_pct=dados.ibs_municipio_pct,
+        vigencia_inicio=inicio,
+        vigencia_fim=dados.vigencia_fim,
+        fonte=dados.fonte or "contador",
+        observacoes=dados.observacoes,
+        usuario_id=usuario_id,
+    )
+    db.add(aliquota)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Já existe alíquota para este CNAE/vigência.",
+        ) from exc
+    db.refresh(aliquota)
+    return aliquota
+
+
+def encerrar_aliquota_ibs_cbs(
+    db: Session, *, filial_id: int, aliquota_id: int
+) -> IbsCbsAliquota:
+    empresa = empresa_atual(db, filial_id=filial_id)
+    aliquota = (
+        db.query(IbsCbsAliquota)
+        .filter(
+            IbsCbsAliquota.id == aliquota_id,
+            IbsCbsAliquota.empresa_id == empresa.id,
+        )
+        .first()
+    )
+    if aliquota is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alíquota não encontrada."
+        )
+    # Vigência futura: encerrar "agora" deixaria fim < início. Nesse caso o
+    # encerramento é imediatamente após o início (a alíquota nunca vigora).
+    agora = datetime.now(UTC)
+    aliquota.vigencia_fim = (
+        agora if agora > aliquota.vigencia_inicio
+        else aliquota.vigencia_inicio + timedelta(seconds=1)
+    )
+    db.commit()
+    db.refresh(aliquota)
+    return aliquota
+
+
+def aliquota_vigente(
+    db: Session, *, empresa_id: int, data: datetime | None = None
+) -> IbsCbsAliquota | None:
+    """Alíquota vigente na data — usada para exibir/calcular localmente."""
+    referencia = data or datetime.now(UTC)
+    return (
+        db.query(IbsCbsAliquota)
+        .filter(
+            IbsCbsAliquota.empresa_id == empresa_id,
+            IbsCbsAliquota.vigencia_inicio <= referencia,
+            or_(
+                IbsCbsAliquota.vigencia_fim.is_(None),
+                IbsCbsAliquota.vigencia_fim > referencia,
+            ),
+        )
+        .order_by(IbsCbsAliquota.vigencia_inicio.desc(), IbsCbsAliquota.id.desc())
+        .first()
+    )
 
 
 # -------------------------------------------------------------------- reajuste

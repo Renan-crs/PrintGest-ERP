@@ -128,6 +128,8 @@ class PaginaDocumentosFiscais(PaginaCrud):
         self._f_vinculo = CampoTexto("Vinculado a")
         self._f_mensagem = CampoArea("Mensagem de retorno", linhas=3)
         self._f_arquivos = CampoTexto("Arquivos (XML / DANFE)")
+        # LC 214/2025 — alíquotas informadas pelo contador no momento da emissão.
+        self._f_ibs_cbs = CampoTexto("IBS/CBS (alíquotas informadas)")
         return [
             (
                 "Documento",
@@ -142,6 +144,7 @@ class PaginaDocumentosFiscais(PaginaCrud):
                 [self._f_cliente, self._f_vinculo, self._f_contingencia, self._f_arquivos],
             ),
             ("Retorno", [self._f_mensagem]),
+            ("Reforma Tributária", [self._f_ibs_cbs]),
         ]
 
     def _preencher_campos(self, dado: dict) -> None:
@@ -158,6 +161,20 @@ class PaginaDocumentosFiscais(PaginaCrud):
         self._f_vinculo.definir(self._vinculo(dado))
         self._f_mensagem.definir(dado.get("mensagem_retorno"))
         self._f_arquivos.definir(self._arquivos(dado))
+        snap = dado.get("ibs_cbs_snapshot") or {}
+        self._f_ibs_cbs.definir(
+            " · ".join(
+                f"{chave}: {valor}"
+                for chave, valor in (
+                    ("CBS", snap.get("cbs_pct")),
+                    ("IBS-UF", snap.get("ibs_uf_pct")),
+                    ("IBS-Mun", snap.get("ibs_municipio_pct")),
+                    ("CNAE", snap.get("cnae")),
+                    ("Fonte", snap.get("fonte")),
+                )
+                if valor
+            ) or "Não parametrizado"
+        )
 
     @staticmethod
     def _vinculo(dado: dict) -> str:
@@ -394,10 +411,15 @@ class PaginaContingencia(QWidget):
         linha.addWidget(titulo, 1)
         self._badge_gateway = badge("GATEWAY INDISPONÍVEL", "atencao")
         self._badge_pendentes = badge("Pendências: –", "primary")
+        self._badge_ibs_cbs = badge("IBS/CBS NÃO PARAMETRIZADO", "atencao")
+        self._badge_ibs_cbs.setToolTip(
+            "Informe as alíquotas do contador em Configurações > IBS/CBS"
+        )
         atualizar, _btn = botao_com_atalho("Atualizar", "")
         _btn.clicked.connect(self.recarregar)
         linha.addWidget(self._badge_gateway)
         linha.addWidget(self._badge_pendentes)
+        linha.addWidget(self._badge_ibs_cbs)
         linha.addWidget(atualizar)
         return caixa
 
@@ -501,6 +523,16 @@ class PaginaContingencia(QWidget):
         )
         self._badge_gateway.style().unpolish(self._badge_gateway)
         self._badge_gateway.style().polish(self._badge_gateway)
+
+        parametrizado = bool(resumo.get("ibs_cbs_parametrizado"))
+        self._badge_ibs_cbs.setText(
+            "IBS/CBS PARAMETRIZADO" if parametrizado else "IBS/CBS NÃO PARAMETRIZADO"
+        )
+        self._badge_ibs_cbs.setProperty(
+            "badgeStyle", "primary" if parametrizado else "atencao"
+        )
+        self._badge_ibs_cbs.style().unpolish(self._badge_ibs_cbs)
+        self._badge_ibs_cbs.style().polish(self._badge_ibs_cbs)
 
     def _com_lista(self, saida: dict, seq: int) -> None:
         if seq != self._seq:

@@ -98,6 +98,7 @@ ITENS_INTERNOS = [
     {"id": "rel_servicos", "rotulo": "Serviços Mais Executados", "nivel": "gerente"},
     {"id": "rel_aniversariantes", "rotulo": "Aniversariantes", "nivel": "gerente"},
     {"id": "dados_empresa", "rotulo": "Dados da Empresa", "nivel": "admin"},
+    {"id": "ibs_cbs", "rotulo": "IBS/CBS", "nivel": "admin"},
     {"id": "personalizacao", "rotulo": "Personalização", "nivel": "admin"},
     {"id": "reajuste_bloco", "rotulo": "Reajuste de Preços", "nivel": "admin"},
     {"id": "usuarios", "rotulo": "Usuários e Níveis", "nivel": "admin"},

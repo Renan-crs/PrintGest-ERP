@@ -36,7 +36,7 @@ from app.models.financeiro import (
     MovimentoCaixa,
     PlanoContas,
 )
-from app.models.fiscal import DocumentoFiscal
+from app.models.fiscal import DocumentoFiscal, IbsCbsAliquota
 from app.models.integracao import Integracao, IntegracaoEvento
 from app.models.licenca import Licenca
 from app.models.movimento import (
@@ -77,6 +77,7 @@ __all__ = [
     "Estacao",
     "EventoSync",
     "Filial",
+    "IbsCbsAliquota",
     "FormaPagamento",
     "Fornecedor",
     "Integracao",

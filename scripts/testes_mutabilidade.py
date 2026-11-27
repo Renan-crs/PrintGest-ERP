@@ -522,6 +522,27 @@ MUTANTES = [
         pasta="desktop",
     ),
     Mutante(
+        "aliquota_ibs_cbs_sem_validacao",
+        "backend/app/services/config_service.py",
+        "    if all(valor is None for valor in informadas):",
+        "    if False:",
+        "tests/test_ibs_cbs.py::test_sem_aliquota_informada_e_rejeitado",
+    ),
+    Mutante(
+        "flag_de_envio_ibs_cbs_invertida",
+        "backend/app/services/fiscal_service.py",
+        "    if snapshot and settings.fiscal_enviar_ibs_cbs:",
+        "    if snapshot:",
+        "tests/test_ibs_cbs.py::test_bloco_so_vai_ao_gateway_com_flag",
+    ),
+    Mutante(
+        "resumo_ibs_cbs_desligado",
+        "backend/app/services/fiscal_service.py",
+        '        "ibs_cbs_parametrizado": _ibs_cbs_snapshot(\n            db, filial_id=filial_id, data=None\n        ) is not None,',
+        '        "ibs_cbs_parametrizado": _ibs_cbs_snapshot(\n            db, filial_id=filial_id, data=None\n        ) is None,',
+        "tests/test_ibs_cbs.py::test_resumo_fiscal_sinaliza_parametrizacao",
+    ),
+    Mutante(
         "pdv_nao_indexa_sku",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "for chave in (codigo, sku, barras):",

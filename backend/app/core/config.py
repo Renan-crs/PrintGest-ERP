@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "PrintGest Local API Service"
-    version: str = "0.5.42"
+    version: str = "0.5.43"
     env: str = "dev"
     # Seguro por padrão: bind apenas em localhost. O instalador fixa
     # 127.0.0.1; uma instalação que servira ESTAÇÕES em rede local sobrescreve
@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     fiscal_gateway_health_path: str = "/health"
     fiscal_gateway_auth_header: str = "Authorization"
     fiscal_gateway_auth_prefix: str = "Bearer "
+    # IBS/CBS (LC 214/2025): as alíquotas são SEMPRE informadas pelo contador.
+    # O bloco só é enviado ao gateway após validação explícita com o provedor.
+    fiscal_enviar_ibs_cbs: bool = False
     # Arquivo cifrado (DPAPI) com as credenciais de integrações de terceiros.
     # Nunca contém segredos em texto; override em testes/diagnóstico.
     cofre_integracoes_arquivo: str = ""

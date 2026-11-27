@@ -18,6 +18,7 @@ from printgest.core.api import Api
 from printgest.ui.modulos.configuracao import (
     PaginaConfiguracoes,
     PaginaEmpresa,
+    PaginaIbsCbs,
     PaginaPersonalizacao,
     PaginaReajuste,
     PaginaUsuarios,
@@ -265,6 +266,13 @@ def _handler(request: httpx.Request) -> httpx.Response:
         if metodo == "GET":
             return _item(alvo)
 
+    if path == "/v1/config/ibs-cbs-aliquotas":
+        if metodo == "GET":
+            return _paginado(ESTADO.get("ibs_cbs", []))
+        payload = _corpo(request)
+        ESTADO.setdefault("ibs_cbs", []).insert(0, {"id": 9, **payload})
+        return httpx.Response(201, json={"data": {"id": 9, **payload}})
+
     return httpx.Response(404, json={"detail": f"rota não esperada: {path}"})
 
 
@@ -293,11 +301,28 @@ def _sem_modais(monkeypatch):
     )
 
 
+def test_ibs_cbs_registra_aliquota_do_contador(app):
+    pagina = PaginaIbsCbs(_api())
+    pagina._cnae.definir("1811301")
+    pagina._cbs.definir("26,5")
+    pagina._ibs_uf.definir("5")
+    pagina._ibs_mun.definir("2")
+    pagina._inicio.definir("2027-01-01")
+    pagina._salvar()
+
+    gravada = ESTADO["ibs_cbs"][0]
+    assert gravada["cnae"] == "1811301"
+    assert gravada["cbs_pct"] == "26.5"
+    assert gravada["ibs_uf_pct"] == "5"
+    assert gravada["fonte"] == "contador"
+
+
 # ------------------------------------------------------------------------- host
-def test_host_configuracoes_admin_tem_quatro_abas(app):
+def test_host_configuracoes_admin_tem_todas_as_abas(app):
     pagina = PaginaConfiguracoes(_api(), nivel="admin")
     assert [b.text() for b in pagina._botoes] == [
         "Dados da Empresa",
+        "IBS/CBS",
         "Personalização",
         "Reajuste de Preços",
         "Usuários e Níveis",

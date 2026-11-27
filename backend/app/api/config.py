@@ -5,7 +5,7 @@ da Empresa / Personalização e o Reajuste de Preços em Bloco (simulação +
 confirmação por senha, com trilha de auditoria em `preco_reajuste_historico`).
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from app.deps import DbDep, FilialDep, UsuarioDep, require_nivel
 from app.models.enums import NivelAcesso
@@ -13,6 +13,8 @@ from app.schemas.common import ItemResponse, ListaResponse, MetaPaginacao
 from app.schemas.config import (
     EmpresaOut,
     EmpresaUpdate,
+    IbsCbsAliquotaIn,
+    IbsCbsAliquotaOut,
     PrecoParametrosIn,
     PrecoParametrosOut,
     ReajusteAplicarIn,
@@ -41,6 +43,44 @@ def atualizar_empresa(payload: EmpresaUpdate, db: DbDep, filial: FilialDep):
     dados = payload.model_dump(exclude_unset=True)
     return ItemResponse(
         data=config_service.atualizar_empresa(db, filial_id=filial, dados=dados)
+    )
+
+
+# --------------------------------------------------------------- IBS/CBS (LC 214)
+@router.get("/ibs-cbs-aliquotas", response_model=ListaResponse[IbsCbsAliquotaOut])
+def ibs_cbs_aliquotas(db: DbDep, filial: FilialDep):
+    itens = config_service.aliquotas_ibs_cbs(db, filial_id=filial)
+    return ListaResponse(
+        data=itens, meta=MetaPaginacao(total=len(itens), limit=200, offset=0)
+    )
+
+
+@router.post(
+    "/ibs-cbs-aliquotas",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ItemResponse[IbsCbsAliquotaOut],
+)
+def criar_ibs_cbs_aliquota(
+    payload: IbsCbsAliquotaIn, db: DbDep, filial: FilialDep, usuario: UsuarioDep
+):
+    return ItemResponse(
+        data=config_service.criar_aliquota_ibs_cbs(
+            db, filial_id=filial, dados=payload, usuario_id=usuario.id
+        )
+    )
+
+
+@router.put(
+    "/ibs-cbs-aliquotas/{aliquota_id}/encerrar",
+    response_model=ItemResponse[IbsCbsAliquotaOut],
+)
+def encerrar_ibs_cbs_aliquota(
+    aliquota_id: int, db: DbDep, filial: FilialDep
+):
+    return ItemResponse(
+        data=config_service.encerrar_aliquota_ibs_cbs(
+            db, filial_id=filial, aliquota_id=aliquota_id
+        )
     )
 
 

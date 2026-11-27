@@ -9,6 +9,38 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.43] - 2026-11-27 — Parametrização IBS/CBS (LC 214/2025)
+
+### Backend
+- Nova tabela `ibs_cbs_aliquota` com alíquotas **informadas pelo contador** para
+  o CNAE da gráfica (CBS, IBS-UF, IBS-município, vigência e fonte). O sistema não
+  gera nem sugere valor padrão; fonte `receita` é apenas declarativa (conferência
+  na calculadora oficial da Receita Federal).
+- Endpoints `GET/POST /v1/config/ibs-cbs-aliquotas` e
+  `PUT /v1/config/ibs-cbs-aliquotas/{id}/encerrar` (somente ADMIN, escopo da
+  empresa da filial). Validação: ao menos uma alíquota, vigência fim > início,
+  CNAE + início únicos (409).
+- `documento_fiscal.ibs_cbs_snapshot` guarda as alíquotas vigentes na emissão.
+  O resumo fiscal expõe `ibs_cbs_parametrizado` para a tela.
+- O bloco `ibs_cbs` **só** vai ao gateway quando
+  `PRINTGEST_FISCAL_ENVIAR_IBS_CBS=true` (padrão `false`). Nenhuma chave antiga
+  do payload, contingência ou cálculo de impostos legado foi alterado.
+- Migration aditiva `f2a4b8c9d0e1` aplicada ao Neon com backup em branch
+  `br-shiny-bread-b52l4cd9` (LSN 0/3CDA7D0).
+
+### Desktop
+- Aba `Configurações > IBS/CBS` para registrar alíquotas com vigência (F10),
+  sem valores sugeridos.
+- Documento fiscal exibe seção "Reforma Tributária" com o snapshot; tela de
+  contingência mostra badge `IBS/CBS NÃO PARAMETRIZADO` quando não há alíquota
+  vigente.
+
+### Validação
+Backend: 538 passed. Desktop: 561 passed, 4 xfailed. Mutação: 69/69 mortos
+(3 novos). Documentação: `docs/ibs_cbs_reforma_tributaria.md`.
+
+---
+
 ## [0.5.42] - 2026-11-27 — Split payment e melhorias UX do PDV
 
 ### Backend

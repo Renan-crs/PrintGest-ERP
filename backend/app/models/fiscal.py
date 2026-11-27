@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -73,6 +74,8 @@ class DocumentoFiscal(Base):
     protocolo: Mapped[str | None] = mapped_column(String(30))
     mensagem_retorno: Mapped[str | None] = mapped_column(Text)
     retorno_json: Mapped[dict | None] = mapped_column(JSONB)
+    # Snapshot das alíquotas IBS/CBS vigentes no momento da emissão (opcional).
+    ibs_cbs_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     contingencia: Mapped[bool] = mapped_column(Boolean, server_default="false")
     tentativas: Mapped[int] = mapped_column(Integer, server_default="0")
     ultima_consulta_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -112,6 +115,61 @@ class FiscalEvento(Base):
     mensagem: Mapped[str | None] = mapped_column(Text)
     detalhes: Mapped[dict | None] = mapped_column(JSONB)
     criado_por: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("usuario.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class IbsCbsAliquota(Base):
+    """Alíquotas de IBS/CBS informadas pelo contador para o CNAE da gráfica.
+
+    Reforma tributária (LC 214/2025) — vigência a partir de 01/01/2027.
+    Nenhum valor padrão: as alíquotas são sempre informadas pelo responsável.
+    """
+
+    __tablename__ = "ibs_cbs_aliquota"
+    __table_args__ = (
+        Index(
+            "uq_ibs_cbs_aliquota_vigencia",
+            "empresa_id",
+            "cnae",
+            "vigencia_inicio",
+            unique=True,
+        ),
+        CheckConstraint(
+            "vigencia_fim IS NULL OR vigencia_fim > vigencia_inicio",
+            name="ck_ibs_cbs_aliquota_vigencia",
+        ),
+        CheckConstraint(
+            "fonte IN ('contador', 'receita')", name="ck_ibs_cbs_aliquota_fonte"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("empresa.id", ondelete="RESTRICT"), nullable=False
+    )
+    cnae: Mapped[str] = mapped_column(String(10), nullable=False)
+    cbs_pct: Mapped[Decimal | None] = mapped_column(Numeric(7, 4), nullable=True)
+    ibs_uf_pct: Mapped[Decimal | None] = mapped_column(Numeric(7, 4), nullable=True)
+    ibs_municipio_pct: Mapped[Decimal | None] = mapped_column(
+        Numeric(7, 4), nullable=True
+    )
+    vigencia_inicio: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    vigencia_fim: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # 'contador' = informada pela gráfica; 'receita' = conferida na calculadora
+    # oficial da Receita Federal (declarativo, sem consulta automática).
+    fonte: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default="contador"
+    )
+    observacoes: Mapped[str | None] = mapped_column(Text)
+    usuario_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("usuario.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -115,6 +115,34 @@ class ReajusteResultadoOut(BaseModel):
     executado_em: datetime
 
 
+class IbsCbsAliquotaIn(BaseModel):
+    """Alíquota informada pelo contador para um CNAE (sem valor padrão)."""
+
+    cnae: str = Field(min_length=1, max_length=10)
+    cbs_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    ibs_uf_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    ibs_municipio_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    vigencia_inicio: datetime | None = None
+    vigencia_fim: datetime | None = None
+    fonte: Literal["contador", "receita"] = "contador"
+    observacoes: str | None = Field(default=None, max_length=500)
+
+
+class IbsCbsAliquotaOut(ORMModel):
+    id: int
+    empresa_id: int
+    cnae: str
+    cbs_pct: Decimal | None = None
+    ibs_uf_pct: Decimal | None = None
+    ibs_municipio_pct: Decimal | None = None
+    vigencia_inicio: datetime
+    vigencia_fim: datetime | None = None
+    fonte: str
+    observacoes: str | None = None
+    usuario_id: int | None = None
+    created_at: datetime
+
+
 class PrecoParametrosOut(BaseModel):
     """Parâmetros vigentes de precificação (Configurações > Precificação)."""
 

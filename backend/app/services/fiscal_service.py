@@ -28,6 +28,7 @@ from app.models.core import Empresa, Filial
 from app.models.enums import ModeloFiscal, StatusFiscal, StatusVenda
 from app.models.fiscal import DocumentoFiscal, FiscalEvento
 from app.models.movimento import OrdemServico, VendaBalcao
+from app.services import config_service
 from app.services.fiscal_gateway import FiscalGateway, GatewayNaoConfigurado
 
 _STATUS_PENDENTES = (
@@ -50,6 +51,32 @@ from app.core.log_seguranca import (  # noqa: E402
     mascarar_texto as _mascarar_texto,
     sanitizar as _sanitizar,
 )
+
+
+def _ibs_cbs_snapshot(db: Session, *, filial_id: int, data: datetime | None) -> dict | None:
+    """Alíquotas vigentes informadas pelo contador — nunca geradas pelo sistema."""
+    try:
+        empresa = config_service.empresa_atual(db, filial_id=filial_id)
+    except HTTPException:
+        return None
+    aliquota = config_service.aliquota_vigente(
+        db, empresa_id=empresa.id, data=data
+    )
+    if aliquota is None:
+        return None
+    return {
+        "cnae": aliquota.cnae,
+        "cbs_pct": str(aliquota.cbs_pct) if aliquota.cbs_pct is not None else None,
+        "ibs_uf_pct": (
+            str(aliquota.ibs_uf_pct) if aliquota.ibs_uf_pct is not None else None
+        ),
+        "ibs_municipio_pct": (
+            str(aliquota.ibs_municipio_pct)
+            if aliquota.ibs_municipio_pct is not None else None
+        ),
+        "vigencia_inicio": aliquota.vigencia_inicio.isoformat(),
+        "fonte": aliquota.fonte,
+    }
 
 
 def _decimal_str(valor: Any) -> str:
@@ -247,6 +274,10 @@ def resumo(db: Session, *, filial_id: int) -> dict:
         "por_modelo": por_modelo,
         "pendentes": pendentes,
         "em_contingencia": em_contingencia,
+        # Parametrização local para o badge da tela (sem tocar no gateway).
+        "ibs_cbs_parametrizado": _ibs_cbs_snapshot(
+            db, filial_id=filial_id, data=None
+        ) is not None,
         **gateway_info(db, filial_id),
     }
 
@@ -331,10 +362,20 @@ def _destinatario(cliente: Cliente | None, nome_avulso: str | None) -> dict:
     }
 
 
+def _com_ibs_cbs(payload: dict, snapshot: dict | None) -> dict:
+    """Bloco aditivo ao payload — DESLIGADO por padrão até validar o gateway."""
+    if snapshot and settings.fiscal_enviar_ibs_cbs:
+        payload["ibs_cbs"] = snapshot
+    return payload
+
+
 def _payload_venda(
     db: Session, venda: VendaBalcao, *, modelo: ModeloFiscal, contingencia: bool
 ) -> dict:
-    return {
+    snapshot = _ibs_cbs_snapshot(
+        db, filial_id=venda.filial_id, data=venda.data_venda
+    )
+    return _com_ibs_cbs({
         "modelo": modelo.value,
         "ambiente": settings.fiscal_gateway_ambiente,
         "contingencia": contingencia,
@@ -370,13 +411,14 @@ def _payload_venda(
             }
             for item in venda.itens
         ],
-    }
+    }, snapshot)
 
 
 def _payload_os(
     db: Session, ordem: OrdemServico, *, modelo: ModeloFiscal, contingencia: bool
 ) -> dict:
-    return {
+    snapshot = _ibs_cbs_snapshot(db, filial_id=ordem.filial_id, data=None)
+    return _com_ibs_cbs({
         "modelo": modelo.value,
         "ambiente": settings.fiscal_gateway_ambiente,
         "contingencia": contingencia,
@@ -406,7 +448,7 @@ def _payload_os(
             }
             for item in ordem.itens
         ],
-    }
+    }, snapshot)
 
 
 # --------------------------------------------------------------------- emissão
@@ -527,6 +569,12 @@ def emitir(
         contingencia=contingencia,
         tentativas=0,
         criado_por=usuario_id,
+    )
+    # Snapshot local das alíquotas vigentes (mesmo com envio desligado).
+    doc.ibs_cbs_snapshot = payload.get("ibs_cbs") or _ibs_cbs_snapshot(
+        db,
+        filial_id=filial_id,
+        data=venda.data_venda if venda is not None else None,
     )
     db.add(doc)
     db.flush()

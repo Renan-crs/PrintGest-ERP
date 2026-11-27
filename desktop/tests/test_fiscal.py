@@ -186,6 +186,34 @@ def test_documentos_modo_leitura_badge(app, pumpar):
     assert not pagina._f_chave.widget.isEnabled()
 
 
+def test_documento_mostra_aliquotas_ibs_cbs(app):
+    pagina = PaginaDocumentosFiscais(_api())
+    pagina._preencher_campos(
+        {
+            **DOC_AUTORIZADO,
+            "ibs_cbs_snapshot": {
+                "cbs_pct": "26.5000", "ibs_uf_pct": "5.0000",
+                "ibs_municipio_pct": "2.0000", "cnae": "1811301",
+                "fonte": "contador",
+            },
+        }
+    )
+    texto = pagina._f_ibs_cbs.valor()
+    assert "26.5000" in texto
+    assert "1811301" in texto
+    assert "contador" in texto
+
+
+def test_contingencia_badge_ibs_cbs(app):
+    pagina = PaginaContingencia(_api())
+    pagina._aplicar_resumo({**ESTADO["resumo"], "ibs_cbs_parametrizado": True})
+    assert "PARAMETRIZADO" in pagina._badge_ibs_cbs.text()
+    assert "NÃO" not in pagina._badge_ibs_cbs.text()
+
+    pagina._aplicar_resumo({**ESTADO["resumo"], "ibs_cbs_parametrizado": False})
+    assert "NÃO PARAMETRIZADO" in pagina._badge_ibs_cbs.text()
+
+
 # ------------------------------------------------------------- contingência
 def test_contingencia_avisa_gateway_e_lista_pendencias(app, pumpar):
     pagina = PaginaContingencia(_api())

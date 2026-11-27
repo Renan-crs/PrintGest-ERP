@@ -41,6 +41,7 @@ class DocumentoFiscalOut(ORMModel):
     cancelado_em: datetime | None = None
     motivo_cancelamento: str | None = None
     criado_por: int | None = None
+    ibs_cbs_snapshot: dict | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -86,3 +87,4 @@ class ResumoFiscal(BaseModel):
     mensagem: str
     gateway_url: str | None = None
     ambiente: str = "homologacao"
+    ibs_cbs_parametrizado: bool = False
