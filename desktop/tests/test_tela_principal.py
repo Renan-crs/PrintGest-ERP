@@ -154,6 +154,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.ui.modulos.plataforma import PaginaConsolidacao, PaginaFiliais
     from printgest.ui.modulos.financeiro import PaginaFinanceiro
     from printgest.ui.modulos.fiscal import PaginaFiscal
+    from printgest.ui.modulos.os import PaginaOrcamento
     from printgest.ui.modulos.fornecedores import PaginaFornecedores
     from printgest.ui.modulos.projetos import PaginaProjetos
     from printgest.ui.modulos.produtos import PaginaProdutos, PaginaServicos
@@ -168,6 +169,7 @@ def test_navega_por_todo_o_menu_sem_erro(app):
     from printgest.ui.modulos.em_construcao import PaginaEmConstrucao
     esperadas = {
         "pdv": PaginaVendaBalcao,
+        "orcamento": PaginaOrcamento,
         "projetos": PaginaProjetos,
         "agendamento": PaginaAgendamento,
         "cliente": PaginaClientes,
@@ -450,6 +452,34 @@ def test_caixa_sem_busca_global_e_sem_atalhos_de_cadastro(app):
 
     admin = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     assert not admin._busca.isHidden()
+
+
+def test_atalho_f6_abre_orcamento(app, monkeypatch):
+    from PySide6.QtGui import QShortcut
+
+    from printgest.ui.modulos.os import PaginaOrcamento
+
+    monkeypatch.setattr(PaginaOrcamento, "recarregar", lambda self, *a, **k: None)
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+    atalhos = {s.key().toString(): s for s in principal.findChildren(QShortcut)}
+
+    assert "F6" in atalhos
+    atalhos["F6"].activated.emit()
+
+    assert principal._pagina_atual_id == "orcamento"
+
+
+def test_navegacao_com_contexto_preenche_cliente_no_orcamento(app, monkeypatch):
+    from printgest.ui.modulos.os import PaginaOrcamento
+
+    monkeypatch.setattr(PaginaOrcamento, "recarregar", lambda self, *a, **k: None)
+    principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
+
+    principal._navegar_com_contexto("orcamento", {"cliente_id": 2})
+
+    pagina = principal._paginas["orcamento"]
+    assert pagina._cliente.valor() == 2
+    assert pagina._editando_id is None
 
 
 def test_busca_global_abre_registro_no_modulo(app, pumpar):

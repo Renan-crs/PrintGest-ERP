@@ -509,6 +509,19 @@ def test_botoes_do_orcamento(app, pagina_orcamento):
     assert "orçamento" in pagina_orcamento._btn_salvar.toolTip().lower()
 
 
+def test_os_ofere_orcamento_com_contexto(app, pumpar, pagina):
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._tabela.selectRow(0)
+    contextos = []
+    pagina.navegar_com_contexto.connect(
+        lambda destino, ctx: contextos.append((destino, ctx))
+    )
+
+    pagina._novo_orcamento_da_os()
+
+    assert contextos == [("orcamento", {"os_id": 1})]
+
+
 def test_converter_fica_visivel_e_bloqueado_no_rascunho(app, pagina_orcamento):
     """No formulário, Converter atua no rascunho e começa desabilitado."""
     assert not pagina_orcamento._widget_converter.isHidden()

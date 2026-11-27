@@ -406,8 +406,13 @@ def test_busca_global_sugere_e_navega(app, pumpar):
     principal = _principal({"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"})
     busca = principal._busca
     busca._campo.setText("Ana")
-    pumpar(lambda: busca._sugestoes.count() >= 3)
+    pumpar(lambda: busca._sugestoes.count() >= 4)
     assert not busca._sugestoes.isHidden()
+    modulos = {
+        (item.data(Qt.ItemDataRole.UserRole) or {}).get("modulo")
+        for item in [busca._sugestoes.item(i) for i in range(busca._sugestoes.count())]
+    }
+    assert "orcamento" in modulos
 
     navegados = []
     busca.navegar.connect(lambda item_id: navegados.append(item_id))

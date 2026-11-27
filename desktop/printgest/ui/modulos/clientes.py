@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from PySide6.QtWidgets import QMessageBox, QPushButton
+
 from printgest.ui.endereco import BlocoEndereco
 from printgest.ui.formulario import (
     MASCARA_CNPJ,
@@ -42,6 +44,25 @@ class PaginaClientes(PaginaCrud):
     LUGAR_BUSCA = "Buscar por nome, razão social, CNPJ/CPF, telefone ou e-mail..."
     CAMPO_NOME = "nome_razao"
     VAZIO = "Nenhum cliente encontrado. Clique em Novo Cliente (F6)."
+
+    # ------------------------------------------------------------ atalhos
+
+    def _acao_extra(self):
+        """Atalho de negócio: orçamento já com o cliente selecionado."""
+        botao = QPushButton("Novo orçamento")
+        botao.setToolTip("Criar orçamento para o cliente selecionado")
+        botao.clicked.connect(self._novo_orcamento)
+        return [botao]
+
+    def _novo_orcamento(self) -> None:
+        dado = self._tabela.objeto_selecionado() or {}
+        cliente_id = dado.get("id")
+        if cliente_id is None:
+            QMessageBox.information(
+                self, "Orçamento", "Selecione um cliente na lista primeiro."
+            )
+            return
+        self.navegar_com_contexto.emit("orcamento", {"cliente_id": cliente_id})
 
     # ----------------------------------------------------------- formulário
 

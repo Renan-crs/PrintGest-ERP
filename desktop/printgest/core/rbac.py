@@ -5,9 +5,9 @@ o enxergam (`niveis`). Ex.: caixa vê Financeiro/Fiscal enquanto operador não �
 isso não é expressável por um "nível mínimo" único. Itens sem permissão **não
 aparecem** no menu (o backend reforça com 403/omitindo campos).
 
-Itens granulares (O.S., orçamento, venda balcão, estoque, funcionários…)
-saíram do menu v2.1 mas continuam navegáveis via atalho/busca/acesso rápido
-através de `ITENS_INTERNOS` e do helper `pode_abrir`.
+Itens granulares (O.S., venda balcão, estoque, funcionários…) saíram do menu
+v2.1 mas continuam navegáveis via atalho/busca/acesso rápido através de
+`ITENS_INTERNOS` e do helper `pode_abrir`. Orçamentos voltaram ao menu Operação.
 """
 
 from __future__ import annotations
@@ -31,6 +31,8 @@ MENU = [
         "Operação",
         [
             {"id": "pdv", "rotulo": "PDV", "niveis": ["admin", "gerente", "operador", "caixa"]},
+            {"id": "orcamento", "rotulo": "Orçamentos",
+             "niveis": ["admin", "gerente", "operador"]},
             {"id": "projetos", "rotulo": "Projetos", "niveis": ["admin", "gerente", "operador"]},
             {"id": "agendamento", "rotulo": "Agendamento", "niveis": ["admin", "gerente", "operador"]},
         ],
@@ -76,7 +78,6 @@ ID_MENU = {item["id"] for _grupo, itens in MENU for item in itens}
 # (atalhos F2/F3/F5, busca global e acesso rápido do Início).
 ITENS_INTERNOS = [
     {"id": "os", "rotulo": "Ordem de Serviço", "nivel": "operador"},
-    {"id": "orcamento", "rotulo": "Orçamentos", "nivel": "operador"},
     {"id": "venda_balcao", "rotulo": "Venda Balcão", "nivel": "caixa"},
     {"id": "estoque_consulta", "rotulo": "Consulta de Estoque", "nivel": "operador"},
     {"id": "estoque_movimento", "rotulo": "Movimentação Manual", "nivel": "operador"},

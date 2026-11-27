@@ -55,7 +55,11 @@ from printgest.core.rbac import (
 )
 from printgest.core.tarefas import rodar
 from printgest.ui import animacao
-from printgest.ui.busca_global import MODULO_POR_ENTIDADE, BuscaGlobal
+from printgest.ui.busca_global import (
+    MODULO_POR_ENTIDADE,
+    _ROTULO_ENTIDADE,
+    BuscaGlobal,
+)
 from printgest.ui.formulario import formatar_moeda
 from printgest.ui.modulos import criar_pagina
 from printgest.ui.widgets_atualizacao import NotificacaoAtualizacao
@@ -88,7 +92,7 @@ _PERFIL_CURTO = {
 # Rótulos curtos para o trilho colapsado (64 px). Nunca escondemos os links:
 # o menu inteiro continua clicável, com tooltip/accessibleName completos.
 _ITEM_CURTO = {
-    "inicio": "⌂", "pdv": "PDV", "projetos": "PRJ", "agendamento": "AG",
+    "inicio": "⌂", "pdv": "PDV", "orcamento": "ORC", "projetos": "PRJ", "agendamento": "AG",
     "cliente": "CLI", "fornecedor": "FOR", "produto": "PRD", "servico": "SRV",
     "categoria": "CAT", "funcionario": "FNC", "financeiro": "FIN",
     "fiscal": "FIS", "estoque": "EST", "relatorios": "REL",
@@ -1158,7 +1162,8 @@ class TelaPrincipal(QMainWindow):
         self._busca.setVisible(bool(self._entidades_busca))
         if self._entidades_busca:
             self._busca.setToolTip(
-                "Buscar " + ", ".join(self._entidades_busca)
+                "Buscar "
+                + ", ".join(_ROTULO_ENTIDADE.get(e, e) for e in self._entidades_busca)
             )
         linha.addWidget(self._busca)
 
@@ -1667,6 +1672,7 @@ class TelaPrincipal(QMainWindow):
             ("F2", "Clientes", "cliente"),
             ("F3", "Produtos", "produto"),
             ("F5", "PDV", "pdv"),
+            ("F6", "Orçamentos", "orcamento"),
         ]:
             # Não anunciar atalho que este perfil não pode executar (caixa).
             if not pode_abrir(self._nivel, modulo):
@@ -1748,7 +1754,11 @@ class TelaPrincipal(QMainWindow):
     # ------------------------------------------------------------ navegação
 
     def _instalar_atalhos(self) -> None:
-        atalhos = {"F2": "cliente", "F3": "produto", "F5": "pdv"}
+        # F6 também é "Novo" dentro dos cadastros (contexto WidgetShortcut);
+        # fora deles, abre o fluxo de orçamento.
+        atalhos = {
+            "F2": "cliente", "F3": "produto", "F5": "pdv", "F6": "orcamento"
+        }
         for tecla, item_id in atalhos.items():
             if not pode_abrir(self._nivel, item_id):
                 continue
@@ -1765,6 +1775,14 @@ class TelaPrincipal(QMainWindow):
         tabela = getattr(self._paginas.get(pagina), "_tabela", None) if pagina else None
         if tabela is not None and hasattr(tabela, "selecionar_id"):
             tabela.selecionar_id(alvo)
+
+    def _navegar_com_contexto(self, item_id: str, contexto: dict) -> None:
+        """Navegação com dados de origem (cliente/O.S. → novo orçamento)."""
+        self._contexto_navegacao = dict(contexto or {})
+        try:
+            self._navegar(item_id)
+        finally:
+            self._contexto_navegacao = {}
 
     def _navegar(self, item_id: str) -> None:
         if item_id != ITEM_INICIO and not pode_abrir(self._nivel, item_id):
@@ -1788,9 +1806,12 @@ class TelaPrincipal(QMainWindow):
             )
             self._paginas[item_id] = pagina
             self._stack_paginas.addWidget(pagina)
-            # Páginas que pedem para abrir outro módulo (ex.: PDV → Nova OS).
+            # Páginas que pedem para abrir outro módulo (ex.: PDV → Nova OS,
+            # Cliente → Novo orçamento, O.S. → Novo orçamento).
             if hasattr(pagina, "navegar"):
                 pagina.navegar.connect(self._navegar)
+            if hasattr(pagina, "navegar_com_contexto"):
+                pagina.navegar_com_contexto.connect(self._navegar_com_contexto)
         # Páginas reaproveitadas: recarrega ao reentrar para refletir escritas
         # feitas em outros módulos (ex.: venda lançada no caixa, cadastro
         # alterado em outra tela). Executa em background — nunca bloqueia.
@@ -1799,6 +1820,9 @@ class TelaPrincipal(QMainWindow):
         self._pagina_atual_id = item_id
         self._marcar(item_id)
         self._stack_paginas.setCurrentWidget(pagina)
+        contexto = getattr(self, "_contexto_navegacao", {})
+        if contexto and hasattr(pagina, "aplicar_contexto"):
+            pagina.aplicar_contexto(contexto)
         # A página "materializa" com um fade curto (§12): responder na hora,
         # nunca bloquear o input (§1). O fade parte da opacidade atual.
         animacao.aparecer(pagina)

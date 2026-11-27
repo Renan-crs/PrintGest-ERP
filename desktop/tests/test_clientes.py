@@ -60,6 +60,19 @@ def pagina():
     return PaginaClientes(api)
 
 
+def test_cliente_abre_orcamento_com_contexto(app, pumpar, pagina):
+    pumpar(lambda: pagina._tabela.rowCount() == 2)
+    pagina._tabela.selectRow(0)
+    contextos = []
+    pagina.navegar_com_contexto.connect(
+        lambda destino, ctx: contextos.append((destino, ctx))
+    )
+
+    pagina._novo_orcamento()
+
+    assert contextos == [("orcamento", {"cliente_id": 1})]
+
+
 def test_carrega_grade_e_total(app, pumpar, pagina):
     pumpar(lambda: pagina._tabela.rowCount() == 2)
     assert pagina._total == 2

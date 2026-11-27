@@ -44,6 +44,7 @@ from printgest.ui.widgets import ElideLabel, FlowLayout, botao_com_atalho
 
 class PaginaCrud(QWidget):
     solicitado_detalhe = Signal(int)
+    navegar_com_contexto = Signal(str, dict)
 
     ENTIDADE = ""
     ROTULO_PAGINA = "Cadastro"
@@ -98,7 +99,10 @@ class PaginaCrud(QWidget):
 
     def _instalar_atalhos(self) -> None:
         """Atalhos do cadastro: F6 = Novo, F10 = Salvar, Esc = cancelar, Ctrl+F = busca."""
-        QShortcut(QKeySequence("F6"), self, self._novo)
+        # WidgetShortcut tem precedência sobre o F6 global (orçamento): quando
+        # o foco está na página, F6 continua criando um registro novo.
+        atalho_novo = QShortcut(QKeySequence("F6"), self, self._novo)
+        atalho_novo.setContext(Qt.ShortcutContext.WidgetShortcut)
         QShortcut(QKeySequence("Del"), self, self._excluir)
         QShortcut(QKeySequence("F10"), self, self._salvar)
         QShortcut(QKeySequence("Esc"), self, self._limpar_form)

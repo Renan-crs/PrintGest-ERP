@@ -25,10 +25,11 @@ def test_hierarquia_de_niveis():
     assert not tem_acesso("operador", "gerente")
 
 
-def test_menu_v21_tem_nove_ids_com_niveis_explícitos():
+def test_menu_ids_tem_niveis_explicitos():
     ids = {i["id"] for _g, itens in MENU for i in itens}
     assert ids == {
         "pdv",
+        "orcamento",
         "projetos",
         "agendamento",
         "cliente",
@@ -61,6 +62,7 @@ def test_operador_ve_operacao_e_cadastros_mas_nao_gestao():
     ids = {i["id"] for _g, itens in menu_visivel("operador") for i in itens}
     assert ids == {
         "pdv",
+        "orcamento",
         "projetos",
         "agendamento",
         "cliente",

@@ -1531,7 +1531,11 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             "Cancelar Projeto", "F8", "danger"
         )
         self._btn_cancelar_os.clicked.connect(self._cancelar_os)
-        for oculto in (avancar, arte, cancelar):
+        orcamento, self._btn_orcamento = botao_com_atalho(
+            "Criar orçamento a partir da O.S.", ""
+        )
+        self._btn_orcamento.clicked.connect(self._novo_orcamento_da_os)
+        for oculto in (avancar, arte, cancelar, orcamento):
             oculto.setVisible(False)
             layout.addWidget(oculto)
 
@@ -1547,10 +1551,26 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         menu.addSeparator()
         act_cancelar = menu.addAction("Cancelar projeto")
         act_cancelar.triggered.connect(self._btn_cancelar_os.click)
+        act_orcamento = menu.addAction("Criar orçamento a partir da O.S.")
+        act_orcamento.triggered.connect(self._btn_orcamento.click)
         btn_mais.setMenu(menu)
         layout.addWidget(btn_mais)
         self._btn_mais_acoes = btn_mais
         return [container]
+
+    def _novo_orcamento_da_os(self) -> None:
+        """Leva cliente e itens da O.S. para um novo orçamento."""
+        if self._editando_id is None:
+            dado = self._selecionado_ou_aviso(
+                "Orçamento", "Selecione uma O.S. na lista para criar o orçamento."
+            )
+            if not dado:
+                return
+            os_id = dado.get("id")
+        else:
+            os_id = self._editando_id
+        if os_id is not None:
+            self.navegar_com_contexto.emit("orcamento", {"os_id": os_id})
 
     def _abrir_arte(self) -> None:
         """Diálogo de arte, prova e aprovação da O.S. selecionada (M3, §3.5)."""
@@ -1696,6 +1716,52 @@ class PaginaOrcamento(PaginaOS):
                 return resposta.json()
 
             tarefas.rodar(_chamar, ok, lambda *_: None)
+
+    # --------------------------------------------------- entradas de contexto
+
+    def aplicar_contexto(self, contexto: dict) -> None:
+        """Entradas vindas de Cliente/O.S./busca global preenchem o rascunho."""
+        cliente_id = contexto.get("cliente_id")
+        if cliente_id is not None:
+            self._novo()
+            self._selecionar_cliente_contexto(cliente_id)
+            return
+        os_id = contexto.get("os_id")
+        if os_id is not None:
+            tarefas.rodar(
+                lambda: self._api.obter("os", os_id),
+                on_ok=self._preparar_a_partir_de_os,
+                on_erro=lambda msg: QMessageBox.warning(
+                    self, "Orçamento", f"Não foi possível carregar a O.S.: {msg}"
+                ),
+            )
+
+    def _selecionar_cliente_contexto(self, cliente_id) -> None:
+        """Se o catálogo ainda não carregou, cria a opção e deixa o loader trocá-la."""
+        self._cliente.definir(cliente_id)
+        if self._cliente.valor() != cliente_id:
+            nome = f"Cliente #{cliente_id}"
+            self._cliente.alterar_opcoes(
+                [(cliente_id, nome)],
+                {cliente_id: {"id": cliente_id, "nome_razao": nome}},
+            )
+            self._cliente.definir(cliente_id)
+
+    def _preparar_a_partir_de_os(self, dados: dict) -> None:
+        self._novo()
+        if dados.get("cliente_id") is not None:
+            self._selecionar_cliente_contexto(dados["cliente_id"])
+        else:
+            self._cliente.combo.setEditText(dados.get("cliente_nome_avulso") or "")
+        chave = {
+            "produto_id", "descricao_avulsa", "quantidade", "dimensoes",
+            "valor_unitario", "desconto", "tipo", "vf",
+        }
+        itens = [
+            {k: v for k, v in item.items() if k in chave}
+            for item in (dados.get("itens") or [])
+        ]
+        self._itens.definir(itens)
 
     def _acao_extra(self):
         """Orçamento: ações secundárias agrupadas em menu para caber no rodapé."""

@@ -29,6 +29,14 @@ MODULO_POR_ENTIDADE = {
     "clientes": "cliente",
     "produtos": "produto",
     "os": "os",
+    "orcamento": "orcamento",
+}
+
+_ROTULO_ENTIDADE = {
+    "clientes": "clientes",
+    "produtos": "produtos",
+    "os": "O.S.",
+    "orcamento": "orçamentos",
 }
 
 
@@ -102,8 +110,11 @@ class BuscaGlobal(QWidget):
             if not pode_abrir(self._nivel, modulo):
                 continue
             self._pendentes += 1
-            if entidade == "os":
-                chamada = lambda e=entidade, t=texto: self._api.listar_os(q=t, limit=6)
+            if entidade in ("os", "orcamento"):
+                tipo = "orcamento" if entidade == "orcamento" else None
+                chamada = lambda t=texto, tp=tipo: self._api.listar_os(
+                    q=t, tipo=tp, limit=6
+                )
             else:
                 chamada = (
                     lambda e=entidade, t=texto: self._api.listar(e, q=t, limit=6)
@@ -148,13 +159,21 @@ class BuscaGlobal(QWidget):
 
     @staticmethod
     def _nome(entidade: str, reg: dict) -> str:
-        if entidade == "os":
-            return reg.get("cliente_nome") or reg.get("descricao") or "—"
+        if entidade in ("os", "orcamento"):
+            return (
+                reg.get("cliente_nome")
+                or reg.get("cliente_nome_avulso")
+                or reg.get("descricao")
+                or "—"
+            )
         return reg.get("nome_razao") or reg.get("nome") or "—"
 
     @staticmethod
     def _rotulo(entidade: str, reg: dict) -> str:
-        base = {"clientes": "Cliente", "produtos": "Produto", "os": "O.S."}[entidade]
-        if entidade == "os":
+        base = {
+            "clientes": "Cliente", "produtos": "Produto",
+            "os": "O.S.", "orcamento": "Orçamento",
+        }[entidade]
+        if entidade in ("os", "orcamento"):
             return f"{base} {reg.get('numero') or reg.get('id')}"
         return f"{base} {reg.get('id')}"
