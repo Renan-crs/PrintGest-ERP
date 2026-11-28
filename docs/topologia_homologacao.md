@@ -61,7 +61,8 @@ Limite padrão de estações ativas: **5** (`estacao_service.LIMITE_PADRAO`). Co
 1. Desinstale qualquer instalação **Servidor** nas outras máquinas. A
    desinstalação **preserva os dados do cliente** (eles ficam no Neon); só sai
    a configuração local.
-2. Execute `PrintGest-Setup-<versao>-Estacao.exe`. O assistente pede o
+2. Execute `PrintGest-Setup-<versao>Estacao.exe` (ex.:
+   `PrintGest-Setup-0.5.46Estacao.exe`). O assistente pede o
    endereço do servidor — informe:
    ```
    http://<IP-do-ArtBalcão>:8000

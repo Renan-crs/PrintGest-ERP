@@ -23,7 +23,7 @@ de cada tag está indicado para rastreabilidade.
   cota de ativações e o reset M2M é feito no RedGest), configuração do
   `PRINTGEST_API_HOST` e da TCP 8000, instalação das estações, exclusões do
   Kaspersky e passos de diagnóstico.
-- Publicado o instalador `PrintGest-Setup-0.5.46-Estacao.exe` ao lado do
+- Publicado o instalador `PrintGest-Setup-0.5.46Estacao.exe` ao lado do
   instalador servidor.
 
 ### Validação
