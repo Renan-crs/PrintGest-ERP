@@ -1,2 +1,2 @@
-__version__ = "0.5.45"
+__version__ = "0.5.46"
 APP_NAME = "PrintGest ERP"

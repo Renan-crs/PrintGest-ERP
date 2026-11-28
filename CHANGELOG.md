@@ -9,6 +9,29 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.46] - 2026-11-27 — Topologia servidor/estações e instalador Estação
+
+### Desktop
+- Estação não consulta mais `latest.json`: o manifesto publicado descreve o
+  **instalador servidor** e avisar a estação poderia trocar o papel da máquina.
+  Atualização de estação passa a ser feita reinstalando o pacote Estação.
+- `main.py` repassa o papel de estação à Tela Principal; opção manual
+  "Verificar atualização" oculta nesse modo.
+
+### Documentação
+- `docs/topologia_homologacao.md`: um servidor por CNPJ/licença (a chave tem
+  cota de ativações e o reset M2M é feito no RedGest), configuração do
+  `PRINTGEST_API_HOST` e da TCP 8000, instalação das estações, exclusões do
+  Kaspersky e passos de diagnóstico.
+- Publicado o instalador `PrintGest-Setup-0.5.46-Estacao.exe` ao lado do
+  instalador servidor.
+
+### Validação
+Backend: 540 passed. Desktop: 569 passed, 4 xfailed. Mutação: 75/75 mortos
+(1 novo). Testes de regressão para a estação não baixar o Setup servidor.
+
+---
+
 ## [0.5.45] - 2026-11-27 — Layout do PDV: formas de pagamento e estado vazio
 
 ### Desktop

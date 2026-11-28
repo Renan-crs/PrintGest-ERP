@@ -398,6 +398,7 @@ class _Roteador:
             modo_leitura=modo_leitura,
             base_url=self._api.base_url_display,
             situacao_licenca=sit,
+            estacao=self._estacao,
         )
         # Quando o usuário faz logout, limpar a sessão salva
         principal.solicitado_logout.connect(self._limpar_e_logout)

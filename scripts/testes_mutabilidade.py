@@ -573,6 +573,14 @@ MUTANTES = [
         pasta="desktop",
     ),
     Mutante(
+        "estacao_recebe_manifesto_de_servidor",
+        "desktop/printgest/ui/tela_principal.py",
+        "        if self._estacao:\n            return  # manifesto de servidor não se aplica a estações",
+        "        if False:\n            return  # desligado",
+        "tests/test_tela_principal.py::test_estacao_nao_oferece_instalador_de_servidor",
+        pasta="desktop",
+    ),
+    Mutante(
         "toggles_pagamento_cortados",
         "desktop/printgest/ui/modulos/venda_balcao.py",
         "        linha_toggles = FlowLayout(margem=0, espaco_h=6, espaco_v=6)",

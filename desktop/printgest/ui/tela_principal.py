@@ -916,9 +916,11 @@ class TelaPrincipal(QMainWindow):
         modo_leitura: bool = False,
         base_url: str = "127.0.0.1:8000",
         situacao_licenca: dict | None = None,
+        estacao: bool = False,
     ) -> None:
         super().__init__()
         self._api = api
+        self._estacao = estacao
         self._usuario = usuario
         self._nivel = usuario.get("nivel_acesso", "operador")
         self._modo_leitura = modo_leitura
@@ -1005,11 +1007,17 @@ class TelaPrincipal(QMainWindow):
         self._timer_atualizacao.setSingleShot(True)
         self._timer_atualizacao.setInterval(2000)
         self._timer_atualizacao.timeout.connect(self._verificar_atualizacao)
-        self._timer_atualizacao.start()
+        # Estação não tem daemon nem licença própria: o `latest.json` publicado
+        # descreve o instalador SERVIDOR. Avisar a estação baixá-lo trocaria o
+        # papel da máquina — por isso a checagem fica desligada aqui.
+        if not self._estacao:
+            self._timer_atualizacao.start()
 
     # ------------------------------------------------------- atualização
 
     def _verificar_atualizacao(self) -> None:
+        if self._estacao:
+            return  # manifesto de servidor não se aplica a estações
         from printgest.core import atualizacao
 
         rodar(
@@ -1213,6 +1221,7 @@ class TelaPrincipal(QMainWindow):
         acao_atualizacao = menu.addAction(
             "Verificar atualização", self._verificar_atualizacao
         )
+        acao_atualizacao.setVisible(not self._estacao)
         acao_atualizacao.setShortcut(QKeySequence("Ctrl+Alt+U"))
         acao_atualizacao.setStatusTip(
             "Verificar se existe uma versão mais nova do PrintGest"

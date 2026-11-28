@@ -40,7 +40,10 @@ def _cliente_handler(request: httpx.Request) -> httpx.Response:
 
 
 def _principal(
-    usuario: dict, modo_leitura: bool = False, situacao: dict | None = None
+    usuario: dict,
+    modo_leitura: bool = False,
+    situacao: dict | None = None,
+    estacao: bool = False,
 ) -> TelaPrincipal:
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_cliente_handler))
     api.autenticar({"token": "tok", "usuario": usuario})
@@ -50,11 +53,30 @@ def _principal(
         modo_leitura=modo_leitura,
         base_url="127.0.0.1:8000",
         situacao_licenca=situacao,
+        estacao=estacao,
     )
 
 
 def _textos_botoes(principal):
     return [str(b.text()) for b in principal.findChildren(QPushButton)]
+
+
+def test_estacao_nao_oferece_instalador_de_servidor(app, monkeypatch):
+    """O `latest.json` baixa o Setup servidor: estação não pode ser avisada."""
+    chamadas = []
+    monkeypatch.setattr(
+        tela_principal_mod, "rodar", lambda *args, **kwargs: chamadas.append(args)
+    )
+    usuario = {"id": 1, "nome": "Ana", "login": "ana", "nivel_acesso": "admin"}
+
+    estacao = _principal(usuario, estacao=True)
+    estacao._verificar_atualizacao()
+    assert chamadas == []
+    assert not estacao._timer_atualizacao.isActive()
+
+    servidor = _principal(usuario)
+    servidor._verificar_atualizacao()
+    assert len(chamadas) == 1
 
 
 def test_abre_no_inicio_com_menu_visivel(app):
