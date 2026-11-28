@@ -9,6 +9,28 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.47] - 2026-11-28 — Instalador único (Servidor/Estação no wizard)
+
+### Instalador
+- Um único `PrintGest-Setup-<versão>.exe` contém desktop e Local API Service.
+  O wizard pergunta se a máquina é **Servidor** ou **Estação**.
+- As credenciais do Neon (`DATABASE_URL`, tenant, chaves de integração) são
+  gravadas no disco **somente no modo Servidor**, a partir de um template que
+  é removido em ambos os modos ao final da instalação. Na Estação só é gravado
+  `PRINTGEST_API_URL` + `PRINTGEST_MODO_ESTACAO`.
+- O modo escolhido fica em `modo.txt`, permitindo que atualizações silenciosas
+  (`/VERYSILENT`) preservem o papel da máquina sem exibir o wizard.
+- Mesmo diretório/AppId para os dois modos; máquinas com o pacote Estação
+  antigo devem ser desinstaladas antes.
+- `latest.json` passa a descrever o instalador único, eliminando a ambiguidade
+  entre os dois manifests anteriores.
+
+### Validação
+Regra do instalador validada (novas checagens de modo e de credenciais).
+Backend: 540 passed. Desktop: 569 passed, 4 xfailed. Mutação: 75/75 mortos.
+
+---
+
 ## [0.5.46] - 2026-11-27 — Topologia servidor/estações e instalador Estação
 
 ### Desktop

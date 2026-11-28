@@ -1,9 +1,9 @@
 # Empacotamento e instalador do PrintGest ERP
 
 Como o sistema vira um pacote instalável em uma máquina sem Python, sem Git e
-sem PostgreSQL pré-instalado: **instaladores únicos, com desinstalador** — no
-**modo Servidor** (desktop + Local API Service + Neon Database) e no
-**modo Estação** (só o desktop, conectando ao servidor da gráfica).
+sem PostgreSQL pré-instalado: **um único instalador, com desinstalador**. No
+wizard o operador escolhe **Servidor** (desktop + Local API Service + Neon) ou
+**Estação** (só consome a API do servidor da gráfica).
 
 > **M0/PRD v3.0:** o PDV agora exige **caixa aberto** para o vendedor logado
 > (`409 "Caixa fechado"` no servidor + banner na tela). Primeira coisa a fazer
@@ -12,49 +12,51 @@ sem PostgreSQL pré-instalado: **instaladores únicos, com desinstalador** — n
 Tudo aqui é gerado por **um comando**:
 
 ```powershell
-# Servidor (máquina que guarda banco e licença)
 powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
-
-# Estação (usa o servidor da gráfica)
-powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Modo estacao
 ```
 
-Saídas: `dist_installer\PrintGest-Setup-<versão>.exe` (Servidor) e
-`PrintGest-Setup-<versão>Estacao.exe` (Estação). Os dois convivem na mesma
-máquina (AppIds e pastas distintas).
+Saída: `dist_installer\PrintGest-Setup-<versão>.exe` e o manifesto
+`latest.json`. Ambos os binários viajam no Setup; as credenciais do Neon são
+gravadas no disco **somente se o operador escolher Servidor**.
 
 ---
 
 ## 1. Arquitetura da instalação
 
-### Modo Servidor (a máquina que guarda banco e licença)
+### Escolha no wizard
+
+- **Servidor:** grava `{app}\PrintGestAPI\.env` com `DATABASE_URL`, tenant e
+  chaves fixas; o `PrintGestAPI.exe` atende a rede na porta 8000.
+- **Estação:** grava apenas `{app}\PrintGest\.env` com
+  `PRINTGEST_API_URL=<servidor>` e `PRINTGEST_MODO_ESTACAO=sim`; nenhuma
+  credencial do backend é gravada.
+
+O modo fica registrado em `{app}\modo.txt` para que atualizações silenciosas
+(`/VERYSILENT`) preservem a escolha sem mostrar o wizard.
+
+### Layout (mesmo diretório para os dois modos)
 
 ```
 {localappdata}\Programs\PrintGest        (instalação por usuário, sem UAC)
 ├── PrintGest\PrintGest.exe              desktop PySide6 (PyInstaller onedir)
 ├── PrintGestAPI\
-│   ├── PrintGestAPI.exe                  Local API Service (FastAPI + uvicorn)
-│   ├── .env                              configuração da instalação
+│   ├── PrintGestAPI.exe                  Local API Service (presente nos dois;
+│   │                                    usado somente no modo Servidor)
+│   ├── .env                              somente no modo Servidor (credenciais)
 │   └── logs\printgest-api.log            log do serviço (sem console)
+├── modo.txt                              servidor | estacao
 └── unins000.exe                          desinstalador (gerado pelo Inno Setup)
 ```
 
-### Modo Estação (usa o servidor da gráfica)
-
-```
-{localappdata}\Programs\PrintGestEstacao
-├── PrintGest\
-│   ├── PrintGest.exe
-│   └── .env                              PRINTGEST_API_URL=<servidor> + MODO_ESTACAO=sim
-└── unins000.exe
-```
-
-Sem backend e sem PostgreSQL embarcado: o assistente de instalação **pergunta o endereço
-do servidor** (ex.: `192.168.0.10:8000`) e grava no `.env` ao lado do exe — o
-desktop lê esse arquivo ao iniciar (`main._carregar_env_do_executavel`). Instalação
-silenciosa usa endereço vazio e o usuário informa na tela **Conectar ao Servidor** (D6).
+Na estação o assistente pergunta o endereço do servidor (ex.:
+`192.168.0.10:8000`) e o grava no `.env` do desktop — o `main._carregar_env_do_executavel`
+lê esse arquivo ao iniciar. Instalação silenciosa sem endereço preserva o `.env`
+existente; se não houver, o usuário informa na tela **Conectar ao Servidor** (D6).
 O gate de serial não existe na estação: a licença pertence ao servidor, que aplica
 o modo de leitura quando algo não está em ordem.
+
+> **Migração:** máquinas com o antigo pacote Estação (pasta `PrintGestEstacao`,
+> AppId próprio) devem ser **desinstaladas** antes de instalar o Setup único.
 
 ### Ciclo de vida
 

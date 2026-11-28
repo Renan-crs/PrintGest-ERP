@@ -41,6 +41,23 @@ Exigir 'assistente da estacao nao grava .env' 'PRINTGEST_API_URL='
 Exigir 'atualizacao silenciosa pode apagar o endereco do servidor' 'Endereco = ''''\) and FileExists\(EnvPath\)'
 Exigir 'guarda de preservacao do .env sem log' 'preservando \.env da estacao'
 
+# 6) Instalador unico: modo escolhido no wizard e inferido em /VERYSILENT.
+Exigir 'falta a pagina de escolha Servidor/Estacao' 'CreateCustomPage\(wpWelcome'
+Exigir 'modo silencioso nao e inferido do estado instalado' 'ModoEstacaoInstalado'
+Exigir 'template de credenciais nao e removido do disco' 'DeleteFile\(Template\)'
+Exigir 'template de credenciais do servidor ausente do pacote' 'config-servidor\.txt'
+
+$empacotar = Get-Content (Join-Path $PSScriptRoot '..\scripts\empacotar.ps1') -Raw
+if ($empacotar -match 'DModoEstacao') {
+  $falhas += 'empacotar.ps1 ainda gera o instalador Estacao separado'
+}
+if ($empacotar -notmatch 'config-servidor\.txt') {
+  $falhas += 'empacotar.ps1 nao gera o template de credenciais do servidor'
+}
+if ($empacotar -notmatch 'PrintGest-Setup-\$versao\.exe') {
+  $falhas += 'manifesto nao aponta para o instalador unico'
+}
+
 if ($falhas.Count -gt 0) {
   Write-Host 'FALHA na regra do instalador:' -ForegroundColor Red
   $falhas | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }

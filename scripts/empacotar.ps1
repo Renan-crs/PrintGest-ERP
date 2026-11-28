@@ -1,11 +1,10 @@
-# Empacota o PrintGest ERP em instaladores Inno Setup (com desinstalador).
+# Empacota o PrintGest ERP em UM instalador Inno Setup (com desinstalador).
 #
-# Modo SERVIDOR (padrao) - desktop + Local API Service + Neon Database.
+# O wizard da instalacao pergunta se a maquina e SERVIDOR ou ESTACAO:
+#   - Servidor: grava o .env do Neon (credenciais) e atende as estacoes;
+#   - Estacao:  grava apenas PRINTGEST_API_URL / PRINTGEST_MODO_ESTACAO.
+# Ambos os binarios viajam no Setup; nenhuma credencial e gravada na estacao.
 #   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1
-#
-# Modo ESTACAO - apenas o desktop; o assistente pergunta o endereco do
-# servidor (PRINTGEST_API_URL gravado em .env ao lado do exe):
-#   powershell -ExecutionPolicy Bypass -File scripts\empacotar.ps1 -Modo estacao
 #
 # Assinatura digital (opcional - exige certificado de code signing):
 #   ... -Assinar <thumbprint-ou-arquivo.pfx>  (senha em PRINTGEST_SIGN_SENHA)
@@ -17,8 +16,10 @@ param(
     # Thumbprint do certificado em Cert:\CurrentUser\My OU caminho de um .pfx.
     # Vazio = nao assina (o Windows pode mostrar SmartScreen no Setup).
     [string]$Assinar = "",
-    [ValidateSet("servidor", "estacao")]
-    [string]$Modo = "servidor"
+    # Mantido por compatibilidade com scripts antigos: o valor NAO altera o
+    # pacote — sempre e gerado o instalador unico.
+    [ValidateSet("unico", "servidor", "estacao")]
+    [string]$Modo = "unico"
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,16 +33,17 @@ $pyApi     = Join-Path $raiz "backend\.venv\Scripts\pyinstaller.exe"
 $pyDesktop = Join-Path $raiz "desktop\.venv\Scripts\pyinstaller.exe"
 $iscc      = Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"
 
-$ehServidor = ($Modo -eq "servidor")
-$sufixo = if ($ehServidor) { "" } else { "Estacao" }
+$sufixo = ""  # instalador unico: sem sufixo de modo
 
-foreach ($ferramenta in @($pyDesktop, $iscc)) { if (-not (Test-Path $ferramenta)) { throw "Ferramenta nao encontrada: $ferramenta" } }
-if ($ehServidor -and -not (Test-Path $pyApi)) { throw "Ferramenta nao encontrada: $pyApi" }
+foreach ($ferramenta in @($pyDesktop, $pyApi, $iscc)) { if (-not (Test-Path $ferramenta)) { throw "Ferramenta nao encontrada: $ferramenta" } }
 
 # Versao do pacote sai do proprio desktop (fonte unica da verdade).
 $versao = (Select-String -Path (Join-Path $raiz "desktop\printgest\__init__.py") `
     -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
-Write-Host "== PrintGest ERP $versao (modo: $Modo) =="
+if ($Modo -ne "unico") {
+    Write-Host "[i] -Modo $Modo ignorado: este script gera sempre o instalador unico."
+}
+Write-Host "== PrintGest ERP $versao (instalador unico) =="
 
 # ------------------------------------------- 0) .env da instalacao (validado
 # ANTES de qualquer build: um contrato c sem api_key nao pode gastar 4 min de
@@ -57,7 +59,8 @@ $linhas = $null
 $databaseUrl = ""
 $contrato = ""
 $apiChave = ""
-if ($ehServidor) {
+# Configuracao do servidor sempre e lida: o instalador unico a embute e so
+# grava no disco quando o wizard escolher Servidor.
     # Fonte do .env: env.instalacao.neon ou env.instalacao.example
     $envNeon = Join-Path $installer "env.instalacao.neon"
     $envLocal = Join-Path $installer "env.instalacao"
@@ -118,7 +121,6 @@ Contrato B (CNPJ + codigo) NAO usa api_key e pode seguir sem ela.
     } else {
         Write-Host "  api_key: AUSENTE do pacote (Contrato B nao precisa)."
     }
-}
 
 # ------------------------------------------------------------ 1) limpeza
 foreach ($alvo in @((Join-Path $dist "PrintGest"), (Join-Path $dist "PrintGestAPI"))) {
@@ -133,88 +135,76 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no desktop." }
 } finally { Pop-Location }
 
-# ------------------------------------- 3) backend (so servidor)
-if ($ehServidor) {
-    Write-Host "[2/4] PyInstaller: PrintGestAPI.exe (backend)..."
-    Push-Location $installer
-    try {
-        & $pyApi "printgestapi.spec" --clean --noconfirm --distpath (Join-Path $dist "") --workpath (Join-Path $build "work_api")
-        if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no backend." }
-    } finally { Pop-Location }
+# ------------------------------------- 3) backend (presente no instalador unico)
+Write-Host "[2/4] PyInstaller: PrintGestAPI.exe (backend)..."
+Push-Location $installer
+try {
+    & $pyApi "printgestapi.spec" --clean --noconfirm --distpath (Join-Path $dist "") --workpath (Join-Path $build "work_api")
+    if ($LASTEXITCODE -ne 0) { throw "PyInstaller falhou no backend." }
+} finally { Pop-Location }
 
-    # Neon Database: PostgreSQL embarcado REMOVIDO (v0.3.4+)
-    # .env da instalacao (chaves fixas impostas pelo build):
-    $forcadas = @{
-        "PRINTGEST_PG_EMBARCADO" = "false"
-        "PRINTGEST_API_HOST"     = "127.0.0.1"
-        "PRINTGEST_ENV"          = "local"
-    }
-    # DATABASE_URL deve vir antes das outras variaveis - valor já limpo
-    $dbUrlVar = if ($databaseUrl) {
-        "PRINTGEST_DATABASE_URL=$databaseUrl"
-    } else {
-        ""
-    }
-    $conteudo = @($dbUrlVar) + $linhas + @(
-        "",
-        "# Instalacao empacotada (gerado por scripts/empacotar.ps1)",
-        "# Inquilino (PRINTGEST_EMPRESA_CNPJ) e gravado pelo assistente de",
-        "# instalacao no .env desta pasta - instalador universal para todas",
-        "# as graficas."
-    ) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
-    $conteudo | Set-Content -Path (Join-Path $dist "PrintGestAPI\.env") -Encoding utf8
-} else {
-    Write-Host "[2/4] modo estacao: sem backend/PostgreSQL no pacote."
-    Write-Host "[3/4] modo estacao: .env com o endereco sera gravado pelo assistente."
+# Neon Database: PostgreSQL embarcado REMOVIDO (v0.3.4+)
+# .env da instalacao (chaves fixas impostas pelo build):
+$forcadas = @{
+    "PRINTGEST_PG_EMBARCADO" = "false"
+    "PRINTGEST_API_HOST"     = "127.0.0.1"
+    "PRINTGEST_ENV"          = "local"
 }
+# DATABASE_URL deve vir antes das outras variaveis - valor já limpo
+$dbUrlVar = if ($databaseUrl) {
+    "PRINTGEST_DATABASE_URL=$databaseUrl"
+} else {
+    ""
+}
+$conteudo = @($dbUrlVar) + $linhas + @(
+    "",
+    "# Instalacao empacotada (gerado por scripts/empacotar.ps1)",
+    "# Inquilino (PRINTGEST_EMPRESA_CNPJ) e gravado pelo assistente de",
+    "# instalacao no .env desta pasta - instalador universal para todas",
+    "# as graficas."
+) + @($forcadas.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key)=$($_.Value)" })
+
+# Copia de desenvolvimento (fora do Setup: Excludes *.env) e TEMPLATE que o
+# wizard so transforma em .env quando o operador escolher SERVIDOR.
+$conteudo | Set-Content -Path (Join-Path $dist "PrintGestAPI\.env") -Encoding utf8
+$conteudo | Set-Content -Path (Join-Path $pacote "config-servidor.txt") -Encoding utf8
+Write-Host "[i] Template de credenciais: build\pacote\config-servidor.txt (gravado so no modo Servidor)."
 
 # ------------------------------------------------------------- 4) LEIA-ME
-$leiaMe = if ($ehServidor) { @"
-PrintGest ERP $versao (Servidor)
+$leiaMe = @"
+PrintGest ERP $versao — instalador unico
 
-PRIMEIRA EXECUCAO
-  1. Abra o PrintGest ERP (atalho da area de trabalho / menu Iniciar).
-  2. O sistema se conecta ao Neon Database (nao ha banco local - levou alguns segundos).
-  3. A tela de ativacao pede a licenca emitida pelo RedGest - como em
-     programas licenciados por serial, ela so e pedida na instalacao.
-  4. Login do administrador: usuario "admin", senha de fabrica "admin123".
-     Troque a senha no primeiro login (tela de troca de senha) - nao opere
-     com a senha de fabrica.
-  5. Depois de entrar, cadastre a equipe em Cadastro de Funcionarios. Informe
-     o login de cada funcionario: ele define a propria senha no primeiro
-     acesso, pela opcao "Primeiro acesso" da tela de login.
+O wizard pergunta se este computador e SERVIDOR ou ESTACAO.
+
+SERVIDOR (uma maquina por CNPJ/licenca)
+  1. Abra o PrintGest ERP. O sistema se conecta ao Neon Database (pode levar
+     alguns segundos na primeira execucao).
+  2. A tela de ativacao pede a licenca emitida pelo RedGest (CNPJ + codigo).
+  3. Login do administrador: usuario "admin", senha de fabrica "admin123".
+     Troque a senha no primeiro login.
+  4. Para atender as estacoes na rede, ajuste PRINTGEST_API_HOST no .env de
+     PrintGestAPI para o IP do servidor e libere a porta 8000/TCP.
+  5. Cadastre a equipe em Cadastro de Funcionarios; cada usuario define a
+     propria senha no primeiro acesso.
+
+ESTACAO (demais maquinas)
+  1. Escolha "Estacao" e informe o endereco do servidor, por exemplo
+     192.168.0.10:8000 (pode ser trocado na tela Conectar ao Servidor).
+  2. Faca login com um usuario criado no servidor. Nao ha ativacao local,
+     nao ha daemon e nenhuma credencial do Neon e gravada nesta maquina.
 
 ONDE FICAM AS COISAS
   - Programa:        {localappdata}\Programs\PrintGest
   - Log do servico:  ...\PrintGest\PrintGestAPI\logs\printgest-api.log
+  - Modo escolhido:  ...\PrintGest\modo.txt (usado nas atualizacoes silenciosas)
 
 DESINSTALACAO
   Use "Desinstalar PrintGest ERP" no menu Iniciar ou Aplicativos do Windows.
-  A desinstalacao encerra o servico e remove o programa. Os dados sao mantidos
-  no Neon Database em nuvem - exporte antes, se precisar.
+  A desinstalacao encerra os processos e remove o programa. Os dados do
+  cliente ficam no Neon e NAO sao apagados.
 
-Suporte: veja docs/empacotamento.md no repositorio.
-"@ } else { @"
-PrintGest ERP $versao (Estacao)
-
-ESTA MAQUINA E UMA ESTACAO
-  O sistema e o banco de dados ficam no SERVIDOR da grafica. Este pacote
-  instala apenas o programa; o endereco do servidor foi pedido na instalacao
-  (e pode ser trocado dentro do programa, na tela Conectar ao Servidor).
-
-PRIMEIRA EXECUCAO
-  1. Abra o PrintGest ERP (atalho da area de trabalho / menu Iniciar).
-  2. Se o endereco ainda nao estiver configurado, a tela Conectar ao
-     Servidor pede - use algo como 192.168.0.10:8000.
-  3. Faca login com o usuario criado no servidor (a licenca e a senha
-     sao gerenciadas la).
-
-DESINSTALACAO
-  Use "Desinstalar PrintGest ERP Estacao" no menu Iniciar ou Aplicativos
-  do Windows. Nenhum dado e removido - tudo vive no servidor.
-
-Suporte: veja docs/empacotamento.md no repositorio.
-"@ }
+Suporte: veja docs/empacotamento.md e docs/topologia_homologacao.md.
+"@
 $leiaMe | Set-Content -Path (Join-Path $pacote "LEIA-ME.txt") -Encoding utf8
 
 # ------------------------------------------- 5) assinatura digital (opcional)
@@ -248,8 +238,10 @@ function Assinar-Exe([string]$exe, [string]$signtool, [string]$modo) {
 if ($Assinar -ne "") {
     Write-Host "[+] Assinando os executaveis (signtool)..."
     $signtool = Resolve-Signtool
-    $alvos = @((Join-Path $dist "PrintGest\PrintGest.exe"))
-    if ($ehServidor) { $alvos += (Join-Path $dist "PrintGestAPI\PrintGestAPI.exe") }
+    $alvos = @(
+        (Join-Path $dist "PrintGest\PrintGest.exe"),
+        (Join-Path $dist "PrintGestAPI\PrintGestAPI.exe")
+    )
     foreach ($exe in $alvos) { Assinar-Exe $exe $signtool $Assinar }
 } else {
     Write-Host "[i] Sem assinatura digital (-Assinar <thumbprint-ou-.pfx> para assinar)."
@@ -257,11 +249,10 @@ if ($Assinar -ne "") {
 }
 
 # --------------------------------------------------- 6) instalador Inno Setup
-Write-Host "[4/4] Compilando o instalador Inno Setup (modo: $Modo)..."
+Write-Host "[4/4] Compilando o instalador Inno Setup (unico)..."
 $saidaAbs = Join-Path $raiz $Saida
 if (-not (Test-Path $saidaAbs)) { New-Item -ItemType Directory -Force -Path $saidaAbs | Out-Null }
 $defines = @("/O$saidaAbs", "/DVersaoApp=$versao")
-if (-not $ehServidor) { $defines += "/DModoEstacao" }
 & $iscc $defines (Join-Path $installer "PrintGest.iss")
 if ($LASTEXITCODE -ne 0) { throw "ISCC falhou." }
 
@@ -278,11 +269,11 @@ if ($Assinar -ne "") {
 $hashSetup = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
 $manifesto = [ordered]@{
     versao = $versao
-    arquivo = "PrintGest-Setup-$versao$sufixo.exe"
+    arquivo = "PrintGest-Setup-$versao.exe"
     sha256 = $hashSetup
     data = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
     url = "https://github.com/Renan-crs/PrintGest-ERP/releases/tag/v$versao"
-    notas = @("Instalador $Modo - sem UAC, dados do cliente preservados.")
+    notas = @("Instalador unico (Servidor ou Estacao escolhidos no wizard) - sem UAC, dados do cliente preservados.")
 }
 $jsonManifesto = $manifesto | ConvertTo-Json -Depth 4
 $destinoManifesto = Join-Path $saidaAbs "latest.json"
@@ -294,8 +285,4 @@ Write-Host "[i] Manifesto de atualizacao: $destinoManifesto"
 $mb = [math]::Round((Get-Item $setup).Length / 1MB, 1)
 Write-Host ""
 Write-Host "OK: $setup ($mb MB)"
-if ($ehServidor) {
-    Write-Host "Maquina SERVIDORA da grafica: duplo clique, sem UAC (instalacao por usuario)."
-} else {
-    Write-Host "Maquina de ESTACAO: duplo clique - o assistente pede o endereco do servidor."
-}
+Write-Host "No wizard escolha SERVIDOR (uma maquina por CNPJ/licenca) ou ESTACAO (informe o endereco do servidor)."
