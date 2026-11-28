@@ -21,11 +21,13 @@ from app.models.enums import (
     FormaPagamento,
     OrigemMov,
     StatusCaixa,
+    StatusConta,
     StatusVenda,
     TipoMovCaixa,
     TipoMovEstoque,
 )
-from app.models.financeiro import Caixa, MovimentoCaixa
+from app.models.core import Usuario
+from app.models.financeiro import Caixa, ContaReceber, MovimentoCaixa
 from app.models.movimento import VendaBalcao, VendaBalcaoItem, VendaPagamento
 from app.schemas.venda import (
     PagamentoVendaIn,
@@ -34,6 +36,7 @@ from app.schemas.venda import (
     VendaItemIn,
     VendaItemOut,
     VendaOut,
+    LancamentoVendaOut,
 )
 from app.services import adiantamento_service, custo_service, filial_service
 from app.services.precificacao_documento import (
@@ -115,7 +118,7 @@ def _totais(itens: list[VendaBalcaoItem], desconto: Decimal) -> tuple[Decimal, D
     return valor_itens, _q(valor_itens - desconto)
 
 
-def _para_out(venda: VendaBalcao) -> VendaOut:
+def _para_out(venda: VendaBalcao, db: Session | None = None) -> VendaOut:
     dados = {c.name: getattr(venda, c.name) for c in venda.__table__.columns}
     nome_avulso = (getattr(venda, "cliente_nome_avulso", None) or "").strip() or None
     dados["cliente_nome"] = venda.cliente.nome_razao if venda.cliente else nome_avulso
@@ -140,6 +143,77 @@ def _para_out(venda: VendaBalcao) -> VendaOut:
     dados["pagamentos"] = [
         PagamentoVendaOut.model_validate(p) for p in (venda.pagamentos or [])
     ]
+
+    # Rastreabilidade: o sinal e o saldo JA vivem em conta_receber — aqui só
+    # são lidos (nunca reescritos). Filtro por filial para não vazar inquilino.
+    contas = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.filial_id == venda.filial_id,
+            ContaReceber.venda_balcao_id == venda.id,
+        )
+        .order_by(ContaReceber.created_at, ContaReceber.id)
+        .all()
+        if db is not None
+        else []
+    )
+    ids_usuario = {c.usuario_baixa_id for c in contas if c.usuario_baixa_id}
+    nomes_usuario = (
+        {
+            u.id: u.nome
+            for u in db.query(Usuario)
+            .filter(Usuario.id.in_(ids_usuario))
+            .all()
+        }
+        if ids_usuario and db is not None
+        else {}
+    )
+    dados["lancamentos"] = [
+        LancamentoVendaOut(
+            id=c.id,
+            descricao=c.descricao,
+            valor=c.valor,
+            valor_pago=c.valor_pago,
+            status=c.status.value if hasattr(c.status, "value") else str(c.status),
+            data_pagamento=c.data_pagamento,
+            usuario_baixa_id=c.usuario_baixa_id,
+            usuario_baixa_nome=nomes_usuario.get(c.usuario_baixa_id),
+            criado_em=c.created_at,
+        )
+        for c in contas
+    ]
+    if contas:
+        dados["valor_sinal"] = sum(
+            (
+                c.valor_pago
+                for c in contas
+                if "adiantamento" in (c.descricao or "").lower()
+                and c.status == StatusConta.PAGA
+            ),
+            Decimal("0.00"),
+        )
+        dados["saldo"] = sum(
+            (
+                max(c.valor - c.valor_pago, Decimal("0.00"))
+                for c in contas
+                if c.status == StatusConta.ABERTA
+            ),
+            Decimal("0.00"),
+        )
+    else:
+        # Sem título: venda quitada no balcão, sinal não houve. Se o operador
+        # recebeu menos que o total, mostra a diferença em aberto.
+        pago = (
+            sum((p.valor for p in (venda.pagamentos or [])), Decimal("0.00"))
+            if venda.pagamentos
+            else (
+                venda.valor_recebido
+                if venda.valor_recebido is not None
+                else venda.valor_total
+            )
+        )
+        dados["valor_sinal"] = Decimal("0.00")
+        dados["saldo"] = max(venda.valor_total - pago, Decimal("0.00"))
     return VendaOut.model_validate(dados)
 
 
@@ -510,7 +584,7 @@ def criar(
         db.rollback()
         raise _erro_integridade() from exc
     db.refresh(venda)
-    return _para_out(venda)
+    return _para_out(venda, db)
 
 
 def buscar(db: Session, venda_id: int, *, filial_id: int) -> VendaBalcao:
@@ -580,7 +654,7 @@ def listar(
         .offset(max(offset, 0))
         .all()
     )
-    return [_para_out(v) for v in itens], total
+    return [_para_out(v, db) for v in itens], total
 
 
 def cancelar(

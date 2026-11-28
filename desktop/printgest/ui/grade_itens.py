@@ -21,8 +21,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
-    QGridLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -35,7 +33,12 @@ from printgest.core import catalogos
 from printgest.core.api import Api
 from printgest.ui.formulario import formatar_moeda, para_decimal
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import estado_atencao, estado_muted, estado_primario
+from printgest.ui.widgets import (
+    FlowLayout,
+    estado_atencao,
+    estado_muted,
+    estado_primario,
+)
 
 _CHAVES = [
     "seq", "descricao", "dimensoes", "quantidade", "vf", "custo",
@@ -159,12 +162,10 @@ class GradeItens(QWidget):
         """Editor em duas etapas: (1) o que é, (2) quanto custa — botões à parte."""
         caixa = QWidget()
         caixa.setObjectName("card")
-        grade = QGridLayout(caixa)
-        grade.setContentsMargins(10, 8, 10, 8)
-        grade.setHorizontalSpacing(8)
-        grade.setVerticalSpacing(4)
-        for coluna, stretch in enumerate((2, 2, 2, 1, 1, 1)):
-            grade.setColumnStretch(coluna, stretch)
+        # Antes: QGridLayout de 6 colunas com mínimos de 180/140 px somando
+        # ~680 px — em painéis de ~460 px os últimos campos e os botões eram
+        # cortados (sem rolagem horizontal). FlowLayout quebra em linhas.
+        grade = FlowLayout(caixa, margem=0, espaco_h=12, espaco_v=6)
 
         def empilhado(texto: str, widget: QWidget) -> QWidget:
             """Rótulo acima do controle — evita sobreposição na inclusão (G1)."""
@@ -179,13 +180,13 @@ class GradeItens(QWidget):
             return celula
 
         self._combo_produto = QComboBox()
-        self._combo_produto.setMinimumWidth(180)
+        self._combo_produto.setMinimumWidth(0)
         self._combo_produto.currentIndexChanged.connect(self._produto_selecionado)
         self._combo_produto.setToolTip("1) Selecione um produto cadastrado")
 
         self._descricao = QLineEdit()
         self._descricao.setPlaceholderText("Ou descreva o serviço avulso")
-        self._descricao.setMinimumWidth(140)
+        self._descricao.setMinimumWidth(0)
         self._descricao.setToolTip("Usado quando nenhum produto é selecionado")
 
         self._check_fornecedor = QCheckBox("Fornecedor")
@@ -194,9 +195,9 @@ class GradeItens(QWidget):
         )
         self._check_fornecedor.toggled.connect(self._origem_mudou)
 
-        grade.addWidget(empilhado("1) Produto / serviço", self._combo_produto), 0, 0)
-        grade.addWidget(empilhado("Descrição avulsa", self._descricao), 0, 1)
-        grade.addWidget(empilhado("Origem", self._check_fornecedor), 0, 2)
+        grade.addWidget(empilhado("1) Produto / serviço", self._combo_produto))
+        grade.addWidget(empilhado("Descrição avulsa", self._descricao))
+        grade.addWidget(empilhado("Origem", self._check_fornecedor))
 
         self._qtd = QLineEdit("1")
         self._qtd.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -225,12 +226,12 @@ class GradeItens(QWidget):
         self._desconto.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._desconto.setToolTip("2) Desconto em reais (opcional)")
 
-        grade.addWidget(empilhado("Qtd.", self._qtd), 1, 0)
-        grade.addWidget(empilhado("Dimensões", self._dimensoes), 1, 1)
-        grade.addWidget(empilhado("VF (R$) — fornecedor", self._vf), 1, 2)
-        grade.addWidget(empilhado("Preço Unit. (R$)", self._unit), 1, 3)
-        grade.addWidget(empilhado("Desc. (R$)", self._desconto), 1, 4)
-        grade.addWidget(self._chk_vf_total, 2, 0, 1, 3)
+        grade.addWidget(empilhado("Qtd.", self._qtd))
+        grade.addWidget(empilhado("Dimensões", self._dimensoes))
+        grade.addWidget(empilhado("VF (R$) — fornecedor", self._vf))
+        grade.addWidget(empilhado("Preço Unit. (R$)", self._unit))
+        grade.addWidget(empilhado("Desc. (R$)", self._desconto))
+        grade.addWidget(self._chk_vf_total)
 
         self._btn_adicionar = QPushButton("+ Adicionar Novo Item")
         self._btn_adicionar.setToolTip("Adicionar item (Enter nos campos)")
@@ -241,7 +242,7 @@ class GradeItens(QWidget):
             self._vf, self._unit, self._desconto,
         ):
             w.returnPressed.connect(self._adicionar)
-        self._btn_adicionar.setMinimumWidth(150)
+        self._btn_adicionar.setMinimumWidth(0)
 
         self._btn_cancelar_edicao = QPushButton("Cancelar edição")
         self._btn_cancelar_edicao.setVisible(False)
@@ -249,15 +250,17 @@ class GradeItens(QWidget):
 
         remover = QPushButton("Remover Selecionada")
         remover.clicked.connect(self._remover)
-        remover.setMinimumWidth(120)
+        remover.setMinimumWidth(0)
 
-        botoes = QHBoxLayout()
-        botoes.setSpacing(8)
+        # Botões também refluem: nunca mais "mover Selec..." cortado.
+        # QWidget intermediário porque FlowLayout expõe addWidget/addItem,
+        # não addLayout (QLayout.addWidget resolve).
+        botoes_widget = QWidget()
+        botoes = FlowLayout(botoes_widget, margem=0, espaco_h=8, espaco_v=6)
         botoes.addWidget(remover)
         botoes.addWidget(self._btn_cancelar_edicao)
-        botoes.addStretch(1)
         botoes.addWidget(self._btn_adicionar)
-        grade.addLayout(botoes, 3, 0, 1, 6)
+        grade.addWidget(botoes_widget)
         return caixa
 
     # ------------------------------------------------------------ produtos

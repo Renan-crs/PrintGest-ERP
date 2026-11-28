@@ -394,6 +394,73 @@ def test_remover_item_atualiza_grade(app, pumpar, pagina):
     assert len(pagina._itens_editor.valor()) == 1
 
 
+def test_detalhes_venda_explicam_sinal_saldo_e_split(app, monkeypatch):
+    """Recebido menor que o total não pode aparecer sem contexto."""
+    from PySide6.QtWidgets import QDialog, QLabel, QTableWidget
+
+    capturado = []
+
+    def falso_exec(self):
+        capturado.append(self)
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, "exec", falso_exec)
+    pagina = PaginaVendaBalcao(_api())
+    pagina._mostrar_dialogo_detalhes(
+        {
+            "numero": 12,
+            "data_venda": "2026-11-28",
+            "status": "ok",
+            "valor_itens": "120.00",
+            "desconto": "0.00",
+            "valor_total": "120.00",
+            "valor_recebido": "60.00",
+            "troco": "0.00",
+            "forma_pagamento": "dinheiro",
+            "saldo": "60.00",
+            "valor_sinal": "0.00",
+            "pagamentos": [
+                {
+                    "forma_pagamento": "dinheiro",
+                    "valor": "60.00",
+                    "valor_recebido": "60.00",
+                    "troco": "0.00",
+                    "parcelas": 1,
+                },
+                {"forma_pagamento": "pix", "valor": "60.00", "parcelas": 1},
+            ],
+            "lancamentos": [
+                {
+                    "id": 1,
+                    "descricao": "Adiantamento — Venda #12 (sinal de 30%)",
+                    "valor": "36.00",
+                    "valor_pago": "36.00",
+                    "status": "paga",
+                    "usuario_baixa_nome": "Ana",
+                    "criado_em": "2026-11-28T09:00:00",
+                }
+            ],
+        }
+    )
+
+    assert capturado, "modal não foi aberto"
+    dlg = capturado[0]
+    textos = [lbl.text() for lbl in dlg.findChildren(QLabel)]
+    assert any("Natureza do pagamento" in t for t in textos)
+    assert any("Sinal/entrada" in t for t in textos)
+    assert any("Saldo em aberto" in t for t in textos)
+    assert any("R$ 60,00" in t for t in textos)
+    # Com sinal confirmado, a natureza prioritária é o adiantamento; o split
+    # continua visível na tabela própria.
+    assert any("Sinal/adiantamento" in t for t in textos)
+    tabelas = dlg.findChildren(QTableWidget)
+    assert len(tabelas) == 3  # itens, pagamentos, lançamentos
+    assert tabelas[1].rowCount() == 2
+    assert "PIX" in tabelas[1].item(1, 0).text()
+    assert "Adiantamento" in tabelas[2].item(0, 0).text()
+    assert "Ana" in tabelas[2].item(0, 5).text()
+
+
 # --- M0 (PRD v3.0 §2): PDV não opera com caixa fechado ------------------------
 
 

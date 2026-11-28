@@ -39,7 +39,12 @@ from printgest.ui.formulario import (
 )
 from printgest.ui.paginador import LOTE, Paginador
 from printgest.ui.tabela import TabelaDensa
-from printgest.ui.widgets import ElideLabel, FlowLayout, botao_com_atalho
+from printgest.ui.widgets import (
+    ConteudoRolavel,
+    ElideLabel,
+    FlowLayout,
+    botao_com_atalho,
+)
 
 
 class PaginaCrud(QWidget):
@@ -238,11 +243,13 @@ class PaginaCrud(QWidget):
         return divisor
 
     def _montar_form(self) -> None:
-        conteudo = QWidget()
+        conteudo = ConteudoRolavel()
         if not self.FORM_EM_TELA_CHEIA:
             conteudo.setMinimumWidth(460)
         self._form_grade = QVBoxLayout(conteudo)
-        self._form_grade.setContentsMargins(16, 14, 16, 14)
+        # Direita reserva a barra vertical; inferior evita que o último campo
+        # (Forma do Sinal/Desconto) cole no rodapé fixo.
+        self._form_grade.setContentsMargins(16, 14, 22, 20)
         self._form_grade.setSpacing(10)
 
         topo_form = QHBoxLayout()

@@ -161,11 +161,13 @@ class TabelaDensa(QTableWidget):
     def resizeEvent(self, evento) -> None:  # noqa: N802 (API Qt)
         super().resizeEvent(evento)
         self._vazio.setGeometry(self.viewport().rect())
+        self._vazio.raise_()  # nunca ficar atrás do editor/cartão vizinho
         self._skeleton.setGeometry(self.viewport().rect())
         self._ajustar_larguras()
 
     def _atualizar_vazio(self) -> None:
         self._vazio.setGeometry(self.viewport().rect())
+        self._vazio.raise_()
         self._vazio.setVisible(
             self.rowCount() == 0
             and bool(self._vazio.text())

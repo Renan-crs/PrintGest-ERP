@@ -9,6 +9,34 @@ de cada tag está indicado para rastreabilidade.
 
 ---
 
+## [0.5.48] - 2026-11-28 — Orçamento sem sobreposição e rastreabilidade de pagamento
+
+### Desktop
+- Editor de itens de O.S./Orçamento troca a grade rígida de 6 colunas por
+  `FlowLayout`: campos e botões quebram linha em vez de serem cortados.
+- Estado vazio da tabela com `raise_()` — a instrução "Nenhum item" não fica
+  atrás do cartão do editor.
+- Formulário rolável reserva margem para a barra vertical e folga inferior;
+  totais do rodapé usam `ElideLabel` (uma linha, com tooltip) e não espremem
+  os botões.
+- Modal de detalhes da venda mostra **natureza do pagamento**, **sinal/entrada**,
+  **saldo em aberto**, tabela de formas (split) e tabela de lançamentos com
+  descrição, quem registrou e quando.
+- Lista de O.S./Orçamentos ganha colunas Sinal e Saldo; o formulário mostra o
+  saldo registrado no servidor e a origem (Orçamento Nº ...) quando aplicável.
+
+### Backend
+- `VendaOut` passa a expor, somente em leitura, `valor_sinal`, `saldo` e
+  `lancamentos` (conta_receber da venda, filtrada por `filial_id`), além do nome
+  de quem baixou cada lançamento. Nenhuma regra de cálculo, caixa ou split
+  payment foi alterada; sem migration.
+
+### Validação
+Backend: 541 passed. Desktop: 575 passed, 4 xfailed. Mutação: 78/78 mortos
+(3 novos). Testes de regressão de layout e de rastreabilidade nos dois lados.
+
+---
+
 ## [0.5.47] - 2026-11-28 — Instalador único (Servidor/Estação no wizard)
 
 ### Instalador

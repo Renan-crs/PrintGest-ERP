@@ -11,7 +11,7 @@
 ; Powershell de build: scripts\empacotar.ps1 (sem -Modo).
 
 #ifndef VersaoApp
-  #define VersaoApp "0.5.47"
+  #define VersaoApp "0.5.48"
 #endif
 
 #define NomeApp "PrintGest ERP"

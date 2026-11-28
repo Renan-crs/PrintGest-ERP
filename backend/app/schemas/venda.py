@@ -98,6 +98,20 @@ class VendaResumoOut(BaseModel):
     por_forma: list[VendaResumoForma] = Field(default_factory=list)
 
 
+class LancamentoVendaOut(BaseModel):
+    """Lançamento financeiro vinculado à venda (conta_receber), somente leitura."""
+
+    id: int
+    descricao: str
+    valor: Decimal
+    valor_pago: Decimal
+    status: str
+    data_pagamento: date | None = None
+    usuario_baixa_id: int | None = None
+    usuario_baixa_nome: str | None = None
+    criado_em: datetime
+
+
 class VendaOut(ORMModel):
     id: int
     filial_id: int
@@ -129,3 +143,7 @@ class VendaOut(ORMModel):
     updated_at: datetime
     itens: list[VendaItemOut] = Field(default_factory=list)
     pagamentos: list[PagamentoVendaOut] = Field(default_factory=list)
+    # Rastreabilidade derivada de conta_receber (sem coluna nova, sem escrita).
+    valor_sinal: Decimal | None = None
+    saldo: Decimal | None = None
+    lancamentos: list[LancamentoVendaOut] = Field(default_factory=list)

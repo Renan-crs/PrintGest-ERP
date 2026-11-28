@@ -573,6 +573,28 @@ MUTANTES = [
         pasta="desktop",
     ),
     Mutante(
+        "saldo_de_venda_parcial_zerado",
+        "backend/app/services/venda_service.py",
+        '        dados["saldo"] = max(venda.valor_total - pago, Decimal("0.00"))',
+        '        dados["saldo"] = Decimal("0.00")',
+        "tests/test_split_pagamento.py::test_recebido_menor_que_total_expoe_saldo",
+    ),
+    Mutante(
+        "lancamentos_de_sinal_omitidos",
+        "backend/app/services/venda_service.py",
+        "            ContaReceber.venda_balcao_id == venda.id,",
+        "            ContaReceber.venda_balcao_id == -1,",
+        "tests/test_adiantamento.py::test_venda_sinal_bloqueia_e_confirmada_cria_conta",
+    ),
+    Mutante(
+        "natureza_do_pagamento_ignora_sinal",
+        "desktop/printgest/ui/modulos/venda_balcao.py",
+        '        if tem_sinal:\n            natureza = "Sinal/adiantamento recebido"',
+        '        if False:\n            natureza = "Sinal/adiantamento recebido"',
+        "tests/test_venda_balcao.py::test_detalhes_venda_explicam_sinal_saldo_e_split",
+        pasta="desktop",
+    ),
+    Mutante(
         "estacao_recebe_manifesto_de_servidor",
         "desktop/printgest/ui/tela_principal.py",
         "        if self._estacao:\n            return  # manifesto de servidor não se aplica a estações",

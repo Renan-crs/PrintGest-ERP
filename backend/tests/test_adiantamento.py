@@ -249,6 +249,14 @@ def test_venda_sinal_bloqueia_e_confirmada_cria_conta(
     assert Decimal(linhas[0][0]) == Decimal("50.00")
     assert linhas[0][1] == "paga"
 
+    detalhe = client.get(
+        f"/v1/vendas/{venda_id}", headers=auth(client, admin_token)
+    ).json()["data"]
+    assert detalhe["valor_sinal"] == "50.00", detalhe["lancamentos"]
+    assert len(detalhe["lancamentos"]) == 1
+    assert "Adiantamento" in detalhe["lancamentos"][0]["descricao"]
+    assert detalhe["lancamentos"][0]["status"] == "paga"
+
 
 def test_confirmacao_gera_movimento_de_caixa_com_caixa_aberto(
     client, admin_token, db_teste

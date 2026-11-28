@@ -47,6 +47,35 @@ def test_split_dinheiro_mais_pix(client, admin_token, caixa_admin):
         f"/v1/vendas/{dados['id']}", headers=auth(client, admin_token)
     ).json()["data"]
     assert len(detalhe["pagamentos"]) == 2
+    # Rastreabilidade: split cobre o total, então não há sinal nem saldo.
+    assert detalhe["valor_sinal"] == "0.00"
+    assert detalhe["saldo"] == "0.00"
+    assert detalhe["lancamentos"] == []
+
+
+def test_recebido_menor_que_total_expoe_saldo(client, admin_token, caixa_admin):
+    """Ex.: produto de 120 com 60 recebidos — o saldo aparece no detalhe."""
+    produto = _criar_produto(client, admin_token)
+    resp = _venda(
+        client,
+        admin_token,
+        produto["id"],
+        itens=[
+            {
+                "produto_id": produto["id"],
+                "quantidade": 1,
+                "valor_unitario": "120.00",
+            }
+        ],
+        valor_recebido="60.00",
+    )
+    assert resp.status_code == 200, resp.text
+    dados = resp.json()["data"]
+    assert dados["valor_total"] == "120.00"
+    assert dados["valor_recebido"] == "60.00"
+    assert dados["saldo"] == "60.00"
+    assert dados["valor_sinal"] == "0.00"
+    assert dados["lancamentos"] == []
 
 
 def test_split_soma_divergente_e_rejeitada(client, admin_token, caixa_admin):

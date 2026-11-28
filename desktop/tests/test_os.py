@@ -143,6 +143,17 @@ def pagina():
     return PaginaOS(api)
 
 
+def test_os_e_orcamento_mostram_sinal_e_saldo_na_lista(pagina_orcamento):
+    """Sinal previsto/recebido e saldo não podem ficar invisíveis na grade."""
+    assert "valor_sinal" in pagina_orcamento.CHAVES
+    assert "saldo" in pagina_orcamento.CHAVES
+    assert "Sinal" in pagina_orcamento.COLUNAS
+    assert "Saldo" in pagina_orcamento.COLUNAS
+    dado = {"valor_sinal": "60.00", "saldo": "140.00"}
+    assert "60,00" in pagina_orcamento._formatar_texto(dado, "valor_sinal")
+    assert "140,00" in pagina_orcamento._formatar_texto(dado, "saldo")
+
+
 @pytest.fixture
 def pagina_orcamento():
     api = Api(base_url="http://daemon.test", transport=httpx.MockTransport(_handler))

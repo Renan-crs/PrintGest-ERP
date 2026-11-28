@@ -64,6 +64,7 @@ from printgest.ui.modulos.pagina_crud import PaginaCrud
 from printgest.ui.paginador import LOTE
 from printgest.ui.tabela import TabelaDensa
 from printgest.ui.widgets import (
+    ElideLabel,
     aplicar_estilo,
     botao_com_atalho,
     estado_sucesso,
@@ -765,9 +766,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
     LUGAR_BUSCA = "Buscar por Nº da O.S. ou nome do cliente..."
     CAMPO_NOME = "cliente_nome"
     # P1#12: remove redundância O.S./Nº e acrescenta entrada + indicador de arte.
-    CHAVES = ["numero", "cliente_nome", "status", "data_emissao", "data_previsao_entrega", "valor_total", "arte_pendente"]
-    COLUNAS = ["Nº", "Cliente", "Status", "Entrada", "Prazo", "Total", "Arte"]
-    PESOS = [1, 4, 2, 2, 2, 2, 1]
+    CHAVES = ["numero", "cliente_nome", "status", "data_emissao", "data_previsao_entrega", "valor_total", "valor_sinal", "saldo", "arte_pendente"]
+    COLUNAS = ["Nº", "Cliente", "Status", "Entrada", "Prazo", "Total", "Sinal", "Saldo", "Arte"]
+    PESOS = [1, 4, 2, 2, 2, 2, 2, 2, 1]
     CHAVE_FILTRO = "status"
     # P0#2 (revisão PDV+Hist+OS): em 1024px o formulário ocupa a tela inteira.
     FORM_EM_TELA_CHEIA = True
@@ -935,6 +936,9 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             (self._telefone_cliente, self._email_cliente), contato_widget
         )
 
+        # Somente leitura: o sinal/saldo registrados vêm de conta_receber.
+        self._lbl_saldo_registrado = CampoTexto("Saldo registrado", valor="—", maximo=200)
+        self._lbl_saldo_registrado.widget.setReadOnly(True)
         financeiro = [
             self._previsao,
             self._forma,
@@ -942,6 +946,7 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             self._sinal_pct,
             self._forma_sinal,
             self._desconto,
+            self._lbl_saldo_registrado,
             self._obs,
         ]
         # Orçamento não tem "pagamento recebido": o sinal já resolve a exigência.
@@ -1068,10 +1073,11 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
 
     def _rodape_pos_acoes(self, layout: QHBoxLayout) -> None:
         # P0#2 (refino): totais fixos no rodapé do formulário.
-        self._lbl_totais_os = QLabel("Itens (0): R$ 0,00 · Desconto: R$ 0,00 · TOTAL: R$ 0,00")
+        # ElideLabel em vez de QLabel com wordWrap: em painel estreito o texto
+        # quebrava em várias linhas e crescia o rodapé, cortando os campos.
+        self._lbl_totais_os = ElideLabel("Itens (0): R$ 0,00 · Desconto: R$ 0,00 · TOTAL: R$ 0,00")
         self._lbl_totais_os.setObjectName("resumoFinanceiro")
         estado_muted(self._lbl_totais_os)
-        self._lbl_totais_os.setWordWrap(True)
         self._lbl_totais_os.setToolTip(
             "Resumo financeiro: itens, desconto, total e (quando aplicável) sinal/saldo"
         )
@@ -1135,6 +1141,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
         if hasattr(self, "_forma_sinal"):
             self._forma_sinal.definir(None)
         self._pagamento_confirmado.definir(False)
+        if hasattr(self, "_lbl_saldo_registrado"):
+            self._lbl_saldo_registrado.definir("—")
         # P1#9: previsão com data/hora padrão.
         self._previsao.definir(datetime.now().replace(hour=9, minute=0, second=0, microsecond=0))
         # P1#11: padrões vendedor/atendente pelo usuário logado (quando houver correspondência).
@@ -1259,6 +1267,8 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             return rotulos.get(valor, valor.replace("_", " ").strip().capitalize() or "")
         if chave == "valor_total":
             return formatar_moeda(dado.get("valor_total"))
+        if chave in ("valor_sinal", "saldo"):
+            return formatar_moeda(dado.get(chave)) if dado.get(chave) is not None else "—"
         if chave == "data_previsao_entrega":
             from datetime import date
 
@@ -1304,6 +1314,15 @@ class PaginaOS(CondicaoPagamentoCliente, PaginaCrud):
             self._aplicar_padrao_usuario()
 
     def _preencher_campos(self, dado: dict) -> None:
+        saldo_registrado = dado.get("saldo")
+        origem = dado.get("orcamento_origem_id")
+        self._lbl_saldo_registrado.definir(
+            (
+                formatar_moeda(saldo_registrado)
+                if saldo_registrado is not None else "—"
+            )
+            + (f" · Origem: Orçamento Nº {origem}" if origem else "")
+        )
         cid = dado.get("cliente_id")
         if cid is not None:
             self._cliente.definir(cid)

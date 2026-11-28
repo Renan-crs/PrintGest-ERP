@@ -1772,10 +1772,28 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
     def _mostrar_dialogo_detalhes(self, venda: dict) -> None:
         dlg = QDialog(self)
         dlg.setWindowTitle(f"Venda Nº {venda.get('numero', '')}")
-        dlg.resize(760, 520)
+        dlg.resize(840, 700)
         layout = QVBoxLayout(dlg)
 
         grade = QGridLayout()
+        pagamentos = venda.get("pagamentos") or []
+        lancamentos = venda.get("lancamentos") or []
+        valor_sinal = venda.get("valor_sinal")
+        saldo = venda.get("saldo")
+
+        tem_sinal = any(
+            "adiantamento" in (l.get("descricao") or "").lower()
+            for l in lancamentos
+        ) or (valor_sinal is not None and _dec(valor_sinal) > 0)
+        if tem_sinal:
+            natureza = "Sinal/adiantamento recebido"
+        elif len(pagamentos) > 1:
+            natureza = "Split payment (múltiplas formas)"
+        elif saldo is not None and _dec(saldo) > 0:
+            natureza = "Pagamento parcial — saldo em aberto"
+        else:
+            natureza = "Pagamento integral"
+
         campos = [
             ("Data", formatar_data_iso(venda.get("data_venda"))),
             ("Cliente", venda.get("cliente_nome") or "Consumidor final"),
@@ -1789,6 +1807,9 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
             ("Total", formatar_moeda(venda.get("valor_total"))),
             ("Valor recebido", formatar_moeda(venda.get("valor_recebido")) if venda.get("valor_recebido") is not None else "—"),
             ("Troco", formatar_moeda(venda.get("troco")) if venda.get("troco") is not None else "—"),
+            ("Natureza do pagamento", natureza),
+            ("Sinal/entrada", formatar_moeda(valor_sinal) if valor_sinal is not None else "—"),
+            ("Saldo em aberto", formatar_moeda(saldo) if saldo is not None else "—"),
             ("Documento fiscal", (
                 f"NFC-e Nº {venda.get('documento_fiscal_id')}"
                 if venda.get("documento_fiscal_id") else "—"
@@ -1850,6 +1871,70 @@ class PaginaVendaBalcao(CondicaoPagamentoCliente, QWidget):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 tabela.setItem(r, c, item)
         layout.addWidget(tabela, 1)
+
+        def tabela_detalhe(rotulo: str, colunas: list[str], linhas: list[tuple]) -> None:
+            layout.addWidget(QLabel(f"<b>{rotulo}</b>"))
+            extra = QTableWidget(0, len(colunas))
+            extra.setHorizontalHeaderLabels(colunas)
+            extra.verticalHeader().setVisible(False)
+            extra.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            extra.setMaximumHeight(96)
+            cab_extra = extra.horizontalHeader()
+            cab_extra.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            for col in range(1, len(colunas)):
+                cab_extra.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+            extra.setRowCount(len(linhas))
+            for r, linha in enumerate(linhas):
+                for c, texto in enumerate(linha):
+                    extra.setItem(r, c, QTableWidgetItem(str(texto)))
+            layout.addWidget(extra)
+
+        # Formas de pagamento (split): antes os R$ 60 de uma venda de R$ 120
+        # apareciam sem explicação — a segunda perna ficava escondida aqui.
+        linhas_pagamentos = [
+            (
+                _ROTULO_PAGAMENTO.get(
+                    str(p.get("forma_pagamento") or ""),
+                    str(p.get("forma_pagamento") or ""),
+                ),
+                formatar_moeda(p.get("valor")),
+                (
+                    formatar_moeda(p.get("valor_recebido"))
+                    if p.get("valor_recebido") is not None else "—"
+                ),
+                (
+                    formatar_moeda(p.get("troco"))
+                    if p.get("troco") is not None else "—"
+                ),
+                str(p.get("parcelas") or 1),
+            )
+            for p in pagamentos
+        ] or [("Forma principal (sem split)", "—", "—", "—", "—")]
+        tabela_detalhe(
+            "Formas de pagamento",
+            ["Forma", "Valor da forma", "Recebido", "Troco", "Parcelas"],
+            linhas_pagamentos,
+        )
+
+        # Lançamentos: origem do sinal e do saldo, com quem registrou e quando.
+        linhas_lancamentos = [
+            (
+                l.get("descricao") or "—",
+                formatar_moeda(l.get("valor")),
+                formatar_moeda(l.get("valor_pago")),
+                str(l.get("status") or "—"),
+                str(l.get("data_pagamento") or "—"),
+                l.get("usuario_baixa_nome")
+                or (str(l.get("usuario_baixa_id")) if l.get("usuario_baixa_id") else "—"),
+                str(l.get("criado_em") or "")[:16].replace("T", " "),
+            )
+            for l in lancamentos
+        ] or [("Nenhum lançamento vinculado", "—", "—", "—", "—", "—", "—")]
+        tabela_detalhe(
+            "Lançamentos (sinal / saldo a receber)",
+            ["Descrição", "Valor", "Pago", "Status", "Dt. pagto", "Registrado por", "Criado em"],
+            linhas_lancamentos,
+        )
 
         btn = QPushButton("Fechar")
         btn.clicked.connect(dlg.accept)

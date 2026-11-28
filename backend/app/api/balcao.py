@@ -27,8 +27,8 @@ router = APIRouter(
 )
 
 
-def _para_out(venda: VendaBalcao) -> VendaOut:
-    return venda_service._para_out(venda)
+def _para_out(venda: VendaBalcao, db=None) -> VendaOut:
+    return venda_service._para_out(venda, db)
 
 
 @router.get("")
@@ -113,7 +113,9 @@ def resumo(
 @router.get("/{venda_id}")
 def buscar(venda_id: int, db: DbDep, filial: FilialDep) -> ItemResponse[VendaOut]:
     return ItemResponse(
-        data=_para_out(venda_service.buscar(db, filial_id=filial, venda_id=venda_id))
+        data=_para_out(
+            venda_service.buscar(db, filial_id=filial, venda_id=venda_id), db
+        )
     )
 
 
